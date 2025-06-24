@@ -136,7 +136,6 @@ const UserPage = () => {
               {user.role}
             </div>
             <div className="mt-4">
-              <div className="text-primary-300">id: {user.userId}</div>
               <div className="text-primary-300">name: {user.username}</div>
               <div className="text-primary-300">email: {user.email}</div>
             </div>

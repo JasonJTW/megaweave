@@ -27,8 +27,14 @@ export default function Signin() {
   //* Google Sign in
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
     console.log("Credential Response:", credentialResponse);
+
+    /// clear previous errors
+    setSigninError(null);
+    setLoading(true);
+
     if (!credentialResponse.credential) {
       setSigninError("Google sign in failed. Please try again.");
+      setLoading(false);
       return;
     }
 
@@ -40,21 +46,25 @@ export default function Signin() {
         credentials: "include",
       });
 
-      if (!response.ok) {
-        const errorMessage = await response.json();
-        console.error("Google sign in failed:", errorMessage.errorMessage);
-        setSigninError(errorMessage.errorMessage || "Google sign in failed");
-      }
       const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Google sign in failed:", data.errorMessage);
+        setSigninError(data.errorMessage || "Google sign in failed");
+        return;
+      }
+
       console.log("Google sign in response data:", data);
-      setLoading(true);
       router.push("/user");
     } catch (error) {
       console.error("Error during Google sign in:", error);
       setSigninError(
-        error instanceof Error ? error.message : "An unexpected error occurred"
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred during Google sign in"
       );
-      return;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -148,19 +158,36 @@ export default function Signin() {
   }, []);
 
   const handleFacebookLogin = () => {
-    if (!isFBReady || !window.FB) return;
+    if (!isFBReady || !window.FB) {
+      setSigninError("Facebook SDK is not ready. Please try again.");
+      return;
+    }
+
+    /// clear previous errors
+    setSigninError(null);
+    setLoading(true);
 
     window.FB.login(
       (response: fb.StatusResponse) => {
-        const accessToken = response.authResponse?.accessToken;
+        if (response.status === "connected") {
+          const accessToken = response.authResponse?.accessToken;
 
-        if (!accessToken) {
-          console.error("Facebook login failed or no access token received");
-          return;
+          if (!accessToken) {
+            console.error("Facebook login failed or no access token received");
+            setSigninError("Facebook login failed: No access token received");
+            setLoading(false);
+            return;
+          }
+
+          console.log("Facebook login successful:", response.authResponse);
+          sendToYourBackend(accessToken);
+        } else if (response.status === "not_authorized") {
+          setSigninError("Facebook login failed: App not authorized");
+          setLoading(false);
+        } else {
+          setSigninError("Facebook login was cancelled or failed");
+          setLoading(false);
         }
-
-        console.log("Facebook login successful:", response.authResponse);
-        sendToYourBackend(accessToken);
       },
       { scope: "email,public_profile" }
     );
@@ -168,19 +195,34 @@ export default function Signin() {
 
   const sendToYourBackend = async (accessToken: string) => {
     try {
-      const response = await fetch("/api/auth/facebook", {
+      const response = await fetch(`${hostName}/api/signin/facebook`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ accessToken }),
+        credentials: "include",
       });
 
       const data = await response.json();
-      console.log("Backend response:", data);
-      // 處理登入成功邏輯
+
+      if (!response.ok) {
+        console.error("Facebook backend signin failed:", data.errorMessage);
+        setSigninError(data.errorMessage || "Facebook sign in failed");
+        return;
+      }
+
+      console.log("Facebook backend response:", data);
+      router.push("/user");
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error sending Facebook token to backend:", error);
+      setSigninError(
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred during Facebook sign in"
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -302,7 +344,7 @@ export default function Signin() {
               <Button
                 className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
                 onClick={handleFacebookLogin}
-                disabled={!isFBReady}
+                disabled={!isFBReady || loading}
               >
                 <svg
                   role="img"
@@ -316,6 +358,7 @@ export default function Signin() {
               </Button>
               <Button
                 className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
                     "hidden-google-signin"
@@ -347,6 +390,8 @@ export default function Signin() {
                   onSuccess={handleGoogleSignin}
                   onError={() => {
                     console.log("Signin with google Failed");
+                    setSigninError("Google sign in failed. Please try again.");
+                    setLoading(false);
                   }}
                 />
               </div>

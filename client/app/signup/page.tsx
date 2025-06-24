@@ -10,9 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeClosed } from "lucide-react";
 import { siGithub, siGoogle } from "simple-icons";
+import { useRouter } from "next/navigation";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
 export default function Signup() {
+  const router = useRouter();
   const [username, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,9 +60,8 @@ export default function Signup() {
 
       /// Add a 5-second delay to inspect the button text
       // await new Promise((resolve) => setTimeout(resolve, 300));
-      alert(
-        `Sign in success!, ${username}, ${password}, ${email}, ${hostName}`
-      );
+      alert(`Welcome to MegaWeave🥳🎉! ${username}`);
+      router.push("/user");
     } catch (error) {
       console.log(error);
       setSignupError(

@@ -446,7 +446,7 @@ export default function PostsGrid() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
-  const handleLike = (postId) => {
+  const handleLike = (postId: string | number) => {
     setLikedPosts((prev) => {
       const newLiked = new Set(prev);
       if (newLiked.has(postId)) {

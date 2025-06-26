@@ -2,15 +2,6 @@ import type { NextConfig } from "next";
 import fs from "fs";
 import path from "path";
 
-console.log(
-  "Loading key from:",
-  path.join(__dirname, "../server/cert", "key.pem")
-);
-console.log(
-  "Loading cert from:",
-  path.join(__dirname, "../server/cert", "cert.pem")
-);
-
 const nextConfig: NextConfig = {
   /* config options here */
   serverRuntimeConfig: {

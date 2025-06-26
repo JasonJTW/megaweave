@@ -14,11 +14,20 @@ console.log(
 const nextConfig: NextConfig = {
   /* config options here */
   serverRuntimeConfig: {
-    https: {
-      key: fs.readFileSync(path.join(__dirname, "../server/cert", "myCA.key")),
-      cert: fs.readFileSync(path.join(__dirname, "../server/cert", "myCA.pem")),
-      passphrase: "jgh0965102587", // 替換為你的密碼
-    },
+    ...(process.env.NODE_ENV === "development" &&
+    process.env.USE_HTTPS === "true"
+      ? {
+          https: {
+            key: fs.readFileSync(
+              path.join(__dirname, "../server/cert", "myCA.key")
+            ),
+            cert: fs.readFileSync(
+              path.join(__dirname, "../server/cert", "myCA.pem")
+            ),
+            passphrase: "jgh0965102587", // 替換為你的密碼
+          },
+        }
+      : {}),
   },
 };
 

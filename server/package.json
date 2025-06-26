@@ -4,7 +4,8 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc --build",
+    "build": "dotenv -e .env.production -- tsc --build",
+    "build:dev": "dotenv -e .env.development -- tsc --build",
     "start": "node ./dist/server.js",
     "dev": "dotenv -e .env.development -- nodemon ./src/server.ts"
   },
@@ -15,6 +16,7 @@
     "@redis/client": "^5.1.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv-cli": "^8.0.0",
     "express": "^4.21.2",
     "google-auth-library": "^10.1.0",
     "mysql2": "^3.14.0"
@@ -24,7 +26,6 @@
     "@types/cors": "^2.8.18",
     "@types/express": "^4.17.21",
     "@types/mysql": "^2.15.27",
-    "dotenv-cli": "^8.0.0",
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"

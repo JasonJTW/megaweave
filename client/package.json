@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --experimental-https",
-    "build": "next build",
+    "dev": " dotenv -e .env.development -- next dev --turbopack --experimental-https",
+    "build": "dotenv -e .env.production -- next build",
+    "build:dev": "dotenv -e .env.development --next build",
     "start": "next start",
     "lint": "next lint"
   },
@@ -15,6 +16,7 @@
     "@react-oauth/google": "^0.12.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv-cli": "^8.0.0",
     "framer-motion": "^12.6.3",
     "lucide-react": "^0.487.0",
     "next": "^15.2.5",

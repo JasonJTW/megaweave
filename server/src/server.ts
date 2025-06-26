@@ -52,7 +52,7 @@ if (ENABLE_HTTPS) {
     console.log(`Secure server listening on port ${PORT}`);
   });
 } else {
-  app.listen(PORT, HOSTNAME, () => {
+  app.listen(PORT, () => {
     console.log(`Server listening on Port ${PORT}`);
   });
 }

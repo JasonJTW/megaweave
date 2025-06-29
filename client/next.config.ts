@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
             cert: fs.readFileSync(
               path.join(__dirname, "../server/cert", "myCA.pem")
             ),
-            passphrase: "jgh0965102587", // 替換為你的密碼
+            passphrase: "jgh0965102587", // password for https key
           },
         }
       : {}),

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import {
   ArrowRight,
@@ -12,7 +13,7 @@ import {
   Share2,
   ChevronDown,
   Github,
-  Twitter,
+  Facebook,
   Mail,
 } from "lucide-react";
 
@@ -133,9 +134,12 @@ const MegaweaveLanding = () => {
             Community
           </a>
         </div>
-        <button className="px-6 py-2 rounded-full font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 bg-megaweave-sand text-megaweave-forest-dark">
+        <Link
+          href="/signup"
+          className="px-6 py-2 rounded-full font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 bg-megaweave-sand text-megaweave-forest-dark"
+        >
           Join Now
-        </button>
+        </Link>
       </nav>
 
       {/* Hero Section */}
@@ -170,9 +174,12 @@ const MegaweaveLanding = () => {
               <span>Start Sharing</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            <button className="px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 backdrop-blur-sm border-2 border-megaweave-gold-light text-megaweave-cream hover:bg-megaweave-gold-light/10">
+            <Link
+              href="/posts"
+              className="px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 backdrop-blur-sm border-2 border-megaweave-gold-light text-megaweave-cream hover:bg-megaweave-gold-light/10"
+            >
               Explore Resources
-            </button>
+            </Link>
           </div>
 
           {/* Stats */}
@@ -385,8 +392,16 @@ const MegaweaveLanding = () => {
             </div>
 
             <div className="flex space-x-6">
-              <Github className="w-6 h-6 cursor-pointer transition-colors text-megaweave-stone hover:text-megaweave-gold-light" />
-              <Twitter className="w-6 h-6 cursor-pointer transition-colors text-megaweave-stone hover:text-megaweave-gold-light" />
+              <Facebook
+                className="w-6 h-6 cursor-pointer transition-colors text-megaweave-stone hover:text-megaweave-gold-light"
+                onClick={() =>
+                  window.open(
+                    "https://www.facebook.com/groups/1596603907320118/?locale=zh_TW",
+                    "_blank"
+                  )
+                }
+              />
+
               <Mail className="w-6 h-6 cursor-pointer transition-colors text-megaweave-stone hover:text-megaweave-gold-light" />
             </div>
           </div>

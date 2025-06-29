@@ -12,7 +12,6 @@ import {
   MessageCircle,
   Share2,
   ChevronDown,
-  Github,
   Facebook,
   Mail,
 } from "lucide-react";

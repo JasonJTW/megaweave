@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import { useEffect } from "react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeClosed } from "lucide-react";
-import { siGithub, siGoogle } from "simple-icons";
+import { siFacebook, siGoogle } from "simple-icons";
 import { useRouter } from "next/navigation";
+import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 export default function Signup() {
   const router = useRouter();
@@ -21,6 +23,94 @@ export default function Signup() {
   const [rememberMe, setRememberMe] = useState(false);
   const [signupError, setSignupError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isFBReady, setIsFBReady] = useState(false);
+  const sendToYourBackend = async (accessToken: string) => {
+    try {
+      const response = await fetch(`${hostName}/api/signin/facebook`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ accessToken }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Facebook backend signin failed:", data.errorMessage);
+        setSignupError(data.errorMessage || "Facebook sign in failed");
+        return;
+      }
+
+      console.log("Facebook backend response:", data);
+      router.push("/user");
+    } catch (error) {
+      console.error("Error sending Facebook token to backend:", error);
+      setSignupError(
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred during Facebook sign in"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
+    console.log("Credential Response:", credentialResponse);
+
+    /// clear previous errors
+    setSignupError(null);
+    setLoading(true);
+
+    if (!credentialResponse.credential) {
+      setSignupError("Google sign in failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${hostName}/api/signin/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Google sign in failed:", data.errorMessage);
+        setSignupError(data.errorMessage || "Google sign in failed");
+        return;
+      }
+
+      console.log("Google sign in response data:", data);
+      router.push("/user");
+    } catch (error) {
+      console.error("Error during Google sign in:", error);
+      setSignupError(
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred during Google sign in"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Check if Facebook SDK is loaded
+    const checkFBReady = () => {
+      if (window.FB) {
+        setIsFBReady(true);
+      } else {
+        setTimeout(checkFBReady, 100);
+      }
+    };
+    checkFBReady();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +160,42 @@ export default function Signup() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFacebookLogin = () => {
+    if (!isFBReady || !window.FB) {
+      setSignupError("Facebook SDK is not ready. Please try again.");
+      return;
+    }
+
+    /// clear previous errors
+    setSignupError(null);
+    setLoading(true);
+
+    window.FB.login(
+      (response: fb.StatusResponse) => {
+        if (response.status === "connected") {
+          const accessToken = response.authResponse?.accessToken;
+
+          if (!accessToken) {
+            console.error("Facebook login failed or no access token received");
+            setSignupError("Facebook login failed: No access token received");
+            setLoading(false);
+            return;
+          }
+
+          console.log("Facebook login successful:", response.authResponse);
+          sendToYourBackend(accessToken);
+        } else if (response.status === "not_authorized") {
+          setSignupError("Facebook login failed: App not authorized");
+          setLoading(false);
+        } else {
+          setSignupError("Facebook login was cancelled or failed");
+          setLoading(false);
+        }
+      },
+      { scope: "email,public_profile" }
+    );
   };
 
   return (
@@ -202,18 +328,38 @@ export default function Signup() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Button className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200">
+              <Button
+                className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                onClick={handleFacebookLogin}
+                disabled={!isFBReady || loading}
+              >
                 <svg
                   role="img"
                   viewBox="0 0 24 24"
                   className="w-5 h-5 mr-2"
                   fill="currentColor"
                 >
-                  <path d={siGithub.path} />
+                  <path d={siFacebook.path} />
                 </svg>
-                Github
+                {isFBReady ? "Facebook" : "Loading Facebook..."}
               </Button>
-              <Button className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200">
+              <Button
+                className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                disabled={loading}
+                onClick={() => {
+                  const container = document.getElementById(
+                    "hidden-google-signin"
+                  );
+                  const googleButton =
+                    container?.querySelector('[role="button"]');
+
+                  if (googleButton) {
+                    (googleButton as HTMLElement).click();
+                  } else {
+                    console.log("Google button not found");
+                  }
+                }}
+              >
                 <svg
                   role="img"
                   viewBox="0 0 24 24"
@@ -224,6 +370,18 @@ export default function Signup() {
                 </svg>
                 Google
               </Button>
+
+              <div className="hidden">
+                <GoogleLogin
+                  containerProps={{ id: "hidden-google-signin" }}
+                  onSuccess={handleGoogleSignin}
+                  onError={() => {
+                    console.log("Signin with google Failed");
+                    setSignupError("Google sign in failed. Please try again.");
+                    setLoading(false);
+                  }}
+                />
+              </div>
             </div>
             <div className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}

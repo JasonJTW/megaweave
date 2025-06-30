@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import {
   ArrowRight,
@@ -106,9 +107,13 @@ const MegaweaveLanding = () => {
       {/* Navigation */}
       <nav className="relative z-10 p-6 flex justify-between items-center backdrop-blur-sm">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg bg-megaweave-primary">
-            <div className="w-6 h-6 rounded-sm opacity-90 bg-megaweave-cream"></div>
-          </div>
+          <Image
+            src="/favicon.ico"
+            alt="MegaWeave"
+            width={32}
+            height={32}
+            className="rounded-sm"
+          />
           <span className="text-2xl font-bold bg-gradient-to-r from-megaweave-gold-light to-megaweave-gold bg-clip-text text-transparent">
             MegaWeave
           </span>

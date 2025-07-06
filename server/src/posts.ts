@@ -1,3 +1,5 @@
+//* posts.ts
+
 import express from "express";
 import { Request, Response, Router } from "express";
 import mysql, { ResultSetHeader, RowDataPacket } from "mysql2";
@@ -12,6 +14,10 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import dotenv from "dotenv";
+import { requireAuth } from "./middleware/auth";
+import { getUserSessionFromRedis } from "./session";
+import { uploadImages, insertImages } from "./upload";
+import { deleteS3Files } from "./upload";
 dotenv.config();
 
 const router = Router();
@@ -82,90 +88,9 @@ type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
 //   return originalUrl.replace(/(\.[^.]+)$/, '_thumb$1');
 // }
 
-/// insert images info into database
-async function insertImages(
-  postId: number,
-  files: Express.MulterS3.File[]
-): Promise<void> {
-  if (!files || files.length === 0) return;
-
-  const imageInsertQuery = `
-    INSERT INTO images (post_id, image_url, thumbnail_url, alt_text, created_at) 
-    VALUES ?
-  `;
-
-  const imageValues = files.map((file) => [
-    postId,
-    file.location,
-    // generateThumbnailUrl(file.location),
-    `Image for post ${postId}`,
-    new Date(),
-  ]);
-
-  await dbPool.query(imageInsertQuery, [imageValues]);
-}
-
 // 擴展 Request 接口
 interface AuthenticatedRequest extends Request {
   user?: UserSession;
-}
-
-// 從 Redis 獲取用戶 session
-async function getUserSessionFromRedis(
-  sessionId: string
-): Promise<UserSession | null> {
-  try {
-    await connectRedis();
-    const rawUser = await redisClient.get(`${REDIS_SESSION_KEY}:${sessionId}`);
-
-    if (!rawUser) {
-      return null;
-    }
-
-    const parsedUser = JSON.parse(rawUser);
-    const sessionSchema = z.object({
-      userId: z.string(),
-      role: z.enum(userRoles),
-      username: z.string().min(3),
-      email: z.string().email(),
-      provider: z.string().optional(),
-    });
-
-    const { success, data: user } = sessionSchema.safeParse(parsedUser);
-    return success ? user : null;
-  } catch (error) {
-    console.error("Error retrieving user session from Redis:", error);
-    return null;
-  }
-}
-
-// 驗證用戶是否已登入 (中間件)
-async function requireAuth(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: express.NextFunction
-) {
-  const sessionId = req.cookies[COOKIE_SESSION_KEY];
-
-  if (!sessionId) {
-    return res.status(401).json({ errorMessage: "Authentication required" });
-  }
-
-  try {
-    const user = await getUserSessionFromRedis(sessionId);
-
-    if (!user) {
-      return res
-        .status(401)
-        .json({ errorMessage: "Session expired or invalid" });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    console.error("Authentication error:", error);
-    return res.status(401).json({ errorMessage: "Authentication failed" });
-  }
 }
 
 // 驗證分類是否存在
@@ -180,7 +105,7 @@ router.post(
   "/",
   requireAuth,
   //* upload image limit
-  upload.array("images", parseInt(UPLOAD_IMAGE_LIMIT!)),
+  uploadImages,
   async (req: AuthenticatedRequest, res: Response) => {
     console.log("API create post called");
 
@@ -253,20 +178,7 @@ router.post(
 
       // 5. 插入圖片記錄
       if (files && files.length > 0) {
-        const imageInsertQuery = `
-        INSERT INTO images (post_id, image_url, thumbnail_url, alt_text, created_at) 
-        VALUES ?
-      `;
-
-        const imageValues = files.map((file) => [
-          postId,
-          file.location,
-          // generateThumbnailUrl(file.location),
-          `Image for ${validationResult!.title}`,
-          new Date(),
-        ]);
-
-        await connection.query(imageInsertQuery, [imageValues]);
+        await insertImages(connection, postId, files);
       }
 
       // 6. 提交事務
@@ -300,8 +212,15 @@ router.post(
       if (connection) {
         await connection.rollback();
       }
-
-      console.error("Create post error:", error);
+      if (files && files.length > 0) {
+        const fileUrls = files.map((file) => file.location);
+        try {
+          await deleteS3Files(fileUrls);
+        } catch (s3Error) {
+          console.error("Failed to cleanup S3 files:", s3Error);
+        }
+      }
+      console.error("⚠️Create post error:", error);
       return res.status(500).json({ errorMessage: "Internal server error" });
     } finally {
       if (connection) {

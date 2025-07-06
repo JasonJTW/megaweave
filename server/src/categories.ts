@@ -1,3 +1,4 @@
+//* categories.ts
 import { Request, Response, Router } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";

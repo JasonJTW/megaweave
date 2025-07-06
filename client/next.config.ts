@@ -4,6 +4,16 @@ import path from "path";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "megaweave-assets.s3.ap-east-2.amazonaws.com",
+        port: "",
+        pathname: "/**",
+      },
+    ],
+  },
   serverRuntimeConfig: {
     ...(process.env.NODE_ENV === "development" &&
     process.env.USE_HTTPS === "true"

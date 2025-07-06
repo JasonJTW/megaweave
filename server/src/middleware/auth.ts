@@ -1,4 +1,4 @@
-// middleware/auth.ts
+//* middleware/auth.ts
 import { Request, Response, NextFunction } from "express";
 import { UserSession } from "../schema";
 import { getUserFromCookie } from "../session";

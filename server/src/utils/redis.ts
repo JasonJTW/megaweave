@@ -5,6 +5,19 @@ dotenv.config();
 //* Create a static Redis client instance
 const redisClient = createClient({
   url: process.env.REDIS_URL,
+  socket: {
+    keepAlive: true,
+    reconnectStrategy: (retries) => {
+      if (retries > 10) {
+        console.error("Redis connection failed after 10 retries");
+        return new Error("Redis connection failed");
+      }
+      return Math.min(retries * 100, 3000); // 重連間隔，最長 3 秒
+    },
+    connectTimeout: 10000, // 10 秒連接超時
+  },
+  // 添加命令超時配置到根級別
+  commandsQueueMaxLength: 100,
 });
 
 redisClient.on("error", (err) => {

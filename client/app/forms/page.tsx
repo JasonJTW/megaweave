@@ -36,6 +36,25 @@ interface Post {
   thumbnail_urls?: string;
 }
 
+interface Category {
+  id: number;
+  name: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Condition {
+  id: number;
+  level: number;
+  name: string;
+  description: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 interface Pagination {
   currentPage: number;
   totalPages: number;
@@ -55,6 +74,12 @@ const PostsApp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 分類和狀況數據
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [conditions, setConditions] = useState<Condition[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [conditionsLoading, setConditionsLoading] = useState(false);
+
   // 搜索和篩選狀態
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -72,17 +97,46 @@ const PostsApp = () => {
     tags: "",
     contact: "",
     categoryId: 1,
-    conditionLevel: 5,
+    conditionLevel: 1,
   });
 
-  // 假設的分類選項
-  const categories = [
-    { id: 1, name: "電子產品" },
-    { id: 2, name: "家具" },
-    { id: 3, name: "服飾" },
-    { id: 4, name: "書籍" },
-    { id: 5, name: "其他" },
-  ];
+  // 獲取分類列表
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    try {
+      const response = await fetch(`${hostName}/api/categories`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setCategories(data.categories);
+      } else {
+        console.error("獲取分類失敗:", data.errorMessage);
+      }
+    } catch (error) {
+      console.error("獲取分類網路錯誤:", error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [hostName]);
+
+  // 獲取狀況等級列表
+  const fetchConditions = useCallback(async () => {
+    setConditionsLoading(true);
+    try {
+      const response = await fetch(`${hostName}/api/conditions`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setConditions(data.conditions);
+      } else {
+        console.error("獲取狀況等級失敗:", data.errorMessage);
+      }
+    } catch (error) {
+      console.error("獲取狀況等級網路錯誤:", error);
+    } finally {
+      setConditionsLoading(false);
+    }
+  }, [hostName]);
 
   // 使用 useCallback 來記憶化 fetchPosts 函數
   const fetchPosts = useCallback(async () => {
@@ -114,11 +168,17 @@ const PostsApp = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchTerm, selectedCategory, selectedLocation]);
+  }, [currentPage, searchTerm, selectedCategory, selectedLocation, hostName]);
 
   // 創建貼文
   const handleCreatePost = async () => {
+    if (!createFormData.title.trim() || !createFormData.content.trim()) {
+      setError("標題和內容為必填項目");
+      return;
+    }
+
     setIsCreating(true);
+    setError(null);
 
     try {
       const formData = new FormData();
@@ -149,19 +209,21 @@ const PostsApp = () => {
       if (response.ok) {
         setShowCreateForm(false);
         setSelectedImages([]);
+
+        /// Rest form data to initial state
         setCreateFormData({
           title: "",
           content: "",
           location: "",
           tags: "",
           contact: "",
-          categoryId: 1,
-          conditionLevel: 5,
+          categoryId: categories.length > 0 ? categories[0].id : 1,
+          conditionLevel: 1,
         });
         fetchPosts(); // 重新獲取貼文列表
       } else {
-        setError("創建貼文失敗");
         const errorData = await response.json();
+        setError(errorData.errorMessage || "創建貼文失敗");
         if (errorData.errorMessage) {
           console.log("error message:", errorData.errorMessage);
         }
@@ -221,8 +283,29 @@ const PostsApp = () => {
     };
     return colors[level as keyof typeof colors] || "bg-gray-100 text-gray-800";
   };
+  // 獲取狀況等級名稱
+  const getConditionName = (level: number) => {
+    const condition = conditions.find((c) => c.level === level);
+    return condition ? condition.name : `等級 ${level}`;
+  };
 
-  // 現在可以安全地將 fetchPosts 加入依賴陣列
+  // 初始化數據
+  useEffect(() => {
+    fetchCategories();
+    fetchConditions();
+  }, [fetchCategories, fetchConditions]);
+
+  // 當分類加載完成後設置默認值
+  useEffect(() => {
+    if (categories.length > 0 && createFormData.categoryId === 1) {
+      setCreateFormData((prev) => ({
+        ...prev,
+        categoryId: categories[0].id,
+      }));
+    }
+  }, [categories, createFormData.categoryId]);
+
+  // 獲取貼文
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
@@ -332,11 +415,12 @@ const PostsApp = () => {
               >
                 {/* 圖片區域 */}
                 {post.image_urls && (
-                  <div className="h-48 bg-gray-200 overflow-hidden">
+                  <div className="h-48 bg-gray-200 overflow-hidden relative">
                     <Image
                       src={post.image_urls.split(",")[0]}
                       alt={post.title}
-                      className="w-full h-full object-cover"
+                      fill
+                      className="object-cover"
                     />
                   </div>
                 )}
@@ -364,7 +448,7 @@ const PostsApp = () => {
                         post.condition_level
                       )}`}
                     >
-                      狀況 {post.condition_level}/5
+                      {getConditionName(post.condition_level)}
                     </span>
                   </div>
 
@@ -487,7 +571,7 @@ const PostsApp = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    標題
+                    標題 *
                   </label>
                   <input
                     type="text"
@@ -505,7 +589,7 @@ const PostsApp = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    內容
+                    內容 *
                   </label>
                   <textarea
                     required
@@ -524,7 +608,7 @@ const PostsApp = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      分類
+                      分類 *
                     </label>
                     <select
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -535,6 +619,7 @@ const PostsApp = () => {
                           categoryId: parseInt(e.target.value),
                         })
                       }
+                      disabled={categoriesLoading}
                     >
                       {categories.map((cat) => (
                         <option key={cat.id} value={cat.id}>
@@ -546,7 +631,7 @@ const PostsApp = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      狀況等級
+                      狀況等級 *
                     </label>
                     <select
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -557,10 +642,11 @@ const PostsApp = () => {
                           conditionLevel: parseInt(e.target.value),
                         })
                       }
+                      disabled={conditionsLoading}
                     >
-                      {[1, 2, 3, 4, 5].map((level) => (
-                        <option key={level} value={level}>
-                          等級 {level}
+                      {conditions.map((condition) => (
+                        <option key={condition.id} value={condition.level}>
+                          {condition.name} - {condition.description}
                         </option>
                       ))}
                     </select>

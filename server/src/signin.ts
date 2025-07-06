@@ -20,6 +20,33 @@ if (!GOOGLE_CLIENT_ID) {
   throw new Error("Missing required environment variable: GOOGLE_CLIENT_ID");
 }
 
+function parseProviders(providersData: any): string[] {
+  // 如果是 null 或 undefined，返回空陣列
+  if (!providersData) {
+    return [];
+  }
+
+  // 如果已經是陣列，直接返回
+  if (Array.isArray(providersData)) {
+    return providersData;
+  }
+
+  // 如果是字串，嘗試解析
+  if (typeof providersData === "string") {
+    try {
+      const parsed = JSON.parse(providersData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error("Error parsing providers JSON:", error);
+      return [];
+    }
+  }
+
+  // 其他情況返回空陣列
+  console.warn("Unexpected providers data type:", typeof providersData);
+  return [];
+}
+
 // 統一的用戶查找和更新函數
 async function findOrCreateUser(
   email: string,
@@ -42,21 +69,7 @@ async function findOrCreateUser(
     const existingUser = existingUsers[0];
 
     // 2. 用戶已存在，更新 provider 信息
-    let providers: string[] = [];
-
-    // 解析現有的 providers (現在是 JSON 格式)
-    if (existingUser.providers) {
-      try {
-        providers = JSON.parse(existingUser.providers);
-        // 確保是陣列格式
-        if (!Array.isArray(providers)) {
-          providers = [];
-        }
-      } catch (error) {
-        console.error("Error parsing providers JSON:", error);
-        providers = [];
-      }
-    }
+    let providers: string[] = parseProviders(existingUser.providers);
 
     // 添加新的 provider（如果還沒有）
     if (!providers.includes(provider)) {
@@ -166,19 +179,7 @@ router.post("/", async (req: Request, res: Response) => {
     const foundUser = rows[0];
 
     // 3. 檢查用戶是否支持 native 登入
-    let userProviders: string[] = [];
-    if (foundUser.providers) {
-      try {
-        userProviders = JSON.parse(foundUser.providers);
-        if (!Array.isArray(userProviders)) {
-          userProviders = [];
-        }
-      } catch (error) {
-        console.error("Error parsing user providers:", error);
-        userProviders = [];
-      }
-    }
-
+    const userProviders: string[] = parseProviders(foundUser.providers);
     // 檢查是否支持 native 登入
     if (
       !userProviders.includes("native") &&

@@ -6,6 +6,7 @@ import getCurrentUser from "./currentUser";
 import signoutAPI from "./signout";
 import postAPI from "./posts";
 import categoriesAPI from "./categories";
+import conditionsAPI from "./conditions";
 //* Test api
 router.post("/test", (req, res) => {
   console.log("API test called");
@@ -23,4 +24,5 @@ router.use("/currentUser", getCurrentUser);
 router.use("/signout", signoutAPI);
 router.use("/posts", postAPI);
 router.use("/categories", categoriesAPI);
+router.use("/conditions", conditionsAPI);
 export default router;

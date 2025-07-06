@@ -1,7 +1,9 @@
+//* signup.ts
 import express, { Request, Response, Router } from "express";
 import dotenv from "dotenv";
 dotenv.config();
 import { User } from "./types/user";
+import { userRoles, UserSession } from "./schema";
 import {
   UserSchema,
   SignupUserSchema,
@@ -17,12 +19,9 @@ import mysql, { OkPacketParams, ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { createUserSession } from "./session";
 import cookieParser from "cookie-parser";
-import { userRoles } from "./schema";
 
 router.post("/", async (req: Request, res: Response) => {
-  /// test dotenv
   console.log("API signup called");
-  //TODO implement signup logic
 
   //* 1. Validate the input
   const user: User = {
@@ -80,18 +79,19 @@ router.post("/", async (req: Request, res: Response) => {
   console.log("user after hashing password:", user);
   //* 4. Insert the user into the database
   try {
-    const query = `INSERT INTO users (username, email, password, salt, providers) VALUES (?, ?, ?, ?, ?)`;
+    const query = `INSERT INTO users (username, email, password, salt, providers, role) VALUES (?, ?, ?, ?, ?, ?)`;
     const [result] = await dbPool.query<ResultSetHeader>(query, [
       user.username,
       user.email,
       user.password,
       user.salt,
       JSON.stringify(["native"]),
+      userRoles[1], // default role is 'user'
     ]);
     console.log("Insert user result:", result);
 
     //* 5. create user session
-    const userSession = {
+    const userSession: UserSession = {
       userId: result.insertId.toString(),
       role: userRoles[1],
       username: user.username,
@@ -99,13 +99,16 @@ router.post("/", async (req: Request, res: Response) => {
     };
     await createUserSession(userSession, req, res);
     console.log("User session created:", userSession);
+    console.log("---------");
+    /// remove sensitive data before sending response
+    const { password, salt, ...safeUser } = user;
+    res.status(200).json({
+      message: "Signup successful!",
+      user: safeUser,
+    });
   } catch (error) {
     return handleError(error, res);
   }
-  console.log("---------");
-  res
-    .status(200)
-    .json({ message: "API signup called successfully!", user: user });
 });
 
 export default router;

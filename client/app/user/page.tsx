@@ -36,7 +36,7 @@ const UserPage = () => {
       }
       const userData = await response.json();
       console.log("Fetched User: ", userData);
-      setUser(userData);
+      setUser(userData.user);
     } catch (error) {
       console.error("Error fetching user data:", error);
       setError(

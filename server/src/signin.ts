@@ -1,3 +1,5 @@
+//* signin.ts
+
 import express from "express";
 import { Request, Response, Router } from "express";
 import mysql, { ResultSetHeader, RowDataPacket } from "mysql2";
@@ -5,9 +7,18 @@ import dbPool from "./utils/db";
 import { SigninUserSchema, SigninUserSchemaType } from "./validations";
 import { handleError } from "./utils/errorHandler";
 import { verifyPassword } from "./passwordHasher";
-import { createUserSession, UserSession } from "./session";
+import { createUserSession } from "./session";
+import { UserSession } from "./schema";
 import { OAuth2Client } from "google-auth-library";
+import dotenv from "dotenv";
+dotenv.config();
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
+
+/// env check
+if (!GOOGLE_CLIENT_ID) {
+  throw new Error("Missing required environment variable: GOOGLE_CLIENT_ID");
+}
 
 // 統一的用戶查找和更新函數
 async function findOrCreateUser(
@@ -140,7 +151,7 @@ router.post("/", async (req: Request, res: Response) => {
   }
 
   if (!validationResult) {
-    return res.status(400).json({ error: "Invalid input" });
+    return res.status(400).json({ errorMessage: "Invalid input" });
   }
 
   try {
@@ -209,20 +220,25 @@ router.post("/", async (req: Request, res: Response) => {
     res.status(200).json({ message: "Signin successful" });
   } catch (error) {
     console.error("Database error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
 
 // Google sign in
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 async function verifyGoogleCredential(credential: string) {
-  const ticket = await googleClient.verifyIdToken({
-    idToken: credential,
-    audience: GOOGLE_CLIENT_ID,
-  });
-  return ticket.getPayload();
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID,
+    });
+    return ticket.getPayload();
+  } catch (error) {
+    console.error("Google credential verification failed:", error);
+    throw new Error("Invalid Google credential");
+  }
 }
 
 router.post("/google", async (req: Request, res: Response) => {
@@ -238,6 +254,11 @@ router.post("/google", async (req: Request, res: Response) => {
 
     if (!googleUser || !googleUser.email) {
       return res.status(400).json({ errorMessage: "Invalid Google user" });
+    }
+
+    // 檢查必要的 Google 用戶資料
+    if (!googleUser.sub) {
+      return res.status(400).json({ errorMessage: "Invalid Google user ID" });
     }
 
     // 使用統一函數處理用戶
@@ -316,6 +337,11 @@ router.post("/facebook", async (req: Request, res: Response) => {
       return res.status(401).json({
         errorMessage: "Invalid Facebook token or email not provided",
       });
+    }
+
+    // 檢查必要的 Facebook 用戶資料
+    if (!facebookUser.id) {
+      return res.status(400).json({ errorMessage: "Invalid Facebook user ID" });
     }
 
     // 使用統一函數處理用戶

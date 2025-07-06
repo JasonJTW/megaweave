@@ -4,6 +4,8 @@ import signupAPI from "./signup";
 import signinAPI from "./signin";
 import getCurrentUser from "./currentUser";
 import signoutAPI from "./signout";
+import postAPI from "./posts";
+import categoriesAPI from "./categories";
 //* Test api
 router.post("/test", (req, res) => {
   console.log("API test called");
@@ -19,4 +21,6 @@ router.use("/signup", signupAPI);
 router.use("/signin", signinAPI);
 router.use("/currentUser", getCurrentUser);
 router.use("/signout", signoutAPI);
+router.use("/posts", postAPI);
+router.use("/categories", categoriesAPI);
 export default router;

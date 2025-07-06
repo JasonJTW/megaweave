@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import https from "https";
 import path from "path";
 import fs from "fs";
+import rateLimit from "express-rate-limit";
 import { disconnectRedis } from "./utils/redis";
 
 dotenv.config();
@@ -14,7 +15,20 @@ dotenv.config();
 const PORT = parseInt(process.env.PORT || "8443");
 const HOSTNAME = process.env.HOSTNAME || "localhost";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 30,
+  // Limit each IP to 100 requests per `window` (here, per 15 minutes).
+  message: {
+    errorMessage: "Too many requests from this IP, please try again later.",
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
 
+// Apply the rate limiting middleware to all requests.
+app.use(express.json());
+app.use(cookieParser());
 app.use(
   cors({
     origin: "https://localhost:3000",
@@ -23,8 +37,14 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(cookieParser());
+app.use(limiter);
+app.get("/health", (req, res) => {
+  res.json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    ssl: ENABLE_HTTPS,
+  });
+});
 app.use("/api", apiRoutes);
 
 if (ENABLE_HTTPS) {

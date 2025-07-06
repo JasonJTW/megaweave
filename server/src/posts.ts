@@ -1,0 +1,454 @@
+import express from "express";
+import { Request, Response, Router } from "express";
+import mysql, { ResultSetHeader, RowDataPacket } from "mysql2";
+import dbPool from "./utils/db";
+import { handleError } from "./utils/errorHandler";
+import { UserSession } from "./schema";
+import { userRoles } from "./schema";
+import { getRedisClient, connectRedis } from "./utils/redis";
+import multer from "multer";
+import multerS3 from "multer-s3";
+import { S3Client } from "@aws-sdk/client-s3";
+import { v4 as uuidv4 } from "uuid";
+import { z } from "zod";
+import dotenv from "dotenv";
+dotenv.config();
+
+const router = Router();
+const redisClient = getRedisClient();
+const COOKIE_SESSION_KEY = process.env.COOKIE_SESSION_KEY!;
+const REDIS_SESSION_KEY = process.env.REDIS_SESSION_KEY!;
+const BUCKET_NAME = process.env.BUCKET_NAME;
+const BUCKET_REGION = process.env.BUCKET_REGION;
+const ACCESS_KEY = process.env.ACCESS_KEY;
+const SECRET_ACCESS_KEY = process.env.SECRET_ACCESS_KEY;
+const UPLOAD_IMAGE_LIMIT = process.env.UPLOAD_IMAGE_LIMIT;
+//* AWS S3 config
+const s3Client = new S3Client({
+  region: BUCKET_REGION,
+  credentials: {
+    accessKeyId: ACCESS_KEY!,
+    secretAccessKey: SECRET_ACCESS_KEY!,
+  },
+});
+
+//* Multer S3 config
+const upload = multer({
+  storage: multerS3({
+    s3: s3Client,
+    bucket: BUCKET_NAME!,
+    key: function (req, file, cb) {
+      const fileExtension = file.originalname.split(".").pop();
+      const fileName = `posts/${Date.now()}-${uuidv4()}.${fileExtension}`;
+      cb(null, fileName);
+    },
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+  }),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    /// image file filter
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"));
+    }
+  },
+});
+
+/// Post validation Schema
+const CreatePostSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  content: z
+    .string()
+    .min(1, "Content is required")
+    .max(2000, "Content too long"),
+  status: z.enum(["active", "inactive", "expired"]).default("active"),
+  location: z.string().max(100).optional(),
+  tags: z.string().max(500).optional(),
+  contact: z.string().max(200).optional(),
+  categoryId: z.number().int().positive("Invalid category ID"),
+  conditionLevel: z.number().int().min(1).max(5, "Condition level must be 1-5"),
+  expiresAt: z.string().datetime().optional(),
+});
+
+type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
+
+/// thumbnail generation
+// function generateThumbnailUrl(originalUrl: string): string {
+//   // 這裡可以實現縮圖邏輯，或使用 AWS Lambda/CloudFront 等服務
+//   // 暫時返回原圖 URL，實際應用中建議實現縮圖功能
+//   return originalUrl.replace(/(\.[^.]+)$/, '_thumb$1');
+// }
+
+/// insert images info into database
+async function insertImages(
+  postId: number,
+  files: Express.MulterS3.File[]
+): Promise<void> {
+  if (!files || files.length === 0) return;
+
+  const imageInsertQuery = `
+    INSERT INTO images (post_id, image_url, thumbnail_url, alt_text, created_at) 
+    VALUES ?
+  `;
+
+  const imageValues = files.map((file) => [
+    postId,
+    file.location,
+    // generateThumbnailUrl(file.location),
+    `Image for post ${postId}`,
+    new Date(),
+  ]);
+
+  await dbPool.query(imageInsertQuery, [imageValues]);
+}
+
+// 擴展 Request 接口
+interface AuthenticatedRequest extends Request {
+  user?: UserSession;
+}
+
+// 從 Redis 獲取用戶 session
+async function getUserSessionFromRedis(
+  sessionId: string
+): Promise<UserSession | null> {
+  try {
+    await connectRedis();
+    const rawUser = await redisClient.get(`${REDIS_SESSION_KEY}:${sessionId}`);
+
+    if (!rawUser) {
+      return null;
+    }
+
+    const parsedUser = JSON.parse(rawUser);
+    const sessionSchema = z.object({
+      userId: z.string(),
+      role: z.enum(userRoles),
+      username: z.string().min(3),
+      email: z.string().email(),
+      provider: z.string().optional(),
+    });
+
+    const { success, data: user } = sessionSchema.safeParse(parsedUser);
+    return success ? user : null;
+  } catch (error) {
+    console.error("Error retrieving user session from Redis:", error);
+    return null;
+  }
+}
+
+// 驗證用戶是否已登入 (中間件)
+async function requireAuth(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: express.NextFunction
+) {
+  const sessionId = req.cookies[COOKIE_SESSION_KEY];
+
+  if (!sessionId) {
+    return res.status(401).json({ errorMessage: "Authentication required" });
+  }
+
+  try {
+    const user = await getUserSessionFromRedis(sessionId);
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ errorMessage: "Session expired or invalid" });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Authentication error:", error);
+    return res.status(401).json({ errorMessage: "Authentication failed" });
+  }
+}
+
+// 驗證分類是否存在
+async function validateCategory(categoryId: number): Promise<boolean> {
+  const query = "SELECT id FROM categories WHERE id = ? AND status = 'active'";
+  const [rows] = await dbPool.query<RowDataPacket[]>(query, [categoryId]);
+  return rows.length > 0;
+}
+
+//* Create post API
+router.post(
+  "/",
+  requireAuth,
+  //* upload image limit
+  upload.array("images", parseInt(UPLOAD_IMAGE_LIMIT!)),
+  async (req: AuthenticatedRequest, res: Response) => {
+    console.log("API create post called");
+
+    const userId = req.user!.userId;
+    //TODO: Configure S3
+    const files = req.files as Express.MulterS3.File[];
+    // 1. 驗證輸入數據
+    let validationResult: CreatePostSchemaType | undefined;
+    try {
+      // 處理數字字段
+      const postData = {
+        ...req.body,
+        categoryId: parseInt(req.body.categoryId),
+        conditionLevel: parseInt(req.body.conditionLevel),
+      };
+
+      validationResult = CreatePostSchema.parse(postData);
+    } catch (error) {
+      console.error("Create post validation error: ", error);
+      return handleError(error, res);
+    }
+
+    if (!validationResult) {
+      return res.status(400).json({ error: "Invalid input" });
+    }
+
+    let connection;
+    try {
+      // 2. 驗證分類是否存在
+      const categoryExists = await validateCategory(
+        validationResult.categoryId
+      );
+      if (!categoryExists) {
+        return res.status(400).json({ errorMessage: "Invalid category" });
+      }
+
+      // 3. 開始數據庫事務
+      //* Use connection to ensure atomicity
+      connection = await dbPool.getConnection();
+      await connection.beginTransaction();
+
+      // 4. 插入貼文記錄
+      const postInsertQuery = `
+      INSERT INTO posts (
+        user_id, title, content, status, location, tags, contact, 
+        category_id, condition_level, expires_at, created_at, updated_at, view_count, interests_count
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
+    `;
+
+      const postValues = [
+        userId,
+        validationResult.title,
+        validationResult.content,
+        validationResult.status,
+        validationResult.location || null,
+        validationResult.tags || null,
+        validationResult.contact || null,
+        validationResult.categoryId,
+        validationResult.conditionLevel,
+        validationResult.expiresAt
+          ? new Date(validationResult.expiresAt)
+          : null,
+      ];
+
+      const [postResult] = await connection.query<ResultSetHeader>(
+        postInsertQuery,
+        postValues
+      );
+      const postId = postResult.insertId;
+
+      // 5. 插入圖片記錄
+      if (files && files.length > 0) {
+        const imageInsertQuery = `
+        INSERT INTO images (post_id, image_url, thumbnail_url, alt_text, created_at) 
+        VALUES ?
+      `;
+
+        const imageValues = files.map((file) => [
+          postId,
+          file.location,
+          // generateThumbnailUrl(file.location),
+          `Image for ${validationResult!.title}`,
+          new Date(),
+        ]);
+
+        await connection.query(imageInsertQuery, [imageValues]);
+      }
+
+      // 6. 提交事務
+      await connection.commit();
+
+      // 7. 返回創建的貼文信息
+      const getPostQuery = `
+      SELECT 
+        p.*,
+        u.username,
+        c.name as category_name,
+        GROUP_CONCAT(i.image_url) as image_urls
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN images i ON p.id = i.post_id
+      WHERE p.id = ?
+      GROUP BY p.id
+    `;
+
+      const [newPost] = await dbPool.query<RowDataPacket[]>(getPostQuery, [
+        postId,
+      ]);
+
+      res.status(201).json({
+        message: "Post created successfully",
+        post: newPost[0],
+      });
+    } catch (error) {
+      // 回滾事務
+      if (connection) {
+        await connection.rollback();
+      }
+
+      console.error("Create post error:", error);
+      return res.status(500).json({ errorMessage: "Internal server error" });
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+);
+
+// 獲取貼文列表 (帶分頁和篩選)
+router.get("/", async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const offset = (page - 1) * limit;
+
+    const category = req.query.category as string;
+    const location = req.query.location as string;
+    const status = (req.query.status as string) || "active";
+    const search = req.query.search as string;
+
+    let whereConditions = ["p.status = ?"];
+    let queryParams: any[] = [status];
+
+    if (category) {
+      whereConditions.push("c.name = ?");
+      queryParams.push(category);
+    }
+
+    if (location) {
+      whereConditions.push("p.location LIKE ?");
+      queryParams.push(`%${location}%`);
+    }
+
+    if (search) {
+      whereConditions.push(
+        "(p.title LIKE ? OR p.content LIKE ? OR p.tags LIKE ?)"
+      );
+      queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    const whereClause = whereConditions.join(" AND ");
+
+    const postsQuery = `
+      SELECT 
+        p.*,
+        u.username,
+        c.name as category_name,
+        GROUP_CONCAT(i.image_url) as image_urls,
+        GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN images i ON p.id = i.post_id
+      WHERE ${whereClause}
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    queryParams.push(limit, offset);
+
+    const [posts] = await dbPool.query<RowDataPacket[]>(
+      postsQuery,
+      queryParams
+    );
+
+    // 獲取總數
+    const countQuery = `
+      SELECT COUNT(DISTINCT p.id) as total
+      FROM posts p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE ${whereClause}
+    `;
+
+    const [countResult] = await dbPool.query<RowDataPacket[]>(
+      countQuery,
+      queryParams.slice(0, -2) // 移除 limit 和 offset
+    );
+
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    res.status(200).json({
+      posts,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: total,
+        itemsPerPage: limit,
+      },
+    });
+  } catch (error) {
+    console.error("Get posts error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
+
+// 獲取單個貼文詳情
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    const postId = parseInt(req.params.id);
+
+    if (isNaN(postId)) {
+      return res.status(400).json({ errorMessage: "Invalid post ID" });
+    }
+
+    // 更新瀏覽次數
+    await dbPool.query(
+      "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
+      [postId]
+    );
+
+    // 獲取貼文詳情
+    const postQuery = `
+      SELECT 
+        p.*,
+        u.username,
+        u.email,
+        c.name as category_name
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE p.id = ?
+    `;
+
+    const [posts] = await dbPool.query<RowDataPacket[]>(postQuery, [postId]);
+
+    if (posts.length === 0) {
+      return res.status(404).json({ errorMessage: "Post not found" });
+    }
+
+    // 獲取貼文圖片
+    const imagesQuery =
+      "SELECT * FROM images WHERE post_id = ? ORDER BY created_at";
+    const [images] = await dbPool.query<RowDataPacket[]>(imagesQuery, [postId]);
+
+    const post = {
+      ...posts[0],
+      images,
+    };
+
+    res.status(200).json({ post });
+  } catch (error) {
+    console.error("Get post error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
+
+export default router;

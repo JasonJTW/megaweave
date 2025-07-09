@@ -1,5 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+
 import {
   Search,
   Plus,
@@ -7,7 +9,7 @@ import {
   Eye,
   Heart,
   Calendar,
-  User,
+  User as UserIcon,
   Tag,
   Upload,
   X,
@@ -67,8 +69,10 @@ interface PostsResponse {
   pagination: Pagination;
 }
 
+import User from "../types/user"; // 假設你有一個 User 類型定義
 const PostsApp = () => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+  const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,6 +104,43 @@ const PostsApp = () => {
     conditionLevel: 1,
   });
 
+  const fetchUser = async () => {
+    try {
+      const response = await fetch(`${hostName}/api/currentUser`, {
+        cache: "no-store",
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorMessage = await response.json();
+        if (response.status === 401) {
+          //* User not authenticated
+          setUser(null);
+          return; // User not authenticated, no need to set error
+        } else {
+          console.error("Error fetching user data:", errorMessage.errorMessage);
+          throw new Error(` ${errorMessage.errorMessage}`);
+        }
+      }
+      const userData = await response.json();
+      console.log("Fetched User: ", userData);
+      setUser(userData.user);
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      setError(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 獲取分類列表
   const fetchCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -110,10 +151,10 @@ const PostsApp = () => {
       if (response.ok) {
         setCategories(data.categories);
       } else {
-        console.error("獲取分類失敗:", data.errorMessage);
+        console.error("Error fetching categories:", data.errorMessage);
       }
     } catch (error) {
-      console.error("獲取分類網路錯誤:", error);
+      console.error("Internal error when fetching categories", error);
     } finally {
       setCategoriesLoading(false);
     }
@@ -160,20 +201,27 @@ const PostsApp = () => {
         setPosts(data.posts);
         setPagination(data.pagination);
       } else {
-        setError("獲取貼文失敗");
+        setError("Fetch posts failed");
       }
     } catch (error) {
-      console.error("網路錯誤:", error);
-      setError("網路錯誤");
+      console.error("Internal server error:", error);
+      setError("Internal server error, please try again later.");
     } finally {
       setLoading(false);
     }
   }, [currentPage, searchTerm, selectedCategory, selectedLocation, hostName]);
 
+  const handleCreatePostButtonClick = () => {
+    if (!user) {
+      alert("Please log in to create a post.");
+      return;
+    }
+    setShowCreateForm(true);
+  };
   // 創建貼文
   const handleCreatePost = async () => {
     if (!createFormData.title.trim() || !createFormData.content.trim()) {
-      setError("標題和內容為必填項目");
+      setError("Required fields cannot be empty.");
       return;
     }
 
@@ -223,14 +271,14 @@ const PostsApp = () => {
         fetchPosts(); // 重新獲取貼文列表
       } else {
         const errorData = await response.json();
-        setError(errorData.errorMessage || "創建貼文失敗");
+        setError(errorData.errorMessage || "Failed to create post");
         if (errorData.errorMessage) {
           console.log("error message:", errorData.errorMessage);
         }
       }
     } catch (error) {
-      console.error("網路錯誤:", error);
-      setError("網路錯誤");
+      console.error("Network error:", error);
+      setError("Network error, please try again later.");
     } finally {
       setIsCreating(false);
     }
@@ -242,18 +290,18 @@ const PostsApp = () => {
 
     // 限制最多 5 張圖片
     if (selectedImages.length + files.length > 5) {
-      setError("最多只能上傳 5 張圖片");
+      setError("Limit of 5 images exceeded");
       return;
     }
 
     // 檢查文件大小和類型
     const validFiles = files.filter((file) => {
       if (file.size > 10 * 1024 * 1024) {
-        setError(`${file.name} 超過 10MB 限制`);
+        setError(`${file.name} exceeds 10MB size limit`);
         return false;
       }
       if (!file.type.startsWith("image/")) {
-        setError(`${file.name} 不是有效的圖片格式`);
+        setError(`${file.name} Not a valid image file`);
         return false;
       }
       return true;
@@ -325,14 +373,18 @@ const PostsApp = () => {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">二手商品交流</h1>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            <h1 className="text-3xl font-bold text-gray-900">Megaweave</h1>
+            <Button
+              onClick={handleCreatePostButtonClick}
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
+                user == null
+                  ? "bg-gray-400 text-gray-200 cursor-pointer hover:bg-gray-500"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
             >
               <Plus className="w-5 h-5" />
-              <span>發布貼文</span>
-            </button>
+              <span>Create new post</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -346,7 +398,7 @@ const PostsApp = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="搜索貼文..."
+                placeholder="Search..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -359,7 +411,7 @@ const PostsApp = () => {
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
-              <option value="">所有分類</option>
+              <option value="">Categories</option>
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.name}>
                   {cat.name}
@@ -372,7 +424,7 @@ const PostsApp = () => {
               <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="地點..."
+                placeholder="Location..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
@@ -389,7 +441,7 @@ const PostsApp = () => {
               }}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
             >
-              重置篩選
+              Resets
             </button>
           </div>
         </div>
@@ -479,7 +531,7 @@ const PostsApp = () => {
                   {/* 底部信息 */}
                   <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t">
                     <div className="flex items-center">
-                      <User className="w-3 h-3 mr-1" />
+                      <UserIcon className="w-3 h-3 mr-1" />
                       <span>{post.username}</span>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -508,7 +560,7 @@ const PostsApp = () => {
                 disabled={currentPage === 1}
                 className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >
-                上一頁
+                previous page
               </button>
 
               {Array.from(
@@ -533,7 +585,7 @@ const PostsApp = () => {
                 disabled={currentPage === pagination.totalPages}
                 className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
               >
-                下一頁
+                next page
               </button>
             </div>
           </div>
@@ -546,12 +598,14 @@ const PostsApp = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">發布新貼文</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Create new post
+                </h2>
                 <button
                   onClick={() => setShowCreateForm(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <span className="sr-only">關閉</span>
+                  <span className="sr-only">Close</span>
                   <svg
                     className="w-6 h-6"
                     fill="none"
@@ -571,7 +625,7 @@ const PostsApp = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    標題 *
+                    Title *
                   </label>
                   <input
                     type="text"
@@ -589,7 +643,7 @@ const PostsApp = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    內容 *
+                    Content *
                   </label>
                   <textarea
                     required
@@ -608,7 +662,7 @@ const PostsApp = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      分類 *
+                      Category *
                     </label>
                     <select
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -631,7 +685,7 @@ const PostsApp = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      狀況等級 *
+                      Condition *
                     </label>
                     <select
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -655,7 +709,7 @@ const PostsApp = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    地點
+                    Location
                   </label>
                   <input
                     type="text"
@@ -672,11 +726,11 @@ const PostsApp = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    標籤
+                    tags
                   </label>
                   <input
                     type="text"
-                    placeholder="用逗號分隔多個標籤"
+                    placeholder="separate tags with commas"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={createFormData.tags}
                     onChange={(e) =>
@@ -708,7 +762,7 @@ const PostsApp = () => {
                 {/* 圖片上傳區域 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    商品圖片 ({selectedImages.length}/5)
+                    item image ({selectedImages.length}/5)
                   </label>
 
                   {/* 圖片上傳按鈕 */}
@@ -734,7 +788,7 @@ const PostsApp = () => {
                       選擇圖片
                     </label>
                     <p className="text-xs text-gray-500 mt-1">
-                      支持 JPG、PNG 等格式，單張圖片最大 10MB
+                      10MB limit per image, up to 5 images
                     </p>
                   </div>
 
@@ -796,7 +850,7 @@ const PostsApp = () => {
                     disabled={isCreating}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
                   >
-                    {isCreating ? "發布中..." : "發布貼文"}
+                    {isCreating ? "Posting..." : "Create Post"}
                   </button>
                 </div>
               </div>

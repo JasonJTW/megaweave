@@ -14,7 +14,8 @@ const BUCKET_REGION = process.env.BUCKET_REGION;
 const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_ACCESS_KEY = process.env.SECRET_ACCESS_KEY;
 const UPLOAD_IMAGE_LIMIT = process.env.UPLOAD_IMAGE_LIMIT || "5";
-
+const CLOUDFRONT_URL = process.env.CLOUDFRONT_URL;
+const S3_BUCKET_IMAGE_FOLDER = process.env.S3_BUCKET_IMAGE_FOLDER;
 // AWS S3 client configuration
 export const s3Client = new S3Client({
   region: BUCKET_REGION,
@@ -70,8 +71,8 @@ export async function insertImages(
 
   const imageValues = files.map((file) => [
     postId,
-    file.location,
-    file.location, // 暫時使用原圖作為縮圖
+    `${CLOUDFRONT_URL}/${file.key}`, // 暫時使用原圖作為縮圖
+    `${CLOUDFRONT_URL}/${file.key}`,
     `Image for post ${postId}`,
     new Date(),
   ]);

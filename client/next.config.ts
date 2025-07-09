@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "megaweave-assets.s3.ap-east-2.amazonaws.com",
+        hostname: "d1unnyyibed1yg.cloudfront.net",
         port: "",
         pathname: "/**",
       },

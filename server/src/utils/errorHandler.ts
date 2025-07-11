@@ -4,11 +4,11 @@ import { z } from "zod";
 export function handleError(error: unknown, res: Response) {
   //* Zod error
   if (error instanceof z.ZodError) {
-    console.log("Zod error:", error.errors[0]?.message || "Validation failed");
+    console.log("Zod error:", error.issues[0]?.message || "Validation failed");
     console.log(`--------`);
     return res.status(400).json({
-      errorMessage: error.errors[0]?.message || "Validation failed",
-      errorDetails: error.errors,
+      errorMessage: error.issues[0]?.message || "Validation failed",
+      errorDetails: error.issues,
     });
   }
 

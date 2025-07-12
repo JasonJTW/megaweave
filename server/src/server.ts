@@ -12,6 +12,7 @@ import { disconnectRedis } from "./utils/redis";
 
 dotenv.config();
 
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
 const PORT = parseInt(process.env.PORT || "8443");
 const HOSTNAME = process.env.HOSTNAME || "localhost";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
@@ -31,7 +32,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "https://localhost:3000",
+    origin: CORS_ORIGIN,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

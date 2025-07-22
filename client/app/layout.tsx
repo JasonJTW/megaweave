@@ -1,12 +1,35 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import localFont from "next/font/local";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+});
+
+const ddinPro = localFont({
+  src: [
+    {
+      path: "../public/fonts/D-DIN-PRO-400-Regular.otf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/D-DIN-PRO-500-Medium.otf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/D-DIN-PRO-600-SemiBold.otf",
+      weight: "600",
+      style: "normal",
+    },
+  ],
+  variable: "--font-ddin-pro",
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -27,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
         {/* Facebook SDK */}
         <Script id="facebook-sdk" strategy="afterInteractive">

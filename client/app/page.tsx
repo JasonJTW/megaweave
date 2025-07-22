@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import React, { useState, useEffect } from "react";
@@ -109,13 +108,13 @@ const MegaweaveLanding = () => {
         <div className="flex items-center space-x-3">
           <Image
             src="/favicon.ico"
-            alt="MegaWeave"
+            alt="megaweaving icon"
             width={32}
             height={32}
             className="rounded-sm"
           />
-          <span className="text-2xl font-bold bg-gradient-to-r from-megaweave-gold-light to-megaweave-gold bg-clip-text text-transparent">
-            MegaWeave
+          <span className="text-2xl font-semibold text-white font-ddin">
+            megaweaving
           </span>
         </div>
         <div className="hidden md:flex space-x-8">
@@ -327,7 +326,7 @@ const MegaweaveLanding = () => {
 
           <div className="grid md:grid-cols-3 gap-8 mt-16">
             <div className="space-y-4 p-8 rounded-2xl backdrop-blur-sm border border-megaweave-sand/20 transition-all duration-300 hover:transform hover:scale-105 bg-megaweave-cream/10">
-              <Recycle className="w-12 h-12 mx-auto text-megaweave-forest-dark" />
+              <Recycle className="w-12 h-12 mx-auto text-megaweave-forest-light" />
               <h3 className="text-xl font-bold text-megaweave-cream">
                 Sustainability
               </h3>
@@ -338,7 +337,7 @@ const MegaweaveLanding = () => {
             </div>
 
             <div className="space-y-4 p-8 rounded-2xl backdrop-blur-sm border border-megaweave-sand/20 transition-all duration-300 hover:transform hover:scale-105 bg-megaweave-cream/10">
-              <Users className="w-12 h-12 mx-auto text-megaweave-stone" />
+              <Users className="w-12 h-12 mx-auto text-megaweave-blue" />
               <h3 className="text-xl font-bold text-megaweave-cream">
                 Community
               </h3>
@@ -349,7 +348,7 @@ const MegaweaveLanding = () => {
             </div>
 
             <div className="space-y-4 p-8 rounded-2xl backdrop-blur-sm border border-megaweave-sand/20 transition-all duration-300 hover:transform hover:scale-105 bg-megaweave-cream/10">
-              <Heart className="w-12 h-12 mx-auto text-megaweave-red" />
+              <Heart className="w-12 h-12 mx-auto text-megaweave-red-light" />
               <h3 className="text-xl font-bold text-megaweave-cream">Equity</h3>
               <p className="text-megaweave-sand">
                 Ensure everyone has access to basic resources regardless of

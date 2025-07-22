@@ -358,10 +358,15 @@ router.get("/:id", async (req: Request, res: Response) => {
       "SELECT * FROM images WHERE post_id = ? ORDER BY created_at";
     const [images] = await dbPool.query<RowDataPacket[]>(imagesQuery, [postId]);
 
+    // 將圖片 URL 轉換為逗號分隔的字符串格式
+    const imageUrls = images.map((img: any) => img.image_url).join(",");
+
     const post = {
       ...posts[0],
+      image_urls: imageUrls,
       images,
     };
+    console.log("post data: ", post);
 
     res.status(200).json({ post });
   } catch (error) {

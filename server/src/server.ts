@@ -12,10 +12,13 @@ import { disconnectRedis } from "./utils/redis";
 
 dotenv.config();
 
-const CORS_ORIGIN = process.env.CORS_ORIGIN;
+const CORS_ORIGINS = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
+  : ["https://localhost:3000"];
 const PORT = parseInt(process.env.PORT || "8443");
 const HOSTNAME = process.env.HOSTNAME || "localhost";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
+const NODE_ENV = process.env.NODE_ENV;
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   limit: 30,
@@ -26,19 +29,22 @@ const limiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
-
+console.log("Cors Origins:", CORS_ORIGINS);
 // Apply the rate limiting middleware to all requests.
 app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: CORS_ORIGIN,
+    origin: CORS_ORIGINS,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
-app.use(limiter);
+
+if (NODE_ENV !== "development") {
+  app.use(limiter);
+}
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",

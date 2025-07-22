@@ -10,31 +10,38 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        ddin: ["var(--font-ddin-pro)"],
+      },
       colors: {
         // Megaweave brand colors
         megaweave: {
           // Light warm tones
           cream: "#FDFCE8", // rgb(253, 252, 232)
-          sand: "#D2CEB4", // rgb(210, 206, 180)
+          sand: "#efe6d6", // rgb(210, 206, 180)
           stone: "#B2A986", // rgb(178, 169, 134)
 
           // Rich golden tones
           gold: {
-            light: "#D5AB1C", // rgb(213, 171, 28)
-            DEFAULT: "#A17624", // rgb(161, 118, 36)
+            light: "#FADC78", // rgb(213, 171, 28)
+            DEFAULT: "#FAB40F", // rgb(161, 118, 36)
           },
 
           // Natural green tones
           forest: {
             light: "#587635", // rgb(88, 118, 53)
-            DEFAULT: "#3E6330", // rgb(62, 99, 48)
-            dark: "#233519", // rgb(35, 53, 25)
+            DEFAULT: "#3C6432", // rgb(62, 99, 48)
+            dark: "#233719", // rgb(35, 53, 25)
           },
 
           // Accent colors
           red: {
-            light: "#D14C41", // rgb(209, 76, 65)
-            dark: "#54160F", // rgb(84, 22, 15)
+            light: "#FAA06C",
+            dark: "#C8551E",
+          },
+          blue: {
+            DEFAULT: "#5AAFA0",
+            light: "#B4E6DC",
           },
         },
 

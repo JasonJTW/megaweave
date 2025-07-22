@@ -1,76 +1,23 @@
+//* forms/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-
+import PostCard from "../components/PostCard/PostCard";
+import { Plus, Search, MapPin, Upload, X, ImageIcon } from "lucide-react";
 import {
-  Search,
-  Plus,
-  MapPin,
-  Eye,
-  Heart,
-  Calendar,
-  User as UserIcon,
-  Tag,
-  Upload,
-  X,
-  ImageIcon,
-} from "lucide-react";
+  Post,
+  PostsResponse,
+  Pagination,
+  Category,
+  Condition,
+} from "../types/schema";
+
+import User from "../types/user";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-// 類型定義
-interface Post {
-  id: number;
-  title: string;
-  content: string;
-  status: string;
-  location?: string;
-  tags?: string;
-  contact?: string;
-  category_id: number;
-  condition_level: number;
-  created_at: string;
-  updated_at: string;
-  view_count: number;
-  interests_count: number;
-  username: string;
-  category_name: string;
-  image_urls?: string;
-  thumbnail_urls?: string;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  description: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface Condition {
-  id: number;
-  level: number;
-  name: string;
-  description: string;
-  status?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface Pagination {
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-  itemsPerPage: number;
-}
-
-interface PostsResponse {
-  posts: Post[];
-  pagination: Pagination;
-}
-
-import User from "../types/user"; // 假設你有一個 User 類型定義
 const PostsApp = () => {
+  const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -315,28 +262,6 @@ const PostsApp = () => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 格式化日期
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("zh-TW");
-  };
-
-  // 獲取狀況等級顏色
-  const getConditionColor = (level: number) => {
-    const colors = {
-      1: "bg-red-100 text-red-800",
-      2: "bg-orange-100 text-orange-800",
-      3: "bg-yellow-100 text-yellow-800",
-      4: "bg-green-100 text-green-800",
-      5: "bg-emerald-100 text-emerald-800",
-    };
-    return colors[level as keyof typeof colors] || "bg-gray-100 text-gray-800";
-  };
-  // 獲取狀況等級名稱
-  const getConditionName = (level: number) => {
-    const condition = conditions.find((c) => c.level === level);
-    return condition ? condition.name : `等級 ${level}`;
-  };
-
   // 初始化數據
   useEffect(() => {
     fetchCategories();
@@ -373,7 +298,18 @@ const PostsApp = () => {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900">Megaweave</h1>
+            <div className="flex items-center space-x-3">
+              <Image
+                src="/favicon.ico"
+                alt="megaweaving icon"
+                width={32}
+                height={32}
+                className="rounded-sm"
+              />
+              <span className="text-2xl font-semibold text-megaweave-forest font-ddin">
+                megaweaving
+              </span>
+            </div>
             <Button
               onClick={handleCreatePostButtonClick}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
@@ -407,7 +343,7 @@ const PostsApp = () => {
 
             {/* 分類篩選 */}
             <select
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:cursor-pointer"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
@@ -461,92 +397,14 @@ const PostsApp = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {posts.map((post) => (
-              <div
+              <PostCard
                 key={post.id}
-                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-              >
-                {/* 圖片區域 */}
-                {post.image_urls && (
-                  <div className="h-48 bg-gray-200 overflow-hidden relative">
-                    <Image
-                      src={post.image_urls.split(",")[0]}
-                      alt={post.title}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                )}
-
-                <div className="p-4">
-                  {/* 標題和分類 */}
-                  <div className="mb-2">
-                    <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">
-                      {post.title}
-                    </h3>
-                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                      {post.category_name}
-                    </span>
-                  </div>
-
-                  {/* 內容 */}
-                  <p className="text-gray-600 text-sm line-clamp-3 mb-3">
-                    {post.content}
-                  </p>
-
-                  {/* 狀況等級 */}
-                  <div className="mb-3">
-                    <span
-                      className={`inline-block text-xs px-2 py-1 rounded-full ${getConditionColor(
-                        post.condition_level
-                      )}`}
-                    >
-                      {getConditionName(post.condition_level)}
-                    </span>
-                  </div>
-
-                  {/* 標籤 */}
-                  {post.tags && (
-                    <div className="mb-3">
-                      <div className="flex items-center text-gray-500 text-xs">
-                        <Tag className="w-3 h-3 mr-1" />
-                        <span className="line-clamp-1">{post.tags}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 地點和時間 */}
-                  <div className="space-y-1 mb-3">
-                    {post.location && (
-                      <div className="flex items-center text-gray-500 text-xs">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        <span>{post.location}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center text-gray-500 text-xs">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      <span>{formatDate(post.created_at)}</span>
-                    </div>
-                  </div>
-
-                  {/* 底部信息 */}
-                  <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t">
-                    <div className="flex items-center">
-                      <UserIcon className="w-3 h-3 mr-1" />
-                      <span>{post.username}</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center">
-                        <Eye className="w-3 h-3 mr-1" />
-                        <span>{post.view_count}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <Heart className="w-3 h-3 mr-1" />
-                        <span>{post.interests_count}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                post={post}
+                conditions={conditions}
+                onPostClick={(post) => {
+                  router.push(`/item/${post.id}`);
+                }}
+              />
             ))}
           </div>
         )}

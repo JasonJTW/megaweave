@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
-import { TeamMember, teamMembers } from "../teamMembers";
+import { TeamMember, teamMembers } from "@/app/teamMembers";
 import { useRouter } from "next/navigation";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 

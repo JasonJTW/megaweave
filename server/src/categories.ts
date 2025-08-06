@@ -11,14 +11,14 @@ router.get("/", async (req: Request, res: Response) => {
     const categoriesQuery = `
       SELECT 
         id,
-        name,
+        name_en,
         description,
         status,
         created_at,
         updated_at
       FROM categories 
       WHERE status = 'active'
-      ORDER BY name ASC
+      ORDER BY name_en ASC
     `;
 
     const [categories] = await dbPool.query<RowDataPacket[]>(categoriesQuery);
@@ -45,7 +45,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     const categoryQuery = `
       SELECT 
         id,
-        name,
+        name_en,
         description,
         status,
         created_at,

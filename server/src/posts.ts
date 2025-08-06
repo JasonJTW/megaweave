@@ -189,7 +189,7 @@ router.post(
       SELECT 
         p.*,
         u.username,
-        c.name as category_name,
+        c.name_en as category_name_en,
         GROUP_CONCAT(i.image_url) as image_urls
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
@@ -268,7 +268,7 @@ router.get("/", async (req: Request, res: Response) => {
       SELECT 
         p.*,
         u.username,
-        c.name as category_name,
+        c.name_en as category_name_en,
         GROUP_CONCAT(i.image_url) as image_urls,
         GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
       FROM posts p
@@ -340,7 +340,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         p.*,
         u.username,
         u.email,
-        c.name as category_name
+        c.name_en as category_name_en
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id

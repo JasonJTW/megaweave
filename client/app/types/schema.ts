@@ -15,14 +15,14 @@ export interface Post {
   view_count: number;
   interests_count: number;
   username: string;
-  category_name: string;
+  category_name_en: string;
   image_urls?: string;
   thumbnail_urls?: string;
 }
 
 export interface Category {
   id: number;
-  name: string;
+  name_en: string;
   description: string;
   status: string;
   created_at: string;

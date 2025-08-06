@@ -357,8 +357,8 @@ const PostDetail: React.FC = () => {
 
               {/* 分類和狀況 */}
               <div className="flex flex-wrap gap-2 mb-4">
-                <span className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full">
-                  {post.category_name}
+                <span className="inline-block bg-megaweave-forest-light text-white text-sm px-3 py-1 rounded-full">
+                  {post.category_name_en}
                 </span>
                 <span
                   className={`inline-block text-sm px-3 py-1 rounded-full ${getConditionColor(

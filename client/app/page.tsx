@@ -1,423 +1,726 @@
+//* forms/page.tsx
 "use client";
-import Link from "next/link";
-import Image from "next/image";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import PostCard from "./components/PostCard/PostCard";
+import { Plus, Search, MapPin, Upload, X, ImageIcon } from "lucide-react";
 import {
-  ArrowRight,
-  Users,
-  Globe,
-  Recycle,
-  Heart,
-  Search,
-  MessageCircle,
-  Share2,
-  ChevronDown,
-  Facebook,
-  Mail,
-} from "lucide-react";
+  Post,
+  PostsResponse,
+  Pagination,
+  Category,
+  Condition,
+} from "./types/schema";
 
-const MegaweaveLanding = () => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
+import User from "./types/user";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+
+const PostsApp = () => {
+  const router = useRouter();
+  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+  const [user, setUser] = useState<User | null>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 分類和狀況數據
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [conditions, setConditions] = useState<Condition[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [conditionsLoading, setConditionsLoading] = useState(false);
+
+  // 搜索和篩選狀態
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
+
+  // 創建貼文狀態
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [createFormData, setCreateFormData] = useState({
+    title: "",
+    content: "",
+    location: "",
+    tags: "",
+    contact: "",
+    categoryId: 1,
+    conditionLevel: 1,
+  });
+
+  const fetchUser = async () => {
+    try {
+      const response = await fetch(`${hostName}/api/currentUser`, {
+        cache: "no-store",
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorMessage = await response.json();
+        if (response.status === 401) {
+          //* User not authenticated
+          setUser(null);
+          return; // User not authenticated, no need to set error
+        } else {
+          console.error("Error fetching user data:", errorMessage.errorMessage);
+          throw new Error(` ${errorMessage.errorMessage}`);
+        }
+      }
+      const userData = await response.json();
+      console.log("Fetched User: ", userData);
+      setUser(userData.user);
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      setError(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setIsVisible(true);
-    const interval = setInterval(() => {
-      setActiveFeature((prev) => (prev + 1) % 3);
-    }, 3000);
-
-    // Set comprehensive background styles to prevent white overscroll
-    const backgroundGradient =
-      "linear-gradient(135deg, #2d3e2d 0%, #1a2a1a 50%, #0f1f0f 100%)";
-    const fallbackColor = "#1a2a1a";
-
-    // Apply to multiple elements to ensure coverage
-    document.body.style.background = backgroundGradient;
-    document.body.style.backgroundColor = fallbackColor;
-    document.documentElement.style.background = backgroundGradient;
-    document.documentElement.style.backgroundColor = fallbackColor;
-
-    // Additional iOS Safari specific fixes
-    document.body.style.minHeight = "100vh";
-    document.documentElement.style.minHeight = "100vh";
-
-    // Prevent overscroll behavior on iOS
-    document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.overscrollBehavior = "none";
-
-    return () => {
-      clearInterval(interval);
-      // Clean up styles on unmount
-      document.body.style.background = "";
-      document.body.style.backgroundColor = "";
-      document.documentElement.style.background = "";
-      document.documentElement.style.backgroundColor = "";
-      document.body.style.minHeight = "";
-      document.documentElement.style.minHeight = "";
-      document.body.style.overscrollBehavior = "";
-      document.documentElement.style.overscrollBehavior = "";
-    };
+    fetchUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const features = [
-    {
-      icon: <Search className="w-8 h-8" />,
-      title: "Discover Resources",
-      description:
-        "Find exactly what you need from our community of 10,000+ members",
-    },
-    {
-      icon: <Share2 className="w-8 h-8" />,
-      title: "Share Commons",
-      description: "Contribute to the permanent commons for collective access",
-    },
-    {
-      icon: <MessageCircle className="w-8 h-8" />,
-      title: "Connect & Match",
-      description:
-        "Direct messaging and forums to facilitate seamless exchanges",
-    },
-  ];
+  // 獲取分類列表
+  const fetchCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+    try {
+      const response = await fetch(`${hostName}/api/categories`);
+      const data = await response.json();
 
-  const stats = [
-    { number: "10,000+", label: "Active Members" },
-    { number: "50,000+", label: "Resources Shared" },
-    { number: "150+", label: "Countries" },
-    { number: "95%", label: "Match Success Rate" },
-  ];
+      if (response.ok) {
+        console.log("categories: ", data);
+        setCategories(data.categories);
+      } else {
+        console.error("Error fetching categories:", data.errorMessage);
+      }
+    } catch (error) {
+      console.error("Internal error when fetching categories", error);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [hostName]);
+
+  // 獲取狀況等級列表
+  const fetchConditions = useCallback(async () => {
+    setConditionsLoading(true);
+    try {
+      const response = await fetch(`${hostName}/api/conditions`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setConditions(data.conditions);
+      } else {
+        console.error("獲取狀況等級失敗:", data.errorMessage);
+      }
+    } catch (error) {
+      console.error("獲取狀況等級網路錯誤:", error);
+    } finally {
+      setConditionsLoading(false);
+    }
+  }, [hostName]);
+
+  // 使用 useCallback 來記憶化 fetchPosts 函數
+  const fetchPosts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: "12",
+      });
+
+      if (searchTerm) params.append("search", searchTerm);
+      if (selectedCategory) params.append("category", selectedCategory);
+      if (selectedLocation) params.append("location", selectedLocation);
+
+      const response = await fetch(`${hostName}/api/posts?${params}`);
+      const data: PostsResponse = await response.json();
+
+      if (response.ok) {
+        setPosts(data.posts);
+        setPagination(data.pagination);
+      } else {
+        setError("Fetch posts failed");
+      }
+    } catch (error) {
+      console.error("Internal server error:", error);
+      setError("Internal server error, please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, searchTerm, selectedCategory, selectedLocation, hostName]);
+
+  const handleCreatePostButtonClick = () => {
+    if (!user) {
+      alert("Please log in to create a post.");
+      router.push("/signin");
+      return;
+    }
+    setShowCreateForm(true);
+  };
+  // 創建貼文
+  const handleCreatePost = async () => {
+    if (!createFormData.title.trim() || !createFormData.content.trim()) {
+      setError("Required fields cannot be empty.");
+      return;
+    }
+
+    setIsCreating(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+
+      // 添加表單數據
+      formData.append("title", createFormData.title);
+      formData.append("content", createFormData.content);
+      formData.append("location", createFormData.location);
+      formData.append("tags", createFormData.tags);
+      formData.append("contact", createFormData.contact);
+      formData.append("categoryId", createFormData.categoryId.toString());
+      formData.append(
+        "conditionLevel",
+        createFormData.conditionLevel.toString()
+      );
+
+      //TODO: Add Share Commons option
+      // 添加圖片文件
+      selectedImages.forEach((image) => {
+        formData.append("images", image);
+      });
+
+      const response = await fetch(`${hostName}/api/posts`, {
+        method: "POST",
+        body: formData, // 使用 FormData 而不是 JSON
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        setShowCreateForm(false);
+        setSelectedImages([]);
+
+        /// Rest form data to initial state
+        setCreateFormData({
+          title: "",
+          content: "",
+          location: "",
+          tags: "",
+          contact: "",
+          categoryId: categories.length > 0 ? categories[0].id : 1,
+          conditionLevel: 1,
+        });
+        fetchPosts(); // 重新獲取貼文列表
+      } else {
+        const errorData = await response.json();
+        setError(errorData.errorMessage || "Failed to create post");
+        if (errorData.errorMessage) {
+          console.log("error message:", errorData.errorMessage);
+        }
+      }
+    } catch (error) {
+      console.error("Network error:", error);
+      setError("Network error, please try again later.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // 處理圖片選擇
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+
+    // 限制最多 5 張圖片
+    if (selectedImages.length + files.length > 5) {
+      setError("Limit of 5 images exceeded");
+      return;
+    }
+
+    // 檢查文件大小和類型
+    const validFiles = files.filter((file) => {
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`${file.name} exceeds 10MB size limit`);
+        return false;
+      }
+      if (!file.type.startsWith("image/")) {
+        setError(`${file.name} Not a valid image file`);
+        return false;
+      }
+      return true;
+    });
+
+    setSelectedImages((prev) => [...prev, ...validFiles]);
+  };
+
+  // 移除選中的圖片
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // 初始化數據
+  useEffect(() => {
+    fetchCategories();
+    fetchConditions();
+  }, [fetchCategories, fetchConditions]);
+
+  // 當分類加載完成後設置默認值
+  useEffect(() => {
+    if (categories.length > 0 && createFormData.categoryId === 1) {
+      setCreateFormData((prev) => ({
+        ...prev,
+        categoryId: categories[0].id,
+      }));
+    }
+  }, [categories, createFormData.categoryId]);
+
+  // 獲取貼文
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
+
+  // Add this useEffect to clean up blob URLs
+  useEffect(() => {
+    return () => {
+      selectedImages.forEach((image) => {
+        URL.revokeObjectURL(URL.createObjectURL(image));
+      });
+    };
+  }, [selectedImages]);
 
   return (
-    <div
-      className="min-h-screen text-white overflow-hidden bg-megaweave-forest"
-      style={{
-        background:
-          "linear-gradient(135deg, #2d3e2d 0%, #1a2a1a 50%, #0f1f0f 100%)",
-        backgroundAttachment: "fixed",
-      }}
-    >
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/2 -right-1/2 w-full h-full rounded-full animate-pulse bg-gradient-to-br from-megaweave-gold/20 to-transparent"></div>
-        <div className="absolute -bottom-1/2 -left-1/2 w-full h-full rounded-full animate-pulse delay-700 bg-gradient-to-tr from-megaweave-gold-light/20 to-transparent"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full animate-pulse delay-1000 bg-gradient-to-br from-megaweave-sand/10 to-transparent"></div>
-        <div className="absolute top-3/4 right-1/4 w-64 h-64 rounded-full animate-pulse delay-500 bg-gradient-to-br from-megaweave-stone/15 to-transparent"></div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="relative z-10 p-6 flex justify-between items-center backdrop-blur-sm">
-        <div className="flex items-center space-x-3">
-          <Image
-            src="/favicon.ico"
-            alt="megaweaving icon"
-            width={32}
-            height={32}
-            className="rounded-sm"
-          />
-          <span className="text-2xl font-semibold text-white font-ddin">
-            megaweaving
-          </span>
-        </div>
-        <div className="hidden md:flex space-x-8">
-          <a
-            href="#features"
-            className="font-medium text-megaweave-sand hover:text-megaweave-gold-light transition-colors"
-          >
-            Features
-          </a>
-          <a
-            href="#how-it-works"
-            className="font-medium text-megaweave-sand hover:text-megaweave-gold-light transition-colors"
-          >
-            How It Works
-          </a>
-          <a
-            href="#community"
-            className="font-medium text-megaweave-sand hover:text-megaweave-gold-light transition-colors"
-          >
-            Community
-          </a>
-        </div>
-        <Link
-          href="/signup"
-          className="px-6 py-2 rounded-full font-semibold shadow-lg transition-all duration-300 transform hover:scale-105 bg-megaweave-sand text-megaweave-forest-dark"
-        >
-          Join Now
-        </Link>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="relative z-10 px-6 py-20 text-center">
-        <div
-          className={`max-w-6xl mx-auto transition-all duration-1000 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-          }`}
-        >
-          <h1 className="text-5xl md:text-7xl font-bold mb-8 leading-tight">
-            <span className="text-megaweave-red-light">
-              &quot; Weaving &quot;
-            </span>
-            <br />
-            <span className="bg-gradient-to-r from-megaweave-cream via-megaweave-gold to-megaweave-red-light bg-clip-text text-transparent">
-              Commons
-            </span>
-            <br />
-            <span className="text-megaweave-red-light">
-              of Shared Resources
-            </span>
-          </h1>
-          <p className="text-xl md:text-2xl mb-12 max-w-4xl mx-auto leading-relaxed text-megaweave-sand">
-            Transform surplus into opportunity. Connect communities worldwide
-            through a transparent, database-driven platform that bridges the gap
-            between overflow and need.
-          </p>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <button className="group px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-xl bg-megaweave-primary text-megaweave-forest-dark">
-              <span>Start Sharing</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <Link
-              href="/posts"
-              className="px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 backdrop-blur-sm border-2 border-megaweave-gold-light text-megaweave-cream hover:bg-megaweave-gold-light/10"
-            >
-              Explore Resources
-            </Link>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-megaweave-gold-light to-megaweave-gold bg-clip-text text-transparent">
-                  {stat.number}
-                </div>
-                <div className="mt-2 font-medium text-megaweave-stone">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <ChevronDown className="w-8 h-8 text-megaweave-gold-light" />
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="relative z-10 px-6 py-20">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-16">
-            <span className="text-megaweave-cream">Built for </span>
-            <span className="text-megaweave-gold-light">Community</span>
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div
-                key={index}
-                className={`backdrop-blur-sm rounded-2xl p-8 transition-all duration-500 hover:transform hover:scale-105 shadow-lg border border-megaweave-sand/20 ${
-                  activeFeature === index
-                    ? "ring-2 ring-megaweave-gold-light bg-megaweave-cream/15"
-                    : "bg-megaweave-cream/10"
-                }`}
-              >
-                <div className="mb-4 text-megaweave-gold-light">
-                  {feature.icon}
-                </div>
-                <h3 className="text-2xl font-bold mb-4 text-megaweave-cream">
-                  {feature.title}
-                </h3>
-                <p className="leading-relaxed text-megaweave-sand">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section
-        id="how-it-works"
-        className="relative z-10 px-6 py-20 backdrop-blur-sm bg-megaweave-forest-dark/30"
-      >
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-4xl md:text-5xl font-bold text-center mb-16">
-            <span className="text-megaweave-cream">How It </span>
-            <span className="text-megaweave-gold">Works</span>
-          </h2>
-
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold bg-megaweave-gold-light text-megaweave-forest-dark">
-                  1
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2 text-megaweave-cream">
-                    Share Your Resources
-                  </h3>
-                  <p className="text-megaweave-sand">
-                    Upload photos and descriptions of items you no longer need.
-                    Tag them for easy discovery.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold bg-megaweave-gold text-megaweave-cream">
-                  2
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2 text-megaweave-cream">
-                    Connect & Match
-                  </h3>
-                  <p className="text-megaweave-sand">
-                    Use our platform to find what you need or respond to
-                    others&apos; requests. Direct messaging facilitates
-                    connections.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold bg-megaweave-forest-light text-megaweave-cream">
-                  3
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2 text-megaweave-cream">
-                    Join the Commons
-                  </h3>
-                  <p className="text-megaweave-sand">
-                    Opt into Share Commons for permanent community access,
-                    creating a distributed resource network.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="w-full h-80 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-xl border border-megaweave-sand/20 bg-gradient-to-br from-megaweave-sand/20 to-megaweave-gold/20">
-                <div className="text-center">
-                  <Globe className="w-16 h-16 mx-auto mb-4 text-megaweave-gold-light" />
-                  <p className="text-lg font-semibold text-megaweave-cream">
-                    Global Resource Network
-                  </p>
-                  <p className="mt-2 text-megaweave-stone">
-                    Connecting communities worldwide
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Community Values */}
-      <section id="community" className="relative z-10 px-6 py-20">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-8">
-            <span className="text-megaweave-cream">Our </span>
-            <span className="text-megaweave-red-light">Values</span>
-          </h2>
-
-          <div className="grid md:grid-cols-3 gap-8 mt-16">
-            <div className="space-y-4 p-8 rounded-2xl backdrop-blur-sm border border-megaweave-sand/20 transition-all duration-300 hover:transform hover:scale-105 bg-megaweave-cream/10">
-              <Recycle className="w-12 h-12 mx-auto text-megaweave-forest-light" />
-              <h3 className="text-xl font-bold text-megaweave-cream">
-                Sustainability
-              </h3>
-              <p className="text-megaweave-sand">
-                Reduce waste by giving resources a second life in communities
-                that need them.
-              </p>
-            </div>
-
-            <div className="space-y-4 p-8 rounded-2xl backdrop-blur-sm border border-megaweave-sand/20 transition-all duration-300 hover:transform hover:scale-105 bg-megaweave-cream/10">
-              <Users className="w-12 h-12 mx-auto text-megaweave-blue" />
-              <h3 className="text-xl font-bold text-megaweave-cream">
-                Community
-              </h3>
-              <p className="text-megaweave-sand">
-                Build connections and mutual aid networks that strengthen local
-                and global communities.
-              </p>
-            </div>
-
-            <div className="space-y-4 p-8 rounded-2xl backdrop-blur-sm border border-megaweave-sand/20 transition-all duration-300 hover:transform hover:scale-105 bg-megaweave-cream/10">
-              <Heart className="w-12 h-12 mx-auto text-megaweave-red-light" />
-              <h3 className="text-xl font-bold text-megaweave-cream">Equity</h3>
-              <p className="text-megaweave-sand">
-                Ensure everyone has access to basic resources regardless of
-                economic circumstances.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="relative z-10 px-6 py-20 backdrop-blur-sm bg-gradient-to-br from-megaweave-gold/30 to-megaweave-gold-light/30">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-8 text-megaweave-cream">
-            Ready to Start Weaving?
-          </h2>
-          <p className="text-xl mb-12 text-megaweave-sand">
-            Join thousands of community members creating a more sustainable and
-            equitable world through resource sharing.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-xl bg-megaweave-primary text-megaweave-forest-dark">
-              Join the Platform
-            </button>
-            <button className="border-2 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 backdrop-blur-sm border-megaweave-cream/50 text-megaweave-cream hover:bg-megaweave-cream/10">
-              Learn More
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="relative z-10 px-6 py-12 border-t backdrop-blur-sm bg-megaweave-forest-dark/50 border-megaweave-sand/20">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg bg-megaweave-primary">
-                <div className="w-4 h-4 rounded-sm opacity-90 bg-megaweave-cream"></div>
-              </div>
-              <span className="text-xl font-bold text-megaweave-cream">
-                Megaweave
+    <div className="min-h-screen bg-gray-50">
+      {/* 標題區域 */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-3">
+              <Image
+                src="/favicon.ico"
+                alt="megaweaving icon"
+                width={32}
+                height={32}
+                className="rounded-sm"
+              />
+              <span className="text-2xl font-semibold text-megaweave-forest font-ddin">
+                megaweaving
               </span>
             </div>
-
-            <div className="flex space-x-6">
-              <Facebook
-                className="w-6 h-6 cursor-pointer transition-colors text-megaweave-stone hover:text-megaweave-gold-light"
-                onClick={() =>
-                  window.open(
-                    "https://www.facebook.com/groups/1596603907320118/?locale=zh_TW",
-                    "_blank"
-                  )
-                }
-              />
-
-              <Mail className="w-6 h-6 cursor-pointer transition-colors text-megaweave-stone hover:text-megaweave-gold-light" />
-            </div>
-          </div>
-
-          <div className="mt-8 pt-8 border-t text-center border-megaweave-sand/20 text-megaweave-stone">
-            <p>
-              &copy; 2025 MEGAWEAVE. Building commons for a sustainable future.
-            </p>
+            <Button
+              onClick={handleCreatePostButtonClick}
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
+                user == null
+                  ? "bg-gray-400 text-gray-200 cursor-pointer hover:bg-gray-500"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              <Plus className="w-5 h-5" />
+              <span>Create new post</span>
+            </Button>
           </div>
         </div>
-      </footer>
+      </div>
+
+      {/* 搜索和篩選區域 */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* 搜索框 */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* 分類篩選 */}
+            <select
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:cursor-pointer"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="">Categories</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.name_en}>
+                  {cat.name_en}
+                </option>
+              ))}
+            </select>
+
+            {/* 地點篩選 */}
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Location..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              />
+            </div>
+
+            {/* 重置按鈕 */}
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setSelectedCategory("");
+                setSelectedLocation("");
+                setCurrentPage(1);
+              }}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              Resets
+            </button>
+          </div>
+        </div>
+
+        {/* 錯誤提示 */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+            {error}
+          </div>
+        )}
+
+        {/* 貼文網格 */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                conditions={conditions}
+                onPostClick={(post) => {
+                  router.push(`/item/${post.id}`);
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* 分頁 */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex justify-center mt-8">
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                previous page
+              </button>
+
+              {Array.from(
+                { length: pagination.totalPages },
+                (_, i) => i + 1
+              ).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-4 py-2 border rounded-lg ${
+                    currentPage === page
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === pagination.totalPages}
+                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                next page
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 創建貼文彈窗 */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Create new post
+                </h2>
+                <button
+                  onClick={() => setShowCreateForm(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span className="sr-only">Close</span>
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={createFormData.title}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        title: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Content *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={createFormData.content}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        content: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Category *
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.categoryId}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          categoryId: parseInt(e.target.value),
+                        })
+                      }
+                      disabled={categoriesLoading}
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name_en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Condition *
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.conditionLevel}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          conditionLevel: parseInt(e.target.value),
+                        })
+                      }
+                      disabled={conditionsLoading}
+                    >
+                      {conditions.map((condition) => (
+                        <option key={condition.id} value={condition.level}>
+                          {condition.name} - {condition.description}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={createFormData.location}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        location: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    tags
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="separate tags with commas"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={createFormData.tags}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        tags: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    聯絡方式
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={createFormData.contact}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        contact: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* 圖片上傳區域 */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    item image ({selectedImages.length}/5)
+                  </label>
+
+                  {/* 圖片上傳按鈕 */}
+                  <div className="mb-4">
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                      id="image-upload"
+                      disabled={selectedImages.length >= 5}
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 ${
+                        selectedImages.length >= 5
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      選擇圖片
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      10MB limit per image, up to 5 images
+                    </p>
+                  </div>
+
+                  {/* 已選圖片預覽 */}
+                  {selectedImages.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {selectedImages.map((image, index) => (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={URL.createObjectURL(image)}
+                              alt={`預覽 ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                            {Math.round(image.size / 1024)}KB
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 空狀態提示 */}
+                  {selectedImages.length === 0 && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">
+                        點擊上方按鈕選擇商品圖片
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        最多可上傳 5 張圖片
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setSelectedImages([]);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreatePost}
+                    disabled={isCreating}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                  >
+                    {isCreating ? "Posting..." : "Create Post"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default MegaweaveLanding;
+export default PostsApp;

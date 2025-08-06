@@ -200,16 +200,16 @@ export default function Signup() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-stone-800 to-teal-600 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-stone-800 to-primary flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: -60 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="bg-primary-950   rounded-2xl shadow-2xl p-8 space-y-6">
+          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6">
             <div className="text-left space-y-1">
-              <h1 className="text-3xl font-mono tracking-wider text-primary-400">
+              <h1 className="text-3xl font-mono tracking-wider text-primary">
                 Sign up
               </h1>
               <p className="text-muted-foreground font-mono tracking-tighter text-sm">
@@ -224,7 +224,7 @@ export default function Signup() {
             <form onSubmit={handleSubmit} className="">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-primary-400">
+                  <Label htmlFor="username" className="text-primary-75">
                     UserName
                   </Label>
                   <Input
@@ -234,12 +234,12 @@ export default function Signup() {
                     onChange={(e) => setUserName(e.target.value)}
                     required
                     placeholder="Enter your username"
-                    className="bg-primary-800 text-primary-400 border-emerald-300"
+                    className="bg-secondary text-primary border-primary"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-primary-400">
+                  <Label htmlFor="email" className="text-primary">
                     Email
                   </Label>
                   <Input
@@ -249,11 +249,11 @@ export default function Signup() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="Enter your email"
-                    className="bg-primary-800 text-primary-400 border-emerald-300"
+                    className="bg-secondary text-primary border-emerald-300"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-primary-400">
+                  <Label htmlFor="password" className="text-primary">
                     Password
                   </Label>
                   <div className="relative">
@@ -264,7 +264,7 @@ export default function Signup() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="Enter your password"
-                      className="bg-primary-800 text-primary-400 border-emerald-300"
+                      className="bg-secondary text-primary border-emerald-300"
                     />
                     <button
                       type="button"
@@ -292,14 +292,14 @@ export default function Signup() {
                         console.log(rememberMe);
                       }}
                     />
-                    <Label htmlFor="remember" className="text-primary-400">
+                    <Label htmlFor="remember" className="text-primary">
                       Remember me
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <a
                       href=""
-                      className="text-primary-400 underline hover:text-emerald-700"
+                      className="text-primary underline hover:text-emerald-700"
                     >
                       Forgot Password?
                     </a>
@@ -310,7 +310,7 @@ export default function Signup() {
               <div className="flex items-center mt-4">
                 <Button
                   type="submit"
-                  className="w-full bg-primary-500 text-primary-900 hover:bg-gradient-to-br from-primary-200 to-primary-500 hover:shadow-primary-50 shadow-2xl transition-all duration-200 hover:mb-8"
+                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8"
                   disabled={!username || !email || !password || loading}
                 >
                   {loading ? "Signing up..." : "Sign up"}
@@ -319,17 +319,18 @@ export default function Signup() {
             </form>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-primary-300" />
+                <span className="w-full border-t border-primary" />
               </div>
-              <div className="relative flex justify-center text-xs text-primary-400 uppercase">
-                <span className="bg-primary-950 px-2 text-muted-foreground">
+              <div className="relative flex justify-center text-xs text-primary uppercase">
+                <span className="bg-secondary px-2 text-muted-foreground">
                   Or continue with
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Button
-                className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                className="w-full bg-primary-50 text-black
+                 hover:bg-primary-30 transition-all duration-200"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >
@@ -344,7 +345,7 @@ export default function Signup() {
                 {isFBReady ? "Facebook" : "Loading Facebook..."}
               </Button>
               <Button
-                className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                className="w-full bg-primary-50 text-black hover:bg-primary-30 transition-all duration-200"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
@@ -387,7 +388,7 @@ export default function Signup() {
               Already have an account?{" "}
               <a
                 href="/signin"
-                className="text-primary-400 underline text-sm hover:text-emerald-700"
+                className="text-primary underline text-sm hover:text-emerald-700"
               >
                 Sign in
               </a>

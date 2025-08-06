@@ -70,8 +70,8 @@ const PostCard: React.FC<PostCardProps> = ({
             <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">
               {post.title}
             </h3>
-            <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-              {post.category_name}
+            <span className="inline-block bg-megaweave-forest-light text-white text-xs px-2 py-1 rounded-full">
+              {post.category_name_en}
             </span>
           </div>
 

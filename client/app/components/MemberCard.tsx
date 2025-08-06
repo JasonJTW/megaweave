@@ -1,18 +1,13 @@
 "use client";
 import React, { useState, useRef } from "react";
-import { TeamMember, teamMembers } from "../teamMembers";
+import { teamMembers } from "../teamMembers";
 import { useRouter } from "next/navigation";
-import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
-interface MemberCardProps {
-  member: TeamMember;
-  router: AppRouterInstance;
-}
 // 獨立的成員卡片組件
-const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
+const MemberCard = ({ member, router }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
 
   const handleMouseEnter = () => {
     setShowTooltip(true);
@@ -22,7 +17,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
     setShowTooltip(false);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = (e) => {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setMousePosition({

@@ -1,45 +1,57 @@
+"use client";
+
 import React from "react";
+import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getTeamMemberById } from "@/app/teamMembers";
 
-interface MemberDetailProps {
-  member: {
-    id: string;
-    name: string;
-    title: string;
-    avatar: string;
-    location: string;
-    department: string;
-    bio: string;
-    experience: Array<{
-      year: string;
-      position: string;
-      company: string;
-      description: string;
-    }>;
-    projects: Array<{
-      name: string;
-      description: string;
-      image?: string;
-    }>;
-    skills: string[];
-    contact?: {
-      email?: string;
-      website?: string;
-      linkedin?: string;
-    };
+const MemberPage: React.FC = () => {
+  const router = useRouter();
+  const params = useParams();
+  const memberId = parseInt(params.id as string);
+
+  // 獲取成員資料
+  const member = getTeamMemberById(memberId);
+
+  const handleClose = () => {
+    router.push("/about"); // 回到關於頁面
   };
-  onClose?: () => void;
-  onPrevious?: () => void;
-  onNext?: () => void;
-}
 
-const MemberDetailPage: React.FC<MemberDetailProps> = ({
-  member,
-  onClose,
-  onPrevious,
-  onNext,
-}) => {
+  const handlePrevious = () => {
+    const prevId = memberId - 1;
+    if (prevId >= 1) {
+      router.push(`/members/${prevId}`);
+    }
+  };
+
+  const handleNext = () => {
+    const nextId = memberId + 1;
+    const nextMember = getTeamMemberById(nextId);
+    if (nextMember) {
+      router.push(`/members/${nextId}`);
+    }
+  };
+
+  // 如果沒有 memberId，顯示錯誤
+  if (!params.id || isNaN(memberId) || !member) {
+    return (
+      <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-secondary mb-4">
+            Not valid member ID
+          </h2>
+          <button
+            onClick={() => router.push("/about")}
+            className="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800"
+          >
+            Back to About
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-primary-75 overflow-hidden relative">
       {/* Navigation Controls */}
@@ -47,7 +59,7 @@ const MemberDetailPage: React.FC<MemberDetailProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onPrevious}
+          onClick={handlePrevious}
           className="bg-black text-white hover:bg-gray-800 rounded-full px-6 py-2 mr-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -59,7 +71,7 @@ const MemberDetailPage: React.FC<MemberDetailProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onNext}
+          onClick={handleNext}
           className="bg-black text-white hover:bg-gray-800 rounded-full px-6 py-2"
         >
           Next
@@ -68,7 +80,7 @@ const MemberDetailPage: React.FC<MemberDetailProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onClose}
+          onClick={handleClose}
           className="bg-black text-white hover:bg-gray-800 rounded-full p-2"
         >
           <X className="w-4 h-4" />
@@ -79,9 +91,11 @@ const MemberDetailPage: React.FC<MemberDetailProps> = ({
         {/* Header with Member Location */}
         <div className="pt-20 pb-10">
           <div className="flex items-center justify-between">
-            <div className="bg-black text-white px-4 py-2 text-sm rounded-full">
-              {member.location}
-            </div>
+            {member.location && (
+              <div className="bg-black text-white px-4 py-2 text-sm rounded-full">
+                {member.location}
+              </div>
+            )}
           </div>
         </div>
 
@@ -149,14 +163,16 @@ const MemberDetailPage: React.FC<MemberDetailProps> = ({
           {/* Right Column - Detailed Information */}
           <div className="space-y-12">
             {/* Profile Section */}
-            <div>
-              <h2 className="text-2xl text-secondary mb-6 pb-4 border-b border-megaweave-stone">
-                Profile
-              </h2>
-              <p className="text-lg text-secondary leading-relaxed">
-                {member.bio}
-              </p>
-            </div>
+            {member.bio && (
+              <div>
+                <h2 className="text-2xl text-secondary mb-6 pb-4 border-b border-megaweave-stone">
+                  Profile
+                </h2>
+                <p className="text-lg text-secondary leading-relaxed">
+                  {member.bio}
+                </p>
+              </div>
+            )}
 
             {/* Experience Section */}
             {member.experience && member.experience.length > 0 && (
@@ -242,4 +258,4 @@ const MemberDetailPage: React.FC<MemberDetailProps> = ({
   );
 };
 
-export default MemberDetailPage;
+export default MemberPage;

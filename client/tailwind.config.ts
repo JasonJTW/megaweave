@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-import colors from "tailwindcss/colors";
+// import colors from "tailwindcss/colors";
 import tailwindcssAnimate from "tailwindcss-animate";
 export default {
   darkMode: ["class"],
@@ -56,14 +56,21 @@ export default {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
+        // primary leaf green
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-          ...colors.neutral,
+          DEFAULT: "#3C6432", // 100%
+          75: "#6a8a66", // 75%
+          50: "#9db09a", // 50%
+          30: "#c4d0c1", // 30%
+          15: "#e2e8e1", // 15%
         },
+        // secondary sand
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "#efe6d6", // 100%
+          75: "#f2ebe0", // 75%
+          50: "##f7f1ea", // 50%
+          30: "##fbf7f4", // 30%
+          15: "##fdfbf9", // 15%
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",

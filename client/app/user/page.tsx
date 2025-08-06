@@ -93,8 +93,8 @@ const UserPage = () => {
 
   if (loading || redirecting) {
     return (
-      <div className="min-h-screen bg-primary-800 flex items-center justify-center">
-        <h1 className="text-primary-300 text-3xl font-semibold font-mono tracking-wide">
+      <div className="min-h-screen bg-primary flex items-center justify-center">
+        <h1 className="text-black text-3xl font-semibold font-mono tracking-wide">
           Loading...
         </h1>
       </div>
@@ -103,8 +103,8 @@ const UserPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-primary-800 flex items-center justify-center">
-        <h1 className="text-primary-300 text-3xl font-semibold font-mono tracking-wide">
+      <div className="min-h-screen bg-primary flex items-center justify-center">
+        <h1 className="text-black text-3xl font-semibold font-mono tracking-wide">
           Error fetching user data: {error}
         </h1>
       </div>
@@ -119,7 +119,7 @@ const UserPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-primary-800">
+      <div className="min-h-screen bg-primary">
         <motion.div
           initial={{ opacity: 0, y: -60 }}
           animate={{ opacity: 1, y: 0 }}
@@ -128,21 +128,21 @@ const UserPage = () => {
         >
           <div className="pl-20 pt-40 flex-row">
             <div className="flex">
-              <h1 className="text-primary-300 text-3xl font-semibold font-mono tracking-wide">
+              <h1 className="text-secondary text-3xl font-semibold font-mono tracking-wide">
                 UserPage
               </h1>
             </div>
-            <div className="flex items-center justify-center rounded-full backdrop-blur-md bg-white bg-opacity-[3%] border-primary-700 border-[0.5px] text-primary-300 text-opacity-65 font-semibold tracking-wider text-xs pt-2 pb-2 pl-4 pr-4 mt-2 w-fit leading-none">
+            <div className="flex items-center justify-center rounded-full backdrop-blur-md bg-white bg-opacity-[10%] border-secondary border-[0.5px] text-secondary text-opacity-65 font-semibold tracking-wider text-xs pt-2 pb-2 pl-4 pr-4 mt-2 w-fit leading-none">
               {user.role}
             </div>
             <div className="mt-4">
-              <div className="text-primary-300">name: {user.username}</div>
-              <div className="text-primary-300">email: {user.email}</div>
+              <div className="text-primary-30">name: {user.username}</div>
+              <div className="text-primary-30">email: {user.email}</div>
             </div>
           </div>
           <div className="pl-20 pt-40 flex-row">
             <button
-              className="flex items-center justify-center rounded-full backdrop-blur-md bg-pink-500 bg-opacity-[30%] border-primary-700 border-[0.5px] text-primary-300 text-opacity-65 font-semibold tracking-wider text-xs pt-2 pb-2 pl-4 pr-4 mt-2 w-fit leading-none"
+              className="flex items-center justify-center rounded-full backdrop-blur-md bg-secondary bg-opacity-[30%] border-primary-700 border-[0.5px] text-primary-300 text-opacity-65 font-semibold tracking-wider text-xs pt-2 pb-2 pl-4 pr-4 mt-2 w-fit leading-none"
               onClick={handleSignOut}
             >
               sign out

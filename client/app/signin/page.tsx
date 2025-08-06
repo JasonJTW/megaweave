@@ -228,16 +228,16 @@ export default function Signin() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-primary-800 to-primary-400 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-stone-800 to-primary flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: -60 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="bg-primary-950   rounded-2xl shadow-2xl p-8 space-y-6">
+          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6">
             <div className="text-left space-y-1">
-              <h1 className="text-3xl font-mono tracking-wider text-primary-400">
+              <h1 className="text-3xl font-mono tracking-wider text-primary">
                 Sign in
               </h1>
               <p className="text-muted-foreground font-mono tracking-tighter text-sm">
@@ -252,7 +252,7 @@ export default function Signin() {
             <form onSubmit={handleSubmit} className="">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-primary-400">
+                  <Label htmlFor="email" className="text-primary">
                     Email
                   </Label>
                   <Input
@@ -262,7 +262,7 @@ export default function Signin() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="Enter your email"
-                    className="bg-primary-800 text-primary-400 border-emerald-300"
+                    className="bg-secondary text-primary border-emerald-300"
                   />
                 </div>
                 <div className="space-y-2">
@@ -277,7 +277,7 @@ export default function Signin() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="Enter your password"
-                      className="bg-primary-800 text-primary-400 border-emerald-300"
+                      className="bg-secondary text-primary border-emerald-300"
                     />
                     <button
                       type="button"
@@ -311,8 +311,8 @@ export default function Signin() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <a
-                      href="#"
-                      className="text-primary-400 underline hover:text-emerald-700"
+                      href=""
+                      className="text-primary underline hover:text-emerald-700"
                     >
                       Forgot Password?
                     </a>
@@ -323,7 +323,7 @@ export default function Signin() {
               <div className="flex items-center mt-4">
                 <Button
                   type="submit"
-                  className="w-full bg-primary-500 text-primary-900 hover:bg-gradient-to-br from-primary-200 to-primary-500 hover:shadow-primary-50 shadow-2xl transition-all duration-200 hover:mb-8"
+                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8"
                   disabled={!email || !password || loading}
                 >
                   {loading ? "Signing in..." : "Sign in"}
@@ -332,17 +332,18 @@ export default function Signin() {
             </form>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-primary-300" />
+                <span className="w-full border-t border-primary" />
               </div>
-              <div className="relative flex justify-center text-xs text-primary-400 uppercase">
-                <span className="bg-primary-950 px-2 text-muted-foreground">
+              <div className="relative flex justify-center text-xs text-primary uppercase">
+                <span className="bg-secondary px-2 text-muted-foreground">
                   Or continue with
                 </span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Button
-                className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                className="w-full bg-primary-50 text-black
+                               hover:bg-primary-30 transition-all duration-200"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >
@@ -357,7 +358,7 @@ export default function Signin() {
                 {isFBReady ? "Facebook" : "Loading Facebook..."}
               </Button>
               <Button
-                className="w-full bg-primary-500 text-primary-900 hover:bg-primary-400 transition-all duration-200"
+                className="w-full bg-primary-50 text-black hover:bg-primary-30 transition-all duration-200"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
@@ -399,8 +400,8 @@ export default function Signin() {
             <div className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
               <a
-                href="/signup"
-                className="text-primary-400 underline text-sm hover:text-emerald-700"
+                href="/signin"
+                className="text-primary underline text-sm hover:text-emerald-700"
               >
                 Sign up
               </a>

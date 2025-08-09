@@ -1,3 +1,4 @@
+import { JSX } from "react";
 export interface TeamMember {
   id: number;
   name: string;
@@ -5,7 +6,7 @@ export interface TeamMember {
   department: string;
   title: string; // Optional title field
   location?: string;
-  bio?: string;
+  bio?: string | JSX.Element;
   experience?: Array<{
     year: string;
     position: string;
@@ -33,7 +34,26 @@ export const teamMembers: TeamMember[] = [
     department: "Member",
     title: "Proposer",
     location: "Taipei, Taiwan",
-    bio: "Creator, curator, and Associate Professor in the Department of Architecture at Shih Chien University, and Adjunct Associate Professor in the Graduate Institute of New Media Art at Taipei National University of the Arts. He is the initiator of the MEGAWEAVING (大量交織) commons movement and moderator of its namesake Facebook group https://www.facebook.com/groups/1596603907320118/?locale=zh_TW, with a long-term commitment to integrating social design, resource systems, and mutually supportive public infrastructure. He also serves as a board member of the Taiwan Watch Institute (社團法人看守台灣協會). ",
+    bio: (
+      <>
+        Creator, curator, and Associate Professor in the Department of
+        Architecture at Shih Chien University, and Adjunct Associate Professor
+        in the Graduate Institute of New Media Art at Taipei National University
+        of the Arts. He is the initiator of the MEGAWEAVING (大量交織) commons
+        movement and moderator of its namesake{" "}
+        <a
+          href="https://www.facebook.com/groups/1596603907320118/?locale=zh_TW"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-megaweave-sand hover:text-megaweave-cream underline transition-colors duration-200"
+        >
+          Facebook group
+        </a>
+        , with a long-term commitment to integrating social design, resource
+        systems, and mutually supportive public infrastructure. He also serves
+        as a board member of the Taiwan Watch Institute (社團法人看守台灣協會).
+      </>
+    ),
     contact: {
       email: "yu-chih@example.com",
       website: "https://yuchih-hsiao.net/",

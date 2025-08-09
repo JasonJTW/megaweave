@@ -35,7 +35,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
   return (
     <div
       key={member.id}
-      className="relative hover:cursor-pointer"
+      className="relative hover:cursor-pointer max-w-xl"
       onClick={() => {
         router.push(`/members/${member.id}`);
       }}

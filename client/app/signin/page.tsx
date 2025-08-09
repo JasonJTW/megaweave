@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 
 export default function Signin() {
@@ -23,6 +23,17 @@ export default function Signin() {
   const [signinError, setSigninError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnTo = searchParams.get("returnTo");
+
+  //* After successful sign in, redirect to the page
+  const handleSigninSuccess = () => {
+    if (returnTo) {
+      router.push(decodeURIComponent(returnTo));
+    } else {
+      router.push("/user");
+    }
+  };
 
   //* Google Sign in
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
@@ -55,7 +66,7 @@ export default function Signin() {
       }
 
       console.log("Google sign in response data:", data);
-      router.push("/user");
+      handleSigninSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
       setSigninError(
@@ -88,7 +99,7 @@ export default function Signin() {
       }
       //* User has valid session in cookie, redirect to user page
       setLoading(true);
-      router.push("/user");
+      handleSigninSuccess();
     } catch (error) {
       console.error("Error fetching user data:", error);
       setError(
@@ -213,7 +224,7 @@ export default function Signin() {
       }
 
       console.log("Facebook backend response:", data);
-      router.push("/user");
+      handleSigninSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
       setSigninError(
@@ -235,7 +246,7 @@ export default function Signin() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6">
+          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6 m-6">
             <div className="text-left space-y-1">
               <h1 className="text-3xl font-mono tracking-wider text-primary">
                 Sign in

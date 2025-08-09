@@ -3,7 +3,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import PostCard from "./components/PostCard/PostCard";
-import { Plus, Search, MapPin, Upload, X, ImageIcon } from "lucide-react";
+import {
+  Plus,
+  Search,
+  MapPin,
+  Upload,
+  X,
+  ImageIcon,
+  ScanFace,
+} from "lucide-react";
 import {
   Post,
   PostsResponse,
@@ -161,8 +169,9 @@ const PostsApp = () => {
 
   const handleCreatePostButtonClick = () => {
     if (!user) {
+      const currentUrl = window.location.pathname + window.location.search;
       alert("Please log in to create a post.");
-      router.push("/signin");
+      router.push(`/signin?returnTo=${encodeURIComponent(currentUrl)}`);
       return;
     }
     setShowCreateForm(true);
@@ -297,7 +306,7 @@ const PostsApp = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 標題區域 */}
+      {/* Icon */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
@@ -309,20 +318,41 @@ const PostsApp = () => {
                 height={32}
                 className="rounded-sm"
               />
-              <span className="text-2xl font-semibold text-megaweave-forest font-ddin">
+              <span className="text-2xl sm:text-2xl font-semibold text-megaweave-forest font-ddin ">
                 megaweaving
               </span>
             </div>
             <Button
               onClick={handleCreatePostButtonClick}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
-                user == null
-                  ? "bg-gray-400 text-gray-200 cursor-pointer hover:bg-gray-500"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`
+                // 手機端：固定懸浮在右下角
+                fixed bottom-6 right-6 z-40 
+                w-14 h-14 rounded-full p-0 shadow-lg
+                flex items-center justify-center
+                
+                // 桌面端：恢復原本位置和樣式
+                sm:relative sm:bottom-auto sm:right-auto sm:z-auto
+                sm:w-auto sm:h-auto sm:rounded-full sm:shadow-none
+                sm:px-3 sm:py-2 sm:flex sm:items-center sm:space-x-1
+                
+                transition-colors duration-300 ${
+                  user == null
+                    ? " bg-megaweave-stone/40 backdrop-blur-[2px] border border-megaweave-sand   cursor-pointer sm:bg-megaweave-stone sm:text-white hover:bg-megaweave-red-light"
+                    : "bg-primary/30 backdrop-blur-sm border border-primary-30  sm:bg-primary sm:text-white hover:bg-primary-50 "
+                }`}
             >
-              <Plus className="w-5 h-5" />
-              <span>Create new post</span>
+              {user == null ? (
+                <ScanFace
+                  style={{ width: "24px", height: "24px" }}
+                  className=" text-white"
+                />
+              ) : (
+                <Plus className=" text-white" />
+              )}
+              {/* 手機端隱藏文字，桌面端顯示 */}
+              <span className="hidden sm:inline">
+                {user == null ? "Sign in to post" : "Create new post"}
+              </span>
             </Button>
           </div>
         </div>

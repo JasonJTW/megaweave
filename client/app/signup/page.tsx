@@ -44,7 +44,7 @@ export default function Signup() {
       }
 
       console.log("Facebook backend response:", data);
-      router.push("/user");
+      handleSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
       setSignupError(
@@ -55,6 +55,10 @@ export default function Signup() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSignupSuccess = () => {
+    router.push("/");
   };
 
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
@@ -87,7 +91,7 @@ export default function Signup() {
       }
 
       console.log("Google sign in response data:", data);
-      router.push("/user");
+      handleSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
       setSignupError(
@@ -151,7 +155,7 @@ export default function Signup() {
       /// Add a 5-second delay to inspect the button text
       // await new Promise((resolve) => setTimeout(resolve, 300));
       alert(`Welcome to MegaWeave🥳🎉! ${username}`);
-      router.push("/user");
+      handleSignupSuccess();
     } catch (error) {
       console.log(error);
       setSignupError(

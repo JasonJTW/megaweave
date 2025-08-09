@@ -108,6 +108,7 @@ jobs:
             --exclude=.github \
             --exclude=*.log \
             --exclude=.env.example \
+            --exclude=.env.production \
             --exclude=coverage \
             ./server/ ~/megaweave/server/
 
@@ -186,6 +187,7 @@ jobs:
             --exclude=*.log \
             --exclude=.env.local \
             --exclude=.env.example \
+            --exclude=.env.production \
             --exclude=coverage \
             ./client/ ~/megaweave/client/
 

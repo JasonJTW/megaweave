@@ -77,7 +77,7 @@ const UserPage = () => {
       console.log("Sign out successful");
       setUser(null);
       setRedirecting(true);
-      router.push("/signin");
+      router.push("/");
     } catch (error) {
       console.error("Error signing out:", error);
       setError(
@@ -119,7 +119,7 @@ const UserPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-primary">
+      <div className="min-h-screen bg-primary-75">
         <motion.div
           initial={{ opacity: 0, y: -60 }}
           animate={{ opacity: 1, y: 0 }}

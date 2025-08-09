@@ -207,7 +207,7 @@ export default function Signup() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6">
+          <div className="bg-secondary rounded-2xl shadow-2xl p-8 m-6 space-y-6">
             <div className="text-left space-y-1">
               <h1 className="text-3xl font-mono tracking-wider text-primary">
                 Sign up

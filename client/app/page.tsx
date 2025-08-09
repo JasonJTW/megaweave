@@ -170,7 +170,6 @@ const PostsApp = () => {
   const handleCreatePostButtonClick = () => {
     if (!user) {
       const currentUrl = window.location.pathname + window.location.search;
-      alert("Please log in to create a post.");
       router.push(`/signin?returnTo=${encodeURIComponent(currentUrl)}`);
       return;
     }

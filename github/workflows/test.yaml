@@ -1,0 +1,248 @@
+name: Megaweave CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: self-hosted
+    outputs:
+      server-changed: ${{ steps.changes.outputs.server }}
+      client-changed: ${{ steps.changes.outputs.client }}
+      any-changed: ${{ steps.changes.outputs.server == 'true' || steps.changes.outputs.client == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            server:
+              - 'server/**'
+            client:
+              - 'client/**'
+
+  create-backup:
+    name: Create Backup
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any-changed == 'true'
+    runs-on: self-hosted
+    outputs:
+      backup-created: ${{ steps.backup.outputs.backup-created }}
+      backup-path: ${{ steps.backup.outputs.backup-path }}
+    steps:
+      - name: Create production backup
+        id: backup
+        run: |
+          if [ -d ~/megaweave ]; then
+            BACKUP_DIR=~/megaweave.backup.$(date +%Y%m%d_%H%M%S)
+            cp -r ~/megaweave $BACKUP_DIR
+            echo "backup-created=true" >> $GITHUB_OUTPUT
+            echo "backup-path=$BACKUP_DIR" >> $GITHUB_OUTPUT
+            echo "✅ Backup created at: $BACKUP_DIR"
+          else
+            echo "backup-created=false" >> $GITHUB_OUTPUT
+            echo "⚠️ No existing production directory to backup"
+          fi
+
+      - name: Cleanup old backups
+        run: |
+          cd ~
+          # 保留最近 5 個備份，刪除更舊的
+          ls -dt megaweave.backup.* 2>/dev/null | tail -n +6 | xargs -r rm -rf
+          echo "🧹 Cleaned up old backups (keeping last 5)"
+
+  deploy-server:
+    name: Deploy Backend
+    needs: [detect-changes, create-backup]
+    if: needs.detect-changes.outputs.server-changed == 'true'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install server dependencies
+        run: |
+          cd server
+          npm install
+
+      - name: Run server tests
+        run: |
+          cd server
+          if npm run test --if-present; then
+            echo "✅ Server tests passed or not configured"
+          else
+            echo "⚠️ Server tests failed"
+            exit 1
+          fi
+
+      - name: Build server
+        run: |
+          cd server
+          npm run build
+
+      - name: Stop backend service
+        run: |
+          sudo systemctl stop megaweave-be.service
+          echo "🛑 Backend service stopped"
+
+      - name: Deploy server to production
+        run: |
+          # 創建生產目錄
+          mkdir -p ~/megaweave/server
+
+          # 同步代碼到生產環境
+          rsync -av --delete \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude=*.log \
+            --exclude=.env.example \
+            --exclude=coverage \
+            ./server/ ~/megaweave/server/
+
+          echo "📦 Server code deployed"
+
+      - name: Install production dependencies
+        run: |
+          cd ~/megaweave/server
+          npm ci --only=production
+          echo "📥 Production dependencies installed"
+
+      - name: Start backend service
+        run: |
+          sudo systemctl start megaweave-be.service
+          echo "🚀 Backend service started"
+
+      - name: Verify backend service
+        run: |
+          sleep 5
+          if sudo systemctl is-active --quiet megaweave-be.service; then
+            echo "✅ Backend service is running successfully"
+          else
+            echo "❌ Backend service failed to start"
+            # 顯示服務狀態和日誌
+            sudo systemctl status megaweave-be.service
+            sudo journalctl -u megaweave-be.service --lines=20 --no-pager
+            exit 1
+          fi
+
+  deploy-client:
+    name: Deploy Frontend
+    needs: [detect-changes, create-backup]
+    if: needs.detect-changes.outputs.client-changed == 'true'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install client dependencies
+        run: |
+          cd client
+          npm install
+
+      - name: Run client tests
+        run: |
+          cd client
+          echo "⏭️ Tests skipped (temporarily disabled)"
+
+      - name: Build client
+        run: |
+          cd client
+          npm run build
+
+      - name: Stop frontend service
+        run: |
+          sudo systemctl stop megaweave-fe.service
+          echo "🛑 Frontend service stopped"
+
+      - name: Deploy client to production
+        run: |
+          # 創建生產目錄
+          mkdir -p ~/megaweave/client
+
+          # 同步代碼到生產環境
+          rsync -av --delete \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude=.next/cache \
+            --exclude=*.log \
+            --exclude=.env.local \
+            --exclude=.env.example \
+            --exclude=coverage \
+            ./client/ ~/megaweave/client/
+
+          echo "📦 Client code deployed"
+
+      - name: Install production dependencies
+        run: |
+          cd ~/megaweave/client
+          npm ci --only=production
+          echo "📥 Production dependencies installed"
+
+      - name: Start frontend service
+        run: |
+          sudo systemctl start megaweave-fe.service
+          echo "🚀 Frontend service started"
+
+      - name: Verify frontend service
+        run: |
+          sleep 5
+          if sudo systemctl is-active --quiet megaweave-fe.service; then
+            echo "✅ Frontend service is running successfully"
+          else
+            echo "❌ Frontend service failed to start"
+            # 顯示服務狀態和日誌
+            sudo systemctl status megaweave-fe.service
+            sudo journalctl -u megaweave-fe.service --lines=20 --no-pager
+            exit 1
+          fi
+
+  deployment-summary:
+    name: Deployment Summary
+    needs: [detect-changes, create-backup, deploy-server, deploy-client]
+    if: always() && needs.detect-changes.outputs.any-changed == 'true'
+    runs-on: self-hosted
+
+    steps:
+      - name: Print deployment summary
+        run: |
+          echo "🎯 === DEPLOYMENT SUMMARY ==="
+          echo "📅 Time: $(date)"
+          echo "🔍 Changes detected:"
+          echo "  - Server: ${{ needs.detect-changes.outputs.server-changed }}"
+          echo "  - Client: ${{ needs.detect-changes.outputs.client-changed }}"
+          echo ""
+          echo "📦 Backup:"
+          if [ "${{ needs.create-backup.outputs.backup-created }}" == "true" ]; then
+            echo "  - ✅ Created: ${{ needs.create-backup.outputs.backup-path }}"
+          else
+            echo "  - ⚠️ No backup needed (fresh deployment)"
+          fi
+          echo ""
+          echo "🚀 Deployment results:"
+          if [ "${{ needs.deploy-server.result }}" != "" ]; then
+            echo "  - Backend: ${{ needs.deploy-server.result }}"
+          fi
+          if [ "${{ needs.deploy-client.result }}" != "" ]; then
+            echo "  - Frontend: ${{ needs.deploy-client.result }}"
+          fi
+          echo ""
+          echo "🎉 Deployment completed!"

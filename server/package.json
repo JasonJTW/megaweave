@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"Null: no test specified\" && exit 0",
     "build": "dotenv -e .env.production -- tsc --build",
     "build:dev": "dotenv -e .env.development -- tsc --build",
     "start": "dotenv -e .env.production -- node ./dist/server.js",

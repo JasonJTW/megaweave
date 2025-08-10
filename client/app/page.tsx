@@ -305,9 +305,9 @@ const PostsApp = () => {
   }, [selectedImages]);
 
   return (
-    <div className="min-h-screen bg-primary-50">
+    <div className="min-h-screen bg-primary-75">
       {/* Icon */}
-      <div className="bg-primary-50 shadow-sm border-b">
+      <div className="bg-primary-75 shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">

@@ -188,10 +188,10 @@ jobs:
 
           echo "📦 Client code deployed"
 
-      - name: Install production dependencies
+      - name: Install all dependencies for build
         run: |
           cd ~/megaweave/client
-          npm ci --omit=dev
+          npm ci
 
           # Make sure .env file exists
           if [ -f .env.production ]; then
@@ -208,6 +208,13 @@ jobs:
           cd ~/megaweave/client
           npm run build
           echo "📦 Client built successfully"
+
+      - name: Clean up dev dependencies
+        run: |
+          cd ~/megaweave/client
+          # Build 完成後移除開發依賴
+          npm ci --omit=dev
+          echo "🧹 Cleaned up dev dependencies for production runtime"
 
       - name: Start frontend service
         run: |

@@ -117,7 +117,7 @@ jobs:
       - name: Install production dependencies
         run: |
           cd ~/megaweave/server
-          npm ci --only=production
+          npm ci --omit=dev
           echo "📥 Production dependencies installed"
 
       - name: Start backend service
@@ -205,6 +205,7 @@ jobs:
 
       - name: Build client
         run: |
+          cd ~/megaweave/client
           npm run build
           echo "📦 Client built successfully"
 
@@ -229,7 +230,7 @@ jobs:
   deployment-summary:
     name: Deployment Summary
     needs: [detect-changes, create-backup, deploy-server, deploy-client]
-    if: always() && needs.detect-changes.outputs.any-changed == 'true'
+    if: needs.detect-changes.outputs.any-changed == 'true' && !contains(needs.*.result, 'failure')
     runs-on: self-hosted
 
     steps:
@@ -257,3 +258,28 @@ jobs:
           fi
           echo ""
           echo "🎉 Deployment completed!"
+
+  deployment-failure:
+    name: Deployment Failed
+    needs: [detect-changes, create-backup, deploy-server, deploy-client]
+    if: always() && needs.detect-changes.outputs.any-changed == 'true' && contains(needs.*.result, 'failure')
+    runs-on: self-hosted
+
+    steps:
+      - name: Print failure summary
+        run: |
+          echo "❌ === DEPLOYMENT FAILED ==="
+          echo "📅 Time: $(date)"
+          echo "🔍 Changes detected:"
+          echo "  - Server: ${{ needs.detect-changes.outputs.server-changed }}"
+          echo "  - Client: ${{ needs.detect-changes.outputs.client-changed }}"
+          echo ""
+          echo "💥 Failed jobs:"
+          if [ "${{ needs.deploy-server.result }}" == "failure" ]; then
+            echo "  - ❌ Backend deployment failed"
+          fi
+          if [ "${{ needs.deploy-client.result }}" == "failure" ]; then
+            echo "  - ❌ Frontend deployment failed"
+          fi
+          echo ""
+          echo "🔧 Please check the job logs above for details"

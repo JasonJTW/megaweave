@@ -20,8 +20,8 @@ const HOSTNAME = process.env.HOSTNAME || "localhost";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
 const NODE_ENV = process.env.NODE_ENV;
 const limiter = rateLimit({
-  windowMs: 1 * 15 * 1000, // 15 seconds
-  limit: 30,
+  windowMs: 1 * 10 * 1000, // 10 seconds
+  limit: 20,
   // Limit each IP to 100 requests per `window` (here, per 15 minutes).
   message: {
     errorMessage: "Too many requests from this IP, please try again later.",

@@ -163,11 +163,6 @@ jobs:
           cd client
           echo "⏭️ Tests skipped (temporarily disabled)"
 
-      - name: Build client
-        run: |
-          cd client
-          npm run build
-
       - name: Stop frontend service
         run: |
           sudo systemctl stop megaweave-fe.service
@@ -183,7 +178,7 @@ jobs:
             --exclude=node_modules \
             --exclude=.git \
             --exclude=.github \
-            --exclude=.next/cache \
+            --exclude=.next \
             --exclude=*.log \
             --exclude=.env.local \
             --exclude=.env.example \
@@ -197,7 +192,21 @@ jobs:
         run: |
           cd ~/megaweave/client
           npm ci --only=production
+
+          # Make sure .env file exists
+          if [ -f .env.production]; then
+            echo "✅ .env.production found"
+            cat .env.production
+          else
+            echo "❌ .env.production not found!"
+            exit 1
+          fi
           echo "📥 Production dependencies installed"
+
+      - name: Build client
+        run: |
+          npm run build
+          echo "📦 Client built successfully"
 
       - name: Start frontend service
         run: |

@@ -27,6 +27,7 @@ import Image from "next/image";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+  console.log("Host Name: ", hostName);
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -304,9 +305,9 @@ const PostsApp = () => {
   }, [selectedImages]);
 
   return (
-    <div className="min-h-screen bg-secondary-75">
+    <div className="min-h-screen bg-primary-50">
       {/* Icon */}
-      <div className="bg-secondary-75 shadow-sm border-b">
+      <div className="bg-primary-50 shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">

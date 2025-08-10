@@ -74,7 +74,7 @@ jobs:
       - name: Install server dependencies
         run: |
           cd server
-          npm install
+          npm ci
 
       - name: Run server tests
         run: |
@@ -85,11 +85,6 @@ jobs:
             echo "⚠️ Server tests failed"
             exit 1
           fi
-
-      - name: Build server
-        run: |
-          cd server
-          npm run build
 
       - name: Stop backend service
         run: |
@@ -114,11 +109,32 @@ jobs:
 
           echo "📦 Server code deployed"
 
-      - name: Install production dependencies
+      - name: Install all dependencies for build
         run: |
           cd ~/megaweave/server
+          npm ci
+
+          # Make sure .env file exists
+          if [ -f .env.production ]; then
+            echo "✅ .env.production found for server"
+          else
+            echo "❌ .env.production not found!"
+            exit 1
+          fi
+          echo "📥 All dependencies installed for build"
+
+      - name: Build server in production
+        run: |
+          cd ~/megaweave/server
+          npm run build
+          echo "📦 Server built successfully in production"
+
+      - name: Install production dependencies only
+        run: |
+          cd ~/megaweave/server
+          # Build 完成後，重新安裝只包含 production 依賴
           npm ci --omit=dev
-          echo "📥 Production dependencies installed"
+          echo "🧹 Cleaned up dev dependencies for production runtime"
 
       - name: Start backend service
         run: |
@@ -237,7 +253,7 @@ jobs:
   deployment-summary:
     name: Deployment Summary
     needs: [detect-changes, create-backup, deploy-server, deploy-client]
-    if: needs.detect-changes.outputs.any-changed == 'true' && !contains(needs.*.result, 'failure')
+    if: always() && needs.detect-changes.outputs.any-changed == 'true' && !contains(needs.*.result, 'failure')
     runs-on: self-hosted
 
     steps:
@@ -259,12 +275,16 @@ jobs:
           echo "🚀 Deployment results:"
           if [ "${{ needs.deploy-server.result }}" != "" ]; then
             echo "  - Backend: ${{ needs.deploy-server.result }}"
+          else
+            echo "  - Backend: skipped (no changes)"
           fi
           if [ "${{ needs.deploy-client.result }}" != "" ]; then
             echo "  - Frontend: ${{ needs.deploy-client.result }}"
+          else
+            echo "  - Frontend: skipped (no changes)"
           fi
           echo ""
-          echo "🎉 Deployment completed!"
+          echo "🎉 Deployment completed successfully!"
 
   deployment-failure:
     name: Deployment Failed

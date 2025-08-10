@@ -8,7 +8,7 @@ export const UserSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   createdAt: z.date(),
   updatedAt: z.date(),
-  role: z.enum(["admin", "user"]),
+  role: z.enum(["admin", "user", "contributor"]),
 });
 
 //* Schema for user signup, omitting (delete/skip) fields that are not required during signup

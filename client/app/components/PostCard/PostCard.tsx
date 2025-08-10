@@ -47,89 +47,91 @@ const PostCard: React.FC<PostCardProps> = ({
 
   return (
     <div
-      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+      className="bg-secondary-30 rounded-2xl overflow-hidden border border-megaweave-brown-light hover:border-megaweave-blue hover:transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-megaweave-blue transition-all duration-300 cursor-pointer"
       onClick={() => onPostClick?.(post)}
     >
       {/* 圖片區域 */}
       {post.image_urls && (
-        <div className="h-48 bg-gray-200 overflow-hidden relative">
+        <div className="h-64 bg-gray-200 overflow-hidden relative">
           <Image
             src={post.image_urls.split(",")[0]}
             alt={post.title}
-            fill
-            className="object-cover"
+            width={800}
+            height={256}
+            className="object-cover transition-transform duration-500 hover:scale-110"
           />
         </div>
       )}
 
-      <div className="p-4">
-        {/* 其餘內容保持不變... */}
-        <div className="p-4">
-          {/* 標題和分類 */}
-          <div className="mb-2">
-            <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">
-              {post.title}
-            </h3>
-            <span className="inline-block bg-megaweave-forest-light text-white text-xs px-2 py-1 rounded-full">
-              {post.category_name_en}
-            </span>
-          </div>
+      {/* 其餘內容保持不變... */}
+      <div className="px-6 py-4">
+        {/* 標題和分類 */}
+        <div className="mb-2">
+          <h3 className="font-semibold text-lg text-gray-900 line-clamp-2 mb-2">
+            {post.title}
+          </h3>
+          <span
+            className="inline-block bg-primary/75
+            border border-gray-500 text-white font-bold text-xs px-2 py-2 rounded-full"
+          >
+            {post.category_name_en}
+          </span>
+        </div>
 
-          {/* 內容 */}
-          <p className="text-gray-600 text-sm line-clamp-3 mb-3">
-            {post.content}
-          </p>
+        {/* 內容 */}
+        <p className="text-gray-600 text-sm line-clamp-3 mb-14">
+          {post.content}
+        </p>
 
-          {/* 狀況等級 */}
+        {/* 狀況等級 */}
+        <div className="mb-3">
+          <span
+            className={`inline-block text-xs px-2 py-1 rounded-full ${getConditionColor(
+              post.condition_level
+            )}`}
+          >
+            {getConditionName(post.condition_level)}
+          </span>
+        </div>
+
+        {/* 標籤 */}
+        {post.tags && (
           <div className="mb-3">
-            <span
-              className={`inline-block text-xs px-2 py-1 rounded-full ${getConditionColor(
-                post.condition_level
-              )}`}
-            >
-              {getConditionName(post.condition_level)}
-            </span>
+            <div className="flex items-center text-gray-500 text-xs">
+              <Tag className="w-3 h-3 mr-1" />
+              <span className="line-clamp-1">{post.tags}</span>
+            </div>
           </div>
+        )}
 
-          {/* 標籤 */}
-          {post.tags && (
-            <div className="mb-3">
-              <div className="flex items-center text-gray-500 text-xs">
-                <Tag className="w-3 h-3 mr-1" />
-                <span className="line-clamp-1">{post.tags}</span>
-              </div>
+        {/* 地點和時間 */}
+        <div className="space-y-1 mb-3">
+          {post.location && (
+            <div className="flex items-center text-gray-500 text-xs">
+              <MapPin className="w-3 h-3 mr-1" />
+              <span>{post.location}</span>
             </div>
           )}
-
-          {/* 地點和時間 */}
-          <div className="space-y-1 mb-3">
-            {post.location && (
-              <div className="flex items-center text-gray-500 text-xs">
-                <MapPin className="w-3 h-3 mr-1" />
-                <span>{post.location}</span>
-              </div>
-            )}
-            <div className="flex items-center text-gray-500 text-xs">
-              <Calendar className="w-3 h-3 mr-1" />
-              <span>{formatDate(post.created_at)}</span>
-            </div>
+          <div className="flex items-center text-gray-500 text-xs">
+            <Calendar className="w-3 h-3 mr-1" />
+            <span>{formatDate(post.created_at)}</span>
           </div>
+        </div>
 
-          {/* 底部信息 */}
-          <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t">
+        {/* 底部信息 */}
+        <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t">
+          <div className="flex items-center">
+            <UserIcon className="w-3 h-3 mr-1" />
+            <span>{post.username}</span>
+          </div>
+          <div className="flex items-center space-x-3">
             <div className="flex items-center">
-              <UserIcon className="w-3 h-3 mr-1" />
-              <span>{post.username}</span>
+              <Eye className="w-3 h-3 mr-1" />
+              <span>{post.view_count}</span>
             </div>
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center">
-                <Eye className="w-3 h-3 mr-1" />
-                <span>{post.view_count}</span>
-              </div>
-              <div className="flex items-center">
-                <Heart className="w-3 h-3 mr-1" />
-                <span>{post.interests_count}</span>
-              </div>
+            <div className="flex items-center">
+              <Heart className="w-3 h-3 mr-1" />
+              <span>{post.interests_count}</span>
             </div>
           </div>
         </div>

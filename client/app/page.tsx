@@ -305,9 +305,9 @@ const PostsApp = () => {
   }, [selectedImages]);
 
   return (
-    <div className="min-h-screen bg-megaweave-stone">
+    <div className="min-h-screen bg-secondary">
       {/* Icon */}
-      <div className="bg-megaweave-stone shadow-sm border-b">
+      <div className="bg-megaweave-secondary shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
@@ -360,7 +360,7 @@ const PostsApp = () => {
 
       {/* 搜索和篩選區域 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-secondary-50 rounded-lg shadow-sm p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* 搜索框 */}
             <div className="relative">
@@ -408,7 +408,7 @@ const PostsApp = () => {
                 setSelectedLocation("");
                 setCurrentPage(1);
               }}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary-30 hover:bg-primary-15 text-gray-700 rounded-lg transition-colors"
             >
               Resets
             </button>

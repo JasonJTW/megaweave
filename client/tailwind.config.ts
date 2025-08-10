@@ -43,6 +43,10 @@ export default {
             DEFAULT: "#5AAFA0",
             light: "#B4E6DC",
           },
+          brown: {
+            DEFAULT: "#46413C",
+            light: "#D2C8B4",
+          },
         },
 
         // Original shadcn/ui colors
@@ -68,9 +72,9 @@ export default {
         secondary: {
           DEFAULT: "#efe6d6", // 100%
           75: "#f2ebe0", // 75%
-          50: "##f7f1ea", // 50%
-          30: "##fbf7f4", // 30%
-          15: "##fdfbf9", // 15%
+          50: "#f7f1ea", // 50%
+          30: "#fbf7f4", // 30%
+          15: "#fdfbf9", // 15%
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",

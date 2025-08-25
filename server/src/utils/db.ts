@@ -15,6 +15,12 @@ const dbPool = mysql
     port: DB_PORT,
     password: DB_PASSWORD,
     database: DB_DATABASE,
+    typeCast: (field, next) => {
+      if (field.type === "TINY" && field.length === 1) {
+        return field.string() === "1"; // 將 TINYINT(1) 轉換為布林值
+      }
+      return next();
+    },
     waitForConnections: true,
     connectionLimit: 10, // 最大連接數
     queueLimit: 0, // 無限制排隊

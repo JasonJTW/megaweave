@@ -83,8 +83,8 @@ const TeamInfoPage = () => {
   const router = useRouter();
 
   return (
-    <div className="min-h-screen bg-primary-75 overflow-hidden">
-      <div className="px-10 md:px-20">
+    <div className="min-h-screen bg-primary-75 overflow-hidden px-4 sm:px-8 md:px-16 lg:px-24 xl:px-32">
+      <div className="px-10 md:px-20 flex flex-col">
         {/* Header */}
         <div className="pt-20 pb-20">
           <div className="max-w-full mx-auto text-center">

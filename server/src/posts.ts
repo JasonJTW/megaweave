@@ -14,7 +14,7 @@ import { S3Client } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import dotenv from "dotenv";
-import { requireAuth } from "./middleware/auth";
+import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { getUserSessionFromRedis } from "./session";
 import { uploadImages, insertImages } from "./upload";
 import { deleteS3Files } from "./upload";
@@ -88,11 +88,6 @@ type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
 //   return originalUrl.replace(/(\.[^.]+)$/, '_thumb$1');
 // }
 
-// 擴展 Request 接口
-interface AuthenticatedRequest extends Request {
-  user?: UserSession;
-}
-
 // 驗證分類是否存在
 async function validateCategory(categoryId: number): Promise<boolean> {
   const query = "SELECT id FROM categories WHERE id = ? AND status = 'active'";
@@ -104,14 +99,15 @@ async function validateCategory(categoryId: number): Promise<boolean> {
 router.post(
   "/",
   requireAuth,
-  //* upload image limit
   uploadImages,
   async (req: AuthenticatedRequest, res: Response) => {
     console.log("API create post called");
 
     const userId = req.user!.userId;
-    //TODO: Configure S3
     const files = req.files as Express.MulterS3.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ errorMessage: "No images uploaded" });
+    }
     // 1. 驗證輸入數據
     let validationResult: CreatePostSchemaType | undefined;
     try {
@@ -170,7 +166,7 @@ router.post(
           : null,
       ];
 
-      const [postResult] = await connection.query<ResultSetHeader>(
+      const [postResult] = await connection.execute<ResultSetHeader>(
         postInsertQuery,
         postValues
       );

@@ -18,6 +18,7 @@ export interface Post {
   category_name_en: string;
   image_urls?: string;
   thumbnail_urls?: string;
+  showContact: boolean;
 }
 
 export interface Category {

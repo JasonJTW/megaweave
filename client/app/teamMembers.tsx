@@ -30,9 +30,9 @@ export const teamMembers: TeamMember[] = [
   {
     id: 1,
     name: "Yu-Chih Hsiao",
-    avatar: "https://picsum.photos/seed/1/600/400?grayscale&blur=3",
+    avatar: "/member1.jpg",
     department: "Member",
-    title: "Proposer",
+    title: "Daddy",
     location: "Taipei, Taiwan",
     bio: (
       <>
@@ -62,7 +62,7 @@ export const teamMembers: TeamMember[] = [
   {
     id: 2,
     name: "Jyun-Hao Jhang",
-    avatar: "https://picsum.photos/seed/jyun/600/400?grayscale&blur=3",
+    avatar: "/member2.jpg",
     department: "Member",
     title: "Developer",
     location: "Taipei, Taiwan",
@@ -71,7 +71,7 @@ export const teamMembers: TeamMember[] = [
   {
     id: 3,
     name: "Yu-Huan Chang",
-    avatar: "https://picsum.photos/seed/3/600/400?grayscale&blur=3",
+    avatar: "/member3.jpg",
     department: "Member",
     title: "Designer",
     location: "Taipei, Taiwan",
@@ -83,7 +83,7 @@ export const teamMembers: TeamMember[] = [
   {
     id: 4,
     name: "Cyrus Chen",
-    avatar: "https://picsum.photos/seed/5/600/400?grayscale&blur=3",
+    avatar: "/member4.jpg",
     department: "Member",
     title: "Project Manager",
     location: "Taipei, Taiwan",
@@ -92,7 +92,7 @@ export const teamMembers: TeamMember[] = [
   {
     id: 5,
     name: "Tzu-I Yang",
-    avatar: "https://picsum.photos/seed/6/600/400?grayscale&blur=3",
+    avatar: "/member5.jpg",
     department: "Member",
     title: "Advisor",
     location: "Taipei, Taiwan",

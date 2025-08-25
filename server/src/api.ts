@@ -7,6 +7,8 @@ import signoutAPI from "./signout";
 import postAPI from "./posts";
 import categoriesAPI from "./categories";
 import conditionsAPI from "./conditions";
+import avatarAPI from "./avatar";
+import userprofileAPI from "./userprofile";
 //* Test api
 router.post("/test", (req, res) => {
   console.log("API test called");
@@ -25,4 +27,6 @@ router.use("/signout", signoutAPI);
 router.use("/posts", postAPI);
 router.use("/categories", categoriesAPI);
 router.use("/conditions", conditionsAPI);
+router.use("/avatar", avatarAPI);
+router.use("/userprofile", userprofileAPI);
 export default router;

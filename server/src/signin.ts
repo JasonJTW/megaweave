@@ -11,6 +11,7 @@ import { createUserSession } from "./session";
 import { UserSession } from "./schema";
 import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
+import { userRoles } from "./schema";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
@@ -117,8 +118,8 @@ async function findOrCreateUser(
   } else {
     // 4. 用戶不存在，創建新用戶
     const insertQuery = `
-      INSERT INTO users (email, username, password, salt, google_id, facebook_id, providers, role) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (email, username, password, salt, google_id, facebook_id, providers, role, contact_email) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const insertValues = [
@@ -129,7 +130,8 @@ async function findOrCreateUser(
       providerData.googleId || null,
       providerData.facebookId || null,
       JSON.stringify([provider]),
-      "user", // 默認角色
+      userRoles[0], // default role is 'user'
+      email,
     ];
 
     const [result] = await dbPool.query<ResultSetHeader>(
@@ -301,7 +303,7 @@ async function verifyFacebookToken(
 ): Promise<FacebookUser | null> {
   try {
     const response = await fetch(
-      `https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture`
+      `https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture.width(800).height(800)`
     );
 
     if (!response.ok) {
@@ -333,6 +335,7 @@ router.post("/facebook", async (req: Request, res: Response) => {
 
   try {
     const facebookUser = await verifyFacebookToken(accessToken);
+    console.log("facebookUser:", facebookUser);
 
     if (!facebookUser || !facebookUser.email) {
       return res.status(401).json({

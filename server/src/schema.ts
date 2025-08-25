@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const userRoles = ["admin", "user", "contributor"] as const;
+export const userRoles = ["user", "admin", "contributor"] as const;
 export type UserRole = (typeof userRoles)[number];
 
 export const sessionSchema = z.object({

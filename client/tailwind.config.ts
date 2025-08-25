@@ -23,21 +23,21 @@ export default {
 
           // Rich golden tones
           gold: {
-            light: "#FADC78", // rgb(213, 171, 28)
             DEFAULT: "#FAB40F", // rgb(161, 118, 36)
+            light: "#FADC78", // rgb(213, 171, 28)
           },
 
           // Natural green tones
           forest: {
-            light: "#587635", // rgb(88, 118, 53)
             DEFAULT: "#3C6432", // rgb(62, 99, 48)
+            light: "#587635", // rgb(88, 118, 53)
             dark: "#233719", // rgb(35, 53, 25)
           },
 
           // Accent colors
           red: {
-            light: "#FAA06C",
             dark: "#C8551E",
+            light: "#FAA06C",
           },
           blue: {
             DEFAULT: "#5AAFA0",
@@ -62,18 +62,18 @@ export default {
         },
         // primary leaf green
         primary: {
-          DEFAULT: "#3C6432", // 100%
-          75: "#6a8a66", // 75%
-          50: "#9db09a", // 50%
+          DEFAULT: "#3b6232", // 100%
+          75: "#6c8965", // 75%
+          50: "#9eb098", // 50%
           30: "#c4d0c1", // 30%
-          15: "#e2e8e1", // 15%
+          15: "#e2e7e0", // 15%
         },
         // secondary sand
         secondary: {
-          DEFAULT: "#efe6d6", // 100%
+          DEFAULT: "#efe5d6", // 100%
           75: "#f2ebe0", // 75%
-          50: "#f7f1ea", // 50%
-          30: "#fbf7f4", // 30%
+          50: "#f7f2eb", // 50%
+          30: "#faf7f3", // 30%
           15: "#fdfbf9", // 15%
         },
         muted: {

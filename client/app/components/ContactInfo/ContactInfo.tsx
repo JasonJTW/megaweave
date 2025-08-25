@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +40,18 @@ const ContactInfo: React.FC<ContactInfoProps> = ({
       day: "numeric",
     });
   };
+
+  const setContactInfo = (post: Post) => {
+    if (post.showContact) {
+      setShowContactInfo(true);
+    } else {
+      setShowContactInfo(false);
+    }
+  };
+
+  useEffect(() => {
+    setContactInfo(post);
+  }, [post]);
 
   // 檢查是否為電話號碼
   const isPhoneNumber = (contact: string) => {
@@ -104,88 +116,90 @@ const ContactInfo: React.FC<ContactInfoProps> = ({
       </div>
 
       {/* 聯絡方式區域 */}
-      <div className="border-t pt-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-gray-900">聯絡方式</h4>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowContactInfo(!showContactInfo)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            {showContactInfo ? (
-              <EyeOff className="w-4 h-4" />
-            ) : (
-              <Eye className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
-
-        {!user ? (
-          <div className="bg-gray-50 rounded-lg p-4 text-center">
-            <p className="text-sm text-gray-600 mb-2">請登入以查看聯絡方式</p>
+      {showContactInfo && (
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-gray-900">聯絡方式</h4>
             <Button
+              variant="ghost"
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() => {
-                // 這裡可以觸發登入流程
-                router.push("/signin");
-              }}
+              onClick={() => setShowContactInfo(!showContactInfo)}
+              className="text-gray-500 hover:text-gray-700"
             >
-              登入
+              {showContactInfo ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
             </Button>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {post.contact ? (
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-full">
-                      {getContactIcon(post.contact)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {post.contact &&
-                          isPhoneNumber(post.contact) &&
-                          "電話號碼"}
-                        {post.contact && isEmail(post.contact) && "電子郵件"}
-                        {post.contact &&
-                          !isPhoneNumber(post.contact) &&
-                          !isEmail(post.contact) &&
-                          "聯絡方式"}
-                      </p>
-                      <p className="text-gray-700 font-mono text-sm">
-                        {post.contact}
-                      </p>
-                    </div>
-                  </div>
-                  <ShareButton
-                    content={post.contact}
-                    label="複製聯絡方式"
-                    className="text-gray-500 hover:text-gray-700"
-                    variant="ghost"
-                    size="sm"
-                    showText={false}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600">發佈者未提供聯絡方式</p>
-              </div>
-            )}
 
-            {/* 聯絡提示 */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-              <p className="text-xs text-yellow-800">
-                <strong>提醒：</strong>
-                請注意個人安全，建議在公共場所進行交易，避免提供個人敏感資訊。
-              </p>
+          {!user ? (
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <p className="text-sm text-gray-600 mb-2">請登入以查看聯絡方式</p>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => {
+                  // 這裡可以觸發登入流程
+                  router.push("/signin");
+                }}
+              >
+                登入
+              </Button>
             </div>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="space-y-3">
+              {post.contact ? (
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-blue-100 rounded-full">
+                        {getContactIcon(post.contact)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {post.contact &&
+                            isPhoneNumber(post.contact) &&
+                            "電話號碼"}
+                          {post.contact && isEmail(post.contact) && "電子郵件"}
+                          {post.contact &&
+                            !isPhoneNumber(post.contact) &&
+                            !isEmail(post.contact) &&
+                            "聯絡方式"}
+                        </p>
+                        <p className="text-gray-700 font-mono text-sm">
+                          {post.contact}
+                        </p>
+                      </div>
+                    </div>
+                    <ShareButton
+                      content={post.contact}
+                      label="複製聯絡方式"
+                      className="text-gray-500 hover:text-gray-700"
+                      variant="ghost"
+                      size="sm"
+                      showText={false}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-sm text-gray-600">發佈者未提供聯絡方式</p>
+                </div>
+              )}
+
+              {/* 聯絡提示 */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-xs text-yellow-800">
+                  <strong>提醒：</strong>
+                  請注意個人安全，建議在公共場所進行交易，避免提供個人敏感資訊。
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 快速操作按鈕 */}
       {showContactInfo && post.contact && user && (

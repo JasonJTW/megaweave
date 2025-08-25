@@ -94,3 +94,8 @@ export function requireRole(...allowedRoles: string[]) {
     next();
   };
 }
+
+// 擴展 Request 接口
+export interface AuthenticatedRequest extends Request {
+  user?: UserSession;
+}

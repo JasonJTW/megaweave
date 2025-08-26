@@ -55,9 +55,11 @@ const UserPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isContributor, setIsContributor] = useState(false);
   const [bio, setBio] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [tempBio, setTempBio] = useState(bio);
+  const [tempContactEmail, setTempContactEmail] = useState(contactEmail);
   const router = useRouter();
 
   const contactForm = useForm<ContactSettingsValues>({
@@ -109,7 +111,7 @@ const UserPage = () => {
   };
 
   const getBio = async () => {
-    const response = await fetch(`${hostName}/api/userprofile`, {
+    const response = await fetch(`${hostName}/api/userprofile/bio`, {
       cache: "no-store",
       method: "GET",
       credentials: "include",
@@ -126,7 +128,7 @@ const UserPage = () => {
 
   const insertBio = async (bio: string) => {
     try {
-      const response = await fetch(`${hostName}/api/userprofile`, {
+      const response = await fetch(`${hostName}/api/userprofile/bio`, {
         cache: "no-store",
         method: "POST",
         credentials: "include",
@@ -149,6 +151,50 @@ const UserPage = () => {
     }
   };
 
+  const insertContactEmail = async (contactEmail: string) => {
+    try {
+      const response = await fetch(
+        `${hostName}/api/userprofile/contact_email`,
+        {
+          cache: "no-store",
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contact_email: contactEmail,
+          }),
+        }
+      );
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error("Failed to update profile: ", result.errorMessage);
+      }
+      const result = await response.json();
+      console.log("Update profile Success: ", result);
+    } catch (error) {
+      console.error("Error update profile: ", error);
+      throw error;
+    }
+  };
+
+  const getContactEmail = async () => {
+    const response = await fetch(`${hostName}/api/userprofile/contact_email`, {
+      cache: "no-store",
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const result = await response.json();
+      console.error("Error fetching userprofile:", result.errorMessage);
+      setError(result.errMessage);
+    }
+    const result = await response.json();
+
+    setContactEmail(result.contactEmail);
+  };
+
   const handleSaveBio = () => {
     setBio(tempBio);
     setIsEditingBio(false);
@@ -165,6 +211,25 @@ const UserPage = () => {
   const handleEditBio = () => {
     setTempBio(bio);
     setIsEditingBio(true);
+  };
+
+  const handleSaveContact = () => {
+    setContactEmail(tempContactEmail);
+    console.log("tempContactEmail:", tempContactEmail);
+    setIsEditingContact(false);
+
+    // Add API call to save contact email
+    insertContactEmail(tempContactEmail);
+  };
+
+  const handleCancelContact = () => {
+    setTempContactEmail(contactEmail);
+    setIsEditingContact(false);
+  };
+
+  const handleEditContact = () => {
+    setTempContactEmail(contactEmail);
+    setIsEditingContact(true);
   };
 
   const handleSignOut = async () => {
@@ -243,6 +308,7 @@ const UserPage = () => {
   useEffect(() => {
     fetchUser();
     getBio();
+    getContactEmail();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -461,7 +527,7 @@ const UserPage = () => {
                 </h3>
                 {!isEditingContact ? (
                   <button
-                    onClick={() => setIsEditingContact(true)}
+                    onClick={handleEditContact}
                     className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-all duration-200 text-sm"
                   >
                     <Edit3 className="w-3 h-3" />
@@ -470,20 +536,14 @@ const UserPage = () => {
                 ) : (
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => {
-                        contactForm.handleSubmit(onContactFormSubmit)();
-                        setIsEditingContact(false);
-                      }}
+                      onClick={handleSaveContact}
                       className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
                     >
                       <Save className="w-3 h-3" />
                       <span>Save</span>
                     </button>
                     <button
-                      onClick={() => {
-                        contactForm.reset();
-                        setIsEditingContact(false);
-                      }}
+                      onClick={handleCancelContact}
                       className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
                     >
                       <X className="w-3 h-3" />
@@ -546,10 +606,16 @@ const UserPage = () => {
                                 type="email"
                                 placeholder="Enter your contact email"
                                 className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                                onChange={(e) => {
+                                  field.onChange(e); // 更新表單狀態
+                                  setTempContactEmail(e.target.value); // 同步更新臨時變量
+                                }}
                               />
                             ) : (
-                              <div className=" text-gray-300 rounded-lg ">
-                                {field.value || "No email provided"}
+                              <div className="text-gray-300 rounded-lg">
+                                {field.value ||
+                                  contactEmail ||
+                                  "No email provided"}
                               </div>
                             )}
                           </FormControl>

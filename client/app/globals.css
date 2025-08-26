@@ -113,3 +113,102 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes neon-pulse {
+  0% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5),
+      0 0 40px rgba(147, 51, 234, 0.3), 0 0 60px rgba(236, 72, 153, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.8),
+      0 0 60px rgba(147, 51, 234, 0.6), 0 0 90px rgba(236, 72, 153, 0.4);
+  }
+}
+
+@keyframes border-gradient-flow {
+  0% {
+    border-image-source: linear-gradient(
+      45deg,
+      #ff006e,
+      #fb5607,
+      #ffbe0b,
+      #8338ec,
+      #3a86ff
+    );
+  }
+  25% {
+    border-image-source: linear-gradient(
+      45deg,
+      #3a86ff,
+      #ff006e,
+      #fb5607,
+      #ffbe0b,
+      #8338ec
+    );
+  }
+  50% {
+    border-image-source: linear-gradient(
+      45deg,
+      #8338ec,
+      #3a86ff,
+      #ff006e,
+      #fb5607,
+      #ffbe0b
+    );
+  }
+  75% {
+    border-image-source: linear-gradient(
+      45deg,
+      #ffbe0b,
+      #8338ec,
+      #3a86ff,
+      #ff006e,
+      #fb5607
+    );
+  }
+  100% {
+    border-image-source: linear-gradient(
+      45deg,
+      #fb5607,
+      #ffbe0b,
+      #8338ec,
+      #3a86ff,
+      #ff006e
+    );
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes border-rotate {
+  0% {
+    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+      linear-gradient(0deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
+  }
+  25% {
+    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+      linear-gradient(90deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
+  }
+  50% {
+    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+      linear-gradient(180deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
+  }
+  75% {
+    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+      linear-gradient(270deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
+  }
+  100% {
+    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+      linear-gradient(360deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
+  }
+}

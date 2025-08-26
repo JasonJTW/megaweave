@@ -70,11 +70,7 @@ export default {
         },
         // secondary sand
         secondary: {
-          DEFAULT: "#efe5d6", // 100%
-          75: "#f2ebe0", // 75%
-          50: "#f7f2eb", // 50%
-          30: "#faf7f3", // 30%
-          15: "#fdfbf9", // 15%
+          DEFAULT: "#eaebe6", // 100%
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",

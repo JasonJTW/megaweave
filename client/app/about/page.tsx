@@ -100,7 +100,7 @@ const TeamInfoPage = () => {
             <div className=" mb-20 md:mb-60 grid grid-cols-1 lg:grid-cols-[2fr_3fr] gap-20">
               {/* Left Column - Description */}
               <div>
-                <h2 className="text-4xl md:text-5xl text-secondary-75 leading-relaxed  mb-4 -mt-4">
+                <h2 className="text-4xl md:text-5xl text-secondary/75 leading-relaxed  mb-4">
                   Weaving Commons of Shared Resources.
                 </h2>
               </div>

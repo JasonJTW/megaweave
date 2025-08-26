@@ -314,9 +314,9 @@ const UserPage = () => {
           >
             <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
               {/* Avatar */}
-              <div className="text-center mb-6">
+              <div className="text-center mb-2">
                 <div className="relative inline-block">
-                  <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-2xl font-bold mb-4 mx-auto shadow-lg shadow-blue-500/20">
+                  <div className="w-72 h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer">
                     {user.username.charAt(0)}
                   </div>
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
@@ -341,17 +341,27 @@ const UserPage = () => {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-4 p-3 bg-gradient-to-r from-megaweave-blue/10 to-megaweave-blue-light/10 rounded-lg border border-blue-500/20"
+                    transition={{ delay: 0.2 }}
+                    className="mt-4 p-3 bg-gradient-to-r from-megaweave-blue/10 to-megaweave-blue-light/10 rounded-lg relative"
+                    style={{
+                      border: "2px solid #3b82f6",
+                      boxShadow: `
+                        0 0 20px rgba(59, 130, 246, 0.6),
+                        0 0 40px rgba(147, 51, 234, 0.4),
+                        0 0 60px rgba(236, 72, 153, 0.3),
+                        inset 0 0 0 2px rgba(255, 255, 255, 0.1)
+                      `,
+                      animation: "neon-pulse 1s ease-in-out infinite alternate",
+                    }}
                   >
                     <div className="flex items-center justify-center space-x-4">
                       <Image
-                        src={"/favicon.ico"}
+                        src={"/favicon2.ico"}
                         alt="contributor-badge"
-                        width={15}
-                        height={15}
+                        width={20}
+                        height={20}
                       />
-                      <p className="text-sm text-megaweave-blue-light">
+                      <p className="text-md text-megaweave-blue-light font-ddin font-bold tracking-widest">
                         Welcome, dear contributor!
                       </p>
                     </div>
@@ -386,7 +396,7 @@ const UserPage = () => {
           >
             {/* Bio Section */}
             <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-semibold flex items-center space-x-2">
                   <UserIcon className="w-5 h-5" />
                   <span>About Me</span>
@@ -444,7 +454,7 @@ const UserPage = () => {
 
             {/* Contact Settings */}
             <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-semibold flex items-center space-x-2">
                   <Contact className="w-5 h-5" />
                   <span>Contact Setting</span>
@@ -540,6 +550,66 @@ const UserPage = () => {
                             ) : (
                               <div className=" text-gray-300 rounded-lg ">
                                 {field.value || "No email provided"}
+                              </div>
+                            )}
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Phone Section */}
+                  <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base font-medium">
+                          Phone
+                        </FormLabel>
+                      </div>
+                      <FormField
+                        control={contactForm.control}
+                        name="phoneVisible"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex items-center space-x-2">
+                              <span
+                                className={`text-sm transition-colors duration-200 ${
+                                  field.value
+                                    ? "text-green-400"
+                                    : "text-gray-400"
+                                }`}
+                              >
+                                {field.value ? "Public" : "Private"}
+                              </span>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  className="data-[state=checked]:bg-blue-500"
+                                />
+                              </FormControl>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={contactForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            {isEditingContact ? (
+                              <input
+                                {...field}
+                                type="phone"
+                                placeholder="Enter your contact phone number"
+                                className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                              />
+                            ) : (
+                              <div className=" text-gray-300 rounded-lg ">
+                                {field.value || "No phone provided"}
                               </div>
                             )}
                           </FormControl>

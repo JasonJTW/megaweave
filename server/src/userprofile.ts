@@ -4,13 +4,13 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import dbPool from "./utils/db";
-import { requireAuth } from "./middleware/auth";
-
+import { requireAuth, requireRole } from "./middleware/auth";
+import { UserRole, userRoles } from "./schema";
 const router = Router();
 
 //RWD: For get & post user profile
 
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/bio", requireAuth, async (req: Request, res: Response) => {
   let query;
   try {
     //* check if userId exists
@@ -40,7 +40,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+router.post("/bio", requireAuth, async (req: Request, res: Response) => {
   let query;
   if (!req.user) {
     return res.status(404).json({ errorMessage: "Please signin first" });
@@ -58,4 +58,136 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     res.status(500).json({ errorMessage: "Failed to update profile" });
   }
 });
+
+router.get(
+  "/contact_email",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    let query;
+    try {
+      //* check if userId exists
+      if (!req.user?.userId) {
+        return res.status(401).json({
+          errorMessage: "User ID not found, Please signin first",
+        });
+      }
+
+      query = `SELECT contact_email FROM users WHERE id = ?`;
+      const [rows] = await dbPool.query(query, [req.user?.userId]);
+      console.log("rows:", rows);
+      const contactEmail = (rows as RowDataPacket[])[0]?.contact_email;
+      return res.status(200).json({ contactEmail: contactEmail });
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("DB error:", error.message);
+        return res
+          .status(500)
+          .json({ errorMessage: "Failed to fetch user profile" });
+      } else {
+        console.error("DB error: ", error);
+      }
+      return res
+        .status(500)
+        .json({ errorMessage: "Failed to fetch user profile" });
+    }
+  }
+);
+
+router.post(
+  "/contact_email",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    let query;
+    if (!req.user) {
+      return res.status(404).json({ errorMessage: "Please signin first" });
+    }
+    const userId = req.user.userId;
+    const newContactEmail = req.body.contact_email;
+    console.log("newContactEmail:", newContactEmail);
+    try {
+      query = `Update users set contact_email = ? where id = ?`;
+      const updateResult = await dbPool.query(query, [newContactEmail, userId]);
+      res.status(200).json({
+        message: "Profile update successfully",
+        data: updateResult,
+        newContactEmail: newContactEmail,
+      });
+    } catch (error) {
+      console.error("Database error:", error);
+      res.status(500).json({ errorMessage: "Failed to update profile" });
+    }
+  }
+);
+
+//RWD userProfile for contributor, displaying on about page
+router.get(
+  `/${userRoles[2]}`,
+  requireAuth,
+  requireRole(`${userRoles[2]}`),
+  async (req: Request, res: Response) => {
+    let query;
+    try {
+      // 不需要任何角色檢查，中間件已經處理了
+      query = `SELECT title, location FROM member WHERE user_id = ?`;
+      const [rows] = await dbPool.query(query, [req.user!.userId]);
+
+      const memberData = (rows as RowDataPacket[])[0];
+
+      return res.status(200).json({
+        title: memberData?.title || null,
+        location: memberData?.location || null,
+        role: req.user!.role,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("DB error:", error.message);
+        return res
+          .status(500)
+          .json({ errorMessage: "Failed to fetch member profile" });
+      } else {
+        console.error("DB error: ", error);
+      }
+      return res
+        .status(500)
+        .json({ errorMessage: "Failed to fetch member profile" });
+    }
+  }
+);
+
+router.post(
+  `/${userRoles[2]}`,
+  requireAuth,
+  requireRole(`${userRoles[2]}`),
+  async (req: Request, res: Response) => {
+    let query;
+    const userId = req.user!.userId;
+    const { title, location } = req.body;
+
+    try {
+      // 不需要角色檢查，中間件已經處理了
+      query = `
+      INSERT INTO member (user_id, title, location) 
+      VALUES (?, ?, ?) 
+      ON DUPLICATE KEY UPDATE 
+        title = VALUES(title), 
+        location = VALUES(location)
+    `;
+
+      const updateResult = await dbPool.query(query, [
+        userId,
+        title || null,
+        location || null,
+      ]);
+
+      res.status(200).json({
+        message: "Member profile updated successfully",
+        data: updateResult,
+      });
+    } catch (error) {
+      console.error("Database error:", error);
+      res.status(500).json({ errorMessage: "Failed to update member profile" });
+    }
+  }
+);
+
 export default router;

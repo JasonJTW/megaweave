@@ -119,6 +119,66 @@ router.post(
   }
 );
 
+router.get(
+  "/contact_phone",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    let query;
+    try {
+      //* check if userId exists
+      if (!req.user?.userId) {
+        return res.status(401).json({
+          errorMessage: "User ID not found, Please signin first",
+        });
+      }
+
+      query = `SELECT contact_phone FROM users WHERE id = ?`;
+      const [rows] = await dbPool.query(query, [req.user?.userId]);
+      console.log("rows:", rows);
+      const contactPhone = (rows as RowDataPacket[])[0]?.contact_phone;
+      return res.status(200).json({ contactPhone: contactPhone });
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("DB error:", error.message);
+        return res
+          .status(500)
+          .json({ errorMessage: "Failed to fetch user profile" });
+      } else {
+        console.error("DB error: ", error);
+      }
+      return res
+        .status(500)
+        .json({ errorMessage: "Failed to fetch user profile" });
+    }
+  }
+);
+
+router.post(
+  "/contact_phone",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    let query;
+    if (!req.user) {
+      return res.status(404).json({ errorMessage: "Please signin first" });
+    }
+    const userId = req.user.userId;
+    const newContactPhone = req.body.contact_phone;
+    console.log("newContactPhone:", newContactPhone);
+    try {
+      query = `Update users set contact_phone = ? where id = ?`;
+      const updateResult = await dbPool.query(query, [newContactPhone, userId]);
+      res.status(200).json({
+        message: "Profile update successfully",
+        data: updateResult,
+        newContactPhone: newContactPhone,
+      });
+    } catch (error) {
+      console.error("Database error:", error);
+      res.status(500).json({ errorMessage: "Failed to update profile" });
+    }
+  }
+);
+
 //RWD userProfile for contributor, displaying on about page
 router.get(
   `/${userRoles[2]}`,

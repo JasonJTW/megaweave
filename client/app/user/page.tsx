@@ -56,10 +56,10 @@ const UserPage = () => {
   const [isContributor, setIsContributor] = useState(false);
   const [bio, setBio] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [tempBio, setTempBio] = useState(bio);
-  const [tempContactEmail, setTempContactEmail] = useState(contactEmail);
   const router = useRouter();
 
   const contactForm = useForm<ContactSettingsValues>({
@@ -179,6 +179,34 @@ const UserPage = () => {
     }
   };
 
+  const insertContactPhone = async (contactPhone: string) => {
+    try {
+      const response = await fetch(
+        `${hostName}/api/userprofile/contact_phone`,
+        {
+          cache: "no-store",
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contact_phone: contactPhone,
+          }),
+        }
+      );
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error("Failed to update profile: ", result.errorMessage);
+      }
+      const result = await response.json();
+      console.log("Update profile Success: ", result);
+    } catch (error) {
+      console.error("Error update profile: ", error);
+      throw error;
+    }
+  };
+
   const getContactEmail = async () => {
     const response = await fetch(`${hostName}/api/userprofile/contact_email`, {
       cache: "no-store",
@@ -191,8 +219,26 @@ const UserPage = () => {
       setError(result.errMessage);
     }
     const result = await response.json();
+    const emailValue = result.contactEmail || "";
+    setContactEmail(emailValue);
+    contactForm.setValue("email", emailValue);
+  };
 
-    setContactEmail(result.contactEmail);
+  const getContactPhone = async () => {
+    const response = await fetch(`${hostName}/api/userprofile/contact_phone`, {
+      cache: "no-store",
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const result = await response.json();
+      console.error("Error fetching userprofile:", result.errorMessage);
+      setError(result.errMessage);
+    }
+    const result = await response.json();
+    const phoneValue = result.contactPhone || "";
+    setContactPhone(phoneValue);
+    contactForm.setValue("phone", phoneValue);
   };
 
   const handleSaveBio = () => {
@@ -213,22 +259,38 @@ const UserPage = () => {
     setIsEditingBio(true);
   };
 
-  const handleSaveContact = () => {
-    setContactEmail(tempContactEmail);
-    console.log("tempContactEmail:", tempContactEmail);
-    setIsEditingContact(false);
+  const handleSaveContact = async () => {
+    const formData = contactForm.getValues();
+    console.log("Contact form data:", formData);
 
-    // Add API call to save contact email
-    insertContactEmail(tempContactEmail);
+    try {
+      if (formData.email !== contactEmail) {
+        await insertContactEmail(formData.email || "");
+      }
+      if (formData.phone !== contactPhone) {
+        await insertContactPhone(formData.phone || "");
+      }
+      setContactEmail(formData.email || "");
+      setContactPhone(formData.phone || "");
+      setIsEditingContact(false);
+    } catch (error) {
+      console.error("Error saving contact info:", error);
+    }
   };
 
   const handleCancelContact = () => {
-    setTempContactEmail(contactEmail);
+    contactForm.setValue("email", contactEmail);
+    contactForm.setValue("phone", contactPhone);
     setIsEditingContact(false);
   };
 
   const handleEditContact = () => {
-    setTempContactEmail(contactEmail);
+    contactForm.reset({
+      email: contactEmail,
+      phone: contactPhone,
+      emailVisible: contactForm.getValues("emailVisible"),
+      phoneVisible: contactForm.getValues("phoneVisible"),
+    });
     setIsEditingContact(true);
   };
 
@@ -309,6 +371,7 @@ const UserPage = () => {
     fetchUser();
     getBio();
     getContactEmail();
+    getContactPhone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -346,7 +409,7 @@ const UserPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-megaweave-brown text-secondary">
+    <div className="min-h-screen bg-megaweave-brown text-secondary px-0 sm:px-6 md:px-12 lg:px-16">
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -355,7 +418,9 @@ const UserPage = () => {
       >
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-            <h1 className="text-9xl font-ddin font-semibold">User Profile</h1>
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-ddin font-extrabold tracking-wide">
+              User Profile
+            </h1>
           </div>
 
           <button
@@ -381,11 +446,11 @@ const UserPage = () => {
             <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
               {/* Avatar */}
               <div className="text-center mb-2">
-                <div className="relative inline-block">
-                  <div className="w-72 h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer">
+                <div className="relative">
+                  <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative">
                     {user.username.charAt(0)}
+                    <div className="absolute -bottom-3 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
                   </div>
-                  <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
                 </div>
               </div>
 
@@ -566,6 +631,8 @@ const UserPage = () => {
                           Email
                         </FormLabel>
                       </div>
+
+                      {/* EmailVisible */}
                       <FormField
                         control={contactForm.control}
                         name="emailVisible"
@@ -594,6 +661,7 @@ const UserPage = () => {
                       />
                     </div>
 
+                    {/* EmailInput */}
                     <FormField
                       control={contactForm.control}
                       name="email"
@@ -604,18 +672,14 @@ const UserPage = () => {
                               <input
                                 {...field}
                                 type="email"
-                                placeholder="Enter your contact email"
                                 className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                                onChange={(e) => {
-                                  field.onChange(e); // 更新表單狀態
-                                  setTempContactEmail(e.target.value); // 同步更新臨時變量
-                                }}
+                                // onChange={(e) => {
+                                // field.onChange(e); // 更新表單狀態
+                                // }}
                               />
                             ) : (
                               <div className="text-gray-300 rounded-lg">
-                                {field.value ||
-                                  contactEmail ||
-                                  "No email provided"}
+                                {field.value || "No email provided"}
                               </div>
                             )}
                           </FormControl>
@@ -632,6 +696,8 @@ const UserPage = () => {
                           Phone
                         </FormLabel>
                       </div>
+
+                      {/* PhoneVisible */}
                       <FormField
                         control={contactForm.control}
                         name="phoneVisible"
@@ -660,6 +726,7 @@ const UserPage = () => {
                       />
                     </div>
 
+                    {/* PhoneInput */}
                     <FormField
                       control={contactForm.control}
                       name="phone"
@@ -672,6 +739,10 @@ const UserPage = () => {
                                 type="phone"
                                 placeholder="Enter your contact phone number"
                                 className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                                // onChange={(e) => {
+                                // field.onChange(e); // 更新表單狀態
+                                // setTempContactPhone(e.target.value); // 同步更新臨時變量
+                                // }}
                               />
                             ) : (
                               <div className=" text-gray-300 rounded-lg ">

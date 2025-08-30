@@ -20,10 +20,16 @@ router.get("/bio", requireAuth, async (req: Request, res: Response) => {
       });
     }
 
-    query = `SELECT bio FROM user_profiles WHERE user_id = ?`;
+    query = `SELECT * FROM user_profiles WHERE user_id = ?`;
     const [rows] = await dbPool.query(query, [req.user?.userId]);
     console.log("rows:", rows);
     const bio = (rows as RowDataPacket[])[0]?.bio;
+    const customName = (rows as RowDataPacket[])[0]?.custom_name;
+    if (!customName) {
+      console.log("User has no custom name set.");
+      query = `UPDATE user_profiles SET custom_name = ? WHERE user_id = ?`;
+      await dbPool.query(query, [req.user.username, req.user.userId]);
+    }
     return res.status(200).json({ bio: bio });
   } catch (error) {
     if (error instanceof Error) {
@@ -59,6 +65,48 @@ router.post("/bio", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/custom_name", requireAuth, async (req: Request, res: Response) => {
+  let query;
+  if (!req.user) {
+    return res.status(404).json({ errorMessage: "Please signin first" });
+  }
+  const userId = req.user.userId;
+  try {
+    query = `SELECT custom_name FROM user_profiles WHERE user_id = ?`;
+    const [rows] = await dbPool.query(query, [userId]);
+    console.log("custom_name rows:", rows);
+    const customName = (rows as RowDataPacket[])[0]?.custom_name;
+
+    return res.status(200).json({ custom_name: customName });
+  } catch (error) {
+    console.error("Database error:", error);
+    res.status(500).json({ errorMessage: "Failed to fetch user profile" });
+  }
+});
+
+router.post(
+  "/custom_name",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    let query;
+    if (!req.user) {
+      return res.status(404).json({ errorMessage: "Please signin first" });
+    }
+    const userId = req.user.userId;
+    const newCustomName = req.body.custom_name;
+    try {
+      query = `Insert into user_profiles (user_id, custom_name) values (?, ?) on duplicate key update custom_name = values(custom_name)`;
+      const updateResult = await dbPool.query(query, [userId, newCustomName]);
+      res
+        .status(200)
+        .json({ message: "Profile update successfully", data: updateResult });
+    } catch (error) {
+      console.error("Database error:", error);
+      res.status(500).json({ errorMessage: "Failed to update profile" });
+    }
+  }
+);
+
 router.get(
   "/contact_email",
   requireAuth,
@@ -72,7 +120,7 @@ router.get(
         });
       }
 
-      query = `SELECT contact_email FROM users WHERE id = ?`;
+      query = `SELECT contact_email FROM user_profiles WHERE user_id = ?`;
       const [rows] = await dbPool.query(query, [req.user?.userId]);
       console.log("rows:", rows);
       const contactEmail = (rows as RowDataPacket[])[0]?.contact_email;
@@ -105,7 +153,7 @@ router.post(
     const newContactEmail = req.body.contact_email;
     console.log("newContactEmail:", newContactEmail);
     try {
-      query = `Update users set contact_email = ? where id = ?`;
+      query = `Insert into user_profiles (contact_email, user_id) values (?, ?) on duplicate key update contact_email = values(contact_email)`;
       const updateResult = await dbPool.query(query, [newContactEmail, userId]);
       res.status(200).json({
         message: "Profile update successfully",
@@ -132,7 +180,7 @@ router.get(
         });
       }
 
-      query = `SELECT contact_phone FROM users WHERE id = ?`;
+      query = `SELECT contact_phone FROM user_profiles WHERE user_id = ?`;
       const [rows] = await dbPool.query(query, [req.user?.userId]);
       console.log("rows:", rows);
       const contactPhone = (rows as RowDataPacket[])[0]?.contact_phone;
@@ -165,7 +213,7 @@ router.post(
     const newContactPhone = req.body.contact_phone;
     console.log("newContactPhone:", newContactPhone);
     try {
-      query = `Update users set contact_phone = ? where id = ?`;
+      query = `Insert into user_profiles (contact_phone, user_id) values (?, ?) on duplicate key update contact_phone = values(contact_phone)`;
       const updateResult = await dbPool.query(query, [newContactPhone, userId]);
       res.status(200).json({
         message: "Profile update successfully",

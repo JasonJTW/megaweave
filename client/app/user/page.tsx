@@ -39,6 +39,8 @@ type ContactSettingsValues = {
 // 初始表單值
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+const userNameMaxLength =
+  Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
 
 const defaultContactValues: ContactSettingsValues = {
   email: "",
@@ -54,12 +56,15 @@ const UserPage = () => {
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isContributor, setIsContributor] = useState(false);
+  const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
-  const [tempBio, setTempBio] = useState(bio);
+  const [tempBio, setTempBio] = useState("");
+  const [tempUsername, setTempUsername] = useState("");
   const router = useRouter();
 
   const contactForm = useForm<ContactSettingsValues>({
@@ -93,6 +98,7 @@ const UserPage = () => {
       const userData = await response.json();
       console.log("Fetched User: ", userData);
       setUser(userData.user);
+      setUsername(userData.user.username);
       if (
         userData.user.role === "contributor" ||
         userData.user.role === "admin"
@@ -122,8 +128,53 @@ const UserPage = () => {
       setError(result.errMessage);
     }
     const result = await response.json();
+    const bioValue = result.bio || "";
+    setBio(bioValue);
+  };
 
-    setBio(result.bio);
+  const getUsername = async () => {
+    const response = await fetch(`${hostName}/api/userprofile/custom_name`, {
+      cache: "no-store",
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      console.error("Error fetching userprofile:", error.errorMessage);
+      setError(error.errMessage);
+    }
+
+    const result = await response.json();
+    console.log("get custom_name:", result.custom_name);
+    setUsername(result.custom_name);
+  };
+
+  const insertUsername = async (custom_name: string) => {
+    try {
+      const response = await fetch(`${hostName}/api/userprofile/custom_name`, {
+        cache: "no-store",
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          custom_name: custom_name,
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(`Failed to update username: ${result.errorMessage}`);
+      }
+      const result = await response.json();
+      console.log("Update username Success: ", result);
+    } catch (error) {
+      console.error("Error update username: ", error);
+      setError(
+        error instanceof Error ? error.message : "Error update username"
+      );
+      throw error;
+    }
   };
 
   const insertBio = async (bio: string) => {
@@ -147,6 +198,7 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
+      setError(error instanceof Error ? error.message : "Error update profile");
       throw error;
     }
   };
@@ -175,6 +227,9 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
+      setError(
+        error instanceof Error ? error.message : "Error update contact email"
+      );
       throw error;
     }
   };
@@ -203,6 +258,9 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
+      setError(
+        error instanceof Error ? error.message : "Error update contact phone"
+      );
       throw error;
     }
   };
@@ -272,9 +330,13 @@ const UserPage = () => {
       }
       setContactEmail(formData.email || "");
       setContactPhone(formData.phone || "");
+      setError(null);
       setIsEditingContact(false);
     } catch (error) {
       console.error("Error saving contact info:", error);
+      setError(
+        error instanceof Error ? error.message : "Error saving contact info"
+      );
     }
   };
 
@@ -292,6 +354,37 @@ const UserPage = () => {
       phoneVisible: contactForm.getValues("phoneVisible"),
     });
     setIsEditingContact(true);
+  };
+
+  const handleSaveUsername = async () => {
+    try {
+      setUsername(tempUsername);
+      setIsEditingUsername(false);
+      await insertUsername(tempUsername);
+      // 同时更新 user 对象中的 username
+      if (user) {
+        setUser({ ...user, username: tempUsername });
+        setError(null);
+      }
+    } catch (error) {
+      console.error("Error saving username:", error);
+      // 如果保存失败，恢复原来的值
+      setUsername(username || "");
+      setTempUsername(username || "");
+      setError(
+        error instanceof Error ? error.message : "Error saving username"
+      );
+    }
+  };
+
+  const handleCancelUsername = () => {
+    setTempUsername(username || user?.username || "");
+    setIsEditingUsername(false);
+  };
+
+  const handleEditUsername = () => {
+    setTempUsername(username || user?.username || "");
+    setIsEditingUsername(true);
   };
 
   const handleSignOut = async () => {
@@ -372,6 +465,7 @@ const UserPage = () => {
     getBio();
     getContactEmail();
     getContactPhone();
+    getUsername();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -433,6 +527,13 @@ const UserPage = () => {
         </div>
       </motion.header>
 
+      {error && (
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <Alert className="bg-red-950/50 border-red-500/30"> {error} </Alert>
+        </div>
+      )}
+
+      {/*TODO Make username editable like bio */}
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -448,7 +549,7 @@ const UserPage = () => {
               <div className="text-center mb-2">
                 <div className="relative">
                   <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative">
-                    {user.username.charAt(0)}
+                    {username.charAt(0)}
                     <div className="absolute -bottom-3 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
                   </div>
                 </div>
@@ -456,7 +557,102 @@ const UserPage = () => {
 
               {/* User Info */}
               <div className="text-center space-y-3">
-                <h2 className="text-2xl font-bold">{user.username}</h2>
+                <div className="flex items-center justify-center space-x-2">
+                  {!isEditingUsername ? (
+                    <motion.div
+                      key="display"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 20 }}
+                      transition={{ duration: 0.2 }}
+                      className="group flex items-center relative px-2"
+                    >
+                      <h2
+                        className="text-2xl font-bold  "
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2, // 最多顯示兩行
+                          WebkitBoxOrient: "vertical",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {username}
+                      </h2>
+                      <button
+                        onClick={handleEditUsername}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity  duration-200 p-1 hover:bg-gray-600/30 rounded absolute left-full top-1/2 -translate-y-1/2"
+                      >
+                        <Edit3
+                          className="w-4 style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2, // 最多顯示兩行
+                            WebkitBoxOrient: 'vertical',
+                            wordBreak: 'break-word'
+                          }}h-4 text-gray-400"
+                        />
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="edit"
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center w-full"
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1, duration: 0.2 }}
+                        className="flex mb-1 justify-end w-full space-x-2"
+                      >
+                        <button
+                          onClick={handleSaveUsername}
+                          className="p-1 hover:bg-green-600/30 rounded text-green-400 transition-colors duration-200"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={handleCancelUsername}
+                          className="p-1 hover:bg-gray-600/30 rounded text-gray-400 transition-colors duration-200"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </motion.div>
+                      <textarea
+                        value={tempUsername}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\n/g, ""); // 防止換行
+                          if (value.length <= userNameMaxLength) {
+                            setTempUsername(value);
+                          }
+                        }}
+                        maxLength={userNameMaxLength}
+                        rows={tempUsername.length > 15 ? 2 : 1}
+                        className="text-xl font-bold bg-gray-700/30 border border-gray-600/30 rounded px-2 py-1 text-center w-full focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none overflow-hidden"
+                        style={{
+                          wordBreak: "break-word",
+                          overflowWrap: "break-word",
+                          lineHeight: "1.2",
+                        }}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          // 防止 Enter 鍵換行
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleSaveUsername();
+                          }
+                        }}
+                      />
+                    </motion.div>
+                  )}
+                </div>
+
                 <p className="text-gray-400">{user.email}</p>
 
                 {/* Role Badge */}

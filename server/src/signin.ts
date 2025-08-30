@@ -12,6 +12,8 @@ import { UserSession } from "./schema";
 import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
 import { userRoles } from "./schema";
+import { connect } from "http2";
+import { th } from "zod/locales";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
@@ -68,7 +70,23 @@ async function findOrCreateUser(
 
   if (existingUsers.length > 0) {
     const existingUser = existingUsers[0];
+    const [existingProfiles] = await dbPool.query<RowDataPacket[]>(
+      "SELECT * FROM user_profiles WHERE user_id = ?",
+      [existingUser.id]
+    );
 
+    // 如果沒有 profile，創建一個
+    if (existingProfiles.length === 0) {
+      const insertProfileQuery = `
+      INSERT INTO user_profiles (user_id, contact_email, custom_name) 
+      VALUES (?, ?, ?)
+    `;
+      await dbPool.query(insertProfileQuery, [
+        existingUser.id,
+        email,
+        existingUser.username || email.split("@")[0],
+      ]);
+    }
     // 2. 用戶已存在，更新 provider 信息
     let providers: string[] = parseProviders(existingUser.providers);
 
@@ -117,12 +135,12 @@ async function findOrCreateUser(
     return updatedUsers[0];
   } else {
     // 4. 用戶不存在，創建新用戶
-    const insertQuery = `
-      INSERT INTO users (email, username, password, salt, google_id, facebook_id, providers, role, contact_email) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    const insertUsersQuery = `
+      INSERT INTO users (email, username, password, salt, google_id, facebook_id, providers, role) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    const insertValues = [
+    const insertUsersValues = [
       email,
       providerData.username || email.split("@")[0], // 默認用戶名
       providerData.password || null,
@@ -131,20 +149,39 @@ async function findOrCreateUser(
       providerData.facebookId || null,
       JSON.stringify([provider]),
       userRoles[0], // default role is 'user'
-      email,
     ];
 
-    const [result] = await dbPool.query<ResultSetHeader>(
-      insertQuery,
-      insertValues
-    );
-
-    // 返回新創建的用戶
-    const [newUsers] = await dbPool.query<RowDataPacket[]>(
-      "SELECT * FROM users WHERE id = ?",
-      [result.insertId]
-    );
-    return newUsers[0];
+    const insertProfileQuery = `INSERT INTO user_profiles (user_id, contact_email, custom_name) VALUES (?, ?, ?)`;
+    const connection = await dbPool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const userResult = await connection.execute<ResultSetHeader>(
+        insertUsersQuery,
+        insertUsersValues
+      );
+      const userId = (userResult[0] as ResultSetHeader).insertId;
+      const insertProfileValues = [
+        userId,
+        email,
+        providerData.username || email.split("@")[0],
+      ];
+      await connection.execute<ResultSetHeader>(
+        insertProfileQuery,
+        insertProfileValues
+      );
+      // 返回新創建的用戶
+      const [newUsers] = await connection.execute<RowDataPacket[]>(
+        "SELECT * FROM users WHERE id = ?",
+        [userId]
+      );
+      await connection.commit();
+      return newUsers[0];
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 }
 

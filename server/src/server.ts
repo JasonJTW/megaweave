@@ -12,25 +12,6 @@ import { connectRedis, disconnectRedis } from "./utils/redis";
 
 dotenv.config();
 
-async function startServer() {
-  try {
-    await connectRedis(); // 先連接 Redis
-
-    if (ENABLE_HTTPS) {
-      // HTTPS 服務器啟動邏輯...
-    } else {
-      app.listen(PORT, () => {
-        console.log(`Server listening on Port ${PORT}`);
-      });
-    }
-  } catch (error) {
-    console.error("Failed to start server:", error);
-    process.exit(1);
-  }
-}
-
-startServer();
-
 const CORS_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
   : ["https://localhost:3000"];
@@ -75,34 +56,44 @@ app.get("/health", (req, res) => {
 
 app.use("/api", apiRoutes);
 
-if (ENABLE_HTTPS) {
-  const CERT_PATH = process.env.CERT_PATH;
-  const KEY_PATH = process.env.KEY_PATH;
-  const PASSPHRASE = process.env.PASSPHRASE;
+async function startServer() {
+  try {
+    await connectRedis(); // 先連接 Redis
 
-  if (!CERT_PATH || !KEY_PATH || !PASSPHRASE) {
-    console.error(
-      "HTTPS configuration is incomplete. Please check your .env.development file."
-    );
+    if (ENABLE_HTTPS) {
+      // HTTPS 服務器啟動邏輯...
+      const CERT_PATH = process.env.CERT_PATH;
+      const KEY_PATH = process.env.KEY_PATH;
+      const PASSPHRASE = process.env.PASSPHRASE;
+
+      if (!CERT_PATH || !KEY_PATH || !PASSPHRASE) {
+        console.error(
+          "HTTPS configuration is incomplete. Please check your .env.development file."
+        );
+        process.exit(1);
+      }
+      //* Implement https in local dev env
+      const sslServer = https.createServer(
+        {
+          key: fs.readFileSync(path.join(__dirname, KEY_PATH)),
+          cert: fs.readFileSync(path.join(__dirname, CERT_PATH)),
+          passphrase: PASSPHRASE, // 替換為你的密碼
+        },
+        app
+      );
+
+      sslServer.listen(PORT, () => {
+        console.log(`Secure server listening on port ${PORT}`);
+      });
+    } else {
+      app.listen(PORT, () => {
+        console.log(`Server listening on Port ${PORT}`);
+      });
+    }
+  } catch (error) {
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
-  //* Implement https in local dev env
-  const sslServer = https.createServer(
-    {
-      key: fs.readFileSync(path.join(__dirname, KEY_PATH)),
-      cert: fs.readFileSync(path.join(__dirname, CERT_PATH)),
-      passphrase: PASSPHRASE, // 替換為你的密碼
-    },
-    app
-  );
-
-  sslServer.listen(PORT, () => {
-    console.log(`Secure server listening on port ${PORT}`);
-  });
-} else {
-  app.listen(PORT, () => {
-    console.log(`Server listening on Port ${PORT}`);
-  });
 }
 
 process.on("SIGINT", async () => {
@@ -116,3 +107,5 @@ process.on("SIGTERM", async () => {
   await disconnectRedis();
   process.exit(0);
 });
+
+startServer();

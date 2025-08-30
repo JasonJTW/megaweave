@@ -8,9 +8,28 @@ import https from "https";
 import path from "path";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
-import { disconnectRedis } from "./utils/redis";
+import { connectRedis, disconnectRedis } from "./utils/redis";
 
 dotenv.config();
+
+async function startServer() {
+  try {
+    await connectRedis(); // 先連接 Redis
+
+    if (ENABLE_HTTPS) {
+      // HTTPS 服務器啟動邏輯...
+    } else {
+      app.listen(PORT, () => {
+        console.log(`Server listening on Port ${PORT}`);
+      });
+    }
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 const CORS_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
@@ -45,6 +64,7 @@ app.use(
 if (NODE_ENV !== "development") {
   app.use(limiter);
 }
+
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",
@@ -52,6 +72,7 @@ app.get("/health", (req, res) => {
     ssl: ENABLE_HTTPS,
   });
 });
+
 app.use("/api", apiRoutes);
 
 if (ENABLE_HTTPS) {

@@ -9,21 +9,26 @@ const redisClient = createClient({
   socket: {
     keepAlive: true,
     noDelay: true,
+    keepAliveInitialDelay: 300000, // Send keep-alive packet every 5 minutes
+    connectTimeout: 30000, // 30 秒連接超時
     reconnectStrategy: (retries) => {
-      if (retries > 20) {
-        console.error("Redis connection failed after 20 retries");
+      if (retries > 10) {
+        console.error(`Redis connection failed after ${retries} retries`);
         return new Error("Redis connection failed");
       }
-      return Math.min(retries * 200, 5000); // 重連間隔，最長 5 秒
+      const delay = Math.min(retries * 1000, 10000);
+      console.log(`Redis reconnect attempt ${retries} in ${delay}ms`);
+      return delay;
     },
-    connectTimeout: 30000, // 30 秒連接超時
   },
   // 添加命令超時配置到根級別
   commandsQueueMaxLength: 100,
+  pingInterval: 30000,
 });
 
 redisClient.on("error", (err) => {
   console.error("Redis Client Error", err.message);
+  isConnecting = false;
 });
 
 redisClient.on("connect", () => {
@@ -39,6 +44,11 @@ redisClient.on("disconnect", () => {
 redisClient.on("reconnecting", () => {
   console.log("Redis client reconnecting...");
   isConnecting = true;
+});
+
+redisClient.on("end", () => {
+  console.log("Redis connection ended.");
+  isConnecting = false;
 });
 
 export async function connectRedis() {

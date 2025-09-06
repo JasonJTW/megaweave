@@ -3,15 +3,31 @@ dotenv.config();
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
+export interface Experience {
+  position: string;
+  company: string;
+  description: string;
+  year: string;
+}
+
+export interface Website {
+  url: string;
+  type?: string;
+}
+
 export interface TeamMember {
+  index: number;
   user_id: number;
   member_name: string;
   avatar_url: string;
   title: string;
   location?: string;
-  bio?: string;
-  website?: string;
+  department?: string;
+  member_bio?: string;
+  websites?: Website[];
   email?: string;
+  experience?: Experience[];
+  skills?: string[];
 }
 
 export async function getTeamMembers() {
@@ -37,6 +53,7 @@ export async function getTeamMembers() {
   }
 }
 
+//Fix: Update be api to get member by id
 // export const getTeamMemberById = (id: number): TeamMember | undefined => {
 //   return teamMembers.find((member) => member.id === id);
 // };

@@ -656,7 +656,7 @@ const UserPage = () => {
                 <p className="text-gray-400">{user.email}</p>
 
                 {/* Role Badge */}
-                <div className="flex justify-center">
+                <div className="flex justify-center ">
                   <span
                     className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/20`}
                   >

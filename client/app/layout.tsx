@@ -4,6 +4,7 @@ import "./globals.css";
 import localFont from "next/font/local";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
+import { TeamProvider } from "./contexts/TeamContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -78,7 +79,7 @@ export default function RootLayout({
         <GoogleOAuthProvider
           clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
         >
-          {children}
+          <TeamProvider>{children}</TeamProvider>
         </GoogleOAuthProvider>
       </body>
     </html>

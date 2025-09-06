@@ -11,10 +11,24 @@ const router = Router();
 //RWD userProfile for contributor, displaying on about page
 
 router.get(`/all`, async (req: Request, res: Response) => {
-  const query = `SELECT * FROM members`;
+  const { userId } = req.query;
+
+  let query: string;
+  let queryParams: any[] = [];
+
+  if (userId) {
+    query = `SELECT * FROM members WHERE user_id = ?`;
+    queryParams = [userId];
+  } else {
+    query = `SELECT * FROM members`;
+  }
+
   try {
-    const [row] = await dbPool.query(query);
-    console.log("All members data: ", row);
+    const [row] = await dbPool.query(query, queryParams);
+    console.log(
+      userId ? `Member data for userId ${userId}: ` : "All members data: ",
+      row
+    );
     return res.status(200).json(row);
   } catch (error) {
     console.error("Database error:", error);

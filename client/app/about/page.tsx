@@ -1,8 +1,12 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
-import { TeamMember, getTeamMembers } from "@/app/teamMembers";
+//* Team Info Page */
+
+import React, { useState, useRef } from "react";
+import { TeamMember } from "@/app/teamMembers";
 import { useRouter } from "next/navigation";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { useTeam } from "../contexts/TeamContext";
+import Image from "next/image";
 
 interface MemberCardProps {
   member: TeamMember;
@@ -32,26 +36,32 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
     }
   };
 
+  const handleClick = () => {
+    router.push(`/members/${member.user_id}`);
+  };
+
   return (
     <div
       key={member.user_id}
       className="relative hover:cursor-pointer max-w-xl"
-      onClick={() => {
-        router.push(`/members/${member.user_id}`);
-      }}
+      onClick={handleClick}
     >
       <div
         ref={containerRef}
-        className="relative"
+        className="relative "
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onMouseMove={handleMouseMove}
       >
-        <img
-          src={member.avatar_url}
-          alt={member.member_name}
-          className="w-full h-100 object-cover bg-gray-200 rounded-xl"
-        />
+        <div className="relative w-full aspect-[3/4]">
+          <Image
+            src={member.avatar_url}
+            alt={member.member_name}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover bg-gray-200 rounded-xl"
+          />
+        </div>
 
         {/* Tooltip - 只在這個卡片 hover 時顯示 */}
         {showTooltip && (
@@ -80,18 +90,32 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
 };
 
 const TeamInfoPage = () => {
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const router = useRouter();
+  const { teamMembers, loading, error } = useTeam();
 
-  const handleGetMembers = async () => {
-    const members: TeamMember[] = await getTeamMembers();
-    setTeamMembers(members);
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary mx-auto mb-4"></div>
+          <p className="text-secondary">Loading team members...</p>
+        </div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    handleGetMembers();
-    console.log("Use effect called");
-  }, []);
+  if (error) {
+    return (
+      <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-secondary mb-4">
+            Error loading team members
+          </h2>
+          <p className="text-secondary/75 mb-4">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-primary-75 overflow-hidden px-4 sm:px-8 md:px-16 lg:px-24 xl:px-32">

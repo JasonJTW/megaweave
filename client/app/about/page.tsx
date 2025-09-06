@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useRef } from "react";
-import { TeamMember, teamMembers } from "@/app/teamMembers";
+import React, { useState, useRef, useEffect } from "react";
+import { TeamMember, getTeamMembers } from "@/app/teamMembers";
 import { useRouter } from "next/navigation";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 
@@ -34,10 +34,10 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
 
   return (
     <div
-      key={member.id}
+      key={member.user_id}
       className="relative hover:cursor-pointer max-w-xl"
       onClick={() => {
-        router.push(`/members/${member.id}`);
+        router.push(`/members/${member.user_id}`);
       }}
     >
       <div
@@ -48,8 +48,8 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
         onMouseMove={handleMouseMove}
       >
         <img
-          src={member.avatar}
-          alt={member.name}
+          src={member.avatar_url}
+          alt={member.member_name}
           className="w-full h-100 object-cover bg-gray-200 rounded-xl"
         />
 
@@ -74,13 +74,24 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
       <div className="absolute top-4 left-4 bg-black text-white px-4 py-2 text-md rounded-full">
         {member.title}
       </div>
-      <p className="text-2xl text-secondary mt-4 mb-20">{member.name}</p>
+      <p className="text-2xl text-secondary mt-4 mb-20">{member.member_name}</p>
     </div>
   );
 };
 
 const TeamInfoPage = () => {
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const router = useRouter();
+
+  const handleGetMembers = async () => {
+    const members: TeamMember[] = await getTeamMembers();
+    setTeamMembers(members);
+  };
+
+  useEffect(() => {
+    handleGetMembers();
+    console.log("Use effect called");
+  }, []);
 
   return (
     <div className="min-h-screen bg-primary-75 overflow-hidden px-4 sm:px-8 md:px-16 lg:px-24 xl:px-32">
@@ -143,15 +154,13 @@ const TeamInfoPage = () => {
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 mt-8">
-                {teamMembers
-                  .filter((member) => member.department === "Member")
-                  .map((member) => (
-                    <MemberCard
-                      key={member.id}
-                      member={member}
-                      router={router}
-                    />
-                  ))}
+                {teamMembers.map((member) => (
+                  <MemberCard
+                    key={member.user_id}
+                    member={member}
+                    router={router}
+                  />
+                ))}
               </div>
             </div>
           </div>

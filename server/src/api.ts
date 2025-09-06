@@ -9,6 +9,7 @@ import categoriesAPI from "./categories";
 import conditionsAPI from "./conditions";
 import avatarAPI from "./avatar";
 import userprofileAPI from "./userprofile";
+import memberAPI from "./member";
 //* Test api
 router.post("/test", (req, res) => {
   console.log("API test called");
@@ -29,4 +30,5 @@ router.use("/categories", categoriesAPI);
 router.use("/conditions", conditionsAPI);
 router.use("/avatar", avatarAPI);
 router.use("/userprofile", userprofileAPI);
+router.use("/member", memberAPI);
 export default router;

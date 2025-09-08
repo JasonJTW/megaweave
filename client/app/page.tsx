@@ -22,7 +22,6 @@ import {
 
 import User from "./types/user";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 const PostsApp = () => {
   const router = useRouter();
@@ -305,26 +304,16 @@ const PostsApp = () => {
   }, [selectedImages]);
 
   return (
-    <div className="min-h-screen bg-secondary">
-      {/* Icon */}
-      <div className="bg-megaweave-secondary shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <Image
-                src="/favicon.ico"
-                alt="megaweaving icon"
-                width={32}
-                height={32}
-                className="rounded-sm"
-              />
-              <span className="text-2xl sm:text-2xl font-semibold text-megaweave-forest font-ddin ">
-                megaweaving
-              </span>
-            </div>
-            <Button
-              onClick={handleCreatePostButtonClick}
-              className={`
+    <>
+      <div className=" fixed inset-0 bg-secondary -z-10"></div>
+      <div className="min-h-screen ">
+        {/* Icon */}
+        <div className="bg-megaweave-secondary shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex justify-between items-center">
+              <Button
+                onClick={handleCreatePostButtonClick}
+                className={`
                 // 手機端：固定懸浮在右下角
                 fixed bottom-6 right-6 z-40 
                 w-14 h-14 rounded-full p-0 shadow-lg
@@ -340,416 +329,417 @@ const PostsApp = () => {
                     ? " bg-megaweave-stone/40 backdrop-blur-[2px] border border-megaweave-sand   cursor-pointer sm:bg-megaweave-stone sm:text-white hover:bg-megaweave-red-light"
                     : "bg-primary/30 backdrop-blur-sm border border-primary-30  sm:bg-primary sm:text-white hover:bg-primary-50 "
                 }`}
-            >
-              {user == null ? (
-                <ScanFace
-                  style={{ width: "24px", height: "24px" }}
-                  className=" text-white"
+              >
+                {user == null ? (
+                  <ScanFace
+                    style={{ width: "24px", height: "24px" }}
+                    className=" text-white"
+                  />
+                ) : (
+                  <Plus className=" text-white" />
+                )}
+                {/* 手機端隱藏文字，桌面端顯示 */}
+                <span className="hidden sm:inline">
+                  {user == null ? "Sign in to post" : "Create new post"}
+                </span>
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* 搜索和篩選區域 */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="bg-secondary-50 rounded-lg shadow-sm p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* 搜索框 */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
-              ) : (
-                <Plus className=" text-white" />
-              )}
-              {/* 手機端隱藏文字，桌面端顯示 */}
-              <span className="hidden sm:inline">
-                {user == null ? "Sign in to post" : "Create new post"}
-              </span>
-            </Button>
-          </div>
-        </div>
-      </div>
+              </div>
 
-      {/* 搜索和篩選區域 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="bg-secondary-50 rounded-lg shadow-sm p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* 搜索框 */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+              {/* 分類篩選 */}
+              <select
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:cursor-pointer"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                <option value="">Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name_en}>
+                    {cat.name_en}
+                  </option>
+                ))}
+              </select>
 
-            {/* 分類篩選 */}
-            <select
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:cursor-pointer"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              <option value="">Categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.name_en}>
-                  {cat.name_en}
-                </option>
-              ))}
-            </select>
+              {/* 地點篩選 */}
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Location..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={selectedLocation}
+                  onChange={(e) => setSelectedLocation(e.target.value)}
+                />
+              </div>
 
-            {/* 地點篩選 */}
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Location..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-              />
-            </div>
-
-            {/* 重置按鈕 */}
-            <button
-              onClick={() => {
-                setSearchTerm("");
-                setSelectedCategory("");
-                setSelectedLocation("");
-                setCurrentPage(1);
-              }}
-              className="px-4 py-2 bg-primary-30 hover:bg-primary-15 text-gray-700 rounded-lg transition-colors"
-            >
-              Resets
-            </button>
-          </div>
-        </div>
-
-        {/* 錯誤提示 */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {/* 貼文網格 */}
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                conditions={conditions}
-                onPostClick={(post) => {
-                  router.push(`/item/${post.id}`);
+              {/* 重置按鈕 */}
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedCategory("");
+                  setSelectedLocation("");
+                  setCurrentPage(1);
                 }}
-              />
-            ))}
+                className="px-4 py-2 bg-primary-30 hover:bg-primary-15 text-gray-700 rounded-lg transition-colors"
+              >
+                Resets
+              </button>
+            </div>
           </div>
-        )}
 
-        {/* 分頁 */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="flex justify-center mt-8">
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                previous page
-              </button>
+          {/* 錯誤提示 */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
 
-              {Array.from(
-                { length: pagination.totalPages },
-                (_, i) => i + 1
-              ).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-4 py-2 border rounded-lg ${
-                    currentPage === page
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
+          {/* 貼文網格 */}
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  conditions={conditions}
+                  onPostClick={(post) => {
+                    router.push(`/item/${post.id}`);
+                  }}
+                />
               ))}
+            </div>
+          )}
 
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === pagination.totalPages}
-                className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                next page
-              </button>
+          {/* 分頁 */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="flex justify-center mt-8">
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  previous page
+                </button>
+
+                {Array.from(
+                  { length: pagination.totalPages },
+                  (_, i) => i + 1
+                ).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-4 py-2 border rounded-lg ${
+                      currentPage === page
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === pagination.totalPages}
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  next page
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 創建貼文彈窗 */}
+        {showCreateForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Create new post
+                  </h2>
+                  <button
+                    onClick={() => setShowCreateForm(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.title}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          title: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Content *
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.content}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          content: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Category *
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={createFormData.categoryId}
+                        onChange={(e) =>
+                          setCreateFormData({
+                            ...createFormData,
+                            categoryId: parseInt(e.target.value),
+                          })
+                        }
+                        disabled={categoriesLoading}
+                      >
+                        {categories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name_en}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Condition *
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={createFormData.conditionLevel}
+                        onChange={(e) =>
+                          setCreateFormData({
+                            ...createFormData,
+                            conditionLevel: parseInt(e.target.value),
+                          })
+                        }
+                        disabled={conditionsLoading}
+                      >
+                        {conditions.map((condition) => (
+                          <option key={condition.id} value={condition.level}>
+                            {condition.name} - {condition.description}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.location}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          location: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      tags
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="separate tags with commas"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.tags}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          tags: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      聯絡方式
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={createFormData.contact}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          contact: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  {/* 圖片上傳區域 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      item image ({selectedImages.length}/5)
+                    </label>
+
+                    {/* 圖片上傳按鈕 */}
+                    <div className="mb-4">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                        id="image-upload"
+                        disabled={selectedImages.length >= 5}
+                      />
+                      <label
+                        htmlFor="image-upload"
+                        className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 ${
+                          selectedImages.length >= 5
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        選擇圖片
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        10MB limit per image, up to 5 images
+                      </p>
+                    </div>
+
+                    {/* 已選圖片預覽 */}
+                    {selectedImages.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {selectedImages.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                              <img
+                                src={URL.createObjectURL(image)}
+                                alt={`預覽 ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                              {Math.round(image.size / 1024)}KB
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 空狀態提示 */}
+                    {selectedImages.length === 0 && (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600">
+                          點擊上方按鈕選擇商品圖片
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          最多可上傳 5 張圖片
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setSelectedImages([]);
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreatePost}
+                      disabled={isCreating}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                    >
+                      {isCreating ? "Posting..." : "Create Post"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* 創建貼文彈窗 */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Create new post
-                </h2>
-                <button
-                  onClick={() => setShowCreateForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <span className="sr-only">Close</span>
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={createFormData.title}
-                    onChange={(e) =>
-                      setCreateFormData({
-                        ...createFormData,
-                        title: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Content *
-                  </label>
-                  <textarea
-                    required
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={createFormData.content}
-                    onChange={(e) =>
-                      setCreateFormData({
-                        ...createFormData,
-                        content: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Category *
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={createFormData.categoryId}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          categoryId: parseInt(e.target.value),
-                        })
-                      }
-                      disabled={categoriesLoading}
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name_en}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Condition *
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={createFormData.conditionLevel}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          conditionLevel: parseInt(e.target.value),
-                        })
-                      }
-                      disabled={conditionsLoading}
-                    >
-                      {conditions.map((condition) => (
-                        <option key={condition.id} value={condition.level}>
-                          {condition.name} - {condition.description}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={createFormData.location}
-                    onChange={(e) =>
-                      setCreateFormData({
-                        ...createFormData,
-                        location: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    tags
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="separate tags with commas"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={createFormData.tags}
-                    onChange={(e) =>
-                      setCreateFormData({
-                        ...createFormData,
-                        tags: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    聯絡方式
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    value={createFormData.contact}
-                    onChange={(e) =>
-                      setCreateFormData({
-                        ...createFormData,
-                        contact: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-
-                {/* 圖片上傳區域 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    item image ({selectedImages.length}/5)
-                  </label>
-
-                  {/* 圖片上傳按鈕 */}
-                  <div className="mb-4">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                      id="image-upload"
-                      disabled={selectedImages.length >= 5}
-                    />
-                    <label
-                      htmlFor="image-upload"
-                      className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 ${
-                        selectedImages.length >= 5
-                          ? "opacity-50 cursor-not-allowed"
-                          : ""
-                      }`}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      選擇圖片
-                    </label>
-                    <p className="text-xs text-gray-500 mt-1">
-                      10MB limit per image, up to 5 images
-                    </p>
-                  </div>
-
-                  {/* 已選圖片預覽 */}
-                  {selectedImages.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {selectedImages.map((image, index) => (
-                        <div key={index} className="relative group">
-                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                            <img
-                              src={URL.createObjectURL(image)}
-                              alt={`預覽 ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                            {Math.round(image.size / 1024)}KB
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 空狀態提示 */}
-                  {selectedImages.length === 0 && (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600">
-                        點擊上方按鈕選擇商品圖片
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        最多可上傳 5 張圖片
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      setSelectedImages([]);
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCreatePost}
-                    disabled={isCreating}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
-                  >
-                    {isCreating ? "Posting..." : "Create Post"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 };
 

@@ -61,7 +61,7 @@ const PostCard: React.FC<PostCardProps> = ({
             height={256}
             className="object-cover transition-transform duration-500 hover:scale-110 relative"
           />
-          <Waypoints className="bg-megaweave-blue´ text-megaweave-brown rounded-full p-1 w-8 h-8 z-50 absolute top-4 right-4"></Waypoints>
+          <Waypoints className="bg-megaweave-blue text-megaweave-brown rounded-full p-1 w-8 h-8 z-10 absolute top-4 right-4"></Waypoints>
         </div>
       )}
 

@@ -5,7 +5,7 @@ import localFont from "next/font/local";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
 import { TeamProvider } from "./contexts/TeamContext";
-
+import Navbar from "./components/Navbar";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -53,6 +53,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
+        <Navbar />
         {/* Facebook SDK */}
         <Script id="facebook-sdk" strategy="afterInteractive">
           {`

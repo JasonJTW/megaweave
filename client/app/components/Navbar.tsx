@@ -7,12 +7,13 @@ import { usePathname } from "next/navigation";
 import {
   Menu,
   Home,
-  Users,
+  UserCog,
   Info,
   Mail,
   Briefcase,
+  GalleryHorizontalEnd,
   Image as ImageIcon,
-  FileText,
+  // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,28 +59,22 @@ const Navbar = () => {
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/about", label: "About", icon: Info },
+    { href: "/user", label: "Profile", icon: UserCog },
   ];
 
   // 下拉菜單項目
   const teamMenuItems: NavigationItem[] = [
     {
-      href: "/team",
+      href: "/about",
       title: "Team Overview",
       description: "Meet our amazing team members",
-      icon: Users,
+      icon: UserCog,
     },
     {
       href: "/team/leadership",
-      title: "Leadership",
-      description: "Our executive team and advisors",
-      icon: Briefcase,
-    },
-    {
-      href: "/team/developers",
-      title: "Developers",
-      description: "Our technical team",
-      icon: FileText,
+      title: "Timeline",
+      description: "Our timeline and milestones",
+      icon: GalleryHorizontalEnd,
     },
   ];
 
@@ -100,7 +95,7 @@ const Navbar = () => {
       href: "/projects/community",
       title: "Community Projects",
       description: "Community-driven initiatives",
-      icon: Users,
+      icon: UserCog,
     },
   ];
 
@@ -228,7 +223,7 @@ const Navbar = () => {
                           : "text-primary-75 hover:text-gray-900 data-[state=open]:text-megaweave-blue "
                       )}
                     >
-                      <Users className="w-4 h-4 mr-2" />
+                      <UserCog className="w-4 h-4 mr-2" />
                       Team
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
@@ -259,7 +254,7 @@ const Navbar = () => {
                             ? "text-gray-50 bg-primary-75 font-semibold"
                             : "text-gray-50 bg-primary/55 font-semibold "
                           : isAtTop
-                          ? "text-green/90 hover:text-blue bg-slate-600 hover:bg-white/10"
+                          ? "text-green/90 hover:text-blue bg-transparent hover:bg-white/10"
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                       )}
                     >
@@ -283,7 +278,7 @@ const Navbar = () => {
                     className={cn(
                       "p-2 transition-all duration-200",
                       isAtTop
-                        ? "text-white hover:bg-white/10 hover:text-white"
+                        ? "text-megaweave-forest-dark hover:bg-white/10 hover:text-megaweave-forest-light"
                         : "text-gray-900 hover:bg-gray-100"
                     )}
                   >

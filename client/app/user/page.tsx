@@ -429,7 +429,7 @@ const UserPage = () => {
   const renderTextWithUrls = (text: string) => {
     if (!text) return;
     const urlRegex =
-      /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&=]*))/g;
+      /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}[-a-zA-Z0-9()@:%_\+.~#?&=\/]*)/g;
 
     const isValidUrl = (url: string): boolean => {
       try {

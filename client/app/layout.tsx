@@ -54,12 +54,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <AdSense publisherId={publisherId} />
-      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
+        <AdSense publisherId={publisherId} />
+
         <Navbar />
         {/* Facebook SDK */}
         <Script id="facebook-sdk" strategy="afterInteractive">

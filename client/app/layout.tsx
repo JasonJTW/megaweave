@@ -9,7 +9,7 @@ import Navbar from "./components/Navbar";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 dotenv.config();
-const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
+// const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -55,12 +55,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script
+        <script
           async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}`}
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6758243674658799"
           crossOrigin="anonymous"
-          strategy="beforeInteractive"
-        />
+        ></script>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}

@@ -6,7 +6,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
 import { TeamProvider } from "./contexts/TeamContext";
 import Navbar from "./components/Navbar";
-import AdSense from "@/components/AdSense";
+// import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 dotenv.config();
 const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
@@ -54,11 +54,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
-        <AdSense publisherId={publisherId} />
-
         <Navbar />
         {/* Facebook SDK */}
         <Script id="facebook-sdk" strategy="afterInteractive">

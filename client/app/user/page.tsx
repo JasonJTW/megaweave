@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
+import renderTextWithUrls from "@/utils/renderTextWithUrl";
 
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -47,6 +48,10 @@ const defaultContactValues: ContactSettingsValues = {
   phone: "",
   emailVisible: false,
   phoneVisible: false,
+};
+
+const MemberForm = () => {
+  return <div>MemberForm</div>;
 };
 
 const UserPage = () => {
@@ -426,40 +431,6 @@ const UserPage = () => {
     }
   };
 
-  const renderTextWithUrls = (text: string) => {
-    if (!text) return;
-    const urlRegex =
-      /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}[-a-zA-Z0-9()@:%_\+.~#?&=\/]*)/g;
-
-    const isValidUrl = (url: string): boolean => {
-      try {
-        const urlObj = new URL(url);
-        return urlObj.protocol === "http:" || urlObj.protocol === "https:";
-      } catch {
-        return false;
-      }
-    };
-
-    const parts = text.split(urlRegex);
-
-    return parts.map((part, index) => {
-      if (urlRegex.test(part) && isValidUrl(part)) {
-        return (
-          <a
-            key={index}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 transition-colors duration-150"
-          >
-            {part}
-          </a>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
-  };
-
   useEffect(() => {
     fetchUser();
     getBio();
@@ -535,7 +506,6 @@ const UserPage = () => {
           </div>
         )}
 
-        {/*TODO Make username editable like bio */}
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-6 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -959,6 +929,9 @@ const UserPage = () => {
             </motion.div>
           </div>
         </div>
+
+        {/* member form */}
+        {isContributor && <MemberForm />}
       </div>
     </>
   );

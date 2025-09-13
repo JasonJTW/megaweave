@@ -6,6 +6,10 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
 import { TeamProvider } from "./contexts/TeamContext";
 import Navbar from "./components/Navbar";
+import AdSense from "@/components/AdSense";
+import dotenv from "dotenv";
+dotenv.config();
+const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -50,6 +54,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <AdSense publisherId={publisherId} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >

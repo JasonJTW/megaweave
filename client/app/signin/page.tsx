@@ -3,7 +3,7 @@
 
 import React, { Suspense } from "react";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { easeInOut, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -238,183 +238,190 @@ function SigninForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-800 to-primary flex items-center justify-center">
-      <motion.div
-        initial={{ opacity: 0, y: -60 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6 m-6">
-          <div className="text-left space-y-1">
-            <h1 className="text-3xl font-mono tracking-wider text-primary">
-              Sign in
-            </h1>
-            <p className="text-muted-foreground font-mono tracking-tighter text-sm">
-              Enter your credential to access your account
-            </p>
-            {(signinError || error) && (
-              <div className="text-red-400 text-sm justify-self-end">
-                * {signinError || error}
-              </div>
-            )}
-          </div>
-          <form onSubmit={handleSubmit} className="">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-primary">
-                  Email
-                </Label>
-                <Input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="Enter your email"
-                  className="bg-secondary text-primary border-emerald-300"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-primary-400">
-                  Password
-                </Label>
-                <div className="relative">
+    <>
+      <div className="fixed inset-0 bg-gradient-to-br from-stone-800 to-primary -z-10"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.5, ease: easeInOut }}
+          className="w-full max-w-md"
+        >
+          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6 m-6">
+            <div className="text-left space-y-1">
+              <h1 className="text-3xl font-mono tracking-wider text-primary">
+                Sign in
+              </h1>
+              <p className="text-muted-foreground font-mono tracking-tighter text-sm">
+                Enter your credential to access your account
+              </p>
+              {(signinError || error) && (
+                <div className="text-red-400 text-sm justify-self-end">
+                  * {signinError || error}
+                </div>
+              )}
+            </div>
+            <form onSubmit={handleSubmit} className="">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-primary">
+                    Email
+                  </Label>
                   <Input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="Enter your password"
+                    placeholder="Enter your email"
                     className="bg-secondary text-primary border-emerald-300"
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPassword(!showPassword);
-                      console.log(showPassword);
-                    }}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
-                  >
-                    {showPassword ? <EyeClosed size={20} /> : <Eye size={20} />}
-                  </button>
                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="remember"
-                    className="border-emerald-300"
-                    onClick={() => {
-                      setRememberMe(!rememberMe);
-                      console.log(rememberMe);
-                    }}
-                  />
-                  <Label htmlFor="remember" className="text-primary-400">
-                    Remember me
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-primary-400">
+                    Password
                   </Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      id="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="Enter your password"
+                      className="bg-secondary text-primary border-emerald-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPassword(!showPassword);
+                        console.log(showPassword);
+                      }}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
+                    >
+                      {showPassword ? (
+                        <EyeClosed size={20} />
+                      ) : (
+                        <Eye size={20} />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <a
-                    href=""
-                    className="text-primary underline hover:text-emerald-700"
-                  >
-                    Forgot Password?
-                  </a>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="remember"
+                      className="border-emerald-300"
+                      onClick={() => {
+                        setRememberMe(!rememberMe);
+                        console.log(rememberMe);
+                      }}
+                    />
+                    <Label htmlFor="remember" className="text-primary-400">
+                      Remember me
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <a
+                      href=""
+                      className="text-primary underline hover:text-emerald-700"
+                    >
+                      Forgot Password?
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center mt-4">
+              <div className="flex items-center mt-4">
+                <Button
+                  type="submit"
+                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8 z-10"
+                  disabled={!email || !password || loading}
+                >
+                  {loading ? "Signing in..." : "Sign in"}
+                </Button>
+              </div>
+            </form>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-primary" />
+              </div>
+              <div className="relative flex justify-center text-xs text-primary uppercase">
+                <span className="bg-secondary px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <Button
-                type="submit"
-                className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8"
-                disabled={!email || !password || loading}
-              >
-                {loading ? "Signing in..." : "Sign in"}
-              </Button>
-            </div>
-          </form>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-primary" />
-            </div>
-            <div className="relative flex justify-center text-xs text-primary uppercase">
-              <span className="bg-secondary px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              className="w-full bg-primary-50 text-black
+                className="w-full bg-primary-50 text-black
                                hover:bg-primary-30 transition-all duration-200"
-              onClick={handleFacebookLogin}
-              disabled={!isFBReady || loading}
-            >
-              <svg
-                role="img"
-                viewBox="0 0 24 24"
-                className="w-5 h-5 mr-2"
-                fill="currentColor"
+                onClick={handleFacebookLogin}
+                disabled={!isFBReady || loading}
               >
-                <path d={siFacebook.path} />
-              </svg>
-              {isFBReady ? "Facebook" : "Loading Facebook..."}
-            </Button>
-            <Button
-              className="w-full bg-primary-50 text-black hover:bg-primary-30 transition-all duration-200"
-              disabled={loading}
-              onClick={() => {
-                const container = document.getElementById(
-                  "hidden-google-signin"
-                );
-                const googleButton =
-                  container?.querySelector('[role="button"]');
+                <svg
+                  role="img"
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 mr-2"
+                  fill="currentColor"
+                >
+                  <path d={siFacebook.path} />
+                </svg>
+                {isFBReady ? "Facebook" : "Loading Facebook..."}
+              </Button>
+              <Button
+                className="w-full bg-primary-50 text-black hover:bg-primary-30 transition-all duration-200"
+                disabled={loading}
+                onClick={() => {
+                  const container = document.getElementById(
+                    "hidden-google-signin"
+                  );
+                  const googleButton =
+                    container?.querySelector('[role="button"]');
 
-                if (googleButton) {
-                  (googleButton as HTMLElement).click();
-                } else {
-                  console.log("Google button not found");
-                }
-              }}
-            >
-              <svg
-                role="img"
-                viewBox="0 0 24 24"
-                className="w-5 h-5 mr-2"
-                fill="currentColor"
-              >
-                <path d={siGoogle.path} />
-              </svg>
-              Google
-            </Button>
-
-            <div className="hidden">
-              <GoogleLogin
-                containerProps={{ id: "hidden-google-signin" }}
-                onSuccess={handleGoogleSignin}
-                onError={() => {
-                  console.log("Signin with google Failed");
-                  setSigninError("Google sign in failed. Please try again.");
-                  setLoading(false);
+                  if (googleButton) {
+                    (googleButton as HTMLElement).click();
+                  } else {
+                    console.log("Google button not found");
+                  }
                 }}
-              />
+              >
+                <svg
+                  role="img"
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 mr-2"
+                  fill="currentColor"
+                >
+                  <path d={siGoogle.path} />
+                </svg>
+                Google
+              </Button>
+
+              <div className="hidden">
+                <GoogleLogin
+                  containerProps={{ id: "hidden-google-signin" }}
+                  onSuccess={handleGoogleSignin}
+                  onError={() => {
+                    console.log("Signin with google Failed");
+                    setSigninError("Google sign in failed. Please try again.");
+                    setLoading(false);
+                  }}
+                />
+              </div>
+            </div>
+            <div className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <a
+                href="/signup"
+                className="text-primary underline text-sm hover:text-emerald-700"
+              >
+                Sign up
+              </a>
             </div>
           </div>
-          <div className="text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <a
-              href="/signin"
-              className="text-primary underline text-sm hover:text-emerald-700"
-            >
-              Sign up
-            </a>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+    </>
   );
 }
 

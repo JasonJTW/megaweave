@@ -4,7 +4,7 @@
 import React from "react";
 import { useEffect } from "react";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { easeInOut, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -204,11 +204,12 @@ export default function Signup() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-stone-800 to-primary flex items-center justify-center">
+      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-stone-800 to-primary"></div>
+      <div className="min-h-screen flex items-center justify-center">
         <motion.div
-          initial={{ opacity: 0, y: -60 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.5, ease: easeInOut }}
           className="w-full max-w-md"
         >
           <div className="bg-secondary rounded-2xl shadow-2xl p-8 m-6 space-y-6">
@@ -314,7 +315,7 @@ export default function Signup() {
               <div className="flex items-center mt-4">
                 <Button
                   type="submit"
-                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8"
+                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8 z-10"
                   disabled={!username || !email || !password || loading}
                 >
                   {loading ? "Signing up..." : "Sign up"}

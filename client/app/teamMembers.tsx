@@ -20,9 +20,9 @@ export interface TeamMember {
   user_id: number;
   member_name: string;
   avatar_url: string;
-  title: string;
+  user_role: string;
   location?: string;
-  department?: string;
+  title?: string;
   member_bio?: string;
   websites?: Website[];
   email?: string;
@@ -52,8 +52,3 @@ export async function getTeamMembers() {
     return [];
   }
 }
-
-//Fix: Update be api to get member by id
-// export const getTeamMemberById = (id: number): TeamMember | undefined => {
-//   return teamMembers.find((member) => member.id === id);
-// };

@@ -207,9 +207,9 @@ const MemberPage = () => {
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                 </div>
-                <div className="absolute top-4 left-4 bg-black text-white px-4 py-2 text-sm rounded-full">
+                {/* <div className="absolute top-4 left-4 bg-black text-white px-4 py-2 text-sm rounded-full">
                   {member.title}
-                </div>
+                </div> */}
               </div>
 
               {/* Member Name and Department */}
@@ -217,9 +217,7 @@ const MemberPage = () => {
                 <h1 className="text-4xl md:text-5xl text-secondary font-bold mb-2">
                   {member.member_name}
                 </h1>
-                <p className="text-xl text-secondary/75 mb-4">
-                  {member.department}
-                </p>
+                <p className="text-xl text-secondary/75 mb-4">{member.title}</p>
               </div>
 
               {/* Contact Information */}

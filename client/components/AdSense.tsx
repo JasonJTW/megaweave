@@ -1,19 +1,32 @@
-import Script from "next/script";
-import React from "react";
+"use client";
 
-type AdsenseTypes = {
-  publisherId: string;
+import { useEffect } from "react";
+
+type AdUnitProps = {
+  slot: string;
+  test?: boolean;
+  style?: React.CSSProperties;
 };
 
-const AdSense = ({ publisherId }: AdsenseTypes) => {
+export default function AdSense({ slot, test = false, style }: AdUnitProps) {
+  useEffect(() => {
+    try {
+      // @ts-expect-error adsense
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      console.error("AdsbyGoogle push error:", e);
+    }
+  }, [slot]);
+
   return (
-    <Script
-      async
-      src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}`}
-      crossOrigin="anonymous"
-      strategy="afterInteractive"
+    <ins
+      className="adsbygoogle"
+      style={style || { display: "block" }}
+      data-ad-client="ca-pub-3940256099942544"
+      data-ad-slot={slot}
+      data-ad-format="auto"
+      data-full-width-responsive="true"
+      {...(test ? { "data-adtest": "on" } : {})}
     />
   );
-};
-
-export default AdSense;
+}

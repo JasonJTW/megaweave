@@ -28,6 +28,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
+import MemberForm from "../memberForm";
 
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -48,10 +49,6 @@ const defaultContactValues: ContactSettingsValues = {
   phone: "",
   emailVisible: false,
   phoneVisible: false,
-};
-
-const MemberForm = () => {
-  return <div>MemberForm</div>;
 };
 
 const UserPage = () => {
@@ -442,18 +439,21 @@ const UserPage = () => {
 
   if (loading || redirecting) {
     return (
-      <div className="min-h-screen bg-megaweave-forest-dark flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-16 h-16 border-4 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin mx-auto mb-4"></div>
-          <h1 className="text-megaweave-cream text-2xl font-medium">
-            Loading...
-          </h1>
-        </motion.div>
-      </div>
+      <>
+        <div className="fixed inset-0 bg-megaweave-forest-dark -z-10"></div>
+        <div className="min-h-screen bg-megaweave-forest-dark flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            <div className="w-16 h-16 border-4 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin mx-auto mb-4"></div>
+            <h1 className="text-megaweave-cream text-2xl font-medium">
+              Loading...
+            </h1>
+          </motion.div>
+        </div>
+      </>
     );
   }
 
@@ -842,9 +842,6 @@ const UserPage = () => {
                                   {...field}
                                   type="email"
                                   className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                                  // onChange={(e) => {
-                                  // field.onChange(e); // 更新表單狀態
-                                  // }}
                                 />
                               ) : (
                                 <div className="text-gray-300 rounded-lg">
@@ -908,10 +905,6 @@ const UserPage = () => {
                                   type="phone"
                                   placeholder="Enter your contact phone number"
                                   className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                                  // onChange={(e) => {
-                                  // field.onChange(e); // 更新表單狀態
-                                  // setTempContactPhone(e.target.value); // 同步更新臨時變量
-                                  // }}
                                 />
                               ) : (
                                 <div className=" text-gray-300 rounded-lg ">
@@ -931,7 +924,12 @@ const UserPage = () => {
         </div>
 
         {/* member form */}
-        {isContributor && <MemberForm />}
+        {isContributor && (
+          <MemberForm
+            isContributor={isContributor}
+            memberUserId={user.userId}
+          />
+        )}
       </div>
     </>
   );

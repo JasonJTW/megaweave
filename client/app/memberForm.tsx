@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
+
 import {
   Form,
   FormControl,
@@ -20,20 +21,21 @@ import {
 } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { TeamMember } from "./teamMembers";
+import { useTeam } from "./contexts/TeamContext";
 
 // Member Form 資料型別
 type MemberFormValues = {
   title?: string;
   location?: string;
   website?: string;
-  Email?: string;
+  email?: string;
 };
 
 const defaultMemberValues: MemberFormValues = {
   title: "",
   location: "",
   website: "",
-  Email: "",
+  email: "",
 };
 
 interface MemberFormProps {
@@ -57,6 +59,8 @@ const MemberForm: React.FC<MemberFormProps> = ({
   const [member, setMember] = useState<TeamMember | null>(null);
   const memberNameMaxLength =
     Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
+  const { refetchTeamMembers } = useTeam();
+
   // Form state
   const memberForm = useForm<MemberFormValues>({
     defaultValues: defaultMemberValues,
@@ -91,7 +95,7 @@ const MemberForm: React.FC<MemberFormProps> = ({
         title: memberData.title || "",
         location: memberData.location || "",
         website: memberData.websites[0].url || "",
-        Email: memberData.email || "",
+        email: memberData.email || "",
       });
 
       setError(null);
@@ -107,14 +111,25 @@ const MemberForm: React.FC<MemberFormProps> = ({
 
   const saveMemberData = async (data: MemberFormValues) => {
     try {
-      const response = await fetch(`${hostName}/api/userprofile/member`, {
+      const updates = {
+        title: data.title,
+        location: data.location,
+        email: data.email, // 使用小寫
+        websites: data.website
+          ? JSON.stringify([{ url: data.website, type: "personal" }])
+          : JSON.stringify([]), // 轉換為陣列格式
+      };
+
+      const response = await fetch(`${hostName}/api/member`, {
         cache: "no-store",
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          updates: updates,
+        }),
       });
 
       if (!response.ok) {
@@ -208,7 +223,8 @@ const MemberForm: React.FC<MemberFormProps> = ({
     try {
       const formData = memberForm.getValues();
       await saveMemberData(formData);
-      setIsEditingMember(false);
+      await refetchTeamMembers();
+      await setIsEditingMember(false);
     } catch (error) {
       // Error handling is done in saveMemberData
       console.log("Error saving member data, staying in edit mode.", error);
@@ -217,7 +233,12 @@ const MemberForm: React.FC<MemberFormProps> = ({
 
   const handleCancelMember = () => {
     // Reset form to original values
-    fetchMemberData();
+    memberForm.reset({
+      title: member?.title || "",
+      location: member?.location || "",
+      website: member?.websites?.[0]?.url || "",
+      email: member?.email || "",
+    });
     setIsEditingMember(false);
     setError(null);
   };
@@ -513,14 +534,14 @@ const MemberForm: React.FC<MemberFormProps> = ({
                       </div>
                       <FormField
                         control={memberForm.control}
-                        name="Email"
+                        name="email"
                         render={({ field }) => (
                           <FormItem>
                             <FormControl>
                               {isEditingMember ? (
                                 <input
                                   {...field}
-                                  type="url"
+                                  type="email"
                                   placeholder="https://Email.com/in/username"
                                   className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
                                 />

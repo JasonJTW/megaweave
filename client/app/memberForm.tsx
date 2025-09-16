@@ -18,6 +18,8 @@ import {
   MapPin,
   Globe,
   IdCardLanyard,
+  Mail,
+  Globe2,
 } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { TeamMember } from "./teamMembers";
@@ -441,11 +443,11 @@ const MemberForm: React.FC<MemberFormProps> = ({
           </div>
 
           {/* Form */}
-          <div>
+          <div className="flex-1 w-full">
             <Form {...memberForm}>
               <form
                 onSubmit={memberForm.handleSubmit(onMemberFormSubmit)}
-                className="space-y-6"
+                className="space-y-6 "
               >
                 {/* Title  */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -527,7 +529,8 @@ const MemberForm: React.FC<MemberFormProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Email */}
                     <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Mail className="w-4 h-4" />
                         <FormLabel className="text-base font-medium">
                           Email
                         </FormLabel>
@@ -557,7 +560,8 @@ const MemberForm: React.FC<MemberFormProps> = ({
                     </div>
                     {/* Website */}
                     <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Globe2 className="w-4 h-4" />
                         <FormLabel className="text-base font-medium">
                           Website
                         </FormLabel>

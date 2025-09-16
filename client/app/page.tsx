@@ -310,11 +310,7 @@ const PostsApp = () => {
       <div className=" fixed inset-0 bg-secondary -z-10"></div>
       <div className="min-h-screen ">
         {/* Icon */}
-        <AdSense
-          slot="1234567890"
-          test={true}
-          style={{ display: "block", minHeight: "250px" }}
-        />
+        <AdSense style={{ display: "block", minHeight: "250px" }} />
         <div className="bg-megaweave-secondary shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex justify-between items-center">

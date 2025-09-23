@@ -151,6 +151,13 @@ const UserPage = () => {
     setUsername(result.custom_name);
   };
 
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files ? e.target.files[0] : "noFile";
+    if (file) {
+      console.log(file);
+    }
+  };
+
   const insertUsername = async (custom_name: string) => {
     try {
       const response = await fetch(`${hostName}/api/userprofile/custom_name`, {
@@ -458,13 +465,15 @@ const UserPage = () => {
   }
 
   if (error) {
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
-      <Alert className="max-w-md bg-red-950/50 border-red-500/30">
-        <AlertDescription className="text-red-300">
-          Error fetching user data: {error}
-        </AlertDescription>
-      </Alert>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
+        <Alert className="max-w-md bg-red-950/50 border-red-500/30">
+          <AlertDescription className="text-red-300">
+            Error fetching user data: {error}
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   if (!user) {
@@ -518,13 +527,20 @@ const UserPage = () => {
             >
               <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
                 {/* Avatar */}
+
+                {/* //TODO: Implement avatar image upload */}
                 <div className="text-center mb-2">
                   <div className="relative">
                     <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative">
-                      {username.charAt(0)}
+                      {username ? username.charAt(0) : "?"}
                       <div className="absolute -bottom-3 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
                     </div>
                   </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarSelect}
+                  />
                 </div>
 
                 {/* User Info */}

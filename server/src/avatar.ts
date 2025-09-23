@@ -7,7 +7,6 @@ import dbPool from "./utils/db";
 dotenv.config();
 
 const router = Router();
-
 router.post(
   "/",
   requireAuth,

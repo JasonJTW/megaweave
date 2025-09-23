@@ -28,6 +28,15 @@ export const s3Client = new S3Client({
   },
 });
 
+async function cleanupFailedAvatarUpload(fileUrl: string) {
+  try {
+    await deleteS3Files([fileUrl]);
+    console.log("Cleaned up failed upload avatar from S3");
+  } catch (cleanupError) {
+    console.error("Failed to clean up uploaded avatar:", cleanupError);
+  }
+}
+
 //* Multer to S3 configuration
 export const uploadConfig = (S3folder: string) => {
   return multer({
@@ -153,12 +162,7 @@ export async function updateAvatar(
     console.error("Error updating avatar:", error);
 
     //* If error occurs, try delete the uploaded file from S3
-    try {
-      await deleteS3Files([avatarUrl]);
-      console.log("Cleaned up failed upload avatar from S3");
-    } catch (cleanupError) {
-      console.error("Failed to clean up uploaded avatar:", cleanupError);
-    }
+    await cleanupFailedAvatarUpload(avatarUrl);
     throw new Error(
       `Failed to update avatar: ${
         error instanceof Error ? error.message : "Unknown error"

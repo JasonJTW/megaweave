@@ -9,7 +9,6 @@ import { UserRole, userRoles } from "./schema";
 const router = Router();
 
 //RWD: For get & post user profile
-
 router.get("/bio", requireAuth, async (req: Request, res: Response) => {
   let query;
   try {

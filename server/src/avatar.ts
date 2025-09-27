@@ -6,7 +6,6 @@ import dotenv from "dotenv";
 import dbPool from "./utils/db";
 dotenv.config();
 
-//* TEST: Testing github action runner
 const router = Router();
 router.post(
   "/",

@@ -23,6 +23,7 @@ import {
 
 import User from "./types/user";
 import { useRouter } from "next/navigation";
+import Footer from "./components/Footer";
 const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 
 const PostsApp = () => {
@@ -741,6 +742,7 @@ const PostsApp = () => {
             </div>
           </div>
         )}
+        <Footer />
       </div>
     </>
   );

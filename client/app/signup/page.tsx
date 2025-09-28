@@ -116,7 +116,7 @@ export default function Signup() {
     checkFBReady();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -226,7 +226,7 @@ export default function Signup() {
                 </div>
               )}
             </div>
-            <form onSubmit={handleSubmit} className="">
+            <form onSubmit={handleSignupSubmit} className="">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-primary-75">

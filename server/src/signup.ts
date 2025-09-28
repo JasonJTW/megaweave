@@ -79,7 +79,7 @@ router.post("/", async (req: Request, res: Response) => {
   console.log("user after hashing password:", user);
   //* 4. Insert the user into the database
   try {
-    const query = `INSERT INTO users (username, email, password, salt, providers, role, contact_email) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const query = `INSERT INTO users (username, email, password, salt, providers, role) VALUES (?, ?, ?, ?, ?, ? )`;
     const [result] = await dbPool.query<ResultSetHeader>(query, [
       user.username,
       user.email,
@@ -87,14 +87,13 @@ router.post("/", async (req: Request, res: Response) => {
       user.salt,
       JSON.stringify(["native"]),
       userRoles[0], // default role is 'user'
-      user.email,
     ]);
     console.log("Insert user result:", result);
 
     //* 5. create user session
     const userSession: UserSession = {
       userId: result.insertId.toString(),
-      role: userRoles[1],
+      role: userRoles[0],
       username: user.username,
       email: user.email,
     };

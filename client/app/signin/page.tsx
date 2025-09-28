@@ -12,22 +12,26 @@ import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
+import Footer from "../components/Footer";
 
 function SigninForm() {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+  const [username, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signinError, setSigninError] = useState<string | null>(null);
+  const [signupError, setSignupError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"login" | "register">("login");
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
 
   //* After successful sign in, redirect to the page
-  const handleSigninSuccess = () => {
+  const handleSigninSignupSuccess = () => {
     if (returnTo) {
       router.push(decodeURIComponent(returnTo));
     } else {
@@ -66,7 +70,7 @@ function SigninForm() {
       }
 
       console.log("Google sign in response data:", data);
-      handleSigninSuccess();
+      handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
       setSigninError(
@@ -99,7 +103,7 @@ function SigninForm() {
       }
       //* User has valid session in cookie, redirect to user page
       setLoading(true);
-      handleSigninSuccess();
+      handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error fetching user data:", error);
       setError(
@@ -224,7 +228,7 @@ function SigninForm() {
       }
 
       console.log("Facebook backend response:", data);
-      handleSigninSuccess();
+      handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
       setSigninError(
@@ -237,140 +241,107 @@ function SigninForm() {
     }
   };
 
+  const handleLoginClick = () => {
+    setMode("login");
+  };
+
+  const handleRegisterClick = () => {
+    setMode("register");
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    /// Validate input
+    if (!username || !email || !password) {
+      setSignupError("All fields are required.");
+      setLoading(false);
+      return;
+    }
+
+    const newUser = {
+      username: username,
+      email: email,
+      password: password,
+    };
+
+    try {
+      const response = await fetch(`${hostName}/api/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newUser),
+        credentials: "include", // Include cookies in the request
+      });
+
+      const data = await response.json();
+      // /// handle error
+      if (!response.ok) {
+        setSignupError(data.errorMessage || "Sign in failed");
+        if (data.details) {
+          console.error("ErrorDetails", data.details);
+        }
+        throw new Error(data.errorMessage || "Sign in failed");
+      }
+      /// Sign in success
+
+      /// Add a 5-second delay to inspect the button text
+      // await new Promise((resolve) => setTimeout(resolve, 300));
+      alert(`Welcome to MegaWeave🥳🎉! ${username}`);
+      handleSigninSignupSuccess();
+    } catch (error) {
+      console.log(error);
+      setSignupError(
+        error instanceof Error ? error.message : "An unexpected error occurred"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
-      <div className="fixed inset-0 bg-gradient-to-br from-stone-800 to-primary -z-10"></div>
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="fixed inset-0 bg-secondary  -z-10"></div>
+      <div className="min-h-screen flex bg-secondary items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: easeInOut }}
           className="w-full max-w-md"
         >
-          <div className="bg-secondary rounded-2xl shadow-2xl p-8 space-y-6 m-6">
-            <div className="text-left space-y-1">
-              <h1 className="text-3xl font-mono tracking-wider text-primary">
-                Sign in
-              </h1>
-              <p className="text-muted-foreground font-mono tracking-tighter text-sm">
-                Enter your credential to access your account
-              </p>
-              {(signinError || error) && (
-                <div className="text-red-400 text-sm justify-self-end">
-                  * {signinError || error}
-                </div>
-              )}
-            </div>
-            <form onSubmit={handleSubmit} className="">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-primary">
-                    Email
-                  </Label>
-                  <Input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    placeholder="Enter your email"
-                    className="bg-secondary text-primary border-emerald-300"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-primary-400">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      id="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      placeholder="Enter your password"
-                      className="bg-secondary text-primary border-emerald-300"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowPassword(!showPassword);
-                        console.log(showPassword);
-                      }}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
-                    >
-                      {showPassword ? (
-                        <EyeClosed size={20} />
-                      ) : (
-                        <Eye size={20} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="remember"
-                      className="border-emerald-300"
-                      onClick={() => {
-                        setRememberMe(!rememberMe);
-                        console.log(rememberMe);
-                      }}
-                    />
-                    <Label htmlFor="remember" className="text-primary-400">
-                      Remember me
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <a
-                      href=""
-                      className="text-primary underline hover:text-emerald-700"
-                    >
-                      Forgot Password?
-                    </a>
-                  </div>
-                </div>
+          <div className="bg-secondary rounded-2xl  p-8 space-y-6">
+            {(signinError || signupError || error) && (
+              <div className="text-red-400 text-sm justify-self-end">
+                * {signinError || error}
               </div>
-
-              <div className="flex items-center mt-4">
-                <Button
-                  type="submit"
-                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8 z-10"
-                  disabled={!email || !password || loading}
-                >
-                  {loading ? "Signing in..." : "Sign in"}
-                </Button>
-              </div>
-            </form>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-primary" />
-              </div>
-              <div className="relative flex justify-center text-xs text-primary uppercase">
-                <span className="bg-secondary px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            )}
+            <div className="flex flex-col-2 max-w-full ">
               <Button
-                className="w-full bg-primary-50 text-black
-                               hover:bg-primary-30 transition-all duration-200"
-                onClick={handleFacebookLogin}
-                disabled={!isFBReady || loading}
+                className={
+                  mode === "login"
+                    ? "pointer-events-none"
+                    : "bg-transparent shadow-none text-megaweave-forest-dark"
+                }
+                onClick={handleLoginClick}
               >
-                <svg
-                  role="img"
-                  viewBox="0 0 24 24"
-                  className="w-5 h-5 mr-2"
-                  fill="currentColor"
-                >
-                  <path d={siFacebook.path} />
-                </svg>
-                {isFBReady ? "Facebook" : "Loading Facebook..."}
+                Log in
               </Button>
               <Button
-                className="w-full bg-primary-50 text-black hover:bg-primary-30 transition-all duration-200"
+                className={
+                  mode === "register"
+                    ? "pointer-events-none"
+                    : "bg-transparent shadow-none text-megaweave-forest-dark"
+                }
+                onClick={handleRegisterClick}
+              >
+                Register
+              </Button>
+            </div>
+
+            <div className="grid grid-rows-2 gap-4">
+              <Button
+                variant={"outline"}
+                className="w-full hover:bg-primary-30 transition-all duration-200 "
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
@@ -394,9 +365,8 @@ function SigninForm() {
                 >
                   <path d={siGoogle.path} />
                 </svg>
-                Google
+                Log in with Google
               </Button>
-
               <div className="hidden">
                 <GoogleLogin
                   containerProps={{ id: "hidden-google-signin" }}
@@ -408,19 +378,215 @@ function SigninForm() {
                   }}
                 />
               </div>
-            </div>
-            <div className="text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <a
-                href="/signup"
-                className="text-primary underline text-sm hover:text-emerald-700"
+              <Button
+                variant={"outline"}
+                className="w-full hover:bg-primary-30 transition-all duration-200"
+                onClick={handleFacebookLogin}
+                disabled={!isFBReady || loading}
               >
-                Sign up
+                <svg
+                  role="img"
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 mr-2"
+                  fill="currentColor"
+                >
+                  <path d={siFacebook.path} />
+                </svg>
+                {isFBReady ? "Log in with Facebook" : "Loading Facebook..."}
+              </Button>
+            </div>
+            <div className="relative">
+              <div className="relative flex justify-center text-megaweave-forest-dark font-ddin font-semibold">
+                <span className="bg-secondary px-2 select-none">or</span>
+              </div>
+            </div>
+
+            {mode === "login" && (
+              <form onSubmit={handleSubmit} className="">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-primary">
+                      Email
+                    </Label>
+                    <Input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="Enter your email"
+                      className="bg-secondary text-primary border-emerald-300"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-primary-400">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        id="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="Enter your password"
+                        className="bg-secondary text-primary border-emerald-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPassword(!showPassword);
+                          console.log(showPassword);
+                        }}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
+                      >
+                        {showPassword ? (
+                          <EyeClosed size={20} />
+                        ) : (
+                          <Eye size={20} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="remember"
+                        className="border-emerald-300"
+                        onClick={() => {
+                          setRememberMe(!rememberMe);
+                          console.log(rememberMe);
+                        }}
+                      />
+                      <Label htmlFor="remember" className="text-primary-400">
+                        Remember me
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center mt-4">
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary-75  hover:shadow-primary-15 shadow-2xl transition-all duration-200 z-10"
+                    disabled={!email || !password || loading}
+                  >
+                    {loading ? "Loging in..." : "Log in"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {mode === "register" && (
+              <form onSubmit={handleSignupSubmit} className="">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="username" className="text-primary-75">
+                      UserName
+                    </Label>
+                    <Input
+                      type="username"
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUserName(e.target.value)}
+                      required
+                      placeholder="Enter your username"
+                      className="bg-secondary text-primary border-primary"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-primary">
+                      Email
+                    </Label>
+                    <Input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="Enter your email"
+                      className="bg-secondary text-primary border-emerald-300"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-primary">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        id="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="Enter your password"
+                        className="bg-secondary text-primary border-emerald-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowPassword(!showPassword);
+                          console.log(showPassword);
+                        }}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
+                      >
+                        {showPassword ? (
+                          <EyeClosed size={20} />
+                        ) : (
+                          <Eye size={20} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="remember"
+                        className="border-emerald-300"
+                        onClick={() => {
+                          setRememberMe(!rememberMe);
+                          console.log(rememberMe);
+                        }}
+                      />
+                      <Label htmlFor="remember" className="text-primary">
+                        Remember me
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href=""
+                        className="text-primary underline hover:text-emerald-700"
+                      >
+                        Forgot Password?
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center mt-4">
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary-75 hover:shadow-primary-15 shadow-2xl transition-all duration-200 z-10 "
+                    disabled={!username || !email || !password || loading}
+                  >
+                    {loading ? "Registering..." : "Register"}
+                  </Button>
+                </div>
+              </form>
+            )}
+            <div className="flex justify-center text-[12px] mt-5">
+              <a
+                href=""
+                className="text-primary items-center hover:text-emerald-700"
+              >
+                Forgot Password?
               </a>
             </div>
           </div>
         </motion.div>
       </div>
+      <Footer />
     </>
   );
 }

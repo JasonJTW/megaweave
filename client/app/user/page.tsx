@@ -252,6 +252,7 @@ const UserPage = () => {
       const formData = new FormData();
       formData.append("image", selectedAvatarFile);
 
+      //TODO: Fix cors issue
       const processedResponse = await fetch(`${processHostName}`, {
         method: "POST",
         credentials: "include",

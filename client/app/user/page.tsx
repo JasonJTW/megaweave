@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import MemberForm from "../memberForm";
+import Footer from "../components/Footer";
 
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -1001,7 +1002,7 @@ const UserPage = () => {
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-gray-300 leading-relaxed whitespace-pre-line"
+                    className="text-gray-300 leading-relaxed whitespace-pre-line break-all"
                   >
                     {renderTextWithUrls(bio)}
                   </motion.p>
@@ -1198,6 +1199,7 @@ const UserPage = () => {
             memberUserId={user.userId}
           />
         )}
+        <Footer />
       </div>
     </>
   );

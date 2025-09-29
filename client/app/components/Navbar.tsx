@@ -10,20 +10,11 @@ import {
   UserCog,
   Info,
   Mail,
-  Briefcase,
   GalleryHorizontalEnd,
-  Image as ImageIcon,
   // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -71,31 +62,10 @@ const Navbar = () => {
       icon: UserCog,
     },
     {
-      href: "/team/leadership",
+      href: "/about",
       title: "Timeline",
       description: "Our timeline and milestones",
       icon: GalleryHorizontalEnd,
-    },
-  ];
-
-  const projectMenuItems: NavigationItem[] = [
-    {
-      href: "/projects",
-      title: "All Projects",
-      description: "View our complete project portfolio",
-      icon: Briefcase,
-    },
-    {
-      href: "/projects/megaweaving",
-      title: "MEGAWEAVING",
-      description: "Resource sharing platform",
-      icon: ImageIcon,
-    },
-    {
-      href: "/projects/community",
-      title: "Community Projects",
-      description: "Community-driven initiatives",
-      icon: UserCog,
     },
   ];
 
@@ -103,9 +73,15 @@ const Navbar = () => {
   const mobileNavItems: NavigationItem[] = [
     {
       href: "/",
-      title: "Home",
-      description: "Navigate to Home",
+      title: "Posts",
+      description: "Navigate to Posts",
       icon: Home,
+    },
+    {
+      href: "/user",
+      title: "Profile",
+      description: "User Profile",
+      icon: UserCog,
     },
     {
       href: "/about",
@@ -114,7 +90,6 @@ const Navbar = () => {
       icon: Info,
     },
     ...teamMenuItems,
-    ...projectMenuItems,
     {
       href: "/contact",
       title: "Contact",
@@ -287,18 +262,6 @@ const Navbar = () => {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80 sm:w-96">
-                  <SheetHeader className="text-left mb-8">
-                    <SheetTitle className="flex items-center space-x-2">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">MW</span>
-                      </div>
-                      <span>MEGAWEAVING</span>
-                    </SheetTitle>
-                    <SheetDescription>
-                      Navigate through our platform
-                    </SheetDescription>
-                  </SheetHeader>
-
                   <div className="space-y-2">
                     {mobileNavItems.map((item) => {
                       const Icon = item.icon;

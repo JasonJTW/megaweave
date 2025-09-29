@@ -577,10 +577,10 @@ const MemberForm: React.FC<MemberFormProps> = ({
                                   {...field}
                                   type="url"
                                   placeholder="https://your-website.com"
-                                  className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                                  className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 break-all"
                                 />
                               ) : (
-                                <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center">
+                                <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center break-all">
                                   {renderTextWithUrls(
                                     field.value || "No website provided"
                                   )}

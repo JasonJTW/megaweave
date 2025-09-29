@@ -28,9 +28,9 @@ export const s3Client = new S3Client({
   },
 });
 
-async function cleanupFailedAvatarUpload(fileUrl: string) {
+async function cleanupFailedAvatarUpload(fileKey: string) {
   try {
-    await deleteS3Files([fileUrl]);
+    await deleteS3Files([fileKey]);
     console.log("Cleaned up failed upload avatar from S3");
   } catch (cleanupError) {
     console.error("Failed to clean up uploaded avatar:", cleanupError);
@@ -98,19 +98,20 @@ export async function insertImages(
 }
 
 // 從 S3 刪除文件的輔助函數
-export async function deleteS3Files(fileUrls: string[]): Promise<void> {
+export async function deleteS3Files(fileKeys: string[]): Promise<void> {
   const BUCKET_NAME = process.env.BUCKET_NAME;
+  if (!BUCKET_NAME) {
+    console.error("deleteS3Files: BUCKET_NAME not set");
+    return;
+  }
+  if (!fileKeys || fileKeys.length === 0) return;
 
-  const deletePromises = fileUrls.map(async (url) => {
-    // 從 URL 中提取 S3 key
-    const key = url.split(".amazonaws.com/")[1];
-
-    const deleteCommand = new DeleteObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: key,
-    });
-
+  const deletePromises = fileKeys.map(async (key) => {
     try {
+      const deleteCommand = new DeleteObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: key,
+      });
       await s3Client.send(deleteCommand);
       console.log(`Successfully deleted: ${key}`);
     } catch (error) {
@@ -129,44 +130,46 @@ export async function updateAvatar(
   connection: PoolConnection,
   userId: string,
   file: Express.MulterS3.File
-): Promise<string> {
-  const avatarUrl = `${CLOUDFRONT_URL}/${file.key}`;
+): Promise<{ avatarUrl: string; oldAvatarKey?: string }> {
+  const s3Key = file.key as string | undefined;
+  if (!s3Key) {
+    throw new Error("Uploaded file does not have a valid S3 key.");
+  }
+
+  const avatarUrl = `${CLOUDFRONT_URL}/${s3Key}`;
   try {
     //* Get old avatar url from database
-
+    //* FOR UPDATE <- prevents race when multiple concurrent uploads for same user
     const [rows] = await connection.execute(
-      "SELECT avatar_url FROM users WHERE id = ?",
+      "SELECT avatar_key FROM users WHERE id = ? FOR UPDATE",
       [userId]
     );
-    const oldAvatarUrl = (rows as RowDataPacket[])[0]?.avatar_url;
-
-    //* Update new avatar url to database
-    await connection.execute(
-      "UPDATE users SET avatar_url = ?, updated_at = NOW() WHERE id = ?",
-      [avatarUrl, userId]
-    );
-
-    //* Delete old avatar from S3 if it exists
-    if (oldAvatarUrl && oldAvatarUrl !== avatarUrl) {
-      try {
-        await deleteS3Files([oldAvatarUrl]).catch(console.error);
-        console.log(`Successfully delete old avatar: ${oldAvatarUrl}`);
-      } catch (s3Error) {
-        console.error("Failed to delete old avatar from S3:", s3Error);
-        /// Not throwing error here because the main function is success and avoid affecting user experience
-      }
+    const row = (rows as RowDataPacket[])[0];
+    if (!row) {
+      throw new Error("User not found.");
     }
 
-    return avatarUrl;
+    const oldAvatarKey = row?.avatar_key as string | undefined;
+
+    //* Update new avatar_url and avatar_key to database
+    await connection.execute(
+      "UPDATE users SET avatar_url = ?, avatar_key = ?, updated_at = NOW() WHERE id = ?",
+      [avatarUrl, s3Key, userId]
+    );
+
+    return { avatarUrl, oldAvatarKey };
   } catch (error) {
     console.error("Error updating avatar:", error);
 
     //* If error occurs, try delete the uploaded file from S3
-    await cleanupFailedAvatarUpload(avatarUrl);
-    throw new Error(
-      `Failed to update avatar: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
+    try {
+      await cleanupFailedAvatarUpload(s3Key);
+    } catch (cleanupError) {
+      console.error(
+        "Failed to clean up uploaded avatar after DB error:",
+        cleanupError
+      );
+    }
+    throw error;
   }
 }

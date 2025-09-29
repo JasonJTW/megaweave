@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import User from "../types/user";
 import { googleLogout } from "@react-oauth/google";
@@ -16,8 +16,6 @@ import {
 } from "lucide-react";
 
 import { useForm } from "react-hook-form";
-// import { zodResolver } from "@hookform/resolvers/zod";
-// import * as z from "zod";
 import {
   Form,
   FormControl,
@@ -38,9 +36,8 @@ type ContactSettingsValues = {
   phoneVisible: boolean;
 };
 
-// 初始表單值
-
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+const processHostName = process.env.NEXT_PUBLIC_PROCESS_HOSTNAME;
 const userNameMaxLength =
   Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
 
@@ -68,6 +65,15 @@ const UserPage = () => {
   const [tempBio, setTempBio] = useState("");
   const [tempUsername, setTempUsername] = useState("");
   const router = useRouter();
+
+  // Avatar preview / upload states
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null); // object URL for preview
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(
+    null
+  );
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previousPreviewRef = useRef<string | null>(null); // store previous object URL so we can revoke it
 
   const contactForm = useForm<ContactSettingsValues>({
     defaultValues: defaultContactValues,
@@ -151,13 +157,160 @@ const UserPage = () => {
     setUsername(result.custom_name);
   };
 
-  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files ? e.target.files[0] : "noFile";
-    if (file) {
-      console.log(file);
+  // --- Avatar: 使用者先預覽，確認後才上傳 ---
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files ? e.target.files[0] : null;
+    if (!file) return;
+
+    // validation (example: limit 5MB)
+    const maxSizeMB = 5;
+    if (file.size / 1024 / 1024 > maxSizeMB) {
+      setError(`Selected file is larger than ${maxSizeMB} MB`);
+      // clear input
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // revoke previous object URL if exists
+    if (previousPreviewRef.current) {
+      try {
+        URL.revokeObjectURL(previousPreviewRef.current);
+      } catch (err) {
+        console.log("Error revoking previous object URL", err);
+      }
+    }
+
+    const url = URL.createObjectURL(file);
+    previousPreviewRef.current = url;
+    setPreviewSrc(url);
+    setSelectedAvatarFile(file);
+    setError(null);
+  };
+
+  const handleCancelAvatarPreview = () => {
+    if (previousPreviewRef.current) {
+      try {
+        URL.revokeObjectURL(previousPreviewRef.current);
+      } catch (err) {
+        console.log("Error revoking previous object URL", err);
+      }
+      previousPreviewRef.current = null;
+    }
+    setPreviewSrc(null);
+    setSelectedAvatarFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // optional: client-side resize/compress (commented - keep if you want)
+  // async function compressImage(
+  //   file: File,
+  //   maxWidth = 1200,
+  //   maxHeight = 1200,
+  //   quality = 0.85
+  // ) {
+  //   return new Promise<Blob | null>((resolve) => {
+  //     const img = new Image();
+  //     img.onload = () => {
+  //       const canvas = document.createElement("canvas");
+  //       let { width, height } = img;
+  //       if (width > maxWidth) {
+  //         height = (maxWidth / width) * height;
+  //         width = maxWidth;
+  //       }
+  //       if (height > maxHeight) {
+  //         width = (maxHeight / height) * width;
+  //         height = maxHeight;
+  //       }
+  //       canvas.width = width;
+  //       canvas.height = height;
+  //       const ctx = canvas.getContext("2d");
+  //       if (!ctx) return resolve(null);
+  //       ctx.drawImage(img, 0, 0, width, height);
+  //       canvas.toBlob(
+  //         (blob) => {
+  //           resolve(blob);
+  //         },
+  //         "image/jpeg",
+  //         quality
+  //       );
+  //     };
+  //     img.onerror = () => resolve(null);
+  //     img.src = URL.createObjectURL(file);
+  //   });
+  // }
+
+  const uploadAvatar = async () => {
+    if (!selectedAvatarFile) return;
+
+    setUploadingAvatar(true);
+    setError(null);
+
+    try {
+      // Optional: compress before upload (uncomment if desired)
+      // const compressedBlob = await compressImage(selectedAvatarFile, 1200, 1200, 0.8);
+      // const fileToUpload = compressedBlob ? new File([compressedBlob], selectedAvatarFile.name, { type: "image/jpeg" }) : selectedAvatarFile;
+      const formData = new FormData();
+      formData.append("image", selectedAvatarFile);
+
+      const processedResponse = await fetch(`${processHostName}`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!processedResponse.ok) {
+        throw new Error(`Processing failed: ${processedResponse.status}`);
+      }
+
+      const processedBlob: Blob = await processedResponse.blob();
+
+      const processedFormData = new FormData();
+      processedFormData.append(
+        "avatar",
+        processedBlob,
+        selectedAvatarFile.name || "avatar.png"
+      );
+
+      const response = await fetch(`${hostName}/api/avatar`, {
+        method: "POST",
+        credentials: "include",
+        body: processedFormData,
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.errorMessage || "Failed to upload avatar");
+      }
+
+      const result = await response.json();
+      console.log("Avatar uploaded successfully:", result);
+
+      // 更新本地 user 狀態 (顯示新的頭像)
+      setUser((prev) =>
+        prev ? { ...prev, avatarUrl: result.avatarUrl } : prev
+      );
+
+      // 清除 preview
+      if (previousPreviewRef.current) {
+        try {
+          URL.revokeObjectURL(previousPreviewRef.current);
+        } catch (err) {
+          console.log("Error revoking previous object URL", err);
+        }
+        previousPreviewRef.current = null;
+      }
+      setPreviewSrc(null);
+      setSelectedAvatarFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      setError(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
+  // 其餘 API helpers 保持原樣
   const insertUsername = async (custom_name: string) => {
     try {
       const response = await fetch(`${hostName}/api/userprofile/custom_name`, {
@@ -441,6 +594,17 @@ const UserPage = () => {
     getContactEmail();
     getContactPhone();
     getUsername();
+    return () => {
+      // cleanup any created object URLs on unmount
+      if (previousPreviewRef.current) {
+        try {
+          URL.revokeObjectURL(previousPreviewRef.current);
+        } catch (err) {
+          console.log("Error revoking previous object URL", err);
+        }
+        previousPreviewRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -479,7 +643,7 @@ const UserPage = () => {
   if (!user) {
     setRedirecting(true);
     router.push("/signin");
-    return;
+    return null;
   }
 
   return (
@@ -527,20 +691,116 @@ const UserPage = () => {
             >
               <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
                 {/* Avatar */}
-
-                {/* //TODO: Implement avatar image upload */}
                 <div className="text-center mb-2">
                   <div className="relative">
-                    <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative">
-                      {username ? username.charAt(0) : "?"}
-                      <div className="absolute -bottom-3 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                    {/* 固定尺寸容器：保持原本的大小/比例（max-w-72, h-80） */}
+                    <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative overflow-hidden">
+                      {/* 如果有 preview，顯示 preview 圖片；否則若 user.avatarUrl 存在則顯示真實頭像，否則顯示字母色塊 */}
+
+                      {previewSrc ? (
+                        // preview: 使用原生 img 以支援 object URL
+                        <img
+                          src={previewSrc}
+                          alt="Avatar preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : user?.avatar_url ? (
+                        // 使用 next/image 以獲得優化（父容器需為 relative）
+                        <div className="absolute inset-0">
+                          <Image
+                            src={user.avatar_url}
+                            alt={`${username} avatar`}
+                            fill
+                            sizes="(max-width: 1024px) 300px, 288px"
+                            className="object-cover"
+                          />
+                        </div>
+                      ) : (
+                        // fallback 色塊顯示使用者首字母
+                        <div className="w-full h-full flex items-center justify-center text-4xl">
+                          {username ? username.charAt(0) : "?"}
+                        </div>
+                      )}
+
+                      {/* 如果是正在上傳，顯示 loading overlay */}
+                      {uploadingAvatar && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        </div>
+                      )}
+
+                      {/* 如果有 preview，顯示 Save / Cancel 按鈕 */}
+                      {previewSrc && !uploadingAvatar && (
+                        <div className="absolute bottom-3 right-3 flex space-x-2">
+                          <button
+                            onClick={uploadAvatar}
+                            className="px-3 py-1 rounded-lg bg-green-600/20 hover:bg-green-600/30 text-sm text-green-400 flex items-center space-x-2"
+                          >
+                            <Save className="w-4 h-4" />
+                            <span>Upload</span>
+                          </button>
+                          <button
+                            onClick={handleCancelAvatarPreview}
+                            className="px-3 py-1 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 text-sm text-gray-300 flex items-center space-x-2"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>Cancel</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* file input (hidden) + change 按鈕 */}
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={handleAvatarSelect}
+                    onChange={handleFileChange}
+                    className="hidden"
                   />
+                  <div className="mt-2 flex items-center justify-center space-x-2">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-lg bg-primary/30 hover:bg-primary/40 transition-all duration-200 text-sm"
+                    >
+                      Change Avatar
+                    </button>
+
+                    {/* 如果目前沒有 preview，但有 avatarUrl，可以提供 Remove 或 Reset 按鈕（示例） */}
+                    {user.avatar_url && !previewSrc && (
+                      <button
+                        onClick={async () => {
+                          // optional: call API to delete avatar
+                          try {
+                            const res = await fetch(`${hostName}/api/avatar`, {
+                              method: "DELETE",
+                              credentials: "include",
+                            });
+                            if (!res.ok) {
+                              const r = await res.json();
+                              throw new Error(
+                                r.errorMessage || "Failed to remove avatar"
+                              );
+                            }
+                            setUser((prev) =>
+                              prev ? { ...prev, avatarUrl: undefined } : prev
+                            );
+                          } catch (err) {
+                            console.error(err);
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to remove avatar"
+                            );
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 transition-all duration-200 text-sm text-red-300"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* User Info */}
@@ -572,16 +832,7 @@ const UserPage = () => {
                           onClick={handleEditUsername}
                           className="opacity-0 group-hover:opacity-100 transition-opacity  duration-200 p-1 hover:bg-gray-600/30 rounded absolute left-full top-1/2 -translate-y-1/2"
                         >
-                          <Edit3
-                            className="w-4 style={{
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2, // 最多顯示兩行
-                            WebkitBoxOrient: 'vertical',
-                            wordBreak: 'break-word'
-                          }}h-4 text-gray-400"
-                          />
+                          <Edit3 className="w-4 h-4" />
                         </button>
                       </motion.div>
                     ) : (

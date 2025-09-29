@@ -3,4 +3,6 @@ export default interface User {
   role: "admin" | "user" | "contributor";
   username: string;
   email: string;
+  avatar_url?: string;
+  avatar_key?: string;
 }

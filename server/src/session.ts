@@ -91,7 +91,7 @@ export async function getUserSessionFromRedis(
 
     const parsedUser = JSON.parse(rawUser);
     const { success, data: user } = sessionSchema.safeParse(parsedUser);
-
+    console.log("Redis session user:", user);
     return success ? user : null;
   } catch (error) {
     console.error("Error retrieving user session:", error);

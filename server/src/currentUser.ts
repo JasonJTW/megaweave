@@ -12,6 +12,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         errorMessage: "Please login first",
       });
     }
+    console.log("Current user:", req.user);
     return res.status(200).json({ user: req.user });
   } catch (error) {
     console.error("Get current user error:", error);

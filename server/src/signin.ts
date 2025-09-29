@@ -216,7 +216,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     const foundUser = rows[0];
-
+    console.log("foundUser:", foundUser);
     // 3. 檢查用戶是否支持 native 登入
     const userProviders: string[] = parseProviders(foundUser.providers);
     // 檢查是否支持 native 登入
@@ -254,6 +254,8 @@ router.post("/", async (req: Request, res: Response) => {
       role: foundUser.role,
       userId: foundUser.id.toString(),
       provider: "native",
+      avatar_url: foundUser.avatar_url || "",
+      avatar_key: foundUser.avatar_key || "",
     };
 
     await createUserSession(validUser, req, res);
@@ -264,7 +266,7 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// Google sign in
+//* Google sign in
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -313,6 +315,8 @@ router.post("/google", async (req: Request, res: Response) => {
       role: user.role,
       userId: user.id.toString(),
       provider: "google",
+      avatar_url: user.avatar_url || "",
+      avatar_key: user.avatar_key || "",
     };
 
     await createUserSession(googleUserSession, req, res);
@@ -397,6 +401,8 @@ router.post("/facebook", async (req: Request, res: Response) => {
       role: user.role,
       userId: user.id.toString(),
       provider: "facebook",
+      avatar_url: user.avatar_url || "",
+      avatar_key: user.avatar_key || "",
     };
 
     await createUserSession(facebookUserSession, req, res);

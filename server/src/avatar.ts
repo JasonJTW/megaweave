@@ -1,4 +1,9 @@
-import { s3Client, uploadAvatarImage, updateAvatar } from "./upload";
+import {
+  s3Client,
+  uploadAvatarImage,
+  updateAvatar,
+  deleteS3Files,
+} from "./upload";
 import { Request, Response, Router } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { v4 as uuidv4 } from "uuid";
@@ -28,11 +33,22 @@ router.post(
       await connection.beginTransaction();
 
       //TODO: update user avatar url in database
-      const avatarUrl = await updateAvatar(connection, userId, file);
+      const result = await updateAvatar(connection, userId, file);
       await connection.commit();
+
+      //! async delete old avatar (file-and-forget)
+      const oldAvatarKey = result.oldAvatarKey;
+      const newAvatarKey = file.key as string;
+      if (oldAvatarKey && oldAvatarKey !== newAvatarKey) {
+        void deleteS3Files([oldAvatarKey])
+          .then(() => console.log(`Delete old Avatar ${oldAvatarKey}`))
+          .catch((e) =>
+            console.error("Failed to delete old avatar (async):", e)
+          );
+      }
       return res.status(200).json({
         message: "Avatar uploaded successfully.",
-        avatarUrl: avatarUrl,
+        avatarUrl: result.avatarUrl,
       });
     } catch (error) {
       //TODO: handle errors

@@ -110,3 +110,8 @@ export async function getUserFromCookie(
 
   return await getUserSessionFromRedis(sessionId);
 }
+
+export async function updateUserSession(
+  req: Request,
+  user: Partial<UserSession>
+) {}

@@ -9,7 +9,7 @@ export const sessionSchema = z.object({
   email: z.email(),
   provider: z.string().optional(),
   avatar_url: z.url().optional().nullable(),
-  avatar_key: z.string().optional(),
+  avatar_key: z.string().optional().nullable(),
 });
 
 export type UserSession = z.infer<typeof sessionSchema>;

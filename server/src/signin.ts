@@ -315,8 +315,8 @@ router.post("/google", async (req: Request, res: Response) => {
       role: user.role,
       userId: user.id.toString(),
       provider: "google",
-      avatar_url: user.avatar_url || "",
-      avatar_key: user.avatar_key || "",
+      avatar_url: user.avatar_url ?? null,
+      avatar_key: user.avatar_key ?? null,
     };
 
     await createUserSession(googleUserSession, req, res);

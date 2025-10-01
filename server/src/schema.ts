@@ -6,9 +6,9 @@ export const sessionSchema = z.object({
   userId: z.string(),
   role: z.enum(userRoles),
   username: z.string().min(3),
-  email: z.string().email(),
+  email: z.email(),
   provider: z.string().optional(),
-  avatar_url: z.string().url().optional(),
+  avatar_url: z.url().optional().nullable(),
   avatar_key: z.string().optional(),
 });
 

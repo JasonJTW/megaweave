@@ -28,6 +28,7 @@ import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import MemberForm from "../memberForm";
 import Footer from "../components/Footer";
+import { useTeam } from "../contexts/TeamContext";
 
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -66,6 +67,7 @@ const UserPage = () => {
   const [tempBio, setTempBio] = useState("");
   const [tempUsername, setTempUsername] = useState("");
   const router = useRouter();
+  const { refetchTeamMembers } = useTeam();
 
   // Avatar preview / upload states
   const [previewSrc, setPreviewSrc] = useState<string | null>(null); // object URL for preview
@@ -240,6 +242,35 @@ const UserPage = () => {
   //   });
   // }
 
+  const updateUserSession = async (updates: Partial<User>) => {
+    if (!updates || Object.keys(updates).length === 0) return;
+    // console.log("Sending updates:", updates);
+    // console.log("Body:", JSON.stringify({ updates: updates }));
+    try {
+      const response = await fetch(`${hostName}/api/currentUser/update`, {
+        cache: "no-store",
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify({ updates: updates }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        setError(result.errorMessage || "Failed to update user session");
+        throw new Error(result.errorMessage || "Failed to update user session");
+      }
+      const result = await response.json();
+      const updatedUser = result.updatedUser;
+      // alert(`User session updated: ${JSON.stringify(updatedUser)}`);
+      setUser(updatedUser);
+    } catch (error) {
+      console.error("Error updating user session:", error);
+    }
+  };
+
   const uploadAvatar = async () => {
     if (!selectedAvatarFile) return;
 
@@ -253,7 +284,6 @@ const UserPage = () => {
       const formData = new FormData();
       formData.append("image", selectedAvatarFile);
 
-      //TODO: Fix cors issue
       const processedResponse = await fetch(`${processHostName}`, {
         method: "POST",
         credentials: "include",
@@ -273,6 +303,7 @@ const UserPage = () => {
         selectedAvatarFile.name || "avatar.png"
       );
 
+      //* Upload to db
       const response = await fetch(`${hostName}/api/avatar`, {
         method: "POST",
         credentials: "include",
@@ -289,7 +320,13 @@ const UserPage = () => {
 
       // 更新本地 user 狀態 (顯示新的頭像)
       setUser((prev) =>
-        prev ? { ...prev, avatarUrl: result.avatarUrl } : prev
+        prev
+          ? {
+              ...prev,
+              avatar_url: result.avatarUrl,
+              avatar_key: result.avatarKey,
+            }
+          : prev
       );
 
       // 清除 preview
@@ -304,6 +341,17 @@ const UserPage = () => {
       setPreviewSrc(null);
       setSelectedAvatarFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
+
+      //* Update user session in redis
+      await updateUserSession({
+        avatar_url: result.avatarUrl,
+        avatar_key: result.avatarKey,
+      });
+
+      //* If user is contributor/admin, refetch team members to update avatar
+      if (isContributor) {
+        await refetchTeamMembers();
+      }
     } catch (error) {
       console.error("Error uploading avatar:", error);
       setError(error instanceof Error ? error.message : "Upload failed");

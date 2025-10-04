@@ -28,12 +28,12 @@ router.post(
       }
 
       const userId = req.user!.userId;
-
+      const userRole = req.user!.role;
       connection = await dbPool.getConnection();
       await connection.beginTransaction();
 
       //TODO: update user avatar url in database
-      const result = await updateAvatar(connection, userId, file);
+      const result = await updateAvatar(connection, userId, userRole, file);
       await connection.commit();
 
       //! async delete old avatar (file-and-forget)
@@ -49,6 +49,7 @@ router.post(
       return res.status(200).json({
         message: "Avatar uploaded successfully.",
         avatarUrl: result.avatarUrl,
+        avatarKey: result.avatarKey,
       });
     } catch (error) {
       //TODO: handle errors

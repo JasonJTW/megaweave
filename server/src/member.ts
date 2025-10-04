@@ -52,10 +52,10 @@ router.get(`/all`, async (req: Request, res: Response) => {
 
   try {
     const [row] = await dbPool.query(query, queryParams);
-    console.log(
-      userId ? `Member data for userId ${userId}: ` : "All members data: ",
-      row
-    );
+    // console.log(
+    //   userId ? `Member data for userId ${userId}: ` : "All members data: ",
+    //   row
+    // );
     return res.status(200).json(row);
   } catch (error) {
     console.error("Database error:", error);

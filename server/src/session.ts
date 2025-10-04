@@ -73,9 +73,6 @@ export async function removeUserSession(req: Request, res: Response) {
   }
 }
 
-/**
- * 從 Redis 獲取用戶 session 的輔助函數
- */
 export async function getUserSessionFromRedis(
   sessionId: string
 ): Promise<UserSession | null> {
@@ -111,7 +108,60 @@ export async function getUserFromCookie(
   return await getUserSessionFromRedis(sessionId);
 }
 
+export class UpdateSessionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UpdateSessionError";
+  }
+}
+
 export async function updateUserSession(
   req: Request,
-  user: Partial<UserSession>
-) {}
+  updates: Partial<UserSession>
+): Promise<UserSession | null> {
+  try {
+    const sessionId = req.cookies[COOKIE_SESSION_KEY];
+    if (!sessionId) {
+      throw new UpdateSessionError("No session ID found in cookies");
+    }
+
+    await connectRedis();
+    const key = `${REDIS_SESSION_KEY}:${sessionId}`;
+    const raw = await redisClient.get(key);
+    if (!raw) {
+      throw new UpdateSessionError("Session not found in Redis");
+    }
+
+    const parsed = JSON.parse(raw);
+
+    //* Merge existing session data with updates
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    const updated = { ...parsed, ...filteredUpdates };
+
+    //* Zod validation
+    const validated = sessionSchema.parse(updated);
+
+    const ttl = await redisClient.ttl(key);
+    if (ttl && ttl > 0) {
+      await redisClient.setEx(key, ttl, JSON.stringify(validated));
+    } else {
+      await redisClient.setEx(
+        key,
+        SESSION_EXPIRATION_SECONDS,
+        JSON.stringify(validated)
+      );
+    }
+
+    console.log("Updated session data:", validated);
+    return validated;
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error("Session validation error:", error.message);
+      throw new UpdateSessionError("Invalid session data");
+    }
+    console.error("UpdateUserSession failed: ", error);
+    return null;
+  }
+}

@@ -129,14 +129,16 @@ export const uploadAvatarImage = avatarUploadConfig.single("avatar");
 export async function updateAvatar(
   connection: PoolConnection,
   userId: string,
+  userRole: string,
   file: Express.MulterS3.File
-): Promise<{ avatarUrl: string; oldAvatarKey?: string }> {
+): Promise<{ avatarUrl: string; oldAvatarKey?: string; avatarKey: string }> {
   const s3Key = file.key as string | undefined;
   if (!s3Key) {
     throw new Error("Uploaded file does not have a valid S3 key.");
   }
 
   const avatarUrl = `${CLOUDFRONT_URL}/${s3Key}`;
+  const avatarKey = s3Key;
   try {
     //* Get old avatar url from database
     //* FOR UPDATE <- prevents race when multiple concurrent uploads for same user
@@ -151,13 +153,21 @@ export async function updateAvatar(
 
     const oldAvatarKey = row?.avatar_key as string | undefined;
 
-    //* Update new avatar_url and avatar_key to database
+    //* Update new avatar_url and avatar_key to db_users
     await connection.execute(
       "UPDATE users SET avatar_url = ?, avatar_key = ?, updated_at = NOW() WHERE id = ?",
-      [avatarUrl, s3Key, userId]
+      [avatarUrl, avatarKey, userId]
     );
 
-    return { avatarUrl, oldAvatarKey };
+    //TODO: If role == 'admin || contributor', update db_members too
+    if (userRole === "admin" || userRole === "contributor") {
+      await connection.execute(
+        "UPDATE members SET avatar_url = ?, avatar_key = ? WHERE user_id = ?",
+        [avatarUrl, avatarKey, userId]
+      );
+    }
+
+    return { avatarUrl, avatarKey };
   } catch (error) {
     console.error("Error updating avatar:", error);
 

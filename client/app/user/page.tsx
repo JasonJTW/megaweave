@@ -1247,8 +1247,8 @@ const UserPage = () => {
             memberUserId={user.userId}
           />
         )}
-        <Footer />
       </div>
+      <Footer />
     </>
   );
 };

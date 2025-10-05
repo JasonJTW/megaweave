@@ -4,33 +4,42 @@ import { FC } from "react";
 
 const Footer: FC = () => {
   return (
-    <footer className="relative overflow-hidden  bg-[#f5f6f4] text-[#14321f] font-ddin max-w-full">
+    <footer className=" overflow-hidden  bg-[#f4f5f3] text-[#14321f] font-ddin max-w-full">
       {/* 頂端細線（幾乎不可見） */}
 
-      {/* 主要內容區（置於 watermark 之上） */}
-      <div className="max-w-full relative px-[30px] pt-[30px] pb-[11px]  border-t-[1px] border-primary/30">
+      {/* 主要內容區（置於 logo 之上） */}
+      <div className="max-w-full px-[30px] pt-[30px] pb-[11px]  border-t-[1px] border-primary/30">
         {/* Top: logo + nav */}
-        <div className="flex flex-row  items-start md:items-center ">
-          <div className="">
+        <div className="flex flex-row items-start md:items-center md:w-full md:justify-between ">
+          <div className="flex flex-row items-center">
             <Image
               src="/favicon.ico"
-              alt="megaweaving logo"
-              width={43}
-              height={43}
-              className="object-cover mr-12"
+              alt="megaweaving icon"
+              width={80}
+              height={80}
+              className="object-cover mr-12 md:mr-7 w-[43px] h-[43px] md:w-[80px] md:h-[80px]"
               priority
             />
+            {/* Desktop Megaweaving logo*/}
+            <div className="hidden md:text-center md:mb-[8px] md:block ">
+              <span
+                aria-hidden
+                className="pointer-events-none select-none block  text-[clamp(50px,15vw,400px)] md:text-[clamp(20px,5vw,400px)] font-extrabold leading-none text-primary/30 tracking-normal"
+              >
+                megaweaving
+              </span>
+            </div>
           </div>
 
           {/* 導航：兩欄布局 */}
-          <div className="flex-1">
-            <div className="grid grid-cols-2 ">
+          <div className="flex-1 md:flex-none md:mr-[45px]">
+            <div className="grid grid-cols-2 md:flex md:flex-row md:gap-[100px] text-[8px] md:text-[16pt] font-ddin font-bold">
               <div>
-                <ul className="space-y-[2px] text-[8px]">
+                <ul className="space-y-[2px] ">
                   <li>
                     <Link
                       href="/about"
-                      className="inline-block font-medium hover:underline transition-all duration-200"
+                      className="inline-block  hover:underline transition-all duration-200"
                     >
                       About Us
                     </Link>
@@ -38,7 +47,7 @@ const Footer: FC = () => {
                   <li>
                     <Link
                       href="#"
-                      className="inline-block font-medium hover:underline transition-all duration-200"
+                      className="inline-block  hover:underline transition-all duration-200"
                     >
                       megaweaving Team
                     </Link>
@@ -46,7 +55,7 @@ const Footer: FC = () => {
                   <li>
                     <Link
                       href="#"
-                      className="inline-block font-medium hover:underline transition-all duration-200"
+                      className="inline-block  hover:underline transition-all duration-200"
                     >
                       Contact
                     </Link>
@@ -55,11 +64,11 @@ const Footer: FC = () => {
               </div>
 
               <div>
-                <ul className="space-y-[2px]  text-[8px]">
+                <ul className="space-y-[2px] ">
                   <li>
                     <Link
                       href="https://www.facebook.com/groups/1596603907320118"
-                      className="inline-block font-medium hover:underline transition-all duration-200"
+                      className="inline-block hover:underline transition-all duration-200"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -69,7 +78,7 @@ const Footer: FC = () => {
                   <li>
                     <Link
                       href="https://www.instagram.com/studio_megaweaving?igsh=cTBxdHphMThldzg0"
-                      className="inline-block font-medium hover:underline transition-all duration-200"
+                      className="inline-block hover:underline transition-all duration-200"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -82,10 +91,10 @@ const Footer: FC = () => {
           </div>
         </div>
 
-        {/* watermark 區域 - 為了讓 watermark 完整顯示，不被覆蓋 */}
+        {/* logo 區域 - 為了讓 logo 完整顯示，不被覆蓋 */}
         <div className="mt-9">
-          {/* 大型 watermark - 完整顯示，不被切割 */}
-          <div className="text-center mb-[8px] w-full">
+          {/* Mobile Megaweaving logo*/}
+          <div className="text-center mb-[8px] w-full md:hidden">
             <span
               aria-hidden
               className="pointer-events-none select-none block  text-[clamp(50px,15vw,400px)] font-extrabold leading-none text-primary/30 tracking-normal"
@@ -94,30 +103,26 @@ const Footer: FC = () => {
             </span>
           </div>
 
-          {/* 分隔線（在 watermark 下方） */}
+          {/* 分隔線（在 logo 下方） */}
           <hr className="border-t-[0.5px] border-primary/25 mb-[8px]" />
 
-          {/* 底部：左右兩端對齊 + 中間隱私政策 */}
-          <div>
-            {/* Tablet & Desktop: 三欄布局 */}
-            <div className="flex items-center justify-between text-[8px] ">
-              <div className="font-medium">© megaweaving 2025</div>
-              <div className="font-medium">
-                <Link
-                  href="#"
-                  className="hover:underline transition-all duration-200"
-                >
-                  Privacy Policy
-                </Link>
-              </div>
-              <div className="font-medium">
-                <Link
-                  href="#"
-                  className="hover:underline transition-all duration-200"
-                >
-                  Terms of Service
-                </Link>
-              </div>
+          {/* Tablet & Desktop: 三欄布局 */}
+          <div className="w-full text-[8px] md:text-[14pt] font-medium">
+            <div className="grid grid-cols-3 text-center md:flex md:items-center md:justify-between">
+              <div className="text-left">© megaweaving 2025</div>
+
+              <Link
+                href="#"
+                className="hover:underline transition-all duration-200 md:ml-auto md:mr-6"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="#"
+                className="text-right hover:underline transition-all duration-200"
+              >
+                Terms of Service
+              </Link>
             </div>
           </div>
         </div>

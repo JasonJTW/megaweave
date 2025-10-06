@@ -8,7 +8,7 @@ const Footer: FC = () => {
       {/* 頂端細線（幾乎不可見） */}
 
       {/* 主要內容區（置於 logo 之上） */}
-      <div className="max-w-full px-[30px] pt-[30px] pb-[11px]  border-t-[1px] border-primary/30">
+      <div className="max-w-full px-[30px] pt-[50px] pb-[11px]  border-t-[1px] border-primary/30">
         {/* Top: logo + nav */}
         <div className="flex flex-row items-start md:items-center md:w-full md:justify-between ">
           <div className="flex flex-row items-center">

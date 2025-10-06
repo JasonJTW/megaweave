@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import UserIcon from "./icons/UserIcon";
+import TeamIcon from "./icons/TeamIcon";
+import ContactIcon from "./icons/ContactIcon";
 import { usePathname } from "next/navigation";
 import {
   Menu,
-  Home,
-  UserCog,
   Info,
   Mail,
   GalleryHorizontalEnd,
@@ -49,8 +50,12 @@ const Navbar = () => {
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
-    { href: "/", label: "Home", icon: Home },
-    { href: "/user", label: "Profile", icon: UserCog },
+    {
+      href: "/contact",
+      label: "Contact us",
+      icon: ContactIcon,
+    },
+    { href: "/user", label: "Profile", icon: UserIcon },
   ];
 
   // 下拉菜單項目
@@ -59,7 +64,7 @@ const Navbar = () => {
       href: "/about",
       title: "Team Overview",
       description: "Meet our amazing team members",
-      icon: UserCog,
+      icon: TeamIcon,
     },
     {
       href: "/about",
@@ -72,16 +77,10 @@ const Navbar = () => {
   // 移動端菜單項目（統一格式）
   const mobileNavItems: NavigationItem[] = [
     {
-      href: "/",
-      title: "Posts",
-      description: "Navigate to Posts",
-      icon: Home,
-    },
-    {
       href: "/user",
       title: "Profile",
       description: "User Profile",
-      icon: UserCog,
+      icon: UserIcon,
     },
     {
       href: "/about",
@@ -150,65 +149,34 @@ const Navbar = () => {
                     alt="megaweaving icon"
                     width={32}
                     height={32}
-                    className="rounded-sm"
+                    className="rounded-sm hidden md:block"
                   />
-                  <span className="text-2xl sm:text-2xl font-semibold text-megaweave-forest font-ddin ">
+                  <span className="text-2xl sm:text-2xl font-semibold text-megaweave-forest-dark font-ddin ">
                     megaweaving
                   </span>
                 </div>
               </div>
             </Link>
 
-            {/* 桌面導航 */}
-            <div className="hidden lg:block">
+            {/* desktop nav item */}
+            <div className="font-ddin">
               <NavigationMenu>
                 <NavigationMenuList>
-                  {/* 主要導航項目 */}
-                  {mainNavItems.map((item) => (
-                    <NavigationMenuItem key={item.href}>
-                      <NavigationMenuLink
-                        asChild
-                        className={cn(
-                          navigationMenuTriggerStyle(),
-                          "transition-all duration-200",
-                          isActivePath(item.href)
-                            ? isAtTop
-                              ? "text-gray-50 bg-primary-75 font-semibold"
-                              : "text-gray-50 bg-primary-75 font-semibold "
-                            : isAtTop
-                            ? "text-green/90 hover:text-blue bg-transparent hover:bg-white/10"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                        )}
-                      >
-                        <Link href={item.href}>
-                          <item.icon className="w-4 h-4 mr-2" />
-                          {item.label}
-                        </Link>
-                      </NavigationMenuLink>
-                    </NavigationMenuItem>
-                  ))}
-
                   {/* Team 下拉菜單 */}
-                  <NavigationMenuItem>
-                    <NavigationMenuTrigger
-                      className={cn(
-                        "transition-all duration-200",
-                        isAtTop
-                          ? "text-primary-75 hover:text-white data-[state=open]:text-megaweave-blue bg-transparent"
-                          : "text-primary-75 hover:text-gray-900 data-[state=open]:text-megaweave-blue "
-                      )}
-                    >
-                      <UserCog className="w-4 h-4 mr-2" />
+                  <NavigationMenuItem className="hidden md:block hover:cursor-pointer">
+                    <NavigationMenuTrigger className="bg-transparent hover:bg-primary-30">
+                      <TeamIcon className="w-[18px] h-[16px] mr-[8px] " />
                       Team
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                       <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px]">
-                        {teamMenuItems.map((item) => (
+                        {teamMenuItems.map((item, index) => (
                           <ListItem
-                            key={item.href}
+                            key={index}
                             title={item.title}
                             href={item.href}
                             icon={item.icon}
+                            className="hover:bg-primary-30"
                           >
                             {item.description}
                           </ListItem>
@@ -217,34 +185,37 @@ const Navbar = () => {
                     </NavigationMenuContent>
                   </NavigationMenuItem>
 
-                  {/* Contact 連結 */}
-                  <NavigationMenuItem>
-                    <NavigationMenuLink
-                      asChild
-                      className={cn(
-                        navigationMenuTriggerStyle(),
-                        "transition-all duration-200",
-                        isActivePath("/contact")
-                          ? isAtTop
-                            ? "text-gray-50 bg-primary-75 font-semibold"
-                            : "text-gray-50 bg-primary/55 font-semibold "
-                          : isAtTop
-                          ? "text-green/90 hover:text-blue bg-transparent hover:bg-white/10"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                      )}
-                    >
-                      <Link href="/contact">
-                        <Mail className="w-4 h-4 mr-2" />
-                        Contact
-                      </Link>
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
+                  {/* main nav item */}
+                  {mainNavItems.map((item, index) => (
+                    <NavigationMenuItem key={index} className="hidden md:block">
+                      <NavigationMenuLink
+                        asChild
+                        className={cn(
+                          navigationMenuTriggerStyle(),
+                          "transition-all duration-200 bg-transparent hover:bg-primary-30"
+                        )}
+                      >
+                        <Link
+                          href={item.href}
+                          className="font-semibold text-[18px]"
+                        >
+                          <item.icon className="w-[18px] h-[16px] mr-[8px] " />
+                          <span className="hidden md:inline">{item.label}</span>
+                        </Link>
+                      </NavigationMenuLink>
+                    </NavigationMenuItem>
+                  ))}
                 </NavigationMenuList>
               </NavigationMenu>
             </div>
 
-            {/* 移動端菜單按鈕 */}
-            <div className="lg:hidden">
+            {/* mobile nav bar item */}
+            <div className="md:hidden flex items-center space-x-2">
+              {/* Profile 按鈕（手機顯示） */}
+              <Link href="/user" className="">
+                <UserIcon className="h-[16px] w-[18px]" />
+                <span className="sr-only">Profile</span>
+              </Link>
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -263,12 +234,12 @@ const Navbar = () => {
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80 sm:w-96">
                   <div className="space-y-2">
-                    {mobileNavItems.map((item) => {
+                    {mobileNavItems.map((item, index) => {
                       const Icon = item.icon;
 
                       return (
                         <Link
-                          key={item.href}
+                          key={index}
                           href={item.href}
                           onClick={() => setIsMobileMenuOpen(false)}
                           className={cn(

@@ -1,5 +1,5 @@
 // components/UserIcon.tsx
-export default function UserIcon({ className }: { className?: string }) {
+export default function ContactIcon({ className }: { className?: string }) {
   return (
     <svg
       width="19"

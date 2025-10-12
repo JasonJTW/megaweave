@@ -314,10 +314,9 @@ const PostsApp = () => {
         {/* Icon */}
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
 
-        <div className="bg-megaweave-secondary shadow-sm border-b">
-          <IconGrid />
-
+        <div className="bg-megaweave-secondary">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <IconGrid />
             <div className="flex space-between">
               <Button className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150">
                 Seek

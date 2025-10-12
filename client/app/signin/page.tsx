@@ -13,6 +13,7 @@ import { siFacebook, siGoogle } from "simple-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Footer from "../components/Footer";
+import Image from "next/image";
 
 function SigninForm() {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -315,6 +316,22 @@ function SigninForm() {
                 * {signinError || error}
               </div>
             )}
+
+            {/* icon */}
+            <div className="flex w-full justify-center">
+              <Image
+                src="/favicon.ico"
+                alt="megaweaving icon"
+                width={150}
+                height={150}
+                className="object-cover"
+                priority
+              />
+            </div>
+            {/* title */}
+            <div className="flex w-full text-[48px] font-ddin font-semibold text-center justify-center">
+              {mode == "register" ? "Register" : "Log in"}
+            </div>
             <div className="flex flex-col-2 max-w-full ">
               <Button
                 className={

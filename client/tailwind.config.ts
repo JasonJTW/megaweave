@@ -31,7 +31,7 @@ export default {
           forest: {
             DEFAULT: "#3C6432", // rgb(62, 99, 48)
             light: "#587635", // rgb(88, 118, 53)
-            dark: "#233719", // rgb(35, 53, 25)
+            dark: "#23361A", // rgb(35, 54, 26)
           },
 
           // Accent colors
@@ -66,7 +66,7 @@ export default {
           75: "#6c8965", // 75%
           50: "#9eb098", // 50%
           30: "#c4d0c2", // 30%
-          15: "#e2e7e0", // 15%
+          15: "#e2e7df", // 15%
         },
         // secondary sand
         secondary: {

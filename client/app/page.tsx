@@ -179,7 +179,7 @@ const PostsApp = () => {
     }
     setShowCreateForm(true);
   };
-  // 創建貼文
+  //! 創建貼文
   const handleCreatePost = async () => {
     if (!createFormData.title.trim() || !createFormData.content.trim()) {
       setError("Required fields cannot be empty.");
@@ -316,6 +316,18 @@ const PostsApp = () => {
 
         <div className="bg-megaweave-secondary shadow-sm border-b">
           <IconGrid />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex space-between">
+              <Button className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150">
+                Seek
+              </Button>
+              <Button className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150">
+                Share
+              </Button>
+            </div>
+          </div>
+
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex justify-between items-center">
               <Button

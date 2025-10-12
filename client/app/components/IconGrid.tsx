@@ -25,28 +25,39 @@ export default function IconGrid() {
 
   return (
     <div className="bg-megaweave-secondary shadow-sm border-b">
-      <motion.div
-        layout
-        className="grid grid-cols-2 grid-rows-2 p-6 md:p-12 max-w-6xl mx-auto gap-4 relative"
+      {/* 1) 固定高度 + overflow-hidden */}
+      {/* 2) containment：把 layout/pain 的變化限制在這個容器內，避免影響整頁 scroll */}
+      <div
+        className="overflow-hidden flex items-center justify-center"
+        style={{ contain: "layout paint" }}
       >
-        {positions.map((iconIndex) => {
-          const { id, Icon, color } = icons[iconIndex];
-          return (
-            <motion.div
-              key={id}
-              layoutId={id}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 25,
-              }}
-              className="flex items-center justify-center aspect-square"
-            >
-              <Icon className={`${color} w-full h-full`} />
-            </motion.div>
-          );
-        })}
-      </motion.div>
+        <motion.div
+          layout
+          layoutScroll={false} // 保留但不補償 scroll
+          className="grid grid-cols-2 grid-rows-2 gap-4 p-6 md:p-12 w-full"
+        >
+          {positions.map((iconIndex) => {
+            const { id, Icon, color } = icons[iconIndex];
+            return (
+              <motion.div
+                key={id}
+                // **移除 layoutId**（不要用 shared layout snapshot）
+                layout // 仍可讓子 element 做位置補間
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25,
+                }}
+                // hint browser to composite on GPU → 減少 layout repaint
+                style={{ willChange: "transform" }}
+                className="flex items-center justify-center aspect-square"
+              >
+                <Icon className={`${color} w-full h-full`} />
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      </div>
     </div>
   );
 }

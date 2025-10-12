@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { FC } from "react";
+import WeavingIcon from "./icons/WeavingIcon";
 
 const Footer: FC = () => {
   return (
@@ -12,14 +12,7 @@ const Footer: FC = () => {
         {/* Top: logo + nav */}
         <div className="flex flex-row items-start md:items-center md:w-full md:justify-between ">
           <div className="flex flex-row items-center">
-            <Image
-              src="/favicon.ico"
-              alt="megaweaving icon"
-              width={80}
-              height={80}
-              className="object-cover mr-12 md:mr-7 w-[43px] h-[43px] md:w-[80px] md:h-[80px]"
-              priority
-            />
+            <WeavingIcon className="w-[50px] h-[50px] mr-12 md:mr-7" />
             {/* Desktop Megaweaving logo*/}
             <div className="hidden md:text-center md:mb-[8px] md:block ">
               <span

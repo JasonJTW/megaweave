@@ -41,7 +41,7 @@ export default {
           },
           blue: {
             DEFAULT: "#5AAFA0",
-            light: "#B4E6DC",
+            light: "#B5D8D4",
           },
           brown: {
             DEFAULT: "#46413C",

@@ -2,8 +2,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-// import dynamic from "next/dynamic";
-import PostCard from "./components/PostCard/PostCard";
+import Feed from "./components/PostCard/Feed";
 import {
   Plus,
   Search,
@@ -435,18 +434,11 @@ const PostsApp = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {posts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  conditions={conditions}
-                  onPostClick={(post) => {
-                    router.push(`/item/${post.id}`);
-                  }}
-                />
-              ))}
-            </div>
+            <Feed
+              posts={posts}
+              conditions={conditions}
+              onPostClick={(post) => router.push(`/item/${post.id}`)}
+            />
           )}
 
           {/* 分頁 */}

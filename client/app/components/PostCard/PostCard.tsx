@@ -1,144 +1,125 @@
+"use client";
 import React from "react";
-
 import Image from "next/image";
-import {
-  MapPin,
-  Calendar,
-  User as UserIcon,
-  Tag,
-  Eye,
-  Heart,
-  Waypoints,
-} from "lucide-react";
-import { Post, Condition } from "../../types/schema";
+import { motion } from "framer-motion";
+import { MapPin, Calendar, User as UserIcon, Tag } from "lucide-react";
+import type { Post, Condition } from "../../types/schema";
 
 interface PostCardProps {
   post: Post;
   conditions: Condition[];
-  onPostClick?: (post: Post) => void;
+  onPostClick: (post: Post) => void;
+  isExpanded?: boolean; // 由父元件傳入
+  index?: number;
 }
 
-const PostCard: React.FC<PostCardProps> = ({
+export default function PostCard({
   post,
   conditions,
   onPostClick,
-}) => {
-  // 格式化日期
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("zh-TW");
-  };
-
-  // 獲取狀況等級顏色
-  const getConditionColor = (level: number) => {
-    const colors = {
-      1: "bg-red-100 text-red-800",
-      2: "bg-orange-100 text-orange-800",
-      3: "bg-yellow-100 text-yellow-800",
-      4: "bg-green-100 text-green-800",
-      5: "bg-emerald-100 text-emerald-800",
-    };
-    return colors[level as keyof typeof colors] || "bg-gray-100 text-gray-800";
-  };
-
-  // 獲取狀況等級名稱
-  const getConditionName = (level: number) => {
-    const condition = conditions.find((c) => c.level === level);
-    return condition ? condition.name : `等級 ${level}`;
-  };
+  isExpanded = false,
+}: PostCardProps) {
+  const condition = conditions.find((c) => c.level === post.condition_level);
 
   return (
-    <div
-      className="bg-secondary-30 rounded-2xl overflow-hidden border border-megaweave-brown-light hover:border-megaweave-blue hover:transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-megaweave-blue transition-all duration-300 cursor-pointer"
-      onClick={() => onPostClick?.(post)}
+    <motion.div
+      layout
+      onClick={() => onPostClick(post)}
+      className={`cursor-pointer rounded-xl border border-gray-200 bg-megaweave-blue-light overflow-hidden transition-all duration-300 my-0 py-0`}
+      style={{
+        // 當展開時限制最大高度為：視窗高度 - title 高度
+        maxHeight: isExpanded
+          ? "calc(100vh - var(--post-title-h, 72px))"
+          : "var(--post-title-h, 72px)",
+      }}
+      initial={{ scale: 0.99, opacity: 0.95 }}
+      animate={{
+        scale: isExpanded ? 1 : 0.995,
+        opacity: 1,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 80,
+        damping: 20,
+      }}
     >
-      {/* 圖片區域 */}
-      {post.image_urls && (
-        <div className="h-64 bg-gray-200 overflow-hidden relative">
-          <Image
-            src={post.image_urls.split(",")[0]}
-            alt={post.title}
-            fill
-            className="object-cover transition-transform duration-500 hover:scale-110 relative"
-          />
-          <Waypoints className="bg-megaweave-blue text-megaweave-brown rounded-full p-1 w-8 h-8 z-10 absolute top-4 right-4"></Waypoints>
+      <div
+        className={`flex items-center justify-between px-4 py-3 bg-megaweave-stone/10 backdrop-blur-sm`}
+        style={{
+          height: "var(--post-title-h, 72px)",
+          minHeight: "var(--post-title-h, 72px)",
+        }}
+      >
+        <h2 className="font-semibold font-ddin text-[36px] text-gray-800 truncate">
+          {post.title}
+        </h2>
+        <div className="hidden md:flex items-center text-gray-500 text-sm">
+          <UserIcon className="w-4 h-4 mr-1" />
+          {post.username}
         </div>
-      )}
+      </div>
 
-      {/* 其餘內容保持不變... */}
-      <div className="px-6 py-4">
-        {/* 標題和分類 */}
-        <div className="mb-2">
-          <h3 className="font-semibold text-lg text-gray-900 line-clamp-2 mb-2">
-            {post.title}
-          </h3>
-          <span
-            className="inline-block bg-primary/75
-            border border-gray-500 text-white font-bold text-xs px-2 py-2 rounded-full"
-          >
-            {post.category_name_en}
-          </span>
-        </div>
-
-        {/* 內容 */}
-        <p className="text-gray-600 text-sm line-clamp-3 mb-14">
-          {post.content}
-        </p>
-
-        {/* 狀況等級 */}
-        <div className="mb-3">
-          <span
-            className={`inline-block text-xs px-2 py-1 rounded-full ${getConditionColor(
-              post.condition_level
-            )}`}
-          >
-            {getConditionName(post.condition_level)}
-          </span>
-        </div>
-
-        {/* 標籤 */}
-        {post.tags && (
-          <div className="mb-3">
-            <div className="flex items-center text-gray-500 text-xs">
-              <Tag className="w-3 h-3 mr-1" />
-              <span className="line-clamp-1">{post.tags}</span>
-            </div>
+      <motion.div
+        className="overflow-hidden"
+        animate={{
+          maxHeight: isExpanded ? "calc(100vh - var(--post-title-h, 72px))" : 0,
+          opacity: isExpanded ? 1 : 0,
+        }}
+        transition={{ duration: 0.45, ease: "easeInOut" }}
+        style={{ overflow: "hidden" }}
+      >
+        {post.image_urls && post.image_urls.length > 0 && (
+          <div className="relative w-full h-64 md:h-80 overflow-hidden">
+            <Image
+              src={post.image_urls.split(",")[0]}
+              alt={post.title}
+              fill
+              className="object-cover rounded-lg"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
           </div>
         )}
 
-        {/* 地點和時間 */}
-        <div className="space-y-1 mb-3">
-          {post.location && (
-            <div className="flex items-center text-gray-500 text-xs">
-              <MapPin className="w-3 h-3 mr-1" />
-              <span>{post.location}</span>
+        <div className="p-4 space-y-3">
+          <p className="text-gray-700 text-sm whitespace-pre-line">
+            {post.content}
+          </p>
+
+          <div className="flex flex-wrap gap-3 pt-2 text-gray-600 text-sm">
+            {post.location && (
+              <div className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                {post.location}
+              </div>
+            )}
+            {post.created_at && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                {new Date(post.created_at).toLocaleDateString()}
+              </div>
+            )}
+            {condition && (
+              <div className="flex items-center gap-1">
+                <Tag className="w-4 h-4" />
+                {condition.name}
+              </div>
+            )}
+          </div>
+
+          {post.tags && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {post.tags.split(",").map((tag, i) => (
+                <span
+                  key={i}
+                  className="text-xs bg-primary-15 text-megaweave-forest-dark px-2 py-1 rounded-full"
+                >
+                  #{tag.trim()}
+                </span>
+              ))}
             </div>
           )}
-          <div className="flex items-center text-gray-500 text-xs">
-            <Calendar className="w-3 h-3 mr-1" />
-            <span>{formatDate(post.created_at)}</span>
-          </div>
         </div>
-
-        {/* 底部信息 */}
-        <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t">
-          <div className="flex items-center">
-            <UserIcon className="w-3 h-3 mr-1" />
-            <span>{post.username}</span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center">
-              <Eye className="w-3 h-3 mr-1" />
-              <span>{post.view_count}</span>
-            </div>
-            <div className="flex items-center">
-              <Heart className="w-3 h-3 mr-1" />
-              <span>{post.interests_count}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
-};
-
-export default PostCard;
+}

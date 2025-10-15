@@ -1,3 +1,4 @@
+// PostCard.tsx 重點改寫
 "use client";
 import React from "react";
 import Image from "next/image";
@@ -9,11 +10,11 @@ interface PostCardProps {
   post: Post;
   conditions: Condition[];
   onPostClick: (post: Post) => void;
-  isExpanded?: boolean; // 由父元件傳入
-  index?: number;
+  isExpanded?: boolean;
+  isActive?: boolean;
 }
 
-export default function PostCard({
+function PostCardInner({
   post,
   conditions,
   onPostClick,
@@ -22,29 +23,21 @@ export default function PostCard({
   const condition = conditions.find((c) => c.level === post.condition_level);
 
   return (
-    <motion.div
-      layout
+    <div
       onClick={() => onPostClick(post)}
-      className={`cursor-pointer rounded-xl border border-gray-200 bg-megaweave-blue-light overflow-hidden transition-all duration-300 my-0 py-0`}
-      style={{
-        // 當展開時限制最大高度為：視窗高度 - title 高度
-        maxHeight: isExpanded
-          ? "calc(100vh - var(--post-title-h, 72px))"
-          : "var(--post-title-h, 72px)",
-      }}
-      initial={{ scale: 0.99, opacity: 0.95 }}
-      animate={{
-        scale: isExpanded ? 1 : 0.995,
-        opacity: 1,
-      }}
-      transition={{
-        type: "spring",
-        stiffness: 80,
-        damping: 20,
-      }}
+      className={`cursor-pointer rounded-xl border border-gray-200 bg-megaweave-blue-light overflow-hidden transition-all duration-300 py-0 ${
+        isExpanded ? "postcard-expanded" : "postcard-collapsed"
+      }`}
+      style={
+        {
+          // 固定 title 高度，展開內容用 transform/opacity 顯示，避免 maxHeight reflow
+          // 如果需要讓 expanded content 覆蓋視窗，可考慮在這裡使用 position: sticky / absolute
+          "--post-title-h": "72px",
+        } as React.CSSProperties & Record<string, string>
+      }
     >
       <div
-        className={`flex items-center justify-between px-4 py-3 bg-megaweave-stone/10 backdrop-blur-sm`}
+        className="flex items-center justify-between px-4 py-3 bg-megaweave-stone/10 backdrop-blur-sm"
         style={{
           height: "var(--post-title-h, 72px)",
           minHeight: "var(--post-title-h, 72px)",
@@ -59,14 +52,15 @@ export default function PostCard({
         </div>
       </div>
 
+      {/* 這塊改成用 transform/opacity 做顯示，避免變更 layout 高度 */}
       <motion.div
         className="overflow-hidden"
-        animate={{
-          maxHeight: isExpanded ? "calc(100vh - var(--post-title-h, 72px))" : 0,
-          opacity: isExpanded ? 1 : 0,
-        }}
-        transition={{ duration: 0.45, ease: "easeInOut" }}
-        style={{ overflow: "hidden" }}
+        initial={false}
+        animate={
+          isExpanded ? { y: 0, maxHeight: 2000 } : { y: -8, maxHeight: 0 }
+        }
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        style={{ pointerEvents: isExpanded ? "auto" : "none" }}
       >
         {post.image_urls && post.image_urls.length > 0 && (
           <div className="relative w-full h-64 md:h-80 overflow-hidden">
@@ -76,6 +70,8 @@ export default function PostCard({
               fill
               className="object-cover rounded-lg"
               sizes="(max-width: 768px) 100vw, 50vw"
+              // lazy load 非首張
+              priority={false}
             />
           </div>
         )}
@@ -84,7 +80,6 @@ export default function PostCard({
           <p className="text-gray-700 text-sm whitespace-pre-line">
             {post.content}
           </p>
-
           <div className="flex flex-wrap gap-3 pt-2 text-gray-600 text-sm">
             {post.location && (
               <div className="flex items-center gap-1">
@@ -120,6 +115,16 @@ export default function PostCard({
           )}
         </div>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
+
+// memoize 以避免不必要 rerender
+export default React.memo(PostCardInner, (prev, next) => {
+  // 只有在 isExpanded 或 post.id 或 post.content 變化時才 rerender
+  return (
+    prev.isExpanded === next.isExpanded &&
+    prev.post.id === next.post.id &&
+    prev.post.content === next.post.content
+  );
+});

@@ -212,3 +212,40 @@
       linear-gradient(360deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
   }
 }
+
+/* 全域或 Feed 所在容器的 CSS */
+.feed-snap {
+  scroll-snap-type: y mandatory; /* 已有 tailwind class，但確保一致 */
+}
+
+/* 對每張卡片強制停在 snap 位置，不被快速滑過 */
+.feed-snap > .snap-child {
+  scroll-snap-align: center;
+  scroll-snap-stop: always; /* 防止快速捲動跳過 (部分瀏覽器支援) */
+}
+
+/* 輕量動畫，使用 transform/opacity 以減少 layout reflow */
+.postcard-compact {
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+.postcard-expanded {
+  transform: scale(1); /* or slight scale */
+  opacity: 1;
+}
+.postcard-collapsed {
+  transform: scale(0.995);
+  opacity: 0.98;
+}
+
+/* 若需要 overlay 展開（選擇性） */
+.postcard-overlay {
+  position: relative;
+}
+.postcard-overlay .expanded-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--post-title-h, 72px);
+  bottom: 0;
+  overflow: auto; /* 若你想在 expanded content 內部可滾動，否則保持 hidden */
+}

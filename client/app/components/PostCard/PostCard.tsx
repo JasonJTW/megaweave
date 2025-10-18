@@ -25,7 +25,7 @@ function PostCardInner({
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`cursor-pointer rounded-xl border border-gray-200 bg-megaweave-blue-light overflow-hidden transition-all duration-300 py-0 ${
+      className={`cursor-pointer rounded-xl  bg-megaweave-blue-light overflow-hidden transition-all duration-300 py-0 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={

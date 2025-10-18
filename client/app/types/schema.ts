@@ -4,21 +4,23 @@ export interface Post {
   id: number;
   title: string;
   content: string;
-  status: string;
+  type: "seek" | "share" | "commons";
+  status: "active" | "inactive" | "expired";
   location?: string;
   tags?: string;
   contact?: string;
   category_id: number;
   condition_level: number;
-  created_at: string;
-  updated_at: string;
+  expires_at?: string;
   view_count: number;
   interests_count: number;
+  created_at: string;
+  updated_at: string;
+  showContact: boolean;
   username: string;
   category_name_en: string;
   image_urls?: string;
   thumbnail_urls?: string;
-  showContact: boolean;
 }
 
 export interface Category {

@@ -1,8 +1,8 @@
 import React from "react";
 import { Post, Condition, Category } from "@/app/types/schema";
-import { Calendar, User as UserIcon } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
 import Image from "next/image";
-import { motion, useScroll } from "framer-motion";
+// import { motion, useScroll } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import TagIcon from "../icons/TagIcon";
 import LocationIcon from "../icons/LocationIcon";

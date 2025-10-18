@@ -12,7 +12,6 @@ import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
-import Footer from "../components/Footer";
 import Image from "next/image";
 
 function SigninForm() {
@@ -603,7 +602,6 @@ function SigninForm() {
           </div>
         </motion.div>
       </div>
-      <Footer />
     </>
   );
 }

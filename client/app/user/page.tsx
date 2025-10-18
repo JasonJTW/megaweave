@@ -27,7 +27,6 @@ import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import MemberForm from "../memberForm";
-import Footer from "../components/Footer";
 import { useTeam } from "../contexts/TeamContext";
 
 // 定義表單資料型別（無需 zod）
@@ -1248,7 +1247,6 @@ const UserPage = () => {
           />
         )}
       </div>
-      <Footer />
     </>
   );
 };

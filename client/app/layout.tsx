@@ -5,9 +5,12 @@ import localFont from "next/font/local";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
 import { TeamProvider } from "./contexts/TeamContext";
+import { PostProvider } from "./contexts/PostContext";
+
 import Navbar from "./components/Navbar";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
+import Footer from "./components/Footer";
 dotenv.config();
 // const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
 const geistSans = Geist({
@@ -91,8 +94,11 @@ export default function RootLayout({
         <GoogleOAuthProvider
           clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
         >
-          <TeamProvider>{children}</TeamProvider>
+          <TeamProvider>
+            <PostProvider>{children}</PostProvider>
+          </TeamProvider>
         </GoogleOAuthProvider>
+        <Footer />
       </body>
     </html>
   );

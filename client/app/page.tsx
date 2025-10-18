@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
+import { usePost } from "./contexts/PostContext";
 import {
   Plus,
   Search,
@@ -12,35 +13,23 @@ import {
   ImageIcon,
   ScanFace,
 } from "lucide-react";
-import {
-  Post,
-  PostsResponse,
-  Pagination,
-  Category,
-  Condition,
-} from "./types/schema";
+import { Post, PostsResponse, Pagination } from "./types/schema";
 
 import User from "./types/user";
 import { useRouter } from "next/navigation";
-import Footer from "./components/Footer";
 // const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 import IconGrid from "./components/IconGrid";
-
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-  console.log("Host Name: ", hostName);
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { categories, conditions } = usePost();
 
   // 分類和狀況數據
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [conditions, setConditions] = useState<Condition[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [conditionsLoading, setConditionsLoading] = useState(false);
 
   // 搜索和篩選狀態
   const [currentPage, setCurrentPage] = useState(1);
@@ -98,45 +87,6 @@ const PostsApp = () => {
     fetchUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 獲取分類列表
-  const fetchCategories = useCallback(async () => {
-    setCategoriesLoading(true);
-    try {
-      const response = await fetch(`${hostName}/api/categories`);
-      const data = await response.json();
-
-      if (response.ok) {
-        console.log("categories: ", data);
-        setCategories(data.categories);
-      } else {
-        console.error("Error fetching categories:", data.errorMessage);
-      }
-    } catch (error) {
-      console.error("Internal error when fetching categories", error);
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, [hostName]);
-
-  // 獲取狀況等級列表
-  const fetchConditions = useCallback(async () => {
-    setConditionsLoading(true);
-    try {
-      const response = await fetch(`${hostName}/api/conditions`);
-      const data = await response.json();
-
-      if (response.ok) {
-        setConditions(data.conditions);
-      } else {
-        console.error("獲取狀況等級失敗:", data.errorMessage);
-      }
-    } catch (error) {
-      console.error("獲取狀況等級網路錯誤:", error);
-    } finally {
-      setConditionsLoading(false);
-    }
-  }, [hostName]);
 
   // 使用 useCallback 來記憶化 fetchPosts 函數
   const fetchPosts = useCallback(async () => {
@@ -275,12 +225,6 @@ const PostsApp = () => {
   const removeImage = (index: number) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
-
-  // 初始化數據
-  useEffect(() => {
-    fetchCategories();
-    fetchConditions();
-  }, [fetchCategories, fetchConditions]);
 
   // 當分類加載完成後設置默認值
   useEffect(() => {
@@ -563,7 +507,6 @@ const PostsApp = () => {
                             categoryId: parseInt(e.target.value),
                           })
                         }
-                        disabled={categoriesLoading}
                       >
                         {categories.map((cat) => (
                           <option key={cat.id} value={cat.id}>
@@ -586,7 +529,6 @@ const PostsApp = () => {
                             conditionLevel: parseInt(e.target.value),
                           })
                         }
-                        disabled={conditionsLoading}
                       >
                         {conditions.map((condition) => (
                           <option key={condition.id} value={condition.level}>
@@ -748,7 +690,6 @@ const PostsApp = () => {
             </div>
           </div>
         )}
-        <Footer />
       </div>
     </>
   );

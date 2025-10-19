@@ -1,6 +1,8 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import PostCard from "./PostCard";
+import { usePost } from "../../contexts/PostContext";
+
 import type { Post, Condition } from "../../types/schema";
 
 interface FeedProps {
@@ -14,6 +16,7 @@ export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
   const pendingIndexRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const debounceTimer = useRef<number | null>(null);
+  const { categories } = usePost();
 
   // state + ref pair to avoid stale closures
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
@@ -186,6 +189,7 @@ export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
           <PostCard
             post={p}
             conditions={conditions}
+            categories={categories}
             onPostClick={handlePostClick}
             isExpanded={activeIndex === i}
           />

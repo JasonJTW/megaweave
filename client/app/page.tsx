@@ -22,6 +22,8 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+import TagIcon from "./components/icons/TagIcon";
+import LocationIcon from "./components/icons/LocationIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -51,8 +53,9 @@ const PostsApp = () => {
     location: "",
     tags: "",
     contact: "",
-    categoryId: undefined as number | undefined,
+    categoryId: null as number | null,
     conditionLevel: 1,
+    type: postType,
   });
 
   const fetchUser = async () => {
@@ -162,6 +165,7 @@ const PostsApp = () => {
         "conditionLevel",
         createFormData.conditionLevel.toString()
       );
+      formData.append("type", postType);
 
       //TODO: Add Share Commons option
       // 添加圖片文件
@@ -186,8 +190,9 @@ const PostsApp = () => {
           location: "",
           tags: "",
           contact: "",
-          categoryId: categories.length > 0 ? categories[0].id : 1,
+          categoryId: null,
           conditionLevel: 1,
+          type: postType,
         });
         fetchPosts(); // 重新獲取貼文列表
       } else {
@@ -358,8 +363,8 @@ const PostsApp = () => {
                   })
                 }
               >
-                <SelectTrigger className="w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  <SelectValue placeholder="選擇分類" />
+                <SelectTrigger className="">
+                  <SelectValue placeholder="Category" />
                 </SelectTrigger>
 
                 <SelectContent>
@@ -462,7 +467,7 @@ const PostsApp = () => {
         {/* 創建貼文彈窗 */}
         {showCreateForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 font-ddin">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-secondary rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <div className="flex justify-center relative items-center border-b pb-2">
                   <h2 className="text-2xl font-bold text-gray-900 capitalize">
@@ -536,7 +541,7 @@ const PostsApp = () => {
                     10MB limit per image, up to 5 images
                   </p>
                 </div>
-                <div className="space-y-4 mt-4">
+                <div className="space-y-[10px] mt-4">
                   <div>
                     <Select
                       value={createFormData.categoryId?.toString()}
@@ -576,14 +581,42 @@ const PostsApp = () => {
                     />
                   </div>
 
+                  <div className="flex items-center gap-[5px]">
+                    <TagIcon className="w-[24px] h-[24px] text-primary" />
+                    <Input
+                      type="text"
+                      placeholder="Hashtag separate with commas"
+                      className=""
+                      value={createFormData.tags}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          tags: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center gap-[5px]">
+                    <LocationIcon className="w-[24px] h-[24px] text-primary" />
+                    <Input
+                      type="text"
+                      placeholder="Location (City)"
+                      value={createFormData.location}
+                      onChange={(e) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          location: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Content *
-                    </label>
                     <textarea
                       required
                       rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="description..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-[20px]"
                       value={createFormData.content}
                       onChange={(e) =>
                         setCreateFormData({
@@ -616,41 +649,6 @@ const PostsApp = () => {
                         ))}
                       </select>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Location
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={createFormData.location}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          location: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      tags
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="separate tags with commas"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={createFormData.tags}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          tags: e.target.value,
-                        })
-                      }
-                    />
                   </div>
 
                   <div>

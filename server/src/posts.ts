@@ -72,6 +72,7 @@ const CreatePostSchema = z.object({
     .max(2000, "Content too long"),
   status: z.enum(["active", "inactive", "expired"]).default("active"),
   location: z.string().max(100).optional(),
+  type: z.enum(["seek", "share", "commons"]),
   tags: z.string().max(500).optional(),
   contact: z.string().max(200).optional(),
   categoryId: z.number().int().positive("Invalid category ID"),
@@ -146,9 +147,9 @@ router.post(
       // 4. 插入貼文記錄
       const postInsertQuery = `
       INSERT INTO posts (
-        user_id, title, content, status, location, tags, contact, 
+        user_id, title, content, status, type, location, tags, contact, 
         category_id, condition_level, expires_at, created_at, updated_at, view_count, interests_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
     `;
 
       const postValues = [
@@ -156,6 +157,7 @@ router.post(
         validationResult.title,
         validationResult.content,
         validationResult.status,
+        validationResult.type,
         validationResult.location || null,
         validationResult.tags || null,
         validationResult.contact || null,

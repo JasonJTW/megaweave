@@ -35,6 +35,21 @@ const ddinPro = localFont({
       weight: "600",
       style: "normal",
     },
+    {
+      path: "../public/fonts/D-DIN-PRO-700-Bold.otf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/D-DIN-PRO-800-ExtraBold.otf",
+      weight: "800",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/D-DIN-PRO-900-Heavy.otf",
+      weight: "900",
+      style: "normal",
+    },
   ],
   variable: "--font-ddin-pro",
   display: "swap",

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import TagIcon from "./components/icons/TagIcon";
 import LocationIcon from "./components/icons/LocationIcon";
+import DeleteIcon from "./components/icons/DeleteIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -238,6 +239,9 @@ const PostsApp = () => {
 
   // 移除選中的圖片
   const removeImage = (index: number) => {
+    if (selectedImages.length == 1) {
+      setError(null);
+    }
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -255,6 +259,19 @@ const PostsApp = () => {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  useEffect(() => {
+    if (showCreateForm) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    // cleanup：防止狀態殘留
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCreateForm]);
 
   // Add this useEffect to clean up blob URLs
   useEffect(() => {
@@ -466,20 +483,30 @@ const PostsApp = () => {
 
         {/* 創建貼文彈窗 */}
         {showCreateForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 font-ddin">
-            <div className="bg-secondary rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 flex z-50 bg-secondary overflow-y-auto font-ddin">
+            <div className="bg-secondary rounded-lg max-w-2xl w-full min-h-screen">
               <div className="p-6">
                 <div className="flex justify-center relative items-center border-b pb-2">
                   <h2 className="text-2xl font-bold text-gray-900 capitalize">
                     {postType}
                   </h2>
                   <button
-                    onClick={() => setShowCreateForm(false)}
-                    className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-2"
+                    onClick={() => {
+                      setSelectedImages([]);
+                      setShowCreateForm(false);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-1"
                   >
-                    <X />
+                    <DeleteIcon />
                   </button>
                 </div>
+                {/* 錯誤提示 */}
+                {/* //TODO: Make this disappear after 3 seconds */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+                    {error}
+                  </div>
+                )}
                 {/* 圖片上傳區域 */}
                 <div>
                   {/* 圖片上傳按鈕 */}
@@ -542,6 +569,7 @@ const PostsApp = () => {
                   </p>
                 </div>
                 <div className="space-y-[10px] mt-4">
+                  {/* Category */}
                   <div>
                     <Select
                       value={createFormData.categoryId?.toString()}
@@ -565,6 +593,35 @@ const PostsApp = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Condition */}
+                  <div>
+                    <Select
+                      value={String(createFormData.conditionLevel)}
+                      onValueChange={(value) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          conditionLevel: parseInt(value),
+                        })
+                      }
+                    >
+                      <SelectTrigger className="w-full border-gray-300">
+                        <SelectValue placeholder="Select condition" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {conditions.map((condition) => (
+                          <SelectItem
+                            key={condition.id}
+                            value={String(condition.level)}
+                          >
+                            {condition.name} - {condition.description}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Title */}
                   <div>
                     <Input
                       type="text"
@@ -627,30 +684,6 @@ const PostsApp = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Condition *
-                      </label>
-                      <select
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        value={createFormData.conditionLevel}
-                        onChange={(e) =>
-                          setCreateFormData({
-                            ...createFormData,
-                            conditionLevel: parseInt(e.target.value),
-                          })
-                        }
-                      >
-                        {conditions.map((condition) => (
-                          <option key={condition.id} value={condition.level}>
-                            {condition.name} - {condition.description}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       聯絡方式
@@ -669,24 +702,14 @@ const PostsApp = () => {
                   </div>
 
                   <div className="flex justify-end space-x-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCreateForm(false);
-                        setSelectedImages([]);
-                      }}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    >
-                      取消
-                    </button>
-                    <button
+                    <Button
                       type="button"
                       onClick={handleCreatePost}
                       disabled={isCreating}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
+                      className="disabled:opacity-50"
                     >
                       {isCreating ? "Posting..." : "Create Post"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

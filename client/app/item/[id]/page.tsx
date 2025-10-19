@@ -299,9 +299,6 @@ const PostDetail: React.FC = () => {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="text-xl font-semibold text-gray-900 truncate">
-                {post.title}
-              </h1>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="ghost" onClick={handleShare} className="p-2">

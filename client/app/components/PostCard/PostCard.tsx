@@ -3,12 +3,17 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { MapPin, Calendar, User as UserIcon, Tag } from "lucide-react";
-import type { Post, Condition } from "../../types/schema";
+import { User as UserIcon } from "lucide-react";
+import type { Post, Condition, Category } from "../../types/schema";
+import { Badge } from "@/components/ui/badge";
+import TagIcon from "../icons/TagIcon";
+import LocationIcon from "../icons/LocationIcon";
+import ClockIcon from "../icons/ClockIcon";
 
 interface PostCardProps {
   post: Post;
   conditions: Condition[];
+  categories: Category[];
   onPostClick: (post: Post) => void;
   isExpanded?: boolean;
   isActive?: boolean;
@@ -17,15 +22,18 @@ interface PostCardProps {
 function PostCardInner({
   post,
   conditions,
+  categories,
   onPostClick,
   isExpanded = false,
 }: PostCardProps) {
   const condition = conditions.find((c) => c.level === post.condition_level);
 
+  const category = categories.find((c) => c.id === post.category_id);
+
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`cursor-pointer rounded-xl  bg-megaweave-blue-light overflow-hidden transition-all duration-300 py-0 ${
+      className={`cursor-pointer rounded-[30px]  bg-megaweave-blue-light  overflow-hidden transition-all duration-300 py-0 pb-4 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -37,7 +45,7 @@ function PostCardInner({
       }
     >
       <div
-        className="flex items-center justify-between px-4 py-3 bg-megaweave-stone/10 backdrop-blur-sm"
+        className="flex items-center justify-between px-4 py-3"
         style={{
           height: "var(--post-title-h, 72px)",
           minHeight: "var(--post-title-h, 72px)",
@@ -63,56 +71,72 @@ function PostCardInner({
         style={{ pointerEvents: isExpanded ? "auto" : "none" }}
       >
         {post.image_urls && post.image_urls.length > 0 && (
-          <div className="relative w-full h-64 md:h-80 overflow-hidden">
-            <Image
-              src={post.image_urls.split(",")[0]}
-              alt={post.title}
-              fill
-              className="object-cover rounded-lg"
-              sizes="(max-width: 768px) 100vw, 50vw"
-              // lazy load 非首張
-              priority={false}
-            />
+          <div className="flex relative justify-center mb-0 rounded-[20px] overflow-hidden mx-4">
+            <div className="relative w-full h-64 md:h-80 overflow-hidden">
+              <Image
+                src={post.image_urls.split(",")[0]}
+                alt={post.title}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                // lazy load 非首張
+                priority={false}
+              />
+            </div>
+            {/* tags */}
+
+            <div className="absolute flex flex-row gap-[6px] bottom-0 right-0 m-3">
+              {/* Category tag */}
+              {category && (
+                <div className="flex items-center">
+                  <Badge>{category.name_en}</Badge>
+                </div>
+              )}
+              {/* Condition tag */}
+              {condition && (
+                <div className=" flex items-center">
+                  <Badge>{condition.name}</Badge>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        <div className="p-4 space-y-3">
-          <p className="text-gray-700 text-sm whitespace-pre-line">
+        <div className="bg-white flex flex-col p-4 mx-4 mt-[14px]  rounded-[20px]">
+          <p className="text-black text-[18px] mb-[10px] truncate">
             {post.content}
           </p>
-          <div className="flex flex-wrap gap-3 pt-2 text-gray-600 text-sm">
+          <div className="min-h-[18px]">
+            {post.tags && (
+              <div className="flex flex-wrap gap-2 leading-[18px]">
+                {post.tags.split(",").map((tag, i) => (
+                  <div key={i} className="flex items-center">
+                    <TagIcon className="text-primary" />
+                    <span
+                      key={i}
+                      className="text-[16px]  text-megaweave-forest-dark px-2 "
+                    >
+                      {tag.trim()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-[6px] mt-[6px]">
             {post.location && (
-              <div className="flex items-center gap-1">
-                <MapPin className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-[16px] leading-[18px]">
+                <LocationIcon className="text-primary" />
                 {post.location}
               </div>
             )}
             {post.created_at && (
-              <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-[16px] leading-[18px]">
+                <ClockIcon className="text-primary" />
                 {new Date(post.created_at).toLocaleDateString()}
               </div>
             )}
-            {condition && (
-              <div className="flex items-center gap-1">
-                <Tag className="w-4 h-4" />
-                {condition.name}
-              </div>
-            )}
           </div>
-
-          {post.tags && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {post.tags.split(",").map((tag, i) => (
-                <span
-                  key={i}
-                  className="text-xs bg-primary-15 text-megaweave-forest-dark px-2 py-1 rounded-full"
-                >
-                  #{tag.trim()}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </motion.div>
     </div>

@@ -94,7 +94,7 @@ export async function insertImages(
     new Date(),
   ]);
 
-  await connection.execute(imageInsertQuery, [imageValues]);
+  await connection.query(imageInsertQuery, [imageValues]);
 }
 
 // 從 S3 刪除文件的輔助函數

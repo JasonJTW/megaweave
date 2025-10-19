@@ -1,5 +1,5 @@
-// components/ClockIcon.tsx
-export default function ClockIcon({ className }: { className?: string }) {
+// components/SeekIcon.tsx
+export default function SeekIcon({ className }: { className?: string }) {
   return (
     <svg
       width="19"

@@ -4,21 +4,24 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import {
-  Plus,
-  Search,
-  MapPin,
-  Upload,
-  X,
-  ImageIcon,
-  ScanFace,
-} from "lucide-react";
+import { Plus, Search, MapPin, X, ScanFace } from "lucide-react";
 import { Post, PostsResponse, Pagination } from "./types/schema";
 
 import User from "./types/user";
 import { useRouter } from "next/navigation";
 // const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 import IconGrid from "./components/IconGrid";
+import ShareIcon from "./components/icons/ShareIcon";
+import SeekIcon from "./components/icons/SeekIcon";
+import AddIcon from "./components/icons/AddIcon";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -38,6 +41,7 @@ const PostsApp = () => {
   const [selectedLocation, setSelectedLocation] = useState("");
 
   // 創建貼文狀態
+  const [postType, setPostType] = useState<Post["type"]>("share");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -47,7 +51,7 @@ const PostsApp = () => {
     location: "",
     tags: "",
     contact: "",
-    categoryId: 1,
+    categoryId: undefined as number | undefined,
     conditionLevel: 1,
   });
 
@@ -120,17 +124,23 @@ const PostsApp = () => {
     }
   }, [currentPage, searchTerm, selectedCategory, selectedLocation, hostName]);
 
-  const handleCreatePostButtonClick = () => {
+  const handleCreatePostButtonClick = (postType: Post["type"]) => {
     if (!user) {
       const currentUrl = window.location.pathname + window.location.search;
       router.push(`/signin?returnTo=${encodeURIComponent(currentUrl)}`);
       return;
     }
+    setPostType(postType);
     setShowCreateForm(true);
   };
+
   //! 創建貼文
   const handleCreatePost = async () => {
-    if (!createFormData.title.trim() || !createFormData.content.trim()) {
+    if (
+      !createFormData.title.trim() ||
+      !createFormData.content.trim() ||
+      !createFormData.categoryId
+    ) {
       setError("Required fields cannot be empty.");
       return;
     }
@@ -147,7 +157,7 @@ const PostsApp = () => {
       formData.append("location", createFormData.location);
       formData.append("tags", createFormData.tags);
       formData.append("contact", createFormData.contact);
-      formData.append("categoryId", createFormData.categoryId.toString());
+      formData.append("categoryId", createFormData.categoryId!.toString());
       formData.append(
         "conditionLevel",
         createFormData.conditionLevel.toString()
@@ -258,22 +268,36 @@ const PostsApp = () => {
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
 
         <div className="bg-megaweave-secondary">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
             <IconGrid />
             <div className="flex space-between">
-              <Button className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150">
+              <Button
+                className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150"
+                onClick={() => {
+                  handleCreatePostButtonClick("seek");
+                }}
+              >
                 Seek
+                <SeekIcon />
               </Button>
-              <Button className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150">
+              <Button
+                className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150"
+                onClick={() => {
+                  handleCreatePostButtonClick("share");
+                }}
+              >
                 Share
+                <ShareIcon />
               </Button>
             </div>
           </div>
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
             <div className="flex justify-between items-center">
               <Button
-                onClick={handleCreatePostButtonClick}
+                onClick={() => {
+                  handleCreatePostButtonClick("share");
+                }}
                 className={`
                 // 手機端：固定懸浮在右下角
                 fixed bottom-6 right-6 z-40 
@@ -309,7 +333,7 @@ const PostsApp = () => {
         </div>
 
         {/* 搜索和篩選區域 */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
           <div className="bg-secondary-50 rounded-lg shadow-sm p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* 搜索框 */}
@@ -325,18 +349,27 @@ const PostsApp = () => {
               </div>
 
               {/* 分類篩選 */}
-              <select
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:cursor-pointer"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+              <Select
+                value={createFormData.categoryId?.toString()}
+                onValueChange={(value) =>
+                  setCreateFormData({
+                    ...createFormData,
+                    categoryId: parseInt(value),
+                  })
+                }
               >
-                <option value="">Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.name_en}>
-                    {cat.name_en}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <SelectValue placeholder="選擇分類" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name_en}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {/* 地點篩選 */}
               <div className="relative">
@@ -428,43 +461,111 @@ const PostsApp = () => {
 
         {/* 創建貼文彈窗 */}
         {showCreateForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 font-ddin">
             <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Create new post
+                <div className="flex justify-center relative items-center border-b pb-2">
+                  <h2 className="text-2xl font-bold text-gray-900 capitalize">
+                    {postType}
                   </h2>
                   <button
                     onClick={() => setShowCreateForm(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-2"
                   >
-                    <span className="sr-only">Close</span>
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    <X />
                   </button>
                 </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Title *
-                    </label>
+                {/* 圖片上傳區域 */}
+                <div>
+                  {/* 圖片上傳按鈕 */}
+                  <div className="mb-4">
                     <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                      id="image-upload"
+                      disabled={selectedImages.length >= 5}
+                    />
+                  </div>
+
+                  {/* 已選圖片預覽 */}
+                  {selectedImages.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {selectedImages.map((image, index) => (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                            <img
+                              src={URL.createObjectURL(image)}
+                              alt={`預覽 ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                            {Math.round(image.size / 1024)}KB
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 空狀態提示 */}
+                  {selectedImages.length === 0 && (
+                    <div className=" bg-primary-30 rounded-lg p-6 min-h-[200px] flex justify-center items-center">
+                      <label
+                        htmlFor="image-upload"
+                        className={`inline-flex items-center px-4 py-2 cursor-pointer hover:scale-125 transition-all duration-200 ease-in-out  ${
+                          selectedImages.length >= 5
+                            ? "opacity-50 cursor-not-allowed"
+                            : ""
+                        }`}
+                      >
+                        <AddIcon />
+                      </label>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    10MB limit per image, up to 5 images
+                  </p>
+                </div>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <Select
+                      value={createFormData.categoryId?.toString()}
+                      onValueChange={(value) =>
+                        setCreateFormData({
+                          ...createFormData,
+                          categoryId: parseInt(value),
+                        })
+                      }
+                    >
+                      <SelectTrigger className="">
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id.toString()}>
+                            {cat.name_en}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Input
                       type="text"
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className=""
+                      placeholder="Title"
                       value={createFormData.title}
                       onChange={(e) =>
                         setCreateFormData({
@@ -494,28 +595,6 @@ const PostsApp = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Category *
-                      </label>
-                      <select
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        value={createFormData.categoryId}
-                        onChange={(e) =>
-                          setCreateFormData({
-                            ...createFormData,
-                            categoryId: parseInt(e.target.value),
-                          })
-                        }
-                      >
-                        {categories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name_en}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Condition *
@@ -589,80 +668,6 @@ const PostsApp = () => {
                         })
                       }
                     />
-                  </div>
-
-                  {/* 圖片上傳區域 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      item image ({selectedImages.length}/5)
-                    </label>
-
-                    {/* 圖片上傳按鈕 */}
-                    <div className="mb-4">
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                        id="image-upload"
-                        disabled={selectedImages.length >= 5}
-                      />
-                      <label
-                        htmlFor="image-upload"
-                        className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 ${
-                          selectedImages.length >= 5
-                            ? "opacity-50 cursor-not-allowed"
-                            : ""
-                        }`}
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        選擇圖片
-                      </label>
-                      <p className="text-xs text-gray-500 mt-1">
-                        10MB limit per image, up to 5 images
-                      </p>
-                    </div>
-
-                    {/* 已選圖片預覽 */}
-                    {selectedImages.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {selectedImages.map((image, index) => (
-                          <div key={index} className="relative group">
-                            <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                              <img
-                                src={URL.createObjectURL(image)}
-                                alt={`預覽 ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                            <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                              {Math.round(image.size / 1024)}KB
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 空狀態提示 */}
-                    {selectedImages.length === 0 && (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">
-                          點擊上方按鈕選擇商品圖片
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          最多可上傳 5 張圖片
-                        </p>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex justify-end space-x-3 pt-4">

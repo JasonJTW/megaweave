@@ -141,19 +141,17 @@ const Navbar = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-24">
             {/* Logo */}
-            <Link href="/" className="flex-shrink-0 group">
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center space-x-3">
-                  <Image
-                    src="/favicon.ico"
-                    alt="megaweaving icon"
-                    width={32}
-                    height={32}
-                    className="rounded-sm hidden md:block"
-                  />
-                  <span className="text-2xl sm:text-2xl font-semibold text-megaweave-forest-dark font-ddin ">
-                    megaweaving
-                  </span>
+            <Link href="/" className="flex-shrink-0">
+              <div className="flex items-center space-x-3 ">
+                <Image
+                  src="/icons/weaving.svg"
+                  alt="megaweaving icon"
+                  width={32}
+                  height={32}
+                  className="hidden md:block align-middle"
+                />
+                <div className="text-2xl sm:text-2xl font-bold text-primary font-ddin leading-[32px] justify-self-center text-center">
+                  megaweaving
                 </div>
               </div>
             </Link>

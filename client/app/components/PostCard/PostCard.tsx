@@ -67,7 +67,7 @@ function PostCardInner({
         animate={
           isExpanded ? { y: 0, maxHeight: 2000 } : { y: -8, maxHeight: 0 }
         }
-        transition={{ duration: 0.2, ease: "easeInOut" }}
+        transition={{ duration: 0.6, ease: "easeIn" }}
         style={{ pointerEvents: isExpanded ? "auto" : "none" }}
       >
         {post.image_urls && post.image_urls.length > 0 && (

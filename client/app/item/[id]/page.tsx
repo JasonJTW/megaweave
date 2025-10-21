@@ -12,7 +12,7 @@ import {
   Eye,
   MapPin,
   Tag,
-  User as UserIcon,
+  // User as UserIcon,
 } from "lucide-react";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
 import CommentSection from "../../components/Comment/CommentSection";
@@ -20,6 +20,7 @@ import ContactInfo from "../../components/ContactInfo/ContactInfo";
 import { Post, Condition, Comment } from "../../types/schema";
 import User from "../../types/user";
 import ShareButton from "@/app/components/ShareButton/ShareButton";
+import Image from "next/image";
 
 const PostDetail: React.FC = () => {
   const router = useRouter();
@@ -330,8 +331,13 @@ const PostDetail: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <UserIcon className="w-5 h-5 text-blue-600" />
+                  <div className="relative w-16 h-16 rounded-full items-center justify-center">
+                    <Image
+                      fill
+                      src={post!.avatar_url!}
+                      alt={`${post!.username}'s avatar`}
+                      className="rounded-lg object-cover"
+                    />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">

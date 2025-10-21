@@ -266,6 +266,7 @@ router.get("/", async (req: Request, res: Response) => {
       SELECT 
         p.*,
         u.username,
+        u.avatar_url,
         c.name_en as category_name_en,
         GROUP_CONCAT(i.image_url) as image_urls,
         GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
@@ -338,6 +339,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         p.*,
         u.username,
         u.email,
+        u.avatar_url,
         c.name_en as category_name_en
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id

@@ -30,9 +30,9 @@ export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
   }, [posts.length]);
 
   // parameters you can tune
-  const HYSTERESIS_PX = 60; // 當新卡片只比舊卡片接近不到這距離（px）就忽略
-  const LOCK_DURATION = 250; // 切換後的鎖定期（ms）
-  const COMMIT_DEBOUNCE = 60; // commit state 的延遲（ms），可 60-140 間微調
+  const HYSTERESIS_PX = 80; // 當新卡片只比舊卡片接近不到這距離（px）就忽略
+  const LOCK_DURATION = 200; // 切換後的鎖定期（ms）
+  const COMMIT_DEBOUNCE = 80; // commit state 的延遲（ms），可 60-140 間微調
   const lastSwitchTimeRef = useRef<number>(0);
 
   // commitActiveIndex: 立即更新 ref，但延遲更新 state（避免過度 rerender）

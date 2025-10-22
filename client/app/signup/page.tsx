@@ -254,7 +254,7 @@ export default function Signup() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="Enter your email"
-                    className="bg-secondary text-primary border-emerald-300"
+                    className="bg-secondary text-primary "
                   />
                 </div>
                 <div className="space-y-2">
@@ -269,7 +269,7 @@ export default function Signup() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="Enter your password"
-                      className="bg-secondary text-primary border-emerald-300"
+                      className="bg-secondary text-primary "
                     />
                     <button
                       type="button"

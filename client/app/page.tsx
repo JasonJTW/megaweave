@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { Plus, Search, MapPin, X, ScanFace } from "lucide-react";
+import { Search, MapPin, X, ScanFace } from "lucide-react";
 import { Post, PostsResponse, Pagination } from "./types/schema";
 
 import User from "./types/user";
@@ -55,7 +55,7 @@ const PostsApp = () => {
     tags: "",
     contact: "",
     categoryId: null as number | null,
-    conditionLevel: 1,
+    conditionLevel: null as number | null,
     type: postType,
   });
 
@@ -143,6 +143,7 @@ const PostsApp = () => {
     if (
       !createFormData.title.trim() ||
       !createFormData.content.trim() ||
+      !createFormData.conditionLevel ||
       !createFormData.categoryId
     ) {
       setError("Required fields cannot be empty.");
@@ -192,7 +193,7 @@ const PostsApp = () => {
           tags: "",
           contact: "",
           categoryId: null,
-          conditionLevel: 1,
+          conditionLevel: null,
           type: postType,
         });
         fetchPosts(); // 重新獲取貼文列表
@@ -284,7 +285,7 @@ const PostsApp = () => {
 
   return (
     <>
-      <div className=" fixed inset-0 bg-secondary -z-10"></div>
+      <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
       <div className="min-h-screen ">
         {/* Icon */}
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
@@ -292,7 +293,7 @@ const PostsApp = () => {
         <div className="bg-megaweave-secondary">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
             <IconGrid />
-            <div className="flex space-between">
+            <div className="flex space-between px-4">
               <Button
                 className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150"
                 onClick={() => {
@@ -343,7 +344,7 @@ const PostsApp = () => {
                     className=" text-white"
                   />
                 ) : (
-                  <Plus className=" text-white" />
+                  <Search className=" text-white" />
                 )}
                 {/* 手機端隱藏文字，桌面端顯示 */}
                 <span className="hidden sm:inline">
@@ -597,17 +598,29 @@ const PostsApp = () => {
                   {/* Condition */}
                   <div>
                     <Select
-                      value={String(createFormData.conditionLevel)}
-                      onValueChange={(value) =>
+                      value={
+                        createFormData.conditionLevel !== null
+                          ? String(createFormData.conditionLevel)
+                          : undefined
+                      }
+                      onValueChange={(value) => {
                         setCreateFormData({
                           ...createFormData,
                           conditionLevel: parseInt(value),
-                        })
-                      }
+                        });
+                      }}
                     >
-                      <SelectTrigger className="w-full border-gray-300">
-                        <SelectValue placeholder="Select condition" />
+                      <SelectTrigger className="w-full ">
+                        <SelectValue placeholder="Condition">
+                          {/* 自訂顯示邏輯 */}
+
+                          {createFormData.conditionLevel !== null &&
+                            conditions.find(
+                              (c) => c.level === createFormData.conditionLevel
+                            )?.name}
+                        </SelectValue>
                       </SelectTrigger>
+
                       <SelectContent>
                         {conditions.map((condition) => (
                           <SelectItem

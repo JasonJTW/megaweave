@@ -43,9 +43,9 @@ export default function IconGrid() {
           layoutScroll={false}
           className="grid grid-cols-2 grid-rows-2 gap-4 p-6 md:p-12 w-full"
         >
-          {positions.map((iconIndex, gridIndex) => {
+          {positions.map((iconIndex) => {
             const { id, Icon } = icons[iconIndex];
-            const color = colorMap[gridIndex];
+            const color = colorMap[iconIndex];
 
             return (
               <motion.div
@@ -57,11 +57,11 @@ export default function IconGrid() {
                   damping: 25,
                 }}
                 animate={{
-                  color,
+                  // color,
                   rotate: rotation, // 🌀 根據 rotation 狀態旋轉
                 }}
                 style={{
-                  willChange: "transform, color",
+                  willChange: "transform",
                   color,
                 }}
                 className="flex items-center justify-center aspect-square"

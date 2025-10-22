@@ -319,7 +319,7 @@ function SigninForm() {
             {/* icon */}
             <div className="flex w-full justify-center">
               <Image
-                src="/favicon.ico"
+                src="/icons/weaving.svg"
                 alt="megaweaving icon"
                 width={150}
                 height={150}
@@ -431,7 +431,7 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary text-primary border-emerald-300"
+                      className="bg-secondary text-primary "
                     />
                   </div>
                   <div className="space-y-2">
@@ -446,7 +446,7 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary text-primary border-emerald-300"
+                        className="bg-secondary text-primary "
                       />
                       <button
                         type="button"
@@ -507,7 +507,7 @@ function SigninForm() {
                       onChange={(e) => setUserName(e.target.value)}
                       required
                       placeholder="Enter your username"
-                      className="bg-secondary text-primary border-primary"
+                      className="bg-secondary text-primary "
                     />
                   </div>
 
@@ -522,7 +522,7 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary text-primary border-emerald-300"
+                      className="bg-secondary text-primary "
                     />
                   </div>
                   <div className="space-y-2">
@@ -537,7 +537,7 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary text-primary border-emerald-300"
+                        className="bg-secondary text-primary "
                       />
                       <button
                         type="button"

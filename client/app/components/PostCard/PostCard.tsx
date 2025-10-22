@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { User as UserIcon } from "lucide-react";
 import type { Post, Condition, Category } from "../../types/schema";
 import { Badge } from "@/components/ui/badge";
-import TagIcon from "../icons/TagIcon";
+// import TagIcon from "../icons/TagIcon";
 import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
 
@@ -33,7 +33,9 @@ function PostCardInner({
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`cursor-pointer rounded-[30px]  bg-megaweave-blue-light  overflow-hidden transition-all duration-300 py-0 pb-4 ${
+      className={`cursor-pointer rounded-[30px] ${
+        post.type == "share" ? "bg-white" : "bg-primary-50"
+      }   overflow-hidden transition-all duration-300 py-0 pb-4 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -108,15 +110,18 @@ function PostCardInner({
           </p>
           <div className="min-h-[18px]">
             {post.tags && (
-              <div className="flex flex-wrap gap-2 leading-[18px]">
+              <div className="flex flex-wrap gap-0 leading-[18px]">
                 {post.tags.split(",").map((tag, i) => (
-                  <div key={i} className="flex items-center">
-                    <TagIcon className="text-primary" />
+                  <div
+                    key={i}
+                    className="flex items-center bg-secondary rounded-[10pt] px-[8px] py-[5px]"
+                  >
+                    {/* <TagIcon className="text-primary" /> */}
                     <span
                       key={i}
-                      className="text-[16px]  text-megaweave-forest-dark px-2 "
+                      className="text-[16px]  text-megaweave-forest-dark px-2 font-medium font-ddin tracking-wider"
                     >
-                      {tag.trim()}
+                      #{tag.trim()}
                     </span>
                   </div>
                 ))}

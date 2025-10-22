@@ -53,7 +53,6 @@ const PostsApp = () => {
     content: "",
     location: "",
     tags: "",
-    contact: "",
     categoryId: null as number | null,
     conditionLevel: null as number | null,
     type: postType,
@@ -161,7 +160,6 @@ const PostsApp = () => {
       formData.append("content", createFormData.content);
       formData.append("location", createFormData.location);
       formData.append("tags", createFormData.tags);
-      formData.append("contact", createFormData.contact);
       formData.append("categoryId", createFormData.categoryId!.toString());
       formData.append(
         "conditionLevel",
@@ -191,7 +189,6 @@ const PostsApp = () => {
           content: "",
           location: "",
           tags: "",
-          contact: "",
           categoryId: null,
           conditionLevel: null,
           type: postType,
@@ -692,23 +689,6 @@ const PostsApp = () => {
                         setCreateFormData({
                           ...createFormData,
                           content: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      聯絡方式
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={createFormData.contact}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          contact: e.target.value,
                         })
                       }
                     />

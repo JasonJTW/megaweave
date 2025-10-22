@@ -8,7 +8,6 @@ import {
   Heart,
   MessageCircle,
   Share2,
-  Flag,
   Eye,
   MapPin,
   Tag,
@@ -16,10 +15,8 @@ import {
 } from "lucide-react";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
 import CommentSection from "../../components/Comment/CommentSection";
-import ContactInfo from "../../components/ContactInfo/ContactInfo";
 import { Post, Condition, Comment } from "../../types/schema";
 import User from "../../types/user";
-import ShareButton from "@/app/components/ShareButton/ShareButton";
 import Image from "next/image";
 
 const PostDetail: React.FC = () => {
@@ -40,7 +37,6 @@ const PostDetail: React.FC = () => {
   const [likeCount, setLikeCount] = useState(0);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [newComment, setNewComment] = useState("");
-  const [showContactInfo, setShowContactInfo] = useState(false);
 
   // 獲取當前用戶
   const fetchUser = useCallback(async () => {
@@ -60,7 +56,7 @@ const PostDetail: React.FC = () => {
   // 獲取貼文詳情
   const fetchPost = useCallback(async () => {
     if (!postId) return;
-
+    setLoading(true);
     try {
       const response = await fetch(`${hostName}/api/posts/${postId}`);
       const data = await response.json();
@@ -86,6 +82,8 @@ const PostDetail: React.FC = () => {
     } catch (error) {
       console.error("Error fetching post:", error);
       setError("載入貼文時發生錯誤");
+    } finally {
+      setLoading(false);
     }
   }, [hostName, postId, user]);
 
@@ -235,10 +233,6 @@ const PostDetail: React.FC = () => {
     }
   }, [postId, fetchPost, fetchComments]);
 
-  useEffect(() => {
-    setLoading(false);
-  }, [post]);
-
   // 如果沒有 postId，顯示錯誤
   if (!postId) {
     return (
@@ -304,12 +298,6 @@ const PostDetail: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Button variant="ghost" onClick={handleShare} className="p-2">
                 <Share2 className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                className="p-2 text-gray-500 hover:text-red-500"
-              >
-                <Flag className="w-5 h-5" />
               </Button>
             </div>
           </div>
@@ -443,37 +431,6 @@ const PostDetail: React.FC = () => {
                 isSubmittingComment={isSubmittingComment}
                 user={user}
               />
-            </div>
-          </div>
-
-          {/* 右側：聯絡資訊和相關操作 */}
-          <div className="space-y-6">
-            {/* 聯絡資訊 */}
-            <ContactInfo
-              post={post}
-              user={user}
-              showContactInfo={showContactInfo}
-              setShowContactInfo={setShowContactInfo}
-            />
-
-            {/* 相關操作 */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">相關操作</h3>
-              <div className="space-y-3">
-                <ShareButton
-                  content={window.location.href}
-                  label="分享貼文"
-                  icon="share"
-                  className="w-full justify-start"
-                />
-                {/* <Button
-                  variant="outline"
-                  className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Flag className="w-4 h-4 mr-2" />
-                  檢舉貼文
-                </Button> */}
-              </div>
             </div>
           </div>
         </div>

@@ -8,7 +8,6 @@ export interface Post {
   status: "active" | "inactive" | "expired";
   location?: string;
   tags?: string;
-  contact?: string;
   category_id: number;
   condition_level: number;
   expires_at?: string;
@@ -16,7 +15,6 @@ export interface Post {
   interests_count: number;
   created_at: string;
   updated_at: string;
-  showContact: boolean;
   username: string;
   category_name_en: string;
   image_urls?: string;

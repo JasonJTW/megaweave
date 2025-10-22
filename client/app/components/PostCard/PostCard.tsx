@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 // import TagIcon from "../icons/TagIcon";
 import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
+import EyesIcon from "../icons/EyesIcon";
 
 interface PostCardProps {
   post: Post;
@@ -34,7 +35,7 @@ function PostCardInner({
     <div
       onClick={() => onPostClick(post)}
       className={`cursor-pointer rounded-[30px] ${
-        post.type == "share" ? "bg-white" : "bg-primary-50"
+        post.type == "share" ? "bg-secondary" : "bg-primary-50"
       }   overflow-hidden transition-all duration-300 py-0 pb-4 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
@@ -87,20 +88,29 @@ function PostCardInner({
             </div>
             {/* tags */}
 
-            <div className="absolute flex flex-row gap-[6px] bottom-0 right-0 m-3">
-              {/* Category tag */}
-              {category && (
-                <div className="flex items-center">
-                  <Badge>{category.name_en}</Badge>
+            <div className="absolute w-full flex flex-row bottom-0 justify-between px-5 py-5">
+              {/* Condition tag */}
+              {post.view_count > 0 && (
+                <div className=" flex items-center">
+                  <Badge className="bg-[#7c7c7c] text-white font-ddin font-normal text-[14px] px-2">
+                    <EyesIcon className="mr-[4px] " />
+                    {post.view_count}
+                  </Badge>
                 </div>
               )}
-              {/* Condition tag */}
               {condition && (
                 <div className=" flex items-center">
                   <Badge>{condition.name}</Badge>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Category tag */}
+        {category && (
+          <div className="flex items-center mx-4 mt-[14px] leading-[34px]">
+            <Badge className="h-[34px]">{category.name_en}</Badge>
           </div>
         )}
 
@@ -128,15 +138,15 @@ function PostCardInner({
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-[6px] mt-[6px]">
+          <div className="flex flex-col gap-[6px] mt-[12px] text-[16px] font-medium leading-[18px]">
             {post.location && (
-              <div className="flex items-center gap-2 text-[16px] leading-[18px]">
+              <div className="flex items-center gap-2  ">
                 <LocationIcon className="text-primary" />
                 {post.location}
               </div>
             )}
             {post.created_at && (
-              <div className="flex items-center gap-2 text-[16px] leading-[18px]">
+              <div className="flex items-center gap-2  ">
                 <ClockIcon className="text-primary" />
                 {new Date(post.created_at).toLocaleDateString()}
               </div>

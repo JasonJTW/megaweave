@@ -63,17 +63,17 @@ const PostDetail: React.FC = () => {
 
       if (response.ok) {
         setPost(data.post);
-        setLikeCount(data.post.interests_count);
+        setLikeCount(data.post.likes_count);
 
         // 檢查用戶是否已按讚
         if (user) {
           const likeResponse = await fetch(
-            `${hostName}/api/posts/${postId}/like/status`,
-            { credentials: "include" }
+            `${hostName}/api/posts/${postId}/like`,
+            { credentials: "include", method: "GET" }
           );
           if (likeResponse.ok) {
             const likeData = await likeResponse.json();
-            setIsLiked(likeData.isLiked);
+            setIsLiked(likeData.liked);
           }
         }
       } else {
@@ -118,18 +118,27 @@ const PostDetail: React.FC = () => {
   const handleLike = async () => {
     if (!user) {
       alert("請先登入才能按讚");
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`
+      );
       return;
     }
 
     try {
       const response = await fetch(`${hostName}/api/posts/${postId}/like`, {
-        method: isLiked ? "DELETE" : "POST",
+        method: "POST",
         credentials: "include",
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.errorMessage || "Unknown error");
+      }
+
       if (response.ok) {
-        setIsLiked(!isLiked);
-        setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+        const result = await response.json();
+        setIsLiked(result.liked);
+        setLikeCount((prev) => (result.liked ? prev + 1 : prev - 1));
       }
     } catch (error) {
       console.error("Error toggling like:", error);

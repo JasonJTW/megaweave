@@ -487,7 +487,7 @@ function SigninForm() {
                     className="w-full bg-primary-75  hover:shadow-primary-15 shadow-2xl transition-all duration-200 z-10"
                     disabled={!email || !password || loading}
                   >
-                    {loading ? "Loging in..." : "Log in"}
+                    {loading ? "Logging in..." : "Log in"}
                   </Button>
                 </div>
               </form>

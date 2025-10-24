@@ -18,6 +18,7 @@ import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { getUserSessionFromRedis } from "./session";
 import { uploadImages, insertImages } from "./upload";
 import { deleteS3Files } from "./upload";
+import likeRouter from "./like";
 dotenv.config();
 
 const router = Router();
@@ -29,6 +30,7 @@ const BUCKET_REGION = process.env.BUCKET_REGION;
 const ACCESS_KEY = process.env.ACCESS_KEY;
 const SECRET_ACCESS_KEY = process.env.SECRET_ACCESS_KEY;
 const UPLOAD_IMAGE_LIMIT = process.env.UPLOAD_IMAGE_LIMIT;
+
 //* AWS S3 config
 const s3Client = new S3Client({
   region: BUCKET_REGION,
@@ -372,5 +374,8 @@ router.get("/:id", async (req: Request, res: Response) => {
     return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
+
+/// like & unlike post api
+router.use("/:id/like", likeRouter);
 
 export default router;

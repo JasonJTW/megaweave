@@ -61,8 +61,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Megaweave",
-  description: "Create by megaweaveHQ",
+  title: "Megaweaving",
+  description: "Create by megaweavingHQ",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

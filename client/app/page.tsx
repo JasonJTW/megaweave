@@ -4,15 +4,15 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { Search, MapPin, X, ScanFace } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { Post, PostsResponse, Pagination } from "./types/schema";
+import { motion, AnimatePresence } from "framer-motion";
 
 import User from "./types/user";
 import { useRouter } from "next/navigation";
 // const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 import IconGrid from "./components/IconGrid";
 import ShareIcon from "./components/icons/ShareIcon";
-import SeekIcon from "./components/icons/SeekIcon";
 import AddIcon from "./components/icons/AddIcon";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +25,9 @@ import {
 import TagIcon from "./components/icons/TagIcon";
 import LocationIcon from "./components/icons/LocationIcon";
 import DeleteIcon from "./components/icons/DeleteIcon";
+import SearchIcon from "./components/icons/SearchIcon";
+import ElfIcon from "./components/icons/ElfIcon";
+import ChevronDownIcon from "./components/icons/ChevronDown";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -57,6 +60,8 @@ const PostsApp = () => {
     conditionLevel: null as number | null,
     type: postType,
   });
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const fetchUser = async () => {
     try {
@@ -297,8 +302,8 @@ const PostsApp = () => {
                   handleCreatePostButtonClick("seek");
                 }}
               >
-                Seek
-                <SeekIcon />
+                + Seek
+                <ElfIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
               </Button>
               <Button
                 className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150"
@@ -306,47 +311,103 @@ const PostsApp = () => {
                   handleCreatePostButtonClick("share");
                 }}
               >
-                Share
-                <ShareIcon />
+                + Share
+                <ShareIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
               </Button>
             </div>
           </div>
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
             <div className="flex justify-between items-center">
+              {/* 選單面板 */}
+              <AnimatePresence>
+                {isMenuOpen && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0, x: 0, y: 30 }}
+                    animate={{ scale: 1, opacity: 1, x: 0, y: 0 }}
+                    exit={{ scale: 0, opacity: 0, x: 0, y: 30 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                      mass: 0.8,
+                      ease: "easeOut",
+                    }}
+                    className="fixed bottom-24 right-8 z-50 max-w-6xl bg-megaweave-forest-dark/80 backdrop-blur-sm rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right"
+                  >
+                    {/* Search Input */}
+                    <div className="relative mb-4">
+                      {/* 搜索框 */}
+                      <Input
+                        type="text"
+                        placeholder="Search"
+                        className="w-full   py-2 "
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+
+                      <button
+                        className="absolute right-4 top-1/2 -translate-y-1/2"
+                        onClick={() => setSearchTerm("")}
+                      >
+                        <DeleteIcon className="w-[18px] h-[18px]" />
+                      </button>
+                    </div>
+
+                    {/* Filter Buttons Row 1 */}
+                    <div className="flex gap-4 mb-4">
+                      <Select
+                        value={createFormData.categoryId?.toString()}
+                        onValueChange={(value) =>
+                          setCreateFormData({
+                            ...createFormData,
+                            categoryId: parseInt(value),
+                          })
+                        }
+                      >
+                        <SelectTrigger className="">
+                          <SelectValue placeholder="Category" />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name_en}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2 ">
+                        Location <ChevronDownIcon className="w-5 h-5" />
+                      </Button>
+                    </div>
+
+                    {/* Filter Buttons Row 2 */}
+                    <div className="flex gap-4 mb-4">
+                      <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
+                        <ElfIcon className="w-5 h-5" /> Seek Only
+                      </Button>
+                      <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
+                        <ShareIcon className="w-5 h-5" /> Share Only
+                      </Button>
+                    </div>
+
+                    {/* Close Overdue Items Button */}
+                    <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
+                      Close Overdue Items
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <Button
                 onClick={() => {
-                  handleCreatePostButtonClick("share");
+                  setIsMenuOpen(!isMenuOpen);
                 }}
-                className={`
-                // 手機端：固定懸浮在右下角
-                fixed bottom-6 right-6 z-40 
-                w-14 h-14 rounded-full p-0 shadow-lg
-                flex items-center justify-center
-                
-                // 桌面端：恢復原本位置和樣式
-                sm:relative sm:bottom-auto sm:right-auto sm:z-auto
-                sm:w-auto sm:h-auto sm:rounded-full sm:shadow-none
-                sm:px-3 sm:py-2 sm:flex sm:items-center sm:space-x-1
-                
-                transition-colors duration-300 ${
-                  user == null
-                    ? " bg-megaweave-stone/40 backdrop-blur-[2px] border border-megaweave-sand   cursor-pointer sm:bg-megaweave-stone sm:text-white hover:bg-megaweave-red-light"
-                    : "bg-primary/30 backdrop-blur-sm border border-primary-30  sm:bg-primary sm:text-white hover:bg-primary-50 "
-                }`}
+                className={
+                  " fixed bottom-6 right-8 z-40 w-14 h-12 rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "
+                }
               >
-                {user == null ? (
-                  <ScanFace
-                    style={{ width: "24px", height: "24px" }}
-                    className=" text-white"
-                  />
-                ) : (
-                  <Search className=" text-white" />
-                )}
-                {/* 手機端隱藏文字，桌面端顯示 */}
-                <span className="hidden sm:inline">
-                  {user == null ? "Sign in to post" : "Create new post"}
-                </span>
+                <SearchIcon className=" text-white" />
               </Button>
             </div>
           </div>
@@ -356,40 +417,7 @@ const PostsApp = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
           <div className="bg-secondary-50 rounded-lg shadow-sm p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* 搜索框 */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-
               {/* 分類篩選 */}
-              <Select
-                value={createFormData.categoryId?.toString()}
-                onValueChange={(value) =>
-                  setCreateFormData({
-                    ...createFormData,
-                    categoryId: parseInt(value),
-                  })
-                }
-              >
-                <SelectTrigger className="">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>
-                      {cat.name_en}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
 
               {/* 地點篩選 */}
               <div className="relative">

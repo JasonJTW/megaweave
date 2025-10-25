@@ -184,21 +184,21 @@ const PostDetail: React.FC = () => {
 
   // 分享功能
   const handleShare = async () => {
-    // if (navigator.share) {
-    //   try {
-    //     await navigator.share({
-    //       title: post?.title,
-    //       text: post?.content,
-    //       url: window.location.href,
-    //     });
-    //   } catch (error) {
-    //     console.error("Error sharing:", error);
-    //   }
-    // } else {
-    // 備用方案：複製到剪貼板
-    navigator.clipboard.writeText(window.location.href);
-    alert("連結已複製到剪貼板");
-    // }
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: post?.title,
+          text: post?.content,
+          url: window.location.href,
+        });
+      } catch (error) {
+        console.error("Error sharing:", error);
+      }
+    } else {
+      //備用方案：複製到剪貼板
+      navigator.clipboard.writeText(window.location.href);
+      alert("連結已複製到剪貼板");
+    }
   };
 
   // 格式化日期

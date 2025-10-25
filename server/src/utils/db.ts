@@ -22,7 +22,7 @@ const dbPool = mysql
       return next();
     },
     waitForConnections: true,
-    connectionLimit: 10, // 最大連接數
+    connectionLimit: 20, // 最大連接數
     queueLimit: 0, // 無限制排隊
     // acquireTimeout: 60000, // 60秒獲取連接超時
     idleTimeout: 300000, // 5分鐘空閒超時

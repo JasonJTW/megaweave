@@ -184,30 +184,24 @@ const PostDetail: React.FC = () => {
 
   // 分享功能
   const handleShare = async () => {
-    const ua = navigator.userAgent.toLowerCase();
-    const isLine = ua.includes("line");
+    const shareText = `${post?.title}\n${post?.content}\n${window.location.href}`;
+    const encodedText = encodeURIComponent(shareText);
 
-    if (isLine) {
-      // 直接用 LINE 分享 URL schema
-      const text = encodeURIComponent(
-        `${post?.title}\n${window.location.href}`
-      );
-      window.location.href = `https://line.me/R/msg/text/?${text}`;
-      return;
-    }
+    // LINE 官方分享網址
+    const lineUrl = `https://line.me/R/msg/text/?${encodedText}`;
 
-    if (navigator.share) {
-      try {
+    try {
+      if (navigator.share) {
         await navigator.share({
           title: post?.title,
-          text: `${post?.content}\n${window.location.href}`,
+          text: shareText,
         });
-      } catch (err) {
-        console.error("Share error:", err);
+      } else {
+        throw new Error("Web Share API not supported");
       }
-    } else {
-      await navigator.clipboard.writeText(window.location.href);
-      alert("連結已複製到剪貼板");
+    } catch {
+      // iOS LINE 會在這裡報錯 → fallback
+      window.open(lineUrl, "_blank");
     }
   };
 
@@ -302,8 +296,8 @@ const PostDetail: React.FC = () => {
   return (
     <div className="min-h-screen">
       {/* 標題列 */}
-      <div className="bg-slate-400 shadow-sm border-b sticky top-20 z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="bg-slate-400 shadow-sm sticky top-20 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Button
@@ -323,7 +317,7 @@ const PostDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-8 px-4 sm:px-6 lg:px-8 py-6 bg-megaweave-blue">
+      <div className="max-w-4xl mx-8 px-4 sm:px-6 lg:px-8 py-6 my-2 bg-megaweave-blue-light rounded-[30px]">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左側：圖片和主要內容 */}
           <div className="lg:col-span-2 space-y-6">

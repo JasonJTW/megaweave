@@ -38,6 +38,10 @@ const PostDetail: React.FC = () => {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [newComment, setNewComment] = useState("");
 
+  // back and share bar
+  const [hidden, setHidden] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
   // 獲取當前用戶
   const fetchUser = useCallback(async () => {
     try {
@@ -186,9 +190,16 @@ const PostDetail: React.FC = () => {
   const handleShare = async () => {
     const shareText = `${post?.title}\n${post?.content}\n${window.location.href}`;
     const encodedText = encodeURIComponent(shareText);
-
-    // LINE 官方分享網址
     const lineUrl = `https://line.me/R/msg/text/?${encodedText}`;
+
+    const ua = navigator.userAgent.toLowerCase();
+    const isiOS = /iphone|ipad|ipod/.test(ua);
+
+    // iOS 一律跳過 navigator.share，改用 LINE 連結
+    if (isiOS) {
+      window.open(lineUrl, "_blank");
+      return;
+    }
 
     try {
       if (navigator.share) {
@@ -197,10 +208,10 @@ const PostDetail: React.FC = () => {
           text: shareText,
         });
       } else {
-        throw new Error("Web Share API not supported");
+        // 其他平台 fallback
+        window.open(lineUrl, "_blank");
       }
     } catch {
-      // iOS LINE 會在這裡報錯 → fallback
       window.open(lineUrl, "_blank");
     }
   };
@@ -245,6 +256,25 @@ const PostDetail: React.FC = () => {
       fetchComments();
     }
   }, [postId, fetchPost, fetchComments]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // 向下滾且離頂端超過100px才隱藏
+        setHidden(true);
+      } else {
+        // 向上滾或回到頂端時顯示
+        setHidden(false);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [lastScrollY]);
 
   // 如果沒有 postId，顯示錯誤
   if (!postId) {
@@ -296,7 +326,11 @@ const PostDetail: React.FC = () => {
   return (
     <div className="min-h-screen">
       {/* 標題列 */}
-      <div className="bg-slate-400 shadow-sm sticky top-20 z-10">
+      <div
+        className={`bg-slate-400 shadow-sm sticky top-0 z-10 transition-transform duration-300 ${
+          hidden ? "-translate-y-full" : "translate-y-0"
+        }`}
+      >
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">

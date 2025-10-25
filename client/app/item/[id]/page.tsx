@@ -187,33 +187,24 @@ const PostDetail: React.FC = () => {
   };
 
   // 分享功能
-  const handleShare = async () => {
+  const handleNativeShare = async () => {
+    try {
+      await navigator.share({
+        title: post?.title,
+        text: `${post?.title}\n${post?.content}`,
+        url: window.location.href,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name !== "AbortError") {
+        alert("分享失敗,請稍後再試");
+      }
+    }
+  };
+
+  const handleLineShare = () => {
     const shareText = `${post?.title}\n${post?.content}\n${window.location.href}`;
     const encodedText = encodeURIComponent(shareText);
-    const lineUrl = `https://line.me/R/msg/text/?${encodedText}`;
-
-    const ua = navigator.userAgent.toLowerCase();
-    const isiOS = /iphone|ipad|ipod/.test(ua);
-
-    // iOS 一律跳過 navigator.share，改用 LINE 連結
-    if (isiOS) {
-      window.open(lineUrl, "_blank");
-      return;
-    }
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: post?.title,
-          text: shareText,
-        });
-      } else {
-        // 其他平台 fallback
-        window.open(lineUrl, "_blank");
-      }
-    } catch {
-      window.open(lineUrl, "_blank");
-    }
+    window.open(`https://line.me/R/msg/text/?${encodedText}`, "_blank");
   };
 
   // 格式化日期
@@ -327,8 +318,8 @@ const PostDetail: React.FC = () => {
     <div className="min-h-screen">
       {/* 標題列 */}
       <div
-        className={`bg-slate-400 shadow-sm sticky top-0 z-10 transition-transform duration-300 ${
-          hidden ? "-translate-y-full" : "translate-y-0"
+        className={`fixed left-0 top-20 right-0 z-10 transition-transform duration-300 ${
+          hidden ? "-translate-y-[250%]" : "translate-y-[0]"
         }`}
       >
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
@@ -337,33 +328,43 @@ const PostDetail: React.FC = () => {
               <Button
                 variant="ghost"
                 onClick={() => router.back()}
-                className="p-2"
+                className="p-4"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-8 h-8" />
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="ghost" onClick={handleShare} className="p-2">
-                <Share2 className="w-5 h-5" />
+              <Button variant="ghost" onClick={handleLineShare} className="p-4">
+                <Share2 className="w-8 h-8" />
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleNativeShare}
+                className="p-4"
+              >
+                <Share2 className="w-8 h-8" />
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-8 px-4 sm:px-6 lg:px-8 py-6 my-2 bg-megaweave-blue-light rounded-[30px]">
+      <div className="max-w-4xl mx-8 px-5 sm:px-6 lg:px-8 py-5 my-[63px] bg-megaweave-blue-light rounded-[30px]">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左側：圖片和主要內容 */}
           <div className="lg:col-span-2 space-y-6">
             {/* 圖片輪播 */}
             {images.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="bg-white rounded-[20px] shadow-sm overflow-hidden">
                 <ImageGallery images={images} />
               </div>
             )}
+            <h1 className="text-2xl font-bold font-ddin text-[36px] text-gray-900 mb-4">
+              {post.title}
+            </h1>
 
             {/* 貼文內容 */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="bg-[#fafafa]/80 rounded-[20px] shadow-sm p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className="relative w-16 h-16 rounded-full items-center justify-center">
@@ -388,10 +389,6 @@ const PostDetail: React.FC = () => {
                   <span className="text-sm">{post.view_count}</span>
                 </div>
               </div>
-
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
-                {post.title}
-              </h1>
 
               {/* 分類和狀況 */}
               <div className="flex flex-wrap gap-2 mb-4">

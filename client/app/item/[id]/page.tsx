@@ -184,19 +184,29 @@ const PostDetail: React.FC = () => {
 
   // 分享功能
   const handleShare = async () => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isLine = ua.includes("line");
+
+    if (isLine) {
+      // 直接用 LINE 分享 URL schema
+      const text = encodeURIComponent(
+        `${post?.title}\n${window.location.href}`
+      );
+      window.location.href = `https://line.me/R/msg/text/?${text}`;
+      return;
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({
           title: post?.title,
-          text: post?.content,
-          url: window.location.href,
+          text: `${post?.content}\n${window.location.href}`,
         });
-      } catch (error) {
-        console.error("Error sharing:", error);
+      } catch (err) {
+        console.error("Share error:", err);
       }
     } else {
-      //備用方案：複製到剪貼板
-      navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(window.location.href);
       alert("連結已複製到剪貼板");
     }
   };
@@ -290,9 +300,9 @@ const PostDetail: React.FC = () => {
   const images = post.image_urls ? post.image_urls.split(",") : [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       {/* 標題列 */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-10">
+      <div className="bg-slate-400 shadow-sm border-b sticky top-20 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -313,7 +323,7 @@ const PostDetail: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-4xl mx-8 px-4 sm:px-6 lg:px-8 py-6 bg-megaweave-blue">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* 左側：圖片和主要內容 */}
           <div className="lg:col-span-2 space-y-6">

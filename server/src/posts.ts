@@ -235,7 +235,7 @@ router.get("/", async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
 
-    const category = req.query.category as string;
+    const category_id = req.query.category_id as string;
     const location = req.query.location as string;
     const status = (req.query.status as string) || "active";
     const search = req.query.search as string;
@@ -243,9 +243,9 @@ router.get("/", async (req: Request, res: Response) => {
     let whereConditions = ["p.status = ?"];
     let queryParams: any[] = [status];
 
-    if (category) {
-      whereConditions.push("c.name = ?");
-      queryParams.push(category);
+    if (category_id) {
+      whereConditions.push("c.id = ?");
+      queryParams.push(category_id);
     }
 
     if (location) {

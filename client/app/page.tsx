@@ -112,7 +112,7 @@ const PostsApp = () => {
       });
 
       if (searchTerm) params.append("search", searchTerm);
-      if (selectedCategory) params.append("category", selectedCategory);
+      if (selectedCategory) params.append("category_id", selectedCategory);
       if (selectedLocation) params.append("location", selectedLocation);
 
       const response = await fetch(`${hostName}/api/posts?${params}`);
@@ -357,13 +357,11 @@ const PostsApp = () => {
                     {/* Filter Buttons Row 1 */}
                     <div className="flex gap-4 mb-4">
                       <Select
-                        value={createFormData.categoryId?.toString()}
-                        onValueChange={(value) =>
-                          setCreateFormData({
-                            ...createFormData,
-                            categoryId: parseInt(value),
-                          })
-                        }
+                        value={selectedCategory}
+                        onValueChange={(value) => {
+                          setSelectedCategory(value);
+                          console.log(value);
+                        }}
                       >
                         <SelectTrigger className="">
                           <SelectValue placeholder="Category" />

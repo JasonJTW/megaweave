@@ -18,7 +18,9 @@ import CommentSection from "../../components/Comment/CommentSection";
 import { Post, Condition, Comment } from "../../types/schema";
 import User from "../../types/user";
 import Image from "next/image";
-
+import { Badge } from "@/components/ui/badge";
+import EyesIcon from "../../components/icons/EyesIcon";
+import BadgeIcon from "@/app/components/icons/BadgeIcon";
 const PostDetail: React.FC = () => {
   const router = useRouter();
   const params = useParams();
@@ -41,7 +43,7 @@ const PostDetail: React.FC = () => {
   // back and share bar
   const [hidden, setHidden] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
-
+  const condition = conditions.find((c) => c.level === post?.condition_level);
   // 獲取當前用戶
   const fetchUser = useCallback(async () => {
     try {
@@ -208,15 +210,15 @@ const PostDetail: React.FC = () => {
   };
 
   // 格式化日期
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("zh-TW", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  // const formatDate = (dateString: string) => {
+  //   return new Date(dateString).toLocaleDateString("zh-TW", {
+  //     year: "numeric",
+  //     month: "long",
+  //     day: "numeric",
+  //     hour: "2-digit",
+  //     minute: "2-digit",
+  //   });
+  // };
 
   // 獲取狀況等級顏色
   const getConditionColor = (level: number) => {
@@ -315,171 +317,201 @@ const PostDetail: React.FC = () => {
   const images = post.image_urls ? post.image_urls.split(",") : [];
 
   return (
-    <div className="min-h-screen">
-      {/* 標題列 */}
-      <div
-        className={`fixed left-0 top-20 right-0 z-10 transition-transform duration-300 ${
-          hidden ? "-translate-y-[250%]" : "translate-y-[0]"
-        }`}
-      >
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.back()}
-                className="p-4"
-              >
-                <ArrowLeft className="w-8 h-8" />
-              </Button>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="ghost" onClick={handleLineShare} className="p-4">
-                <Share2 className="w-8 h-8" />
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={handleNativeShare}
-                className="p-4"
-              >
-                <Share2 className="w-8 h-8" />
-              </Button>
+    <>
+      <div className="fixed inset-0 bg-[#f5f4f3] -z-10"></div>
+      <div className="min-h-screen bg-[#f5f5f3] font-ddin">
+        {/* 標題列 */}
+        <div
+          className={`fixed left-0 top-20 right-0 z-10 transition-transform duration-300 bg-[#f5f4f3] ${
+            hidden ? "-translate-y-[250%]" : "translate-y-[0]"
+          }`}
+        >
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => router.back()}
+                  className="p-4"
+                >
+                  <ArrowLeft className="w-8 h-8" />
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  onClick={handleLineShare}
+                  className="p-4"
+                >
+                  <Share2 className="w-8 h-8" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleNativeShare}
+                  className="p-4"
+                >
+                  <Share2 className="w-8 h-8" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-4xl mx-8 px-5 sm:px-6 lg:px-8 py-5 my-[63px] bg-megaweave-blue-light rounded-[30px]">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左側：圖片和主要內容 */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* 圖片輪播 */}
-            {images.length > 0 && (
-              <div className="bg-white rounded-[20px] shadow-sm overflow-hidden">
-                <ImageGallery images={images} />
-              </div>
-            )}
-            <h1 className="text-2xl font-bold font-ddin text-[36px] text-gray-900 mb-4">
-              {post.title}
-            </h1>
+        <div className="max-w-4xl mx-8 px-5 sm:px-6 lg:px-8 py-5 my-[70px] bg-white rounded-[30px]">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 左側：圖片和主要內容 */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* 圖片輪播 */}
 
-            {/* 貼文內容 */}
-            <div className="bg-[#fafafa]/80 rounded-[20px] shadow-sm p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="relative w-16 h-16 rounded-full items-center justify-center">
-                    <Image
-                      fill
-                      src={post!.avatar_url!}
-                      alt={`${post!.username}'s avatar`}
-                      className="rounded-lg object-cover"
+              {images.length > 0 && (
+                <>
+                  <div className="relative">
+                    {post.type === "share" && (
+                      <BadgeIcon className="absolute -top-1 right-5 z-20" />
+                    )}
+                    <div className="bg-white rounded-[20px] shadow-sm overflow-hidden relative">
+                      <ImageGallery images={images} />
+
+                      {/* tags */}
+                      <div className="absolute w-full flex flex-row bottom-0 justify-between px-5 py-5">
+                        {/* Condition tag */}
+                        {post.view_count > 0 && (
+                          <div className=" flex items-center">
+                            <Badge className="bg-[#7c7c7c] text-white font-ddin font-normal text-[14px] px-2">
+                              <EyesIcon className="mr-[4px] " />
+                              {post.view_count}
+                            </Badge>
+                          </div>
+                        )}
+                        {condition && (
+                          <div className=" flex items-center">
+                            <Badge>{condition.name}</Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+              <h1 className="text-2xl font-bold font-ddin text-[36px] text-gray-900 mb-4">
+                {post.title}
+              </h1>
+
+              {/* 貼文內容 */}
+              <div className="bg-[#fafafa]/80 rounded-[20px] shadow-sm p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative w-16 h-16 items-center justify-center">
+                      <Image
+                        fill
+                        src={post!.avatar_url!}
+                        alt={`${post!.username}'s avatar`}
+                        className="rounded-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        {`${post.username} (owner)`}
+                      </h3>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-1 text-gray-500">
+                    <Eye className="w-4 h-4" />
+                    <span className="text-sm">{post.view_count}</span>
+                  </div>
+                </div>
+
+                {/* 分類和狀況 */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="inline-block bg-megaweave-forest-light text-white text-sm px-3 py-1 rounded-full">
+                    {post.category_name_en}
+                  </span>
+                  <span
+                    className={`inline-block text-sm px-3 py-1 rounded-full ${getConditionColor(
+                      post.condition_level
+                    )}`}
+                  >
+                    {getConditionName(post.condition_level)}
+                  </span>
+                </div>
+
+                {/* 內容 */}
+                <div className="prose prose-gray max-w-none mb-6">
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                </div>
+
+                {/* 標籤 */}
+                {post.tags && (
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Tag className="w-4 h-4 text-gray-500" />
+                    <div className="flex flex-wrap gap-1">
+                      {post.tags.split(",").map((tag, index) => (
+                        <span
+                          key={index}
+                          className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded"
+                        >
+                          #{tag.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 地點 */}
+                {post.location && (
+                  <div className="flex items-center space-x-2 mb-6">
+                    <MapPin className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-700">{post.location}</span>
+                  </div>
+                )}
+
+                {/* 互動按鈕 */}
+                <div className="flex items-center space-x-4 pt-4 border-t">
+                  <Button
+                    variant="ghost"
+                    onClick={handleLike}
+                    className={`flex items-center space-x-2 ${
+                      isLiked ? "text-red-500" : "text-gray-500"
+                    }`}
+                  >
+                    <Heart
+                      className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`}
                     />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {post.username}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {formatDate(post.created_at)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1 text-gray-500">
-                  <Eye className="w-4 h-4" />
-                  <span className="text-sm">{post.view_count}</span>
+                    <span>{likeCount}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="flex items-center space-x-2 text-gray-500"
+                    onClick={() =>
+                      document
+                        .getElementById("comments")
+                        ?.scrollIntoView({ behavior: "smooth" })
+                    }
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                    <span>{comments.length}</span>
+                  </Button>
                 </div>
               </div>
 
-              {/* 分類和狀況 */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className="inline-block bg-megaweave-forest-light text-white text-sm px-3 py-1 rounded-full">
-                  {post.category_name_en}
-                </span>
-                <span
-                  className={`inline-block text-sm px-3 py-1 rounded-full ${getConditionColor(
-                    post.condition_level
-                  )}`}
-                >
-                  {getConditionName(post.condition_level)}
-                </span>
+              {/* 評論區 */}
+              <div id="comments" className="bg-white rounded-lg shadow-sm">
+                <CommentSection
+                  comments={comments}
+                  onSubmitComment={handleSubmitComment}
+                  newComment={newComment}
+                  setNewComment={setNewComment}
+                  isSubmittingComment={isSubmittingComment}
+                  user={user}
+                />
               </div>
-
-              {/* 內容 */}
-              <div className="prose prose-gray max-w-none mb-6">
-                <p className="text-gray-700 whitespace-pre-wrap">
-                  {post.content}
-                </p>
-              </div>
-
-              {/* 標籤 */}
-              {post.tags && (
-                <div className="flex items-center space-x-2 mb-4">
-                  <Tag className="w-4 h-4 text-gray-500" />
-                  <div className="flex flex-wrap gap-1">
-                    {post.tags.split(",").map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded"
-                      >
-                        #{tag.trim()}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 地點 */}
-              {post.location && (
-                <div className="flex items-center space-x-2 mb-6">
-                  <MapPin className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-700">{post.location}</span>
-                </div>
-              )}
-
-              {/* 互動按鈕 */}
-              <div className="flex items-center space-x-4 pt-4 border-t">
-                <Button
-                  variant="ghost"
-                  onClick={handleLike}
-                  className={`flex items-center space-x-2 ${
-                    isLiked ? "text-red-500" : "text-gray-500"
-                  }`}
-                >
-                  <Heart
-                    className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`}
-                  />
-                  <span>{likeCount}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="flex items-center space-x-2 text-gray-500"
-                  onClick={() =>
-                    document
-                      .getElementById("comments")
-                      ?.scrollIntoView({ behavior: "smooth" })
-                  }
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  <span>{comments.length}</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* 評論區 */}
-            <div id="comments" className="bg-white rounded-lg shadow-sm">
-              <CommentSection
-                comments={comments}
-                onSubmitComment={handleSubmitComment}
-                newComment={newComment}
-                setNewComment={setNewComment}
-                isSubmittingComment={isSubmittingComment}
-                user={user}
-              />
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

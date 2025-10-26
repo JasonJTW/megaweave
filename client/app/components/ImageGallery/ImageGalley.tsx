@@ -37,7 +37,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
       <div className="relative">
         {/* 主圖片 */}
         <div
-          className="relative h-96 bg-gray-200 overflow-hidden cursor-pointer"
+          className="relative h-60 bg-gray-200 overflow-hidden cursor-pointer"
           onClick={openModal}
         >
           <Image

@@ -1,6 +1,6 @@
 //* forms/page.tsx
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
@@ -62,6 +62,7 @@ const PostsApp = () => {
   });
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const fetchUser = async () => {
     try {
@@ -292,7 +293,7 @@ const PostsApp = () => {
         {/* Icon */}
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
 
-        <div className="bg-megaweave-secondary">
+        <div className="bg-[#F4F5F3]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
             <IconGrid />
             <div className="flex space-between px-4">
@@ -322,79 +323,116 @@ const PostsApp = () => {
               {/* 選單面板 */}
               <AnimatePresence>
                 {isMenuOpen && (
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0, x: 0, y: 30 }}
-                    animate={{ scale: 1, opacity: 1, x: 0, y: 0 }}
-                    exit={{ scale: 0, opacity: 0, x: 0, y: 30 }}
-                    transition={{
-                      type: "spring",
-                      stiffness: 400,
-                      damping: 30,
-                      mass: 0.8,
-                      ease: "easeOut",
-                    }}
-                    className="fixed bottom-24 right-8 z-50 max-w-6xl bg-megaweave-forest-dark/80 backdrop-blur-sm rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right"
-                  >
-                    {/* Search Input */}
-                    <div className="relative mb-4">
-                      {/* 搜索框 */}
-                      <Input
-                        type="text"
-                        placeholder="Search"
-                        className="w-full   py-2 "
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
+                  <>
+                    {/* 背景遮罩 */}
+                    <div
+                      className="fixed inset-0 z-40 bg-transparent"
+                      onClick={() => setIsMenuOpen(false)}
+                    />
+                    <motion.div
+                      ref={menuRef}
+                      initial={{
+                        scale: 0,
+                        opacity: 0,
+                        x: 0,
+                        y: 30,
+                        filter: "blur(20px)",
+                      }}
+                      animate={{
+                        scale: 1,
+                        opacity: 1,
+                        x: 0,
+                        y: 0,
+                        filter: "blur(0px)",
+                      }}
+                      exit={{
+                        scale: 0,
+                        opacity: 0,
+                        x: 0,
+                        y: 30,
+                        filter: "blur(20px)",
+                      }}
+                      transition={{
+                        scale: {
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 30,
+                          mass: 0.8,
+                        },
+                        opacity: { duration: 0.2 }, // opacity 提前結束
+                        y: {
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 30,
+                          mass: 0.8,
+                        },
+                      }}
+                      className="fixed bottom-24 right-8 z-50 max-w-6xl bg-megaweave-forest-dark/80 backdrop-blur-sm rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right"
+                    >
+                      {/* Search Input */}
+                      <div className="relative mb-4">
+                        {/* 搜索框 */}
+                        <Input
+                          type="text"
+                          placeholder="Search"
+                          className="w-full   py-2 "
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
 
-                      <button
-                        className="absolute right-4 top-1/2 -translate-y-1/2"
-                        onClick={() => setSearchTerm("")}
-                      >
-                        <DeleteIcon className="w-[18px] h-[18px]" />
-                      </button>
-                    </div>
+                        <button
+                          className="absolute right-4 top-1/2 -translate-y-1/2"
+                          onClick={() => setSearchTerm("")}
+                        >
+                          <DeleteIcon className="w-[18px] h-[18px]" />
+                        </button>
+                      </div>
 
-                    {/* Filter Buttons Row 1 */}
-                    <div className="flex gap-4 mb-4">
-                      <Select
-                        value={selectedCategory}
-                        onValueChange={(value) => {
-                          setSelectedCategory(value);
-                          console.log(value);
-                        }}
-                      >
-                        <SelectTrigger className="">
-                          <SelectValue placeholder="Category" />
-                        </SelectTrigger>
+                      {/* Filter Buttons Row 1 */}
+                      <div className="flex gap-4 mb-4">
+                        <Select
+                          value={selectedCategory}
+                          onValueChange={(value) => {
+                            setSelectedCategory(value);
+                            console.log(value);
+                          }}
+                        >
+                          <SelectTrigger className="">
+                            <SelectValue placeholder="Category" />
+                          </SelectTrigger>
 
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id.toString()}>
-                              {cat.name_en}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2 ">
-                        Location <ChevronDownIcon className="w-5 h-5" />
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem
+                                key={cat.id}
+                                value={cat.id.toString()}
+                              >
+                                {cat.name_en}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2 ">
+                          Location <ChevronDownIcon className="w-5 h-5" />
+                        </Button>
+                      </div>
+
+                      {/* Filter Buttons Row 2 */}
+                      <div className="flex gap-4 mb-4">
+                        <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
+                          <ElfIcon className="w-5 h-5" /> Seek Only
+                        </Button>
+                        <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
+                          <ShareIcon className="w-5 h-5" /> Share Only
+                        </Button>
+                      </div>
+
+                      {/* Close Overdue Items Button */}
+                      <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
+                        Close Overdue Items
                       </Button>
-                    </div>
-
-                    {/* Filter Buttons Row 2 */}
-                    <div className="flex gap-4 mb-4">
-                      <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
-                        <ElfIcon className="w-5 h-5" /> Seek Only
-                      </Button>
-                      <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
-                        <ShareIcon className="w-5 h-5" /> Share Only
-                      </Button>
-                    </div>
-
-                    {/* Close Overdue Items Button */}
-                    <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
-                      Close Overdue Items
-                    </Button>
-                  </motion.div>
+                    </motion.div>
+                  </>
                 )}
               </AnimatePresence>
               <Button

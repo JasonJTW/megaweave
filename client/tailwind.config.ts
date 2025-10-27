@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 // import colors from "tailwindcss/colors";
 import tailwindcssAnimate from "tailwindcss-animate";
+import { DEFAULT_CIPHERS } from "tls";
 export default {
   darkMode: ["class"],
   content: [
@@ -67,10 +68,14 @@ export default {
           50: "#9eb098", // 50%
           30: "#c4d0c2", // 30%
           15: "#e2e7df", // 15%
+          5: "#f4f5f3", // 5%
         },
         // secondary sand
         secondary: {
           DEFAULT: "#eaebe6", // 100%
+        },
+        dark: {
+          DEFAULT: "#222222", // 100%
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -94,6 +99,7 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        
       },
 
       // Custom gradients for easier use
@@ -115,6 +121,7 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        '5xl': '5rem'
       },
     },
   },

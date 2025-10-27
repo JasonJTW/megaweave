@@ -8,9 +8,6 @@ import {
   Heart,
   MessageCircle,
   Share2,
-  Eye,
-  MapPin,
-  Tag,
   // User as UserIcon,
 } from "lucide-react";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
@@ -21,6 +18,8 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import EyesIcon from "../../components/icons/EyesIcon";
 import BadgeIcon from "@/app/components/icons/BadgeIcon";
+import LocationIcon from "@/app/components/icons/LocationIcon";
+import ClockIcon from "@/app/components/icons/ClockIcon";
 const PostDetail: React.FC = () => {
   const router = useRouter();
   const params = useParams();
@@ -69,6 +68,7 @@ const PostDetail: React.FC = () => {
 
       if (response.ok) {
         setPost(data.post);
+        console.log(data.post);
         setLikeCount(data.post.likes_count);
 
         // 檢查用戶是否已按讚
@@ -221,22 +221,12 @@ const PostDetail: React.FC = () => {
   // };
 
   // 獲取狀況等級顏色
-  const getConditionColor = (level: number) => {
-    const colors = {
-      1: "bg-red-100 text-red-800",
-      2: "bg-orange-100 text-orange-800",
-      3: "bg-yellow-100 text-yellow-800",
-      4: "bg-green-100 text-green-800",
-      5: "bg-emerald-100 text-emerald-800",
-    };
-    return colors[level as keyof typeof colors] || "bg-gray-100 text-gray-800";
-  };
 
   // 獲取狀況等級名稱
-  const getConditionName = (level: number) => {
-    const condition = conditions.find((c) => c.level === level);
-    return condition ? condition.name : `等級 ${level}`;
-  };
+  // const getConditionName = (level: number) => {
+  //   const condition = conditions.find((c) => c.level === level);
+  //   return condition ? condition.name : `等級 ${level}`;
+  // };
 
   useEffect(() => {
     fetchUser();
@@ -360,7 +350,7 @@ const PostDetail: React.FC = () => {
         <div className="max-w-4xl mx-8 px-5 sm:px-6 lg:px-8 py-5 my-[70px] bg-white rounded-[30px]">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* 左側：圖片和主要內容 */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-[15px]">
               {/* 圖片輪播 */}
 
               {images.length > 0 && (
@@ -396,104 +386,93 @@ const PostDetail: React.FC = () => {
               <h1 className="text-2xl font-bold font-ddin text-[36px] text-gray-900 mb-4">
                 {post.title}
               </h1>
-
-              {/* 貼文內容 */}
-              <div className="bg-[#fafafa]/80 rounded-[20px] shadow-sm p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="relative w-16 h-16 items-center justify-center">
-                      <Image
-                        fill
-                        src={post!.avatar_url!}
-                        alt={`${post!.username}'s avatar`}
-                        className="rounded-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {`${post.username} (owner)`}
-                      </h3>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 text-gray-500">
-                    <Eye className="w-4 h-4" />
-                    <span className="text-sm">{post.view_count}</span>
-                  </div>
-                </div>
-
-                {/* 分類和狀況 */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className="inline-block bg-megaweave-forest-light text-white text-sm px-3 py-1 rounded-full">
-                    {post.category_name_en}
-                  </span>
-                  <span
-                    className={`inline-block text-sm px-3 py-1 rounded-full ${getConditionColor(
-                      post.condition_level
-                    )}`}
-                  >
-                    {getConditionName(post.condition_level)}
-                  </span>
-                </div>
-
-                {/* 內容 */}
-                <div className="prose prose-gray max-w-none mb-6">
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {post.content}
-                  </p>
-                </div>
-
-                {/* 標籤 */}
+              {/* 分類和狀況 */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <Badge>{post.category_name_en}</Badge>
+              </div>
+              {/* 內容 */}
+              <div className="prose prose-gray max-w-none mb-6">
+                <p className="text-gray-700 whitespace-pre-wrap">
+                  {post.content}
+                </p>
+              </div>
+              <div className="min-h-[18px]">
                 {post.tags && (
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Tag className="w-4 h-4 text-gray-500" />
-                    <div className="flex flex-wrap gap-1">
-                      {post.tags.split(",").map((tag, index) => (
+                  <div className="flex flex-wrap gap-0 leading-[18px]">
+                    {post.tags.split(",").map((tag, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center bg-secondary rounded-[10pt] px-[4px] py-[2px]"
+                      >
+                        {/* <TagIcon className="text-primary" /> */}
                         <span
-                          key={index}
-                          className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded"
+                          key={i}
+                          className="text-[16px]  text-megaweave-forest-dark px-2 font-medium font-ddin tracking-wider"
                         >
                           #{tag.trim()}
                         </span>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-
-                {/* 地點 */}
+              </div>
+              <div className="flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
                 {post.location && (
-                  <div className="flex items-center space-x-2 mb-6">
-                    <MapPin className="w-4 h-4 text-gray-500" />
-                    <span className="text-gray-700">{post.location}</span>
+                  <div className="flex items-center gap-2  ">
+                    <LocationIcon className="text-primary" />
+                    {post.location}
                   </div>
                 )}
+                {post.created_at && (
+                  <div className="flex items-center gap-2  ">
+                    <ClockIcon className="text-primary" />
+                    {new Date(post.created_at).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
 
-                {/* 互動按鈕 */}
-                <div className="flex items-center space-x-4 pt-4 border-t">
-                  <Button
-                    variant="ghost"
-                    onClick={handleLike}
-                    className={`flex items-center space-x-2 ${
-                      isLiked ? "text-red-500" : "text-gray-500"
-                    }`}
-                  >
-                    <Heart
-                      className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`}
-                    />
-                    <span>{likeCount}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center space-x-2 text-gray-500"
-                    onClick={() =>
-                      document
-                        .getElementById("comments")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                    <span>{comments.length}</span>
-                  </Button>
+              {/* 貼文內容 */}
+              <div className="flex items-center bg-[#fafafa] rounded-[30px] p-[9px]">
+                <div className="relative w-[50px] h-[50px] items-center justify-center">
+                  <Image
+                    fill
+                    src={post!.avatar_url!}
+                    alt={`${post!.username}'s avatar`}
+                    className="rounded-full object-cover"
+                  />
                 </div>
+                <div className="ml-[18px]">
+                  <h3 className="font-semibold text-gray-900">
+                    {`${post.username} (owner)`}
+                  </h3>
+                </div>
+              </div>
+              {/* 互動按鈕 */}
+              <div className="flex items-center justify-start pb-4 border-b border-megaweave-blue">
+                <Button
+                  variant="ghost"
+                  onClick={handleLike}
+                  className={`w-14 inline-flex items-center space-x-[1px] ${
+                    isLiked ? "text-red-500" : "text-gray-500"
+                  }`}
+                >
+                  <Heart
+                    className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`}
+                  />
+                  <span className="text-black">{likeCount}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="items-center w-14 space-x-[1px] text-gray-500"
+                  onClick={() =>
+                    document
+                      .getElementById("comments")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  <span>{comments.length}</span>
+                </Button>
               </div>
 
               {/* 評論區 */}

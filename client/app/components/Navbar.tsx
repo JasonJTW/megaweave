@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
-import ContactIcon from "./icons/ContactIcon";
 import { usePathname } from "next/navigation";
 import {
   Menu,
@@ -50,11 +49,6 @@ const Navbar = () => {
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
-    {
-      href: "/contact",
-      label: "Contact us",
-      icon: ContactIcon,
-    },
     { href: "/user", label: "Profile", icon: UserIcon },
   ];
 
@@ -164,7 +158,7 @@ const Navbar = () => {
                   <NavigationMenuItem className="hidden md:block hover:cursor-pointer">
                     <NavigationMenuTrigger className="bg-transparent hover:bg-primary-30">
                       <TeamIcon className="w-[18px] h-[16px] mr-[8px] " />
-                      Team
+                      About
                     </NavigationMenuTrigger>
                     <NavigationMenuContent>
                       <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px]">

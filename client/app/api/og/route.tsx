@@ -4,7 +4,13 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 export const runtime = "edge";
 
+// preload 字體
+const font = fetch(
+  new URL("./D-DIN-PRO-600-SemiBold.otf", import.meta.url)
+).then((res) => res.arrayBuffer());
+
 export async function GET(req: Request) {
+  const fontData = await font;
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
@@ -31,23 +37,23 @@ export async function GET(req: Request) {
           style={{
             width: "100%",
             height: "100%",
-            background: "linear-gradient(90deg,#1db954,#121212)",
+            background: "#c4d0c2",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
             color: "white",
             fontSize: 60,
-            fontFamily: "sans-serif",
+            fontFamily: "D-DIN-PRO",
           }}
         >
           <img
             src={image_url || defaultImage}
             width="400"
             height="400"
-            style={{ borderRadius: 16, display: "flex" }}
+            style={{ borderRadius: 16, display: "flex", objectFit: "cover" }}
           />
-          <div style={{ marginTop: 20, display: "flex" }}>
+          <div style={{ marginTop: 20, display: "flex", fontFamily: "ddin" }}>
             {post.title || "NO TITLE"}
           </div>
           <div style={{ fontSize: 30, opacity: 0.8, display: "flex" }}>
@@ -55,7 +61,18 @@ export async function GET(req: Request) {
           </div>
         </div>
       ),
-      { width: 1200, height: 630 }
+      {
+        width: 1200,
+        height: 630,
+        fonts: [
+          {
+            name: "D-DIN-PRO",
+            data: fontData,
+            style: "normal",
+            weight: 600,
+          },
+        ],
+      }
     );
   } catch (error) {
     console.error("OG image generation error:", error);

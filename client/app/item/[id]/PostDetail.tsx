@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   ArrowLeft,
   Heart,
-  MessageCircle,
   Share2,
   // User as UserIcon,
 } from "lucide-react";
@@ -20,6 +19,7 @@ import EyesIcon from "../../components/icons/EyesIcon";
 import BadgeIcon from "@/app/components/icons/BadgeIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import ClockIcon from "@/app/components/icons/ClockIcon";
+import MessageIcon from "@/app/components/icons/MessageIcon";
 
 type PostDetailProps = {
   postId: string;
@@ -491,7 +491,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       ?.scrollIntoView({ behavior: "smooth" })
                   }
                 >
-                  <MessageCircle className="w-5 h-5" />
+                  <MessageIcon className="w-5 h-5 text-dark" />
                   <span>{comments.length}</span>
                 </Button>
               </div>

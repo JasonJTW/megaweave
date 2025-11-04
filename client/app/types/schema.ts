@@ -12,7 +12,7 @@ export interface Post {
   condition_level: number;
   expires_at?: string;
   view_count: number;
-  interests_count: number;
+  likes_count: number;
   created_at: string;
   updated_at: string;
   username: string;

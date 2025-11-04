@@ -149,7 +149,7 @@ router.post(
       const postInsertQuery = `
       INSERT INTO posts (
         user_id, title, content, status, type, location, tags, 
-        category_id, condition_level, expires_at, created_at, updated_at, view_count, interests_count
+        category_id, condition_level, expires_at, created_at, updated_at, view_count, likes_count
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
     `;
 

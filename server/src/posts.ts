@@ -19,6 +19,7 @@ import { getUserSessionFromRedis } from "./session";
 import { uploadImages, insertImages } from "./upload";
 import { deleteS3Files } from "./upload";
 import likeRouter from "./like";
+import { title } from "process";
 dotenv.config();
 
 const router = Router();
@@ -66,6 +67,11 @@ const upload = multer({
 });
 
 /// Post validation Schema
+const ItemSchema = z.object({
+  title: z.string().min(1, "Item title is required").max(20, "Title too long"),
+  quantity: z.number().int().min(1, "Quantity must be at least 1"),
+});
+
 const CreatePostSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   content: z
@@ -74,11 +80,12 @@ const CreatePostSchema = z.object({
     .max(2000, "Content too long"),
   status: z.enum(["active", "inactive", "expired"]).default("active"),
   location: z.string().max(100).optional(),
-  type: z.enum(["seek", "share", "commons"]),
+  type: z.enum(["wish", "share", "commons"]),
   tags: z.string().max(500).optional(),
   categoryId: z.number().int().positive("Invalid category ID"),
   conditionLevel: z.number().int().min(1).max(5, "Condition level must be 1-5"),
   expiresAt: z.string().datetime().optional(),
+  items: z.array(ItemSchema).min(1, "At least one item is required"),
 });
 
 type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
@@ -107,9 +114,11 @@ router.post(
 
     const userId = req.user!.userId;
     const files = req.files as Express.MulterS3.File[];
-    if (!files || files.length === 0) {
-      return res.status(400).json({ errorMessage: "No images uploaded" });
-    }
+    const items = req.body.items;
+    console.log("Items: ", items);
+    // if (!files || files.length === 0) {
+    //   return res.status(400).json({ errorMessage: "No images uploaded" });
+    // }
     // 1. 驗證輸入數據
     let validationResult: CreatePostSchemaType | undefined;
     try {
@@ -118,6 +127,7 @@ router.post(
         ...req.body,
         categoryId: parseInt(req.body.categoryId),
         conditionLevel: parseInt(req.body.conditionLevel),
+        items: items ? JSON.parse(items) : undefined,
       };
 
       validationResult = CreatePostSchema.parse(postData);
@@ -173,6 +183,23 @@ router.post(
         postValues
       );
       const postId = postResult.insertId;
+
+      // 4.5 Insert items if items exist
+      if (validationResult.items && validationResult.items.length > 0) {
+        const valuePlaceholders = validationResult.items
+          .map(() => "(?, ?, ?, NOW(), NOW())")
+          .join(", ");
+
+        const bulkInsertItemQuery = `
+    INSERT INTO items (post_id, title, quantity, created_at, updated_at) VALUES ${valuePlaceholders}
+  `;
+
+        const bulkValues: any[] = [];
+        for (const item of validationResult.items) {
+          bulkValues.push(postId, item.title, item.quantity);
+        }
+        await connection.execute(bulkInsertItemQuery, bulkValues);
+      }
 
       // 5. 插入圖片記錄
       if (files && files.length > 0) {
@@ -347,9 +374,9 @@ router.get("/:id", async (req: Request, res: Response) => {
       WHERE p.id = ?
     `;
 
-    const [posts] = await dbPool.query<RowDataPacket[]>(postQuery, [postId]);
+    const [rows] = await dbPool.query<RowDataPacket[]>(postQuery, [postId]);
 
-    if (posts.length === 0) {
+    if (rows.length === 0) {
       return res.status(404).json({ errorMessage: "Post not found" });
     }
 
@@ -360,12 +387,17 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     // 將圖片 URL 轉換為逗號分隔的字符串格式
     const imageUrls = images.map((img: any) => img.image_url).join(",");
-
+    const [items] = await dbPool.query(
+      `SELECT * FROM items WHERE post_id = ?`,
+      [postId]
+    );
     const post = {
-      ...posts[0],
+      ...rows[0],
       image_urls: imageUrls,
       images,
+      items,
     };
+
     console.log("post data: ", post);
 
     res.status(200).json({ post });

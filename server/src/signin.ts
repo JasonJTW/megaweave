@@ -254,8 +254,8 @@ router.post("/", async (req: Request, res: Response) => {
       role: foundUser.role,
       userId: foundUser.id.toString(),
       provider: "native",
-      avatar_url: foundUser.avatar_url || "",
-      avatar_key: foundUser.avatar_key || "",
+      avatar_url: foundUser.avatar_url || null,
+      avatar_key: foundUser.avatar_key || null,
     };
 
     await createUserSession(validUser, req, res);
@@ -401,8 +401,8 @@ router.post("/facebook", async (req: Request, res: Response) => {
       role: user.role,
       userId: user.id.toString(),
       provider: "facebook",
-      avatar_url: user.avatar_url || "",
-      avatar_key: user.avatar_key || "",
+      avatar_url: user.avatar_url || null,
+      avatar_key: user.avatar_key || null,
     };
 
     await createUserSession(facebookUserSession, req, res);

@@ -4,7 +4,7 @@ export interface Post {
   id: number;
   title: string;
   content: string;
-  type: "seek" | "share" | "commons";
+  type: "wish" | "share" | "commons";
   status: "active" | "inactive" | "expired";
   location?: string;
   tags?: string;
@@ -20,6 +20,32 @@ export interface Post {
   image_urls?: string;
   thumbnail_urls?: string;
   avatar_url?: string;
+  items: Item[];
+}
+
+export interface CreatePostFormData {
+  title: string;
+  content: string;
+  location: string;
+  tags: string;
+  categoryId: number | null;
+  conditionLevel: number | null;
+  type: Post["type"];
+  items: ItemInput[];
+}
+
+export interface Item {
+  id: number;
+  post_id: number;
+  title: string;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ItemInput {
+  title: string;
+  quantity: number | undefined;
 }
 
 export interface Category {
@@ -54,11 +80,11 @@ export interface PostsResponse {
 }
 
 export interface Comment {
-  id: string | number;
+  id: number;
+  item_id: number;
   username: string;
   content: string;
   created_at: string;
-  // 如果有其他屬性，也可以添加
-  user_id?: string | number;
-  post_id?: string | number;
+  user_id?: number;
+  post_id: number;
 }

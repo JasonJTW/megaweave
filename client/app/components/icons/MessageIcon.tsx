@@ -1,8 +1,6 @@
 export default function MessageIcon({ className }: { className?: string }) {
   return (
     <svg
-      width="171"
-      height="171"
       viewBox="0 0 171 171"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

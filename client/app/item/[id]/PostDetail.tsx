@@ -194,19 +194,19 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   // 分享功能
-  const handleNativeShare = async () => {
-    try {
-      await navigator.share({
-        title: post?.title,
-        text: `${post?.title}\n${post?.content}`,
-        url: window.location.href,
-      });
-    } catch (error) {
-      if (error instanceof DOMException && error.name !== "AbortError") {
-        alert("分享失敗,請稍後再試");
-      }
-    }
-  };
+  // const handleNativeShare = async () => {
+  //   try {
+  //     await navigator.share({
+  //       title: post?.title,
+  //       text: `${post?.title}\n${post?.content}`,
+  //       url: window.location.href,
+  //     });
+  //   } catch (error) {
+  //     if (error instanceof DOMException && error.name !== "AbortError") {
+  //       alert("分享失敗,請稍後再試");
+  //     }
+  //   }
+  // };
 
   // const handleLineShare = () => {
   //   const shareText = `${post?.title}\n${post?.content}\n${window.location.href}`;
@@ -337,7 +337,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <div className="min-h-screen bg-[#f5f5f3] font-ddin">
         {/* 標題列 */}
         <div
-          className={`fixed left-0 top-20 right-0 z-10 transition-transform duration-300 bg-[#f5f4f3] ${
+          className={`fixed left-0 top-20 right-0 z-[21] transition-transform duration-300 bg-[#f5f4f3] ${
             hidden ? "-translate-y-[250%]" : "translate-y-[0]"
           }`}
         >
@@ -356,13 +356,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <Button variant="ghost" onClick={handleIGShare} className="p-4">
                   <Share2 className="w-8 h-8" />
                 </Button>
-                <Button
+                {/* <Button
                   variant="ghost"
                   onClick={handleNativeShare}
                   className="p-4"
                 >
                   <Share2 className="w-8 h-8" />
-                </Button>
+                </Button> */}
               </div>
             </div>
           </div>

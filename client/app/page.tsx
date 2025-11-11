@@ -4,8 +4,13 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { MapPin, X } from "lucide-react";
-import { Post, PostsResponse, Pagination } from "./types/schema";
+import { X } from "lucide-react";
+import {
+  Post,
+  PostsResponse,
+  Pagination,
+  CreatePostFormData,
+} from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 
 import User from "./types/user";
@@ -27,7 +32,6 @@ import LocationIcon from "./components/icons/LocationIcon";
 import DeleteIcon from "./components/icons/DeleteIcon";
 import SearchIcon from "./components/icons/SearchIcon";
 import ElfIcon from "./components/icons/ElfIcon";
-import ChevronDownIcon from "./components/icons/ChevronDown";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -51,7 +55,7 @@ const PostsApp = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [createFormData, setCreateFormData] = useState({
+  const [createFormData, setCreateFormData] = useState<CreatePostFormData>({
     title: "",
     content: "",
     location: "",
@@ -59,6 +63,7 @@ const PostsApp = () => {
     categoryId: null as number | null,
     conditionLevel: null as number | null,
     type: postType,
+    items: [{ title: "", quantity: undefined }],
   });
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -145,11 +150,15 @@ const PostsApp = () => {
 
   //! 創建貼文
   const handleCreatePost = async () => {
+    const itemsInvalid = createFormData.items.some(
+      (item) => !item.title.trim() || !item.quantity || item.quantity < 1
+    );
     if (
       !createFormData.title.trim() ||
       !createFormData.content.trim() ||
       !createFormData.conditionLevel ||
-      !createFormData.categoryId
+      !createFormData.categoryId ||
+      itemsInvalid
     ) {
       setError("Required fields cannot be empty.");
       return;
@@ -179,6 +188,8 @@ const PostsApp = () => {
         formData.append("images", image);
       });
 
+      formData.append("items", JSON.stringify(createFormData.items));
+
       const response = await fetch(`${hostName}/api/posts`, {
         method: "POST",
         body: formData, // 使用 FormData 而不是 JSON
@@ -198,6 +209,7 @@ const PostsApp = () => {
           categoryId: null,
           conditionLevel: null,
           type: postType,
+          items: [{ title: "", quantity: 1 }],
         });
         fetchPosts(); // 重新獲取貼文列表
       } else {
@@ -295,15 +307,15 @@ const PostsApp = () => {
 
         <div className="bg-[#F4F5F3]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
-            <IconGrid />
-            <div className="flex space-between px-4">
+            {!showCreateForm && <IconGrid />}
+            <div className="flex space-between px-4 pb-[20px]">
               <Button
                 className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150"
                 onClick={() => {
-                  handleCreatePostButtonClick("seek");
+                  handleCreatePostButtonClick("wish");
                 }}
               >
-                + Seek
+                + Wish
                 <ElfIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
               </Button>
               <Button
@@ -390,37 +402,46 @@ const PostsApp = () => {
 
                       {/* Filter Buttons Row 1 */}
                       <div className="flex gap-4 mb-4">
-                        <Select
-                          value={selectedCategory}
-                          onValueChange={(value) => {
-                            setSelectedCategory(value);
-                            console.log(value);
-                          }}
-                        >
-                          <SelectTrigger className="">
-                            <SelectValue placeholder="Category" />
-                          </SelectTrigger>
-
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem
-                                key={cat.id}
-                                value={cat.id.toString()}
-                              >
-                                {cat.name_en}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2 ">
-                          Location <ChevronDownIcon className="w-5 h-5" />
-                        </Button>
+                        <div className="w-1/2">
+                          <Select
+                            value={selectedCategory}
+                            onValueChange={(value) => {
+                              setSelectedCategory(value);
+                              console.log(value);
+                            }}
+                          >
+                            <SelectTrigger className="w-full min-w-0">
+                              <SelectValue placeholder="Category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((cat) => (
+                                <SelectItem
+                                  key={cat.id}
+                                  value={cat.id.toString()}
+                                >
+                                  {cat.name_en}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-1/2">
+                          <Input
+                            className="text-megaweave-forest-dark w-full "
+                            type="text"
+                            placeholder="Location"
+                            value={selectedLocation}
+                            onChange={(e) =>
+                              setSelectedLocation(e.target.value)
+                            }
+                          />
+                        </div>
                       </div>
 
                       {/* Filter Buttons Row 2 */}
                       <div className="flex gap-4 mb-4">
                         <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
-                          <ElfIcon className="w-5 h-5" /> Seek Only
+                          <ElfIcon className="w-5 h-5" /> Wish Only
                         </Button>
                         <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
                           <ShareIcon className="w-5 h-5" /> Share Only
@@ -449,39 +470,8 @@ const PostsApp = () => {
           </div>
         </div>
 
-        {/* 搜索和篩選區域 */}
+        {/* Error message and posts*/}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-          <div className="bg-secondary-50 rounded-lg shadow-sm p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* 分類篩選 */}
-
-              {/* 地點篩選 */}
-              <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Location..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={selectedLocation}
-                  onChange={(e) => setSelectedLocation(e.target.value)}
-                />
-              </div>
-
-              {/* 重置按鈕 */}
-              <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("");
-                  setSelectedLocation("");
-                  setCurrentPage(1);
-                }}
-                className="px-4 py-2 bg-primary-30 hover:bg-primary-15 text-gray-700 rounded-lg transition-colors"
-              >
-                Resets
-              </button>
-            </div>
-          </div>
-
           {/* 錯誤提示 */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
@@ -543,7 +533,7 @@ const PostsApp = () => {
           )}
         </div>
 
-        {/* 創建貼文彈窗 */}
+        {/* Create Post */}
         {showCreateForm && (
           <div className="fixed inset-0 flex z-50 bg-secondary overflow-y-auto font-ddin">
             <div className="bg-secondary rounded-lg max-w-2xl w-full min-h-screen">
@@ -556,6 +546,7 @@ const PostsApp = () => {
                     onClick={() => {
                       setSelectedImages([]);
                       setShowCreateForm(false);
+                      setError(null);
                     }}
                     className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-1"
                   >
@@ -758,6 +749,58 @@ const PostsApp = () => {
                     />
                   </div>
 
+                  {/* items */}
+                  {createFormData.items!.map((item, i) => (
+                    <div className="flex flex-row gap-2 w-full" key={i}>
+                      <Input
+                        type="text"
+                        required
+                        className="!flex-[3] "
+                        placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
+                        value={item.title}
+                        onChange={(e) => {
+                          const items = [...createFormData.items!];
+                          items[i].title = e.target.value;
+                          setCreateFormData({
+                            ...createFormData,
+                            items,
+                          });
+                        }}
+                      />
+                      <Input
+                        type="number"
+                        required
+                        className="!flex-[1] text-[12px] text-center placeholder:text-center"
+                        placeholder="Quantity"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const items = [...createFormData.items!];
+                          items[i].quantity = parseInt(e.target.value);
+                          setCreateFormData({
+                            ...createFormData,
+                            items,
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex space-x-3 ">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setCreateFormData({
+                          ...createFormData,
+                          items: [
+                            ...createFormData.items,
+                            { title: "", quantity: 1 },
+                          ],
+                        });
+                      }}
+                      className="bg-white text-primary shadow-none border border-primary-30 text-[18pt] leading-[18px] py-[8px]"
+                    >
+                      +
+                    </Button>
+                  </div>
                   <div className="flex justify-end space-x-3 pt-4">
                     <Button
                       type="button"

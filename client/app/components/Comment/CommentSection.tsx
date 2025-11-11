@@ -1,9 +1,11 @@
 //* CommentSection.tsx
 import React from "react";
+// import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, MessageCircle, User as UserIcon } from "lucide-react";
 import { Comment } from "../../types/schema";
 import User from "../../types/user";
+import CommentCard from "./CommentCard";
 
 interface CommentSectionProps {
   comments: Comment[];
@@ -30,14 +32,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center space-x-2 mb-6">
-        <MessageCircle className="w-5 h-5 text-gray-500" />
-        <h3 className="text-lg font-semibold text-gray-900">
-          評論 ({comments.length})
-        </h3>
-      </div>
-
+    <div className="">
+      <CommentCard />
       {/* 評論輸入區 */}
       {user ? (
         <div className="mb-6">

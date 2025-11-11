@@ -143,6 +143,7 @@ function SigninForm() {
       /// Sign in success
       setSigninError(null);
       console.log("response data:", data);
+      handleSigninSignupSuccess();
     } catch (error) {
       setSigninError(
         error instanceof Error ? error.message : "An unexpected error occurred"

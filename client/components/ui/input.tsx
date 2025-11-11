@@ -10,23 +10,26 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, value, onChange, clearable = true, ...props }, ref) => {
     const handleClear = (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
+      if (!onChange) return;
+      const clearedValue = type === "number" ? 1 : "";
       if (onChange) {
         const event = {
-          target: { value: "" },
+          target: { value: clearedValue },
         } as React.ChangeEvent<HTMLInputElement>;
         onChange(event);
       }
     };
 
     return (
-      <div className="relative w-full">
+      <div className={cn("relative w-full", className)}>
         <input
           type={type}
           value={value}
           onChange={onChange}
           ref={ref}
           className={cn(
-            "flex h-[34px] w-full rounded-full border font-ddin border-primary-30 bg-white px-3 py-1 text-primary-75 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm pr-8 placeholder:text-primary-75", // pr-8 為清除按鈕預留空間
+            "flex h-[34px] w-full rounded-full border font-ddin border-primary-30 bg-white px-3 py-1 text-primary-75 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm placeholder:text-primary-75",
+            clearable && value ? "pr-3" : "pr-3", // pr-8 為清除按鈕預留空間
             className
           )}
           {...props}

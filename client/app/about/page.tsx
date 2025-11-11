@@ -21,7 +21,7 @@ interface TitleSVGProps {
 const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
   const words = text.split(" ");
   const lines: string[] = [];
-  const lineLength = 10; // 每行幾個字
+  const lineLength = 11; // 每行幾個字
   let currentLine = "";
   let initY = 0;
 

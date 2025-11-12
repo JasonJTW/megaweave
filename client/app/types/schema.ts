@@ -20,7 +20,7 @@ export interface Post {
   image_urls?: string;
   thumbnail_urls?: string;
   avatar_url?: string;
-  items: Item[];
+  items?: Item[];
 }
 
 export interface CreatePostFormData {
@@ -31,7 +31,7 @@ export interface CreatePostFormData {
   categoryId: number | null;
   conditionLevel: number | null;
   type: Post["type"];
-  items: ItemInput[];
+  items?: ItemInput[];
 }
 
 export interface Item {

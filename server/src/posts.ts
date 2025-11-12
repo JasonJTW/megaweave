@@ -85,7 +85,7 @@ const CreatePostSchema = z.object({
   categoryId: z.number().int().positive("Invalid category ID"),
   conditionLevel: z.number().int().min(1).max(5, "Condition level must be 1-5"),
   expiresAt: z.string().datetime().optional(),
-  items: z.array(ItemSchema).min(1, "At least one item is required"),
+  items: z.array(ItemSchema).min(1, "At least one item is required").optional(),
 });
 
 type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
@@ -335,8 +335,8 @@ router.get("/", async (req: Request, res: Response) => {
       pagination: {
         currentPage: page,
         totalPages,
-        totalItems: total,
-        itemsPerPage: limit,
+        totalPosts: total,
+        postsPerPage: limit,
       },
     });
   } catch (error) {

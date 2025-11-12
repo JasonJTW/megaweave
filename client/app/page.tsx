@@ -150,15 +150,14 @@ const PostsApp = () => {
 
   //! 創建貼文
   const handleCreatePost = async () => {
-    const itemsInvalid = createFormData.items.some(
+    const itemsInvalid = createFormData.items?.some(
       (item) => !item.title.trim() || !item.quantity || item.quantity < 1
     );
     if (
       !createFormData.title.trim() ||
       !createFormData.content.trim() ||
       !createFormData.conditionLevel ||
-      !createFormData.categoryId ||
-      itemsInvalid
+      !createFormData.categoryId
     ) {
       setError("Required fields cannot be empty.");
       return;
@@ -188,7 +187,9 @@ const PostsApp = () => {
         formData.append("images", image);
       });
 
-      formData.append("items", JSON.stringify(createFormData.items));
+      if (!itemsInvalid) {
+        formData.append("items", JSON.stringify(createFormData.items));
+      }
 
       const response = await fetch(`${hostName}/api/posts`, {
         method: "POST",
@@ -791,8 +792,8 @@ const PostsApp = () => {
                         setCreateFormData({
                           ...createFormData,
                           items: [
-                            ...createFormData.items,
-                            { title: "", quantity: 1 },
+                            ...(createFormData.items ?? []),
+                            { title: "", quantity: undefined },
                           ],
                         });
                       }}

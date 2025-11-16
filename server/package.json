@@ -4,8 +4,8 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Null: no test specified\" && exit 0",
-    "build": "dotenv -e .env.production -- tsc --build",
-    "build:dev": "dotenv -e .env.development -- tsc --build",
+    "build": "dotenv -e .env.production -- npx tsc --build",
+    "build:dev": "dotenv -e .env.development -- npx tsc --build",
     "start": "dotenv -e .env.production -- node ./dist/server.js",
     "dev": "dotenv -e .env.development -- nodemon ./src/server.ts"
   },

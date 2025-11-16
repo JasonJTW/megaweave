@@ -28,6 +28,7 @@ const redisClient = createClient({
 
 redisClient.on("error", (err) => {
   console.error("Redis Client Error", err.message);
+  console.log("Redis URL: ", process.env.REDIS_URL);
   isConnecting = false;
 });
 

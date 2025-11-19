@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useNavbar } from "../contexts/NavBarContext";
 import Link from "next/link";
 import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
@@ -41,9 +42,7 @@ type NavigationItem = {
 };
 
 const Navbar = () => {
-  const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [isAtTop, setIsAtTop] = useState(true);
+  const { isNavbarVisible, isAtTop } = useNavbar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
@@ -91,28 +90,6 @@ const Navbar = () => {
     },
   ];
 
-  useEffect(() => {
-    const controlNavbar = () => {
-      const currentScrollY = window.scrollY;
-
-      setIsAtTop(currentScrollY < 10);
-
-      if (currentScrollY < 100) {
-        setIsVisible(true);
-      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setIsVisible(false);
-        setIsMobileMenuOpen(false);
-      } else if (currentScrollY < lastScrollY) {
-        setIsVisible(true);
-      }
-
-      setLastScrollY(currentScrollY);
-    };
-
-    window.addEventListener("scroll", controlNavbar);
-    return () => window.removeEventListener("scroll", controlNavbar);
-  }, [lastScrollY]);
-
   const isActivePath = (path: string) => {
     if (path === "/") {
       return pathname === path;
@@ -125,7 +102,7 @@ const Navbar = () => {
       {/* 導航欄 */}
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
-          isVisible ? "translate-y-0" : "-translate-y-full"
+          isNavbarVisible ? "translate-y-0" : "-translate-y-full"
         } ${
           isAtTop
             ? "bg-transparent"

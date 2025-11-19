@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
 import { X } from "lucide-react";
+import { useNavbar } from "./contexts/NavBarContext";
 import {
   Post,
   PostsResponse,
@@ -41,6 +42,7 @@ const PostsApp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { categories, conditions } = usePost();
+  const { isNavbarVisible } = useNavbar();
 
   // 分類和狀況數據
 
@@ -303,171 +305,172 @@ const PostsApp = () => {
     <>
       <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
       <div className="min-h-screen ">
-        {/* Icon */}
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
 
-        <div className="bg-[#F4F5F3]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
-            {!showCreateForm && <IconGrid />}
-            <div className="flex space-between px-4 pb-[20px]">
-              <Button
-                className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150"
-                onClick={() => {
-                  handleCreatePostButtonClick("wish");
-                }}
-              >
-                + Wish
-                <ElfIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
-              </Button>
-              <Button
-                className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150"
-                onClick={() => {
-                  handleCreatePostButtonClick("share");
-                }}
-              >
-                + Share
-                <ShareIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
-              </Button>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
+          {!showCreateForm && <IconGrid />}
+        </div>
 
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
-            <div className="flex justify-between items-center">
-              {/* 選單面板 */}
-              <AnimatePresence>
-                {isMenuOpen && (
-                  <>
-                    {/* 背景遮罩 */}
-                    <div
-                      className="fixed inset-0 z-40 bg-transparent"
-                      onClick={() => setIsMenuOpen(false)}
-                    />
-                    <motion.div
-                      ref={menuRef}
-                      initial={{
-                        scale: 0,
-                        opacity: 0,
-                        x: 0,
-                        y: 30,
-                        filter: "blur(20px)",
-                      }}
-                      animate={{
-                        scale: 1,
-                        opacity: 1,
-                        x: 0,
-                        y: 0,
-                        filter: "blur(0px)",
-                      }}
-                      exit={{
-                        scale: 0,
-                        opacity: 0,
-                        x: 0,
-                        y: 30,
-                        filter: "blur(20px)",
-                      }}
-                      transition={{
-                        scale: {
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 30,
-                          mass: 0.8,
-                        },
-                        opacity: { duration: 0.2 }, // opacity 提前結束
-                        y: {
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 30,
-                          mass: 0.8,
-                        },
-                      }}
-                      className="fixed bottom-24 right-8 z-50 max-w-6xl bg-megaweave-forest-dark/80 backdrop-blur-sm rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right"
-                    >
-                      {/* Search Input */}
-                      <div className="relative mb-4">
-                        {/* 搜索框 */}
-                        <Input
-                          type="text"
-                          placeholder="Search"
-                          className="w-full   py-2 "
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+        <div
+          className={`flex justify-between items-center px-4 py-[20px] sticky z-20 bg-primary-5 transition-all duration-300 ${
+            isNavbarVisible ? "top-[80px]" : "top-[0px]"
+          }
+         `}
+        >
+          <Button
+            className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150"
+            onClick={() => {
+              handleCreatePostButtonClick("wish");
+            }}
+          >
+            + Wish
+            <ElfIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
+          </Button>
+          <Button
+            className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150"
+            onClick={() => {
+              handleCreatePostButtonClick("share");
+            }}
+          >
+            + Share
+            <ShareIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
+          </Button>
+        </div>
 
-                        <button
-                          className="absolute right-4 top-1/2 -translate-y-1/2"
-                          onClick={() => setSearchTerm("")}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
+          <div className="flex justify-between items-center">
+            {/* 選單面板 */}
+            <AnimatePresence>
+              {isMenuOpen && (
+                <>
+                  {/* 背景遮罩 */}
+                  <div
+                    className="fixed inset-0 z-40 bg-transparent"
+                    onClick={() => setIsMenuOpen(false)}
+                  />
+                  <motion.div
+                    ref={menuRef}
+                    initial={{
+                      scale: 0,
+                      opacity: 0,
+                      x: 0,
+                      y: 30,
+                      filter: "blur(20px)",
+                    }}
+                    animate={{
+                      scale: 1,
+                      opacity: 1,
+                      x: 0,
+                      y: 0,
+                      filter: "blur(0px)",
+                    }}
+                    exit={{
+                      scale: 0,
+                      opacity: 0,
+                      x: 0,
+                      y: 30,
+                      filter: "blur(20px)",
+                    }}
+                    transition={{
+                      scale: {
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30,
+                        mass: 0.8,
+                      },
+                      opacity: { duration: 0.2 }, // opacity 提前結束
+                      y: {
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 30,
+                        mass: 0.8,
+                      },
+                    }}
+                    className="fixed bottom-24 right-8 z-50 max-w-6xl bg-megaweave-forest-dark/80 backdrop-blur-sm rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right"
+                  >
+                    {/* Search Input */}
+                    <div className="relative mb-4">
+                      {/* 搜索框 */}
+                      <Input
+                        type="text"
+                        placeholder="Search"
+                        className="w-full   py-2 "
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+
+                      <button
+                        className="absolute right-4 top-1/2 -translate-y-1/2"
+                        onClick={() => setSearchTerm("")}
+                      >
+                        <DeleteIcon className="w-[18px] h-[18px]" />
+                      </button>
+                    </div>
+
+                    {/* Filter Buttons Row 1 */}
+                    <div className="flex gap-4 mb-4">
+                      <div className="w-1/2">
+                        <Select
+                          value={selectedCategory}
+                          onValueChange={(value) => {
+                            setSelectedCategory(value);
+                            console.log(value);
+                          }}
                         >
-                          <DeleteIcon className="w-[18px] h-[18px]" />
-                        </button>
+                          <SelectTrigger className="w-full min-w-0">
+                            <SelectValue placeholder="Category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem
+                                key={cat.id}
+                                value={cat.id.toString()}
+                              >
+                                {cat.name_en}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-
-                      {/* Filter Buttons Row 1 */}
-                      <div className="flex gap-4 mb-4">
-                        <div className="w-1/2">
-                          <Select
-                            value={selectedCategory}
-                            onValueChange={(value) => {
-                              setSelectedCategory(value);
-                              console.log(value);
-                            }}
-                          >
-                            <SelectTrigger className="w-full min-w-0">
-                              <SelectValue placeholder="Category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map((cat) => (
-                                <SelectItem
-                                  key={cat.id}
-                                  value={cat.id.toString()}
-                                >
-                                  {cat.name_en}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="w-1/2">
-                          <Input
-                            className="text-megaweave-forest-dark w-full "
-                            type="text"
-                            placeholder="Location"
-                            value={selectedLocation}
-                            onChange={(e) =>
-                              setSelectedLocation(e.target.value)
-                            }
-                          />
-                        </div>
+                      <div className="w-1/2">
+                        <Input
+                          className="text-megaweave-forest-dark w-full "
+                          type="text"
+                          placeholder="Location"
+                          value={selectedLocation}
+                          onChange={(e) => setSelectedLocation(e.target.value)}
+                        />
                       </div>
+                    </div>
 
-                      {/* Filter Buttons Row 2 */}
-                      <div className="flex gap-4 mb-4">
-                        <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
-                          <ElfIcon className="w-5 h-5" /> Wish Only
-                        </Button>
-                        <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
-                          <ShareIcon className="w-5 h-5" /> Share Only
-                        </Button>
-                      </div>
-
-                      {/* Close Overdue Items Button */}
-                      <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
-                        Close Overdue Items
+                    {/* Filter Buttons Row 2 */}
+                    <div className="flex gap-4 mb-4">
+                      <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
+                        <ElfIcon className="w-5 h-5" /> Wish Only
                       </Button>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-              <Button
-                onClick={() => {
-                  setIsMenuOpen(!isMenuOpen);
-                }}
-                className={
-                  " fixed bottom-6 right-8 z-40 w-14 h-12 rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "
-                }
-              >
-                <SearchIcon className=" text-white" />
-              </Button>
-            </div>
+                      <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
+                        <ShareIcon className="w-5 h-5" /> Share Only
+                      </Button>
+                    </div>
+
+                    {/* Close Overdue Items Button */}
+                    <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
+                      Close Overdue Items
+                    </Button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+            <Button
+              onClick={() => {
+                setIsMenuOpen(!isMenuOpen);
+              }}
+              className={
+                " fixed bottom-6 right-8 z-40 w-14 h-12 rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "
+              }
+            >
+              <SearchIcon className=" text-white" />
+            </Button>
           </div>
         </div>
 

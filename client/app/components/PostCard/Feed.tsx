@@ -191,11 +191,12 @@ export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
             conditions={conditions}
             categories={categories}
             onPostClick={handlePostClick}
-            isExpanded={activeIndex === i}
+            // isExpanded={activeIndex === i}
+            isExpanded={true} // always expanded for now
           />
         </div>
       ))}
-      <div className="h-[40vh]" aria-hidden="true" />
+      {/* <div className="h-[40vh]" aria-hidden="true" /> */}
     </div>
   );
 }

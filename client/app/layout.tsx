@@ -6,7 +6,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import Script from "next/script";
 import { TeamProvider } from "./contexts/TeamContext";
 import { PostProvider } from "./contexts/PostContext";
-
+import { NavbarProvider } from "./contexts/NavBarContext";
 import Navbar from "./components/Navbar";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
@@ -86,10 +86,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
-        <Navbar />
-        {/* Facebook SDK */}
-        <Script id="facebook-sdk" strategy="afterInteractive">
-          {`
+        <NavbarProvider>
+          <Navbar />
+
+          {/* Facebook SDK */}
+          <Script id="facebook-sdk" strategy="afterInteractive">
+            {`
             window.fbAsyncInit = function() {
               FB.init({
                 appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
@@ -109,15 +111,16 @@ export default function RootLayout({
                fjs.parentNode.insertBefore(js, fjs);
              }(document, 'script', 'facebook-jssdk'));
           `}
-        </Script>
-        <GoogleOAuthProvider
-          clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-        >
-          <TeamProvider>
-            <PostProvider>{children}</PostProvider>
-          </TeamProvider>
-        </GoogleOAuthProvider>
-        <Footer />
+          </Script>
+          <GoogleOAuthProvider
+            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+          >
+            <TeamProvider>
+              <PostProvider>{children}</PostProvider>
+            </TeamProvider>
+          </GoogleOAuthProvider>
+          <Footer />
+        </NavbarProvider>
       </body>
     </html>
   );

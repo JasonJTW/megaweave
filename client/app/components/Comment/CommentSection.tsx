@@ -1,129 +1,177 @@
-//* CommentSection.tsx
-import React from "react";
-// import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Send, MessageCircle, User as UserIcon } from "lucide-react";
-import { Comment } from "../../types/schema";
+// components/Comment/CommentSection.tsx
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { Post } from "../../types/schema"; // ✅ 移除未使用的 Item
 import User from "../../types/user";
 import CommentCard from "./CommentCard";
+import CommentInput from "./CommentInput";
+import CommentItem from "./CommentItem";
+import {
+  Comment,
+  getComments,
+  getCommentCounts,
+} from "@/services/commentService";
 
 interface CommentSectionProps {
-  comments: Comment[];
-  onSubmitComment: () => void;
-  newComment: string;
-  setNewComment: (comment: string) => void;
-  isSubmittingComment: boolean;
+  post: Post;
   user: User | null;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({
-  comments,
-  onSubmitComment,
-  newComment,
-  setNewComment,
-  isSubmittingComment,
-  user,
-}) => {
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSubmitComment();
+type TabKey = "all" | number;
+
+const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
+  const [activeTab, setActiveTab] = useState<TabKey | null>(null);
+  const [comments, setComments] = useState<Record<string, Comment[]>>({});
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 取得留言數量（初始載入）
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await getCommentCounts(post.id);
+      setCounts(res.counts);
+    } catch (err: unknown) {
+      // ✅ 改用 unknown
+      console.error("Error fetching counts:", err);
+    }
+  }, [post.id]);
+
+  // 取得特定 tab 的留言
+  const fetchCommentsByTab = useCallback(
+    async (tab: TabKey) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const res = await getComments(post.id, tab);
+        setComments(res.comments);
+      } catch (err: unknown) {
+        // ✅ 改用 unknown
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("載入留言失敗");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [post.id]
+  );
+
+  // 初始載入留言數量
+  useEffect(() => {
+    fetchCounts();
+  }, [fetchCounts]);
+
+  // 當 activeTab 改變時，載入該 tab 的留言
+  useEffect(() => {
+    if (activeTab !== null) {
+      fetchCommentsByTab(activeTab);
+    }
+  }, [activeTab, fetchCommentsByTab]);
+
+  // 處理 tab 點擊
+  const handleTabClick = (tab: TabKey) => {
+    if (activeTab === tab) {
+      setActiveTab(null);
+    } else {
+      setActiveTab(tab);
     }
   };
 
-  return (
-    <div className="">
-      <CommentCard />
-      {/* 評論輸入區 */}
-      {user ? (
-        <div className="mb-6">
-          <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <UserIcon className="w-4 h-4 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="寫下你的評論..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                rows={3}
-              />
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-xs text-gray-500">
-                  按 Enter 發送，Shift+Enter 換行
-                </span>
-                <Button
-                  onClick={onSubmitComment}
-                  disabled={isSubmittingComment || !newComment.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm"
-                >
-                  {isSubmittingComment ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>發送中...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <Send className="w-4 h-4" />
-                      <span>發送</span>
-                    </div>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
-          <p className="text-gray-600">請先登入才能留言</p>
-        </div>
-      )}
-
-      {/* 評論列表 */}
-      <div className="space-y-6">
-        {comments.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>還沒有評論，成為第一個留言的人吧！</p>
-          </div>
-        ) : (
-          comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} />
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
-// 評論項目組件
-const CommentItem: React.FC<{ comment: Comment }> = ({ comment }) => {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("zh-TW", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  // 新增留言成功後重新載入
+  const handleCommentSuccess = () => {
+    fetchCounts();
+    if (activeTab !== null) {
+      fetchCommentsByTab(activeTab);
+    }
   };
 
+  // 取得特定 tab 的留言列表
+  const getTabComments = (tab: TabKey): Comment[] => {
+    const key = tab === "all" ? "all" : `item_${tab}`;
+    return comments[key] || [];
+  };
+
+  // 取得特定 tab 的留言數
+  const getCount = (tab: TabKey): number => {
+    const key = tab === "all" ? "all" : `item_${tab}`;
+    return counts[key] || 0;
+  };
+
+  // Tab 列表
+  const tabs: { key: TabKey; title: string }[] = [
+    { key: "all", title: "All" },
+    ...(post.items?.map((item) => ({
+      key: item.id as number,
+      title: item.title,
+    })) || []),
+  ];
+
   return (
-    <div className="flex items-start space-x-3">
-      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-        <UserIcon className="w-4 h-4 text-gray-600" />
-      </div>
-      <div className="flex-1">
-        <div className="flex items-center space-x-2 mb-1">
-          <span className="font-medium text-gray-900">{comment.username}</span>
-          <span className="text-xs text-gray-500">
-            {formatDate(comment.created_at)}
-          </span>
+    <div className="">
+      {tabs.map((tab) => (
+        <div key={tab.key} className="mb-[10px]">
+          {/* CommentCard 作為 Tab 標題 */}
+          <CommentCard
+            title={tab.title}
+            count={getCount(tab.key)}
+            isOpen={activeTab === tab.key}
+            onToggle={() => handleTabClick(tab.key)}
+          />
+
+          {/* 展開時顯示留言內容 */}
+          {activeTab === tab.key && (
+            <div className="ml-4 mt-2 p-4 bg-white rounded-lg">
+              {/* 留言輸入框 */}
+              <CommentInput
+                postId={post.id}
+                itemId={tab.key === "all" ? "all" : tab.key}
+                user={user}
+                placeholder={
+                  tab.key === "all"
+                    ? "對這篇貼文發表留言..."
+                    : `對「${tab.title}」發表留言...`
+                }
+                onSuccess={handleCommentSuccess}
+              />
+
+              {/* 留言列表 */}
+              <div className="mt-4">
+                {isLoading ? (
+                  <div className="py-4 text-center text-gray-500">
+                    <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+                    <p className="mt-2 text-sm">載入中...</p>
+                  </div>
+                ) : error ? (
+                  <div className="py-4 text-center text-red-500 text-sm">
+                    {error}
+                  </div>
+                ) : getTabComments(tab.key).length === 0 ? (
+                  <div className="py-4 text-center text-gray-500 text-sm">
+                    還沒有留言
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {getTabComments(tab.key).map((comment) => (
+                      <CommentItem
+                        key={comment.id}
+                        comment={comment}
+                        postId={post.id}
+                        user={user}
+                        onReplySuccess={handleCommentSuccess}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        <p className="text-gray-700 whitespace-pre-wrap">{comment.content}</p>
-      </div>
+      ))}
     </div>
   );
 };

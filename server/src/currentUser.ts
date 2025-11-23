@@ -1,8 +1,15 @@
+// currentUser.ts
 import { Request, Response } from "express";
-import { getUserFromCookie, updateUserSession } from "./session";
+import {
+  getUserFromCookie,
+  updateUserSession,
+  RedisConnectionError,
+  UpdateSessionError,
+} from "./session";
 import { requireAuth } from "./middleware/auth";
 import _ from "lodash";
 import Router from "express";
+
 const router = Router();
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {
@@ -17,6 +24,15 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.status(200).json({ user: req.user });
   } catch (error) {
     console.error("Get current user error:", error);
+
+    // ✅ 處理 Redis 連線錯誤
+    if (error instanceof RedisConnectionError) {
+      return res.status(503).json({
+        errorMessage:
+          "Service temporarily unavailable. Please try again later.",
+      });
+    }
+
     return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
@@ -32,6 +48,7 @@ router.post("/update", requireAuth, async (req: Request, res: Response) => {
     const updates = req.body.updates;
     console.log("User before update:", req.user);
     console.log("Received updates:", updates);
+
     if (!updates || _.isEqual(updates, req.user)) {
       return res.status(400).json({
         errorMessage:
@@ -51,6 +68,21 @@ router.post("/update", requireAuth, async (req: Request, res: Response) => {
     return res.status(200).json({ updatedUser: updatedUserSession });
   } catch (error) {
     console.error("Update current user error:", error);
+
+    // ✅ 處理特定錯誤
+    if (error instanceof RedisConnectionError) {
+      return res.status(503).json({
+        errorMessage:
+          "Service temporarily unavailable. Please try again later.",
+      });
+    }
+
+    if (error instanceof UpdateSessionError) {
+      return res.status(400).json({
+        errorMessage: error.message,
+      });
+    }
+
     return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });

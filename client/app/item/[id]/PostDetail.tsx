@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
 import CommentSection from "../../components/Comment/CommentSection";
-import { Post, Condition, Comment } from "../../types/schema";
+import { Post, Condition } from "../../types/schema";
 import User from "../../types/user";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
   const [post, setPost] = useState<Post | null>(null);
   const [conditions, setConditions] = useState<Condition[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +40,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // 互動狀態
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [newComment, setNewComment] = useState("");
 
   // back and share bar
   const [hidden, setHidden] = useState(false);
@@ -111,20 +108,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     }
   }, [hostName]);
 
-  // 獲取評論
-  const fetchComments = useCallback(async () => {
-    if (!postId) return;
-    try {
-      const response = await fetch(`${hostName}/api/posts/${postId}/comments`);
-      const data = await response.json();
-      if (response.ok) {
-        setComments(data.comments);
-      }
-    } catch (error) {
-      console.error("Error fetching comments:", error);
-    }
-  }, [hostName, postId]);
-
   // 處理按讚
   const handleLike = async () => {
     if (!user) {
@@ -153,43 +136,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       }
     } catch (error) {
       console.error("Error toggling like:", error);
-    }
-  };
-
-  // 提交評論
-  const handleSubmitComment = async () => {
-    if (!user) {
-      alert("請先登入才能留言");
-      return;
-    }
-
-    if (!newComment.trim()) {
-      alert("請輸入評論內容");
-      return;
-    }
-
-    setIsSubmittingComment(true);
-    try {
-      const response = await fetch(`${hostName}/api/posts/${postId}/comments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ content: newComment }),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        setNewComment("");
-        fetchComments(); // 重新獲取評論
-      } else {
-        alert("評論提交失敗");
-      }
-    } catch (error) {
-      console.error("Error submitting comment:", error);
-      alert("評論提交時發生錯誤");
-    } finally {
-      setIsSubmittingComment(false);
     }
   };
 
@@ -261,9 +207,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   useEffect(() => {
     if (postId) {
       fetchPost();
-      fetchComments();
     }
-  }, [postId, fetchPost, fetchComments]);
+  }, [postId, fetchPost]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -492,20 +437,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   }
                 >
                   <MessageIcon className="w-5 h-5 text-dark" />
-                  <span>{comments.length}</span>
                 </Button>
               </div>
 
               {/* 評論區 */}
               <div id="comments" className="bg-white rounded-lg shadow-sm">
-                <CommentSection
-                  comments={comments}
-                  onSubmitComment={handleSubmitComment}
-                  newComment={newComment}
-                  setNewComment={setNewComment}
-                  isSubmittingComment={isSubmittingComment}
-                  user={user}
-                />
+                <CommentSection post={post} user={user} />
               </div>
             </div>
           </div>

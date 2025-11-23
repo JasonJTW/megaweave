@@ -95,14 +95,14 @@ const UserPage = () => {
       });
 
       if (!response.ok) {
-        const errorMessage = await response.json();
-        console.error("Error fetching user data:", errorMessage.errorMessage);
         //* Handle HTTP errors
         if (response.status === 401) {
-          router.push("/signin");
+          setLoading(false);
           setRedirecting(true);
+          router.push("/signin");
+          return false;
         }
-
+        const errorMessage = await response.json();
         throw new Error(` ${errorMessage.errorMessage}`);
       }
       const userData = await response.json();
@@ -115,14 +115,16 @@ const UserPage = () => {
       ) {
         setIsContributor(true);
       }
+      setLoading(false);
       setError(null);
+      return true;
     } catch (error) {
       console.error("Error fetching user data:", error);
       setError(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
-    } finally {
       setLoading(false);
+      return false;
     }
   };
 
@@ -136,6 +138,7 @@ const UserPage = () => {
       const result = await response.json();
       console.error("Error fetching userprofile:", result.errorMessage);
       setError(result.errMessage);
+      return;
     }
     const result = await response.json();
     const bioValue = result.bio || "";
@@ -152,6 +155,7 @@ const UserPage = () => {
       const error = await response.json();
       console.error("Error fetching userprofile:", error.errorMessage);
       setError(error.errMessage);
+      return;
     }
 
     const result = await response.json();
@@ -486,6 +490,7 @@ const UserPage = () => {
       const result = await response.json();
       console.error("Error fetching userprofile:", result.errorMessage);
       setError(result.errMessage);
+      return;
     }
     const result = await response.json();
     const emailValue = result.contactEmail || "";
@@ -503,6 +508,7 @@ const UserPage = () => {
       const result = await response.json();
       console.error("Error fetching userprofile:", result.errorMessage);
       setError(result.errMessage);
+      return;
     }
     const result = await response.json();
     const phoneValue = result.contactPhone || "";
@@ -638,11 +644,16 @@ const UserPage = () => {
   };
 
   useEffect(() => {
-    fetchUser();
-    getBio();
-    getContactEmail();
-    getContactPhone();
-    getUsername();
+    const init = async () => {
+      const success = await fetchUser();
+      if (success) {
+        getBio();
+        getContactEmail();
+        getContactPhone();
+        getUsername();
+      }
+    };
+    init();
     return () => {
       // cleanup any created object URLs on unmount
       if (previousPreviewRef.current) {
@@ -690,8 +701,6 @@ const UserPage = () => {
   }
 
   if (!user) {
-    setRedirecting(true);
-    router.push("/signin");
     return null;
   }
 

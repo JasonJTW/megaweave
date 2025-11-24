@@ -23,7 +23,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
   itemId,
   parentId = null,
   user,
-  placeholder = "寫下你的留言...",
+  placeholder = "Write a comment",
   onSuccess,
   onCancel,
   autoFocus = false,
@@ -36,7 +36,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
   const handleSubmit = async () => {
     // 檢查登入
     if (!user) {
-      alert("請先登入才能留言");
+      alert("Please sign in to comment.");
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`
       );
@@ -61,11 +61,11 @@ const CommentInput: React.FC<CommentInputProps> = ({
       onSuccess?.();
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message || "發送失敗，請稍後再試");
+        setError(err.message || "Failed to submit comment");
       } else if (typeof err === "string") {
         setError(err);
       } else {
-        setError("發送失敗，請稍後再試");
+        setError("Failed to submit comment");
       }
     } finally {
       setIsSubmitting(false);
@@ -115,7 +115,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={user ? placeholder : "請先登入才能留言"}
+            placeholder={user ? placeholder : "Please sign in to comment"}
             autoFocus={autoFocus}
             disabled={isSubmitting || !user}
             rows={parentId ? 2 : 3}
@@ -149,7 +149,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
                      hover:bg-primary/90 transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "發送中..." : "發送"}
+          {isSubmitting ? "Submitting" : "Submit"}
         </button>
       </div>
     </div>

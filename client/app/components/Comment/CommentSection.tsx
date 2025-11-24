@@ -133,8 +133,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                 user={user}
                 placeholder={
                   tab.key === "all"
-                    ? "對這篇貼文發表留言..."
-                    : `對「${tab.title}」發表留言...`
+                    ? "Write a comment"
+                    : `Comment on ${tab.title}`
                 }
                 onSuccess={handleCommentSuccess}
               />
@@ -144,7 +144,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                 {isLoading ? (
                   <div className="py-4 text-center text-gray-500">
                     <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-                    <p className="mt-2 text-sm">載入中...</p>
+                    <p className="mt-2 text-sm">Loading...</p>
                   </div>
                 ) : error ? (
                   <div className="py-4 text-center text-red-500 text-sm">
@@ -152,7 +152,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                   </div>
                 ) : getTabComments(tab.key).length === 0 ? (
                   <div className="py-4 text-center text-gray-500 text-sm">
-                    還沒有留言
+                    No comments yet. Be the first to comment!
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">

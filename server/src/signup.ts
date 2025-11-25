@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 import { hashPassword, generateSalt } from "./passwordHasher";
 import { handleError } from "./utils/errorHandler";
+import { v4 as uuidv4 } from "uuid";
 
 const router: Router = express.Router();
 import mysql, { OkPacketParams, ResultSetHeader, RowDataPacket } from "mysql2";
@@ -30,6 +31,7 @@ router.post("/", async (req: Request, res: Response) => {
     email: req.body.email,
     password: req.body.password,
     salt: "",
+    public_id: "",
   };
   console.log(`User:`, user);
   let validationResult: SignupUserSchemaType | undefined;
@@ -68,18 +70,22 @@ router.post("/", async (req: Request, res: Response) => {
   }
   console.log(`userExisted:`, userExisted);
 
-  //* 3. Hash the password
+  //* 3. Hash the password & Generate public_id
+  const public_id = uuidv4();
+  console.log("Generated public_id: ", public_id);
   const salt = generateSalt();
   const hashedPassword = await hashPassword(user.password, salt);
   console.log("hashedPassword:", hashedPassword);
   console.log("salt:", salt);
   user.password = hashedPassword;
   user.salt = salt;
+  user.public_id = public_id;
 
-  console.log("user after hashing password:", user);
+  console.log("user after hashing password and generating public_id:", user);
+
   //* 4. Insert the user into the database
   try {
-    const query = `INSERT INTO users (username, email, password, salt, providers, role) VALUES (?, ?, ?, ?, ?, ? )`;
+    const query = `INSERT INTO users (username, email, password, salt, providers, role, public_id) VALUES (?, ?, ?, ?, ?, ?, ? )`;
     const [result] = await dbPool.query<ResultSetHeader>(query, [
       user.username,
       user.email,
@@ -87,6 +93,7 @@ router.post("/", async (req: Request, res: Response) => {
       user.salt,
       JSON.stringify(["native"]),
       userRoles[0], // default role is 'user'
+      user.public_id,
     ]);
     console.log("Insert user result:", result);
 
@@ -96,6 +103,7 @@ router.post("/", async (req: Request, res: Response) => {
       role: userRoles[0],
       username: user.username,
       email: user.email,
+      public_id: user.public_id,
     };
     await createUserSession(userSession, req, res);
     console.log("User session created:", userSession);

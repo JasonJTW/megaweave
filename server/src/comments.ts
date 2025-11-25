@@ -8,7 +8,7 @@ const router = express.Router();
 interface CommentRow extends RowDataPacket {
   id: number;
   post_id: number;
-  item_id: number | null; // 新增：NULL = All, 有值 = 特定 Item
+  item_id: number | null;
   parent_id: number | null;
   user_id: number;
   content: string;
@@ -16,6 +16,11 @@ interface CommentRow extends RowDataPacket {
   depth: number;
   path: string;
   created_at: Date;
+  username?: string;
+  avatar_url?: string;
+  public_id?: string;
+  like_count?: number;
+  reply_count?: number;
 }
 
 interface CommentWithChildren extends CommentRow {
@@ -23,55 +28,8 @@ interface CommentWithChildren extends CommentRow {
 }
 
 /**
- // 針對整個 Post（All）的留言
-POST /comments
-{
-  "post_id": 1,
-  "item_id": null,    // 或不傳
-  "user_id": 10,
-  "content": "這個貼文很棒！"
-}
-
-// 針對特定 Item 的留言
-POST /comments
-{
-  "post_id": 1,
-  "item_id": 1,       // Item 01
-  "user_id": 10,
-  "content": "請問地點細節？"
-}
-
-// 回覆留言（自動繼承父留言的 item_id）
-POST /comments
-{
-  "post_id": 1,
-  "parent_id": 5,
-  "user_id": 11,
-  "content": "想了解"
-}
-
-// 取得該 post 所有留言（依 item 分組）
-GET /comments?post_id=1
-
-// 只取 "All" 的留言
-GET /comments?post_id=1&item_id=all
-
-// 只取特定 item 的留言
-GET /comments?post_id=1&item_id=1
-
-
-取得各 tab 的留言數
-GET /comments/counts?post_id=1
-
-// 回傳
-{
-  "post_id": 1,
-  "counts": {
-    "all": 2,
-    "item_1": 3,
-    "item_3": 1
-  }
-}
+ * POST /comments
+ * 創建新留言
  */
 router.post("/", async (req: Request, res: Response) => {
   const {
@@ -132,7 +90,7 @@ router.post("/", async (req: Request, res: Response) => {
           .json({ message: "Parent comment not in this post" });
       }
 
-      // 子留言繼承父留言的 item_id（確保同一串留言在同一個 item 下）
+      // 子留言繼承父留言的 item_id
       effectiveItemId = parent.item_id;
 
       // 深度限制
@@ -183,15 +141,24 @@ router.post("/", async (req: Request, res: Response) => {
 
     await connection.commit();
 
+    // 🔥 返回新留言時也 JOIN users 獲取完整資訊
+    const [newCommentRows] = await connection.query<CommentRow[]>(
+      `SELECT 
+        c.*,
+        u.username,
+        u.avatar_url,
+        u.public_id
+      FROM comments c
+      LEFT JOIN users u ON c.user_id = u.id
+      WHERE c.id = ?`,
+      [insertedId]
+    );
+
+    const newComment = newCommentRows[0];
+
     res.status(201).json({
       message: "Comment created",
-      comment: {
-        id: insertedId,
-        post_id,
-        item_id: effectiveItemId,
-        parent_id,
-        depth,
-      },
+      comment: newComment,
     });
   } catch (err: any) {
     await connection.rollback();
@@ -204,10 +171,10 @@ router.post("/", async (req: Request, res: Response) => {
 
 /**
  * GET /comments?post_id=123
- * GET /comments?post_id=123&item_id=1      // 特定 item 的留言
- * GET /comments?post_id=123&item_id=all    // 只取 "All" 的留言
+ * GET /comments?post_id=123&item_id=1
+ * GET /comments?post_id=123&item_id=all
  *
- * 返回格式：依 item 分組的留言
+ * 🔥 修改：JOIN users 表獲取 public_id
  */
 router.get("/", async (req: Request, res: Response) => {
   const postId = Number(req.query.post_id);
@@ -222,7 +189,8 @@ router.get("/", async (req: Request, res: Response) => {
       SELECT 
         c.*,
         u.username,
-        u.avatar_url
+        u.avatar_url,
+        u.public_id
       FROM comments c
       LEFT JOIN users u ON c.user_id = u.id
       WHERE c.post_id = ? AND c.is_deleted = 0
@@ -271,7 +239,9 @@ router.get("/", async (req: Request, res: Response) => {
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(comment);
     });
+
     console.log("comments rows: ", rows);
+
     res.json({
       post_id: postId,
       total: rows.length,
@@ -285,7 +255,7 @@ router.get("/", async (req: Request, res: Response) => {
 
 /**
  * GET /comments/counts?post_id=123
- * 取得各 item 的留言數量（用於顯示在 tab 上）
+ * 取得各 item 的留言數量
  */
 router.get("/counts", async (req: Request, res: Response) => {
   const postId = Number(req.query.post_id);

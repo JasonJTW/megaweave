@@ -8,6 +8,84 @@ import { requireAuth, requireRole } from "./middleware/auth";
 import { UserRole, userRoles } from "./schema";
 const router = Router();
 
+//* public get profile api
+router.get("/public/:uuid", async (req: Request, res: Response) => {
+  const { uuid } = req.params;
+
+  try {
+    // 驗證 UUID 格式
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uuid)) {
+      return res.status(400).json({
+        errorMessage: "Invalid user ID format",
+      });
+    }
+
+    console.log(`Fetching public profile for user: ${uuid}`);
+
+    // 1. 獲取用戶基本資料 (通過 public_id)
+    const userQuery = `
+      SELECT 
+        id,
+        public_id,
+        username,
+        email,
+        avatar_url,
+        avatar_key,
+        role,
+        created_at
+      FROM users 
+      WHERE public_id = ?
+    `;
+    const [userRows] = await dbPool.query(userQuery, [uuid]);
+
+    if ((userRows as RowDataPacket[]).length === 0) {
+      console.log(`User not found: ${uuid}`);
+      return res.status(404).json({
+        errorMessage: "User not found",
+      });
+    }
+
+    const user = (userRows as RowDataPacket[])[0];
+    console.log(`Found user: ${user.username} (id: ${user.id})`);
+
+    // 2. 使用 users.id 來查詢 user_profiles
+    const profileQuery = `
+      SELECT *
+      FROM user_profiles 
+      WHERE user_id = ?
+    `;
+    const [profileRows] = await dbPool.query(profileQuery, [user.id]); // 🔥 使用 user.id 而不是 uuid
+    const profile = (profileRows as RowDataPacket[])[0] || {};
+
+    console.log(`Profile data:`, profile);
+
+    // 3. 組合回傳資料
+    const responseData = {
+      public_id: user.public_id, // 🔥 返回 public_id (UUID)
+      username: profile.custom_name || user.username,
+      email: user.email, // 可選：是否要公開 email
+      avatar_url: user.avatar_url,
+      avatar_key: user.avatar_key,
+      role: user.role,
+      created_at: user.created_at,
+      bio: profile.bio || "",
+      contact_email: profile.contact_email || null,
+      contact_phone: profile.contact_phone || null,
+    };
+
+    console.log(`Returning profile data for ${user.username}`);
+    return res.status(200).json(responseData);
+  } catch (error) {
+    console.error("Error fetching public profile:", error);
+    return res.status(500).json({
+      errorMessage: "Internal server error",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
 //RWD: For get & post user profile
 router.get("/bio", requireAuth, async (req: Request, res: Response) => {
   let query;

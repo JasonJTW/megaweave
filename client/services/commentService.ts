@@ -10,6 +10,7 @@ export interface Comment {
   item_id: number | null;
   parent_id: number | null;
   user_id: number;
+  public_id: string;
   username?: string;
   avatar_url?: string;
   content: string;
@@ -28,6 +29,7 @@ export interface CreateCommentParams {
   parent_id?: number | null;
   user_id: number;
   content: string;
+  public_id: string;
 }
 
 export interface CommentsResponse {
@@ -61,6 +63,7 @@ export async function createComment(
       parent_id: params.parent_id ?? null,
       user_id: params.user_id,
       content: params.content,
+      public_id: params.public_id,
     }),
   });
 

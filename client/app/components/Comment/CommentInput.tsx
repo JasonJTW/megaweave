@@ -55,6 +55,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
         parent_id: parentId,
         user_id: Number(user.userId),
         content: content.trim(),
+        public_id: user.public_id,
       });
 
       setContent("");

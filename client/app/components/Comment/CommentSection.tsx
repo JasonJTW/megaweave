@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Post } from "../../types/schema"; // ✅ 移除未使用的 Item
 import User from "../../types/user";
 import CommentCard from "./CommentCard";
@@ -52,7 +53,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         if (err instanceof Error) {
           setError(err.message);
         } else {
-          setError("載入留言失敗");
+          setError("Error fetching comments");
         }
       } finally {
         setIsLoading(false);
@@ -113,63 +114,71 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
   return (
     <div className="">
+      {/* 遍歷 Tab 列表，為每個 Tab 渲染一個區塊 */}
       {tabs.map((tab) => (
         <div key={tab.key} className="mb-[10px]">
-          {/* CommentCard 作為 Tab 標題 */}
           <CommentCard
             title={tab.title}
             count={getCount(tab.key)}
             isOpen={activeTab === tab.key}
             onToggle={() => handleTabClick(tab.key)}
           />
+          <AnimatePresence>
+            {activeTab === tab.key && (
+              <motion.div
+                initial={{ opacity: 0.6, height: 0 }} // 初始狀態
+                animate={{ opacity: 1, height: "auto" }} // 展開狀態
+                exit={{ opacity: 0, height: 0 }} // 離開/收合狀態
+                transition={{ duration: 0.2, ease: "easeInOut" }} // 動畫時間與曲線
+                className="overflow-hidden" // 必須有 overflow-hidden 來裁剪 height 0
+              >
+                <div className=" p-4 bg-primary-5 rounded-b-[18px]">
+                  <CommentInput
+                    postId={post.id}
+                    itemId={tab.key === "all" ? "all" : tab.key}
+                    user={user}
+                    placeholder={
+                      tab.key === "all"
+                        ? "Write a comment"
+                        : `Comment on ${tab.title}`
+                    }
+                    onSuccess={handleCommentSuccess}
+                  />
 
-          {/* 展開時顯示留言內容 */}
-          {activeTab === tab.key && (
-            <div className="ml-4 mt-2 p-4 bg-white rounded-lg">
-              {/* 留言輸入框 */}
-              <CommentInput
-                postId={post.id}
-                itemId={tab.key === "all" ? "all" : tab.key}
-                user={user}
-                placeholder={
-                  tab.key === "all"
-                    ? "Write a comment"
-                    : `Comment on ${tab.title}`
-                }
-                onSuccess={handleCommentSuccess}
-              />
-
-              {/* 留言列表 */}
-              <div className="mt-4">
-                {isLoading ? (
-                  <div className="py-4 text-center text-gray-500">
-                    <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-                    <p className="mt-2 text-sm">Loading...</p>
+                  {/* 留言列表 */}
+                  <div className="mt-4">
+                    {/* ... (留言列表內容不變) ... */}
+                    {isLoading ? (
+                      <div className="py-4 text-center text-gray-500">
+                        <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+                        <p className="mt-2 text-sm">Loading...</p>
+                      </div>
+                    ) : error ? (
+                      <div className="py-4 text-center text-red-500 text-sm">
+                        {error}
+                      </div>
+                    ) : getTabComments(tab.key).length === 0 ? (
+                      <div className="py-4 text-center text-gray-500 text-sm">
+                        No comments yet. Be the first to comment!
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100">
+                        {getTabComments(tab.key).map((comment) => (
+                          <CommentItem
+                            key={comment.id}
+                            comment={comment}
+                            postId={post.id}
+                            user={user}
+                            onReplySuccess={handleCommentSuccess}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ) : error ? (
-                  <div className="py-4 text-center text-red-500 text-sm">
-                    {error}
-                  </div>
-                ) : getTabComments(tab.key).length === 0 ? (
-                  <div className="py-4 text-center text-gray-500 text-sm">
-                    No comments yet. Be the first to comment!
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-100">
-                    {getTabComments(tab.key).map((comment) => (
-                      <CommentItem
-                        key={comment.id}
-                        comment={comment}
-                        postId={post.id}
-                        user={user}
-                        onReplySuccess={handleCommentSuccess}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       ))}
     </div>

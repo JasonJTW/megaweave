@@ -37,8 +37,12 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
   return (
     <div
-      className={`flex h-[36px] bg-primary-5 rounded-[18px] font-ddin px-[17px] py-[4px] items-center justify-between
-                  ${isOpen ? "bg-primary-10" : ""}`}
+      className={`flex h-[36px] bg-primary-5 font-ddin px-[17px] py-[6px] items-center justify-between
+      ${
+        isOpen
+          ? "bg-primary-10 rounded-t-[18px] rounded-b-none" // 展開時：只有頂部圓角
+          : "rounded-[18px]" // 收合時：完整圓角
+      }`}
     >
       <div className="font-medium text-[21px] text-center">{title}</div>
 

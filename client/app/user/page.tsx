@@ -706,19 +706,17 @@ const UserPage = () => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-megaweave-brown -z-10"></div>
+      <div className="fixed inset-0 bg-primary-5 -z-10"></div>
       <div className="min-h-screen  text-secondary px-0 sm:px-6 md:px-12 lg:px-16">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="border-b border-megaweave-brown/50 backdrop-blur-sm bg-megaweave-brown/30"
+          className="  "
         >
           <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-ddin font-extrabold tracking-wide">
-                User Profile
-              </h1>
+              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-ddin font-extrabold tracking-wide"></h1>
             </div>
 
             <button
@@ -738,7 +736,7 @@ const UserPage = () => {
         )}
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-6 py-8 font-ddin">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile Card */}
             <motion.div
@@ -747,7 +745,7 @@ const UserPage = () => {
               transition={{ delay: 0.1 }}
               className="lg:col-span-1"
             >
-              <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="bg-white border-primary-3´0 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
                 {/* Avatar */}
                 <div className="text-center mb-2">
                   <div className="relative">
@@ -874,7 +872,7 @@ const UserPage = () => {
                         className="group flex items-center relative px-2"
                       >
                         <h2
-                          className="text-2xl font-bold  "
+                          className="text-xl font-bold text-[#222]  "
                           style={{
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -955,7 +953,7 @@ const UserPage = () => {
                   {/* Role Badge */}
                   <div className="flex justify-center ">
                     <span
-                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/20`}
+                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 text-white`}
                     >
                       {user.role}
                     </span>
@@ -996,17 +994,25 @@ const UserPage = () => {
 
                 {/* Stats */}
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-                  <div className="p-3 bg-megaweave-blue-light/10 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-400">24</div>
-                    <div className="text-xs text-gray-400">Projects</div>
+                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
+                    <div className="text-[36px] font-bold text-[#222] ">24</div>
+                    <div className="text-[16px] font-semibold text-[#222]">
+                      post
+                    </div>
                   </div>
-                  <div className="p-3 bg-megaweave-blue-light/10 rounded-lg">
-                    <div className="text-2xl font-bold text-green-400">156</div>
-                    <div className="text-xs text-gray-400">Commits</div>
+                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
+                    <div className="text-[36px] font-bold text-[#222] ">
+                      156
+                    </div>
+                    <div className="text-[16px] font-semibold text-[#222]">
+                      weaved
+                    </div>
                   </div>
-                  <div className="p-3 bg-megaweave-blue-light/10 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-400">89</div>
-                    <div className="text-xs text-gray-400">Stars</div>
+                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
+                    <div className="text-[36px] font-bold text-[#222] ">89</div>
+                    <div className="text-[16px] font-semibold text-[#222]">
+                      point
+                    </div>
                   </div>
                 </div>
               </div>

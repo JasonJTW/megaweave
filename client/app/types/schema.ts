@@ -21,6 +21,7 @@ export interface Post {
   thumbnail_urls?: string;
   avatar_url?: string;
   items?: Item[];
+  author_public_id: string;
 }
 
 export interface CreatePostFormData {

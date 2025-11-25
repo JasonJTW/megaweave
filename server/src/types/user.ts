@@ -4,4 +4,5 @@ export type User = {
   email: string;
   password: string;
   salt: string;
+  public_id: string;
 };

@@ -14,6 +14,8 @@ import dotenv from "dotenv";
 import { userRoles } from "./schema";
 import { connect } from "http2";
 import { th } from "zod/locales";
+import { uuid } from "zod";
+import { v4 as uuidv4 } from "uuid";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
@@ -136,9 +138,11 @@ async function findOrCreateUser(
   } else {
     // 4. 用戶不存在，創建新用戶
     const insertUsersQuery = `
-      INSERT INTO users (email, username, password, salt, google_id, facebook_id, providers, role) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (email, username, password, salt, google_id, facebook_id, providers, role, public_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+
+    const public_id = uuidv4();
 
     const insertUsersValues = [
       email,
@@ -149,6 +153,7 @@ async function findOrCreateUser(
       providerData.facebookId || null,
       JSON.stringify([provider]),
       userRoles[0], // default role is 'user'
+      public_id,
     ];
 
     const insertProfileQuery = `INSERT INTO user_profiles (user_id, contact_email, custom_name) VALUES (?, ?, ?)`;
@@ -256,6 +261,7 @@ router.post("/", async (req: Request, res: Response) => {
       provider: "native",
       avatar_url: foundUser.avatar_url || null,
       avatar_key: foundUser.avatar_key || null,
+      public_id: foundUser.public_id,
     };
 
     await createUserSession(validUser, req, res);
@@ -317,6 +323,7 @@ router.post("/google", async (req: Request, res: Response) => {
       provider: "google",
       avatar_url: user.avatar_url ?? null,
       avatar_key: user.avatar_key ?? null,
+      public_id: user.public_id,
     };
 
     await createUserSession(googleUserSession, req, res);
@@ -403,6 +410,7 @@ router.post("/facebook", async (req: Request, res: Response) => {
       provider: "facebook",
       avatar_url: user.avatar_url || null,
       avatar_key: user.avatar_key || null,
+      public_id: user.public_id,
     };
 
     await createUserSession(facebookUserSession, req, res);

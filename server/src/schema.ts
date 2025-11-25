@@ -10,6 +10,7 @@ export const sessionSchema = z.object({
   provider: z.string().optional(),
   avatar_url: z.url().optional().nullable(),
   avatar_key: z.string().optional().nullable(),
+  public_id: z.string(),
 });
 
 export type UserSession = z.infer<typeof sessionSchema>;

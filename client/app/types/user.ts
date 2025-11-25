@@ -6,4 +6,5 @@ export default interface User {
   email: string;
   avatar_url?: string;
   avatar_key?: string;
+  public_id: string;
 }

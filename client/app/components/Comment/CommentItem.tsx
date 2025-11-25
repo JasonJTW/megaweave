@@ -6,6 +6,7 @@ import { Comment } from "@/services/commentService";
 import CommentInput from "./CommentInput";
 import User from "../../types/user";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 interface CommentItemProps {
   comment: Comment;
@@ -21,11 +22,21 @@ const CommentItem: React.FC<CommentItemProps> = ({
   onReplySuccess,
 }) => {
   const [showReplyInput, setShowReplyInput] = useState(false);
+  const router = useRouter();
 
   // 回覆成功後
   const handleReplySuccess = () => {
     setShowReplyInput(false);
     onReplySuccess?.(); // 通知父元件重新載入留言
+  };
+
+  // 🔥 新增：點擊頭像前往 profile 頁面
+  const handleAvatarClick = () => {
+    if (comment.public_id) {
+      router.push(`/profile/${comment.public_id}`);
+    } else {
+      console.warn("User public_id not available");
+    }
   };
 
   // 格式化時間（相對時間）
@@ -51,8 +62,18 @@ const CommentItem: React.FC<CommentItemProps> = ({
   return (
     <div className="py-3">
       <div className="flex gap-3">
-        {/* 頭像 */}
-        <div className="flex-shrink-0 w-[40px] h-[40px] relative">
+        {/* 頭像 - 🔥 添加點擊功能 */}
+        <div
+          className="flex-shrink-0 w-[40px] h-[40px] relative cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={handleAvatarClick}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              handleAvatarClick();
+            }
+          }}
+        >
           {comment.avatar_url ? (
             <Image
               src={comment.avatar_url}
@@ -61,7 +82,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               className="rounded-full object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+            <div className="w-full h-full rounded-full bg-gray-300 flex items-center justify-center">
               <span className="text-gray-600 text-sm">
                 {comment.username?.charAt(0) || "?"}
               </span>
@@ -70,12 +91,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
         </div>
 
         <div className="flex-1 min-w-0">
-          {/* 用戶名與內容 */}
+          {/* 用戶名與內容 - 🔥 用戶名也可點擊 */}
           <div className="bg-gray-50 rounded-lg px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900">
+              <button
+                onClick={handleAvatarClick}
+                className="text-sm font-medium text-gray-900 hover:text-primary transition-colors hover:underline"
+              >
                 {comment.username || `User ${comment.user_id}`}
-              </span>
+              </button>
               <span className="text-xs text-gray-400">
                 {formatDate(comment.created_at)}
               </span>

@@ -160,6 +160,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   //   window.open(`https://line.me/R/msg/text/?${encodedText}`, "_blank");
   // };
 
+  const handleAvatarClick = () => {
+    if (post?.author_public_id) {
+      router.push(`/profile/${post.author_public_id}`);
+    }
+  };
+
   const handleIGShare = async () => {
     try {
       const response = await fetch(`/api/og?id=${postId}`);
@@ -358,7 +364,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
               </div>
               {/* 內容 */}
               <div className="prose prose-gray max-w-none mb-6">
-                <p className="text-gray-700 whitespace-pre-wrap">
+                <p className="text-gray-700 whitespace-pre-wrap break-words">
                   {post.content}
                 </p>
               </div>
@@ -398,7 +404,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
               </div>
 
               {/* 貼文內容 */}
-              <div className="flex items-center bg-[#fafafa] rounded-[30px] p-[9px]">
+              <div
+                className="flex items-center bg-[#fafafa] rounded-[30px] p-[9px]"
+                onClick={handleAvatarClick}
+              >
                 <div className="relative w-[50px] h-[50px] items-center justify-center">
                   <Image
                     fill

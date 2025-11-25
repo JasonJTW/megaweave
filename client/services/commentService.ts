@@ -21,6 +21,7 @@ export interface Comment {
   reply_count: number;
   created_at: string;
   children: Comment[];
+  is_private: boolean;
 }
 
 export interface CreateCommentParams {

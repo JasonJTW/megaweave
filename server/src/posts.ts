@@ -293,6 +293,7 @@ router.get("/", async (req: Request, res: Response) => {
       SELECT 
         p.*,
         u.username,
+        u.public_id as author_public_id,
         u.avatar_url,
         c.name_en as category_name_en,
         GROUP_CONCAT(i.image_url) as image_urls,
@@ -365,6 +366,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       SELECT 
         p.*,
         u.username,
+        u.public_id as author_public_id,
         u.email,
         u.avatar_url,
         c.name_en as category_name_en

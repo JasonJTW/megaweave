@@ -8,6 +8,7 @@ import { TeamProvider } from "./contexts/TeamContext";
 import { PostProvider } from "./contexts/PostContext";
 import { NavbarProvider } from "./contexts/NavBarContext";
 import Navbar from "./components/Navbar";
+import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 import Footer from "./components/Footer";
@@ -86,6 +87,27 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
+        <Toaster
+          position="top-center"
+          containerStyle={{ top: "100px" }}
+          toastOptions={{
+            duration: 5000, // 預設顯示 5 秒
+            style: {
+              background: "#f56565", // Tailwind bg-red-500
+              color: "#fff",
+              borderRadius: "15px",
+              padding: "0.5rem 1rem",
+              fontSize: "14px",
+              fontWeight: 500,
+              boxShadow:
+                "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+            },
+            iconTheme: {
+              primary: "#fff",
+              secondary: "#f56565",
+            },
+          }}
+        />
         <NavbarProvider>
           <Navbar />
 

@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 import {
   Menu,
   Info,
-  Mail,
+  // Mail,
   GalleryHorizontalEnd,
   // FileText,
 } from "lucide-react";
@@ -82,12 +82,12 @@ const Navbar = () => {
       icon: Info,
     },
     ...teamMenuItems,
-    {
-      href: "/contact",
-      title: "Contact",
-      description: "Get in touch with us",
-      icon: Mail,
-    },
+    // {
+    //   href: "/contact",
+    //   title: "Contact",
+    //   description: "Get in touch with us",
+    //   icon: Mail,
+    // },
   ];
 
   const isActivePath = (path: string) => {

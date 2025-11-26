@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createComment } from "@/services/commentService";
 import User from "../../types/user";
 import Image from "next/image";
-
+import toast from "react-hot-toast";
 interface CommentInputProps {
   postId: number;
   itemId?: "all" | number; // "all" = All 留言, 數字 = 特定 item
@@ -35,13 +35,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
 
   const handleSubmit = async () => {
     // 檢查登入
-    if (!user) {
-      alert("Please sign in to comment.");
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`
-      );
-      return;
-    }
+    handleNotLogIn();
 
     if (!content.trim()) return;
 
@@ -53,9 +47,9 @@ const CommentInput: React.FC<CommentInputProps> = ({
         post_id: postId,
         item_id: itemId === "all" ? null : itemId ?? null, // "all" 轉成 null
         parent_id: parentId,
-        user_id: Number(user.userId),
+        user_id: Number(user!.userId),
         content: content.trim(),
-        public_id: user.public_id,
+        public_id: user!.public_id,
       });
 
       setContent("");
@@ -78,6 +72,17 @@ const CommentInput: React.FC<CommentInputProps> = ({
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       handleSubmit();
+    }
+  };
+
+  const handleNotLogIn = () => {
+    if (!user) {
+      toast("Please log in to comment");
+      setTimeout(() => {
+        router.push(
+          `/signin?returnTo=${encodeURIComponent(window.location.href)}`
+        );
+      }, 1000);
     }
   };
 
@@ -117,8 +122,9 @@ const CommentInput: React.FC<CommentInputProps> = ({
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={user ? placeholder : "Please sign in to comment"}
+            onFocus={handleNotLogIn}
             autoFocus={autoFocus}
-            disabled={isSubmitting || !user}
+            disabled={isSubmitting}
             rows={parentId ? 2 : 3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg 
             focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
@@ -145,12 +151,12 @@ const CommentInput: React.FC<CommentInputProps> = ({
         )}
         <button
           onClick={handleSubmit}
-          disabled={isSubmitting || !content.trim() || !user}
+          disabled={isSubmitting || !content.trim()}
           className="px-4 py-1.5 text-sm text-white bg-primary rounded-lg
           hover:bg-primary/90 transition-colors
           disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Submitting" : "Submit"}
+          {!user ? "Log in" : isSubmitting ? "Submitting" : "Submit"}
         </button>
       </div>
     </div>

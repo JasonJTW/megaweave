@@ -46,7 +46,7 @@ export interface Item {
 
 export interface ItemInput {
   title: string;
-  quantity: number | undefined;
+  quantity: number | "";
 }
 
 export interface Category {

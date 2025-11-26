@@ -65,7 +65,7 @@ const PostsApp = () => {
     categoryId: null as number | null,
     conditionLevel: null as number | null,
     type: postType,
-    items: [{ title: "", quantity: undefined }],
+    items: [{ title: "", quantity: "" }],
   });
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -191,6 +191,7 @@ const PostsApp = () => {
 
       if (!itemsInvalid) {
         formData.append("items", JSON.stringify(createFormData.items));
+        console.log(createFormData.items);
       }
 
       const response = await fetch(`${hostName}/api/posts`, {
@@ -776,10 +777,12 @@ const PostsApp = () => {
                         required
                         className="!flex-[1] text-[12px] text-center placeholder:text-center"
                         placeholder="Quantity"
-                        value={item.quantity}
+                        value={item.quantity ?? ""}
                         onChange={(e) => {
                           const items = [...createFormData.items!];
-                          items[i].quantity = parseInt(e.target.value);
+                          items[i].quantity = e.target.value
+                            ? parseInt(e.target.value)
+                            : "";
                           setCreateFormData({
                             ...createFormData,
                             items,
@@ -796,7 +799,7 @@ const PostsApp = () => {
                           ...createFormData,
                           items: [
                             ...(createFormData.items ?? []),
-                            { title: "", quantity: undefined },
+                            { title: "", quantity: "" },
                           ],
                         });
                       }}

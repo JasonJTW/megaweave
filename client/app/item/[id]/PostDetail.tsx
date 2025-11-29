@@ -409,12 +409,18 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 onClick={handleAvatarClick}
               >
                 <div className="relative w-[50px] h-[50px] items-center justify-center">
-                  <Image
-                    fill
-                    src={post!.avatar_url!}
-                    alt={`${post!.username}'s avatar`}
-                    className="rounded-full object-cover"
-                  />
+                  {post.avatar_url ? (
+                    <Image
+                      fill
+                      src={post!.avatar_url!}
+                      alt={`${post!.username}'s avatar`}
+                      className="rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-xl">
+                      {post.username ? post.username.charAt(0) : "?"}
+                    </div>
+                  )}
                 </div>
                 <div className="ml-[18px]">
                   <h3 className="font-semibold text-gray-900">

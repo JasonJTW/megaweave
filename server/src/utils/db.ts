@@ -1,3 +1,5 @@
+// server/src/utils/db.ts
+
 import dotenv from "dotenv";
 dotenv.config();
 import mysql, { RowDataPacket } from "mysql2";
@@ -17,20 +19,18 @@ const dbPool = mysql
     database: DB_DATABASE,
     typeCast: (field, next) => {
       if (field.type === "TINY" && field.length === 1) {
-        return field.string() === "1"; // 將 TINYINT(1) 轉換為布林值
+        return field.string() === "1";
       }
       return next();
     },
     waitForConnections: true,
-    connectionLimit: 20, // 最大連接數
-    queueLimit: 0, // 無限制排隊
-    // acquireTimeout: 60000, // 60秒獲取連接超時
-    idleTimeout: 300000, // 5分鐘空閒超時
-    maxIdle: 10, // 最大空閒連接
-    enableKeepAlive: true, // 保持連接活躍
-    keepAliveInitialDelay: 0, // 立即開始保持連接
-    // 連接參數
-    connectTimeout: 30000, // 30秒連接超時
+    connectionLimit: 20,
+    queueLimit: 0,
+    idleTimeout: 300000,
+    maxIdle: 10,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+    connectTimeout: 30000,
   })
   .promise();
 
@@ -51,7 +51,7 @@ dbPool.on("enqueue", () => {
   console.log("Waiting for available connection slot");
 });
 
-// 錯誤處理 - 需要監聽底層連接池的錯誤
+// 錯誤處理
 const poolConnection = dbPool.pool;
 poolConnection.on("error", (err: any) => {
   console.error("Database pool error:", err);
@@ -60,17 +60,67 @@ poolConnection.on("error", (err: any) => {
   }
 });
 
-// 優雅關閉連接池
-process.on("SIGINT", async () => {
-  console.log("Closing database pool...");
-  await dbPool.end();
-  process.exit(0);
-});
+// ✅ 新增：監控連接池狀態
+const monitorInterval = setInterval(() => {
+  try {
+    const pool = dbPool.pool as any; // 需要訪問內部屬性
+    const allConnections = pool._allConnections?.length || 0;
+    const freeConnections = pool._freeConnections?.length || 0;
+    const queueLength = pool._connectionQueue?.length || 0;
+    const inUse = allConnections - freeConnections;
 
-process.on("SIGTERM", async () => {
-  console.log("Closing database pool...");
-  await dbPool.end();
-  process.exit(0);
-});
+    const status = {
+      timestamp: new Date().toISOString(),
+      total: allConnections,
+      free: freeConnections,
+      inUse: inUse,
+      queued: queueLength,
+      utilizationRate:
+        allConnections > 0
+          ? ((inUse / allConnections) * 100).toFixed(1) + "%"
+          : "0%",
+    };
+
+    console.log("📊 Pool Status:", status);
+
+    // ⚠️ 警告：如果使用率過高或有排隊，發出警告
+    if (inUse >= 18 || queueLength > 0) {
+      console.warn("⚠️  WARNING: Connection pool under pressure!", {
+        inUse,
+        limit: 20,
+        queued: queueLength,
+      });
+    }
+  } catch (error) {
+    console.error("Error monitoring pool:", error);
+  }
+}, 10000); // 每 10 秒
+
+// 優雅關閉連接池
+export async function closeDatabase(): Promise<void> {
+  console.log("📍 Closing database pool...");
+
+  // 停止監控
+  clearInterval(monitorInterval);
+
+  try {
+    // 最後一次報告狀態
+    const pool = dbPool.pool as any;
+    console.log("Final pool status:", {
+      total: pool._allConnections?.length || 0,
+      free: pool._freeConnections?.length || 0,
+      inUse:
+        (pool._allConnections?.length || 0) -
+        (pool._freeConnections?.length || 0),
+      queued: pool._connectionQueue?.length || 0,
+    });
+
+    await dbPool.end();
+    console.log("✅ Database pool closed successfully");
+  } catch (error) {
+    console.error("❌ Error closing database pool:", error);
+    throw error;
+  }
+}
 
 export default dbPool;

@@ -783,7 +783,7 @@ const UserPage = () => {
                 <div className="text-center mb-2">
                   <div className="relative">
                     {/* 固定尺寸容器：保持原本的大小/比例（max-w-72, h-80） */}
-                    <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative overflow-hidden">
+                    <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto  hover:cursor-pointer relative overflow-hidden">
                       {/* 如果有 preview，顯示 preview 圖片；否則若 user.avatarUrl 存在則顯示真實頭像，否則顯示字母色塊 */}
 
                       {previewSrc ? (

@@ -51,7 +51,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     // 如果指定了 item_id，驗證該 item 屬於這個 post
     if (item_id) {
-      const [itemRows] = await connection.query<RowDataPacket[]>(
+      const [itemRows] = await connection.execute<RowDataPacket[]>(
         "SELECT id FROM items WHERE id = ? AND post_id = ?",
         [item_id, post_id]
       );
@@ -68,7 +68,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     if (parent_id) {
       // 取得父留言資料
-      const [parentRows] = await connection.query<CommentRow[]>(
+      const [parentRows] = await connection.execute<CommentRow[]>(
         `SELECT id, root_id, depth, path, item_id, post_id 
          FROM comments 
          WHERE id = ? AND is_deleted = 0`,
@@ -106,14 +106,14 @@ router.post("/", async (req: Request, res: Response) => {
       path = parent.path ? `${parent.path}/${parent.id}` : `/${parent.id}`;
 
       // 更新父留言的 reply_count
-      await connection.query(
+      await connection.execute(
         "UPDATE comments SET reply_count = reply_count + 1 WHERE id = ?",
         [parent_id]
       );
     }
 
     // 插入新留言
-    const [result] = await connection.query<ResultSetHeader>(
+    const [result] = await connection.execute<ResultSetHeader>(
       `INSERT INTO comments 
        (post_id, item_id, parent_id, user_id, content, root_id, depth, path)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -133,7 +133,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     // 頂層留言：更新 root_id 為自己
     if (!parent_id) {
-      await connection.query("UPDATE comments SET root_id = ? WHERE id = ?", [
+      await connection.execute("UPDATE comments SET root_id = ? WHERE id = ?", [
         insertedId,
         insertedId,
       ]);
@@ -142,7 +142,7 @@ router.post("/", async (req: Request, res: Response) => {
     await connection.commit();
 
     // 🔥 返回新留言時也 JOIN users 獲取完整資訊
-    const [newCommentRows] = await connection.query<CommentRow[]>(
+    const [newCommentRows] = await connection.execute<CommentRow[]>(
       `SELECT 
         c.*,
         u.username,
@@ -214,7 +214,7 @@ router.get("/", async (req: Request, res: Response) => {
         c.created_at ASC
     `;
 
-    const [rows] = await dbPool.query<CommentRow[]>(query, params);
+    const [rows] = await dbPool.execute<CommentRow[]>(query, params);
 
     // 建立樹狀結構
     const commentMap = new Map<number, CommentWithChildren>();
@@ -265,7 +265,7 @@ router.get("/counts", async (req: Request, res: Response) => {
   }
 
   try {
-    const [rows] = await dbPool.query<RowDataPacket[]>(
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
       `SELECT 
         item_id,
         COUNT(*) as count

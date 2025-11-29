@@ -100,7 +100,7 @@ type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
 // 驗證分類是否存在
 async function validateCategory(categoryId: number): Promise<boolean> {
   const query = "SELECT id FROM categories WHERE id = ? AND status = 'active'";
-  const [rows] = await dbPool.query<RowDataPacket[]>(query, [categoryId]);
+  const [rows] = await dbPool.execute<RowDataPacket[]>(query, [categoryId]);
   return rows.length > 0;
 }
 
@@ -224,7 +224,7 @@ router.post(
       GROUP BY p.id
     `;
 
-      const [newPost] = await dbPool.query<RowDataPacket[]>(getPostQuery, [
+      const [newPost] = await dbPool.execute<RowDataPacket[]>(getPostQuery, [
         postId,
       ]);
 
@@ -272,7 +272,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     if (category_id) {
       whereConditions.push("c.id = ?");
-      queryParams.push(category_id);
+      queryParams.push(parseInt(category_id));
     }
 
     if (location) {
@@ -305,15 +305,15 @@ router.get("/", async (req: Request, res: Response) => {
       WHERE ${whereClause}
       GROUP BY p.id
       ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
-    queryParams.push(limit, offset);
-
-    const [posts] = await dbPool.query<RowDataPacket[]>(
+    const [posts] = await dbPool.execute<RowDataPacket[]>(
       postsQuery,
       queryParams
     );
+
+    console.log("posts: ", posts);
 
     // 獲取總數
     const countQuery = `
@@ -323,9 +323,9 @@ router.get("/", async (req: Request, res: Response) => {
       WHERE ${whereClause}
     `;
 
-    const [countResult] = await dbPool.query<RowDataPacket[]>(
+    const [countResult] = await dbPool.execute<RowDataPacket[]>(
       countQuery,
-      queryParams.slice(0, -2) // 移除 limit 和 offset
+      queryParams
     );
 
     const total = countResult[0].total;
@@ -356,7 +356,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
 
     // 更新瀏覽次數
-    await dbPool.query(
+    await dbPool.execute(
       "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
       [postId]
     );
@@ -376,7 +376,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       WHERE p.id = ?
     `;
 
-    const [rows] = await dbPool.query<RowDataPacket[]>(postQuery, [postId]);
+    const [rows] = await dbPool.execute<RowDataPacket[]>(postQuery, [postId]);
 
     if (rows.length === 0) {
       return res.status(404).json({ errorMessage: "Post not found" });
@@ -385,11 +385,13 @@ router.get("/:id", async (req: Request, res: Response) => {
     // 獲取貼文圖片
     const imagesQuery =
       "SELECT * FROM images WHERE post_id = ? ORDER BY created_at";
-    const [images] = await dbPool.query<RowDataPacket[]>(imagesQuery, [postId]);
+    const [images] = await dbPool.execute<RowDataPacket[]>(imagesQuery, [
+      postId,
+    ]);
 
     // 將圖片 URL 轉換為逗號分隔的字符串格式
     const imageUrls = images.map((img: any) => img.image_url).join(",");
-    const [items] = await dbPool.query(
+    const [items] = await dbPool.execute(
       `SELECT * FROM items WHERE post_id = ?`,
       [postId]
     );

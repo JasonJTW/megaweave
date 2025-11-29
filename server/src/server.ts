@@ -1,3 +1,5 @@
+// server/src/server.ts
+
 import express from "express";
 import cookieParser from "cookie-parser";
 const app = express();
@@ -9,6 +11,7 @@ import path from "path";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
 import { connectRedis, disconnectRedis } from "./utils/redis";
+import { closeDatabase } from "./utils/db";
 
 dotenv.config();
 
@@ -59,7 +62,7 @@ app.use("/api", apiRoutes);
 async function startServer() {
   try {
     await connectRedis(); // 先連接 Redis
-
+    let server: https.Server | ReturnType<typeof app.listen>;
     if (ENABLE_HTTPS) {
       // HTTPS 服務器啟動邏輯...
       const CERT_PATH = process.env.CERT_PATH;
@@ -73,7 +76,7 @@ async function startServer() {
         process.exit(1);
       }
       //* Implement https in local dev env
-      const sslServer = https.createServer(
+      server = https.createServer(
         {
           key: fs.readFileSync(path.join(__dirname, KEY_PATH)),
           cert: fs.readFileSync(path.join(__dirname, CERT_PATH)),
@@ -82,30 +85,57 @@ async function startServer() {
         app
       );
 
-      sslServer.listen(PORT, () => {
+      server.listen(PORT, () => {
         console.log(`Secure server listening on port ${PORT}`);
       });
     } else {
-      app.listen(PORT, () => {
+      server = app.listen(PORT, () => {
         console.log(`Server listening on Port ${PORT}`);
       });
     }
+
+    const shutdown = async (signal: string) => {
+      console.log(`\n${signal} received, shutting down gracefully...`);
+
+      // 1. 停止接受新請求
+      server.close(async () => {
+        console.log("✅ server closed");
+
+        // 2. 按順序關閉連接
+        try {
+          console.log("\n=== Starting graceful shutdown sequence ===");
+
+          // Step 1: 關閉 Redis
+          console.log("\n📍 Step 1/2: Closing Redis...");
+          await disconnectRedis();
+
+          // Step 2: 關閉資料庫
+          console.log("\n📍 Step 2/2: Closing database...");
+          await closeDatabase();
+
+          console.log("\n✅ All connections closed successfully");
+          console.log("=== Server Shutdown complete ===\n");
+          process.exit(0);
+        } catch (error) {
+          console.error("\n❌ Error during server shutdown:", error);
+          process.exit(1);
+        }
+      });
+
+      // 如果 30 秒內還沒關閉，強制退出
+      setTimeout(() => {
+        console.error("\n⚠️  Forced shutdown after 30s timeout");
+        process.exit(1);
+      }, 30000);
+    };
+
+    // ✅ 只在這裡監聽信號
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
   }
 }
-
-process.on("SIGINT", async () => {
-  console.log("Shutting down gracefully...");
-  await disconnectRedis();
-  process.exit(0);
-});
-
-process.on("SIGTERM", async () => {
-  console.log("Shutting down gracefully...");
-  await disconnectRedis();
-  process.exit(0);
-});
 
 startServer();

@@ -90,7 +90,7 @@ router.delete(
       // Get current avatar key before deleting
       let oldAvatarKey: string | null = null;
 
-      const [rows] = await connection.query(
+      const [rows] = await connection.execute(
         `SELECT avatar_key FROM users WHERE id = ?`,
         [userId]
       );
@@ -100,7 +100,7 @@ router.delete(
       }
 
       // Update database to remove avatar
-      await connection.query(
+      await connection.execute(
         `UPDATE users SET avatar_url = NULL, avatar_key = NULL WHERE id = ?`,
         [userId]
       );

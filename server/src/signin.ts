@@ -66,13 +66,13 @@ async function findOrCreateUser(
 ): Promise<RowDataPacket> {
   // 1. 先查找是否已存在相同 email 的用戶
   const findQuery = "SELECT * FROM users WHERE email = ?";
-  const [existingUsers] = await dbPool.query<RowDataPacket[]>(findQuery, [
+  const [existingUsers] = await dbPool.execute<RowDataPacket[]>(findQuery, [
     email,
   ]);
 
   if (existingUsers.length > 0) {
     const existingUser = existingUsers[0];
-    const [existingProfiles] = await dbPool.query<RowDataPacket[]>(
+    const [existingProfiles] = await dbPool.execute<RowDataPacket[]>(
       "SELECT * FROM user_profiles WHERE user_id = ?",
       [existingUser.id]
     );
@@ -83,7 +83,7 @@ async function findOrCreateUser(
       INSERT INTO user_profiles (user_id, contact_email, custom_name) 
       VALUES (?, ?, ?)
     `;
-      await dbPool.query(insertProfileQuery, [
+      await dbPool.execute(insertProfileQuery, [
         existingUser.id,
         email,
         existingUser.username || email.split("@")[0],
@@ -128,12 +128,15 @@ async function findOrCreateUser(
     updateQuery += " WHERE email = ?";
     updateValues.push(email);
 
-    await dbPool.query(updateQuery, updateValues);
+    await dbPool.execute(updateQuery, updateValues);
 
     // 返回更新後的用戶資料
-    const [updatedUsers] = await dbPool.query<RowDataPacket[]>(findQuery, [
+    const [updatedUsers] = await dbPool.execute<RowDataPacket[]>(findQuery, [
       email,
     ]);
+    if (updatedUsers.length === 0) {
+      throw new Error("User not found after update");
+    }
     return updatedUsers[0];
   } else {
     // 4. 用戶不存在，創建新用戶
@@ -214,7 +217,7 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     // 2. 查找用戶
     const query = "SELECT * FROM users WHERE email = ?";
-    const [rows] = await dbPool.query<RowDataPacket[]>(query, [user.email]);
+    const [rows] = await dbPool.execute<RowDataPacket[]>(query, [user.email]);
 
     if (rows.length === 0) {
       return res.status(404).json({ errorMessage: "User not found" });

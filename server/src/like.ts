@@ -14,9 +14,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   if (!userId)
     return res.status(401).json({ errorMessage: "Please signin first" });
 
-  const connection = await dbPool.getConnection();
   try {
-    const [rows] = await connection.execute<RowDataPacket[]>(
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
       "SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?",
       [userId, postId]
     );

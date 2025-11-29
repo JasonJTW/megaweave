@@ -28,6 +28,10 @@ import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import MemberForm from "../memberForm";
 import { useTeam } from "../contexts/TeamContext";
+import ElfIcon from "../components/icons/ElfIcon";
+import ReuseIcon from "../components/icons/ReuseIcon";
+import CommonShareIcon from "../components/icons/CommonShareIcon";
+import WeavingIcon from "../components/icons/WeavingIcon";
 
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -604,6 +608,25 @@ const UserPage = () => {
     setIsEditingUsername(true);
   };
 
+  const handleRemoveAvatar = async () => {
+    try {
+      //* Delete avatar from DB
+      const res = await fetch(`${hostName}/api/avatar`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const r = await res.json();
+        throw new Error(r.errorMessage || "Failed to remove avatar");
+      }
+      //* Update user state
+      setUser((prev) => (prev ? { ...prev, avatar_url: undefined } : prev));
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to remove avatar");
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       //* Sign out from Google OAuth
@@ -735,8 +758,18 @@ const UserPage = () => {
           </div>
         )}
 
+        {/*icons*/}
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center space-x-2 px-6">
+            <ReuseIcon className="h-[85px] w-auto text-megaweave-gold" />
+            <WeavingIcon className="h-[85px] w-auto text-megaweave-forest" />
+            <ElfIcon className="h-[85px] w-auto text-megaweave-red-dark" />
+            <CommonShareIcon className="h-[85px] w-auto text-megaweave-blue" />
+          </div>
+        </div>
+
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto px-6 py-8 font-ddin">
+        <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile Card */}
             <motion.div
@@ -826,31 +859,7 @@ const UserPage = () => {
                     {/* 如果目前沒有 preview，但有 avatarUrl，可以提供 Remove 或 Reset 按鈕（示例） */}
                     {user.avatar_url && !previewSrc && (
                       <button
-                        onClick={async () => {
-                          // optional: call API to delete avatar
-                          try {
-                            const res = await fetch(`${hostName}/api/avatar`, {
-                              method: "DELETE",
-                              credentials: "include",
-                            });
-                            if (!res.ok) {
-                              const r = await res.json();
-                              throw new Error(
-                                r.errorMessage || "Failed to remove avatar"
-                              );
-                            }
-                            setUser((prev) =>
-                              prev ? { ...prev, avatarUrl: undefined } : prev
-                            );
-                          } catch (err) {
-                            console.error(err);
-                            setError(
-                              err instanceof Error
-                                ? err.message
-                                : "Failed to remove avatar"
-                            );
-                          }
-                        }}
+                        onClick={handleRemoveAvatar}
                         className="px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 transition-all duration-200 text-sm text-red-300"
                       >
                         Remove

@@ -9,6 +9,7 @@ import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
 import dbPool from "./utils/db";
+import { updateUserSession } from "./session";
 dotenv.config();
 
 const router = Router();
@@ -19,7 +20,7 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     let connection;
     try {
-      //* start transaction
+      // * start transaction
       const file = req.file as Express.MulterS3.File;
       if (!file) {
         return res
@@ -31,8 +32,7 @@ router.post(
       const userRole = req.user!.role;
       connection = await dbPool.getConnection();
       await connection.beginTransaction();
-
-      //TODO: update user avatar url in database
+      // TODO: update user avatar url in database
       const result = await updateAvatar(connection, userId, userRole, file);
       await connection.commit();
 
@@ -67,6 +67,72 @@ router.post(
       return res
         .status(500)
         .json({ errorMessage: "Failed to upload avatar. " });
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+);
+
+router.delete(
+  "/",
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    let connection;
+    try {
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      connection = await dbPool.getConnection();
+      await connection.beginTransaction();
+
+      // Get current avatar key before deleting
+      let oldAvatarKey: string | null = null;
+
+      const [rows] = await connection.query(
+        `SELECT avatar_key FROM users WHERE id = ?`,
+        [userId]
+      );
+
+      if (Array.isArray(rows) && rows.length > 0) {
+        oldAvatarKey = (rows[0] as any).avatar_key;
+      }
+
+      // Update database to remove avatar
+      await connection.query(
+        `UPDATE users SET avatar_url = NULL, avatar_key = NULL WHERE id = ?`,
+        [userId]
+      );
+
+      await connection.commit();
+      await updateUserSession(req, { avatar_url: null, avatar_key: null });
+      //! async delete avatar from S3 (fire-and-forget)
+      // todo:
+      if (oldAvatarKey) {
+        void deleteS3Files([oldAvatarKey])
+          .then(() => console.log(`Deleted avatar ${oldAvatarKey}`))
+          .catch((e) =>
+            console.error("Failed to delete avatar from S3 (async):", e)
+          );
+      }
+
+      return res.status(200).json({
+        message: "Avatar removed successfully.",
+      });
+    } catch (error) {
+      console.error("Error removing avatar:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+      }
+      if (connection) {
+        try {
+          await connection.rollback();
+        } catch (rollbackError) {
+          console.error("Error rolling back transaction:", rollbackError);
+        }
+      }
+      return res.status(500).json({ errorMessage: "Failed to remove avatar." });
     } finally {
       if (connection) {
         connection.release();

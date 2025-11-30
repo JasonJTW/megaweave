@@ -4,13 +4,13 @@ import { motion } from "framer-motion";
 import WeavingIcon from "./icons/WeavingIcon";
 import ReuseIcon from "./icons/ReuseIcon";
 import ElfIcon from "./icons/ElfIcon";
-import MessageIcon from "./icons/MessageIcon";
+import CommonShareIcon from "./icons/CommonShareIcon";
 
 export default function IconGrid() {
   const icons = [
     { id: "reuse", Icon: ReuseIcon },
     { id: "weaving", Icon: WeavingIcon },
-    { id: "message", Icon: MessageIcon },
+    { id: "common", Icon: CommonShareIcon },
     { id: "elf", Icon: ElfIcon },
   ];
 
@@ -26,10 +26,10 @@ export default function IconGrid() {
   }, []);
 
   const colorMap = [
-    "#58A89B", // 藍
-    "#3B6232", // 綠
-    "#C05421", // 紅
     "#FABE50", // 黃
+    "#3B6232", // 綠
+    "#58A89B", // 藍
+    "#C05421", // 紅
   ];
 
   return (
@@ -41,7 +41,7 @@ export default function IconGrid() {
         <motion.div
           layout
           layoutScroll={false}
-          className="grid grid-cols-2 grid-rows-2 gap-4 p-6 md:p-12 w-full"
+          className="grid grid-cols-2 grid-rows-2 gap-0 px-5 pt-6 md:p-12 w-full"
         >
           {positions.map((iconIndex) => {
             const { id, Icon } = icons[iconIndex];
@@ -64,9 +64,9 @@ export default function IconGrid() {
                   willChange: "transform",
                   color,
                 }}
-                className="flex items-center justify-center aspect-square"
+                className="flex items-center justify-center aspect-square "
               >
-                <Icon className="w-full h-full" />
+                <Icon className="w-full h-full " />
               </motion.div>
             );
           })}

@@ -4,16 +4,10 @@ import { motion } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import User from "../types/user";
+import { UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  User as UserIcon,
-  LogOut,
-  Edit3,
-  Save,
-  X,
-  Contact,
-} from "lucide-react";
+import { User as UserIcon, LogOut, Save, X, Contact } from "lucide-react";
 
 import { useForm } from "react-hook-form";
 import {
@@ -32,6 +26,8 @@ import ElfIcon from "../components/icons/ElfIcon";
 import ReuseIcon from "../components/icons/ReuseIcon";
 import CommonShareIcon from "../components/icons/CommonShareIcon";
 import WeavingIcon from "../components/icons/WeavingIcon";
+import UserPageDecoLine from "../components/Deco/UserPageDecoLine";
+import EditIcon from "../components/icons/EditIcon";
 
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -53,6 +49,12 @@ const defaultContactValues: ContactSettingsValues = {
   phoneVisible: false,
 };
 
+const defaultStats: UserStats = {
+  postCount: 0,
+  weaveCount: 0,
+  points: 0,
+};
+
 const UserPage = () => {
   //* Get user data from cookie session
   const [user, setUser] = useState<User | null>(null);
@@ -69,6 +71,7 @@ const UserPage = () => {
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [tempBio, setTempBio] = useState("");
   const [tempUsername, setTempUsername] = useState("");
+  const [stats, setStats] = useState<UserStats>(defaultStats);
   const router = useRouter();
   const { refetchTeamMembers } = useTeam();
 
@@ -90,25 +93,63 @@ const UserPage = () => {
     // 這裡可以添加 API 調用來保存設定
   };
 
+  const fetchWithTimeout = async (
+    url: string,
+    options: RequestInit,
+    timeout = 10000
+  ) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("Request timeout - Server may be unavailable");
+      }
+      throw error;
+    }
+  };
+
   const fetchUser = async () => {
     try {
-      const response = await fetch(`${hostName}/api/currentUser`, {
-        cache: "no-store",
-        method: "GET",
-        credentials: "include",
-      });
+      const response = await fetchWithTimeout(
+        `${hostName}/api/currentUser`,
+        {
+          cache: "no-store",
+          method: "GET",
+          credentials: "include",
+        },
+        10000 //? 10 seconds timeout
+      );
 
       if (!response.ok) {
-        //* Handle HTTP errors
         if (response.status === 401) {
           setLoading(false);
           setRedirecting(true);
           router.push("/signin");
           return false;
         }
+
+        // 處理 500 等伺服器錯誤
+        if (response.status >= 500) {
+          setError("Server is currently unavailable. Please try again later.");
+          setLoading(false);
+          return false;
+        }
+
         const errorMessage = await response.json();
-        throw new Error(` ${errorMessage.errorMessage}`);
+        throw new Error(
+          errorMessage.errorMessage || "Failed to fetch user data"
+        );
       }
+
       const userData = await response.json();
       console.log("Fetched User: ", userData);
       setUser(userData.user);
@@ -165,6 +206,39 @@ const UserPage = () => {
     const result = await response.json();
     console.log("get custom_name:", result.custom_name);
     setUsername(result.custom_name);
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetchWithTimeout(
+        `${hostName}/api/user/stats`,
+        {
+          cache: "no-store",
+          method: "GET",
+          credentials: "include",
+        },
+        10000 //? 10 seconds timeout
+      );
+
+      if (!response.ok) {
+        const errorMessage = await response.json();
+        throw new Error(
+          errorMessage.errorMessage || "Failed to fetch user stats"
+        );
+      }
+
+      const statsData = await response.json();
+      console.log("Fetched User Stats: ", statsData);
+
+      setStats({
+        postCount: statsData.postCount || 0,
+        weaveCount: statsData.weaveCount || 0,
+        points: statsData.points || 0,
+      });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      // 這裡可以選擇不設置錯誤，讓 stats 保持為 defaultStats (0, 0, 0)
+    }
   };
 
   // --- Avatar: 使用者先預覽，確認後才上傳 ---
@@ -674,6 +748,7 @@ const UserPage = () => {
         getContactEmail();
         getContactPhone();
         getUsername();
+        fetchStats();
       }
     };
     init();
@@ -778,12 +853,25 @@ const UserPage = () => {
               transition={{ delay: 0.1 }}
               className="lg:col-span-1"
             >
-              <div className="bg-white border-primary-3´0 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
                 {/* Avatar */}
-                <div className="text-center mb-2">
+                <div className="text-center mb-2 mt-4 ">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
                   <div className="relative">
+                    <button
+                      className="absolute -top-4 right-0"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <EditIcon />
+                    </button>
                     {/* 固定尺寸容器：保持原本的大小/比例（max-w-72, h-80） */}
-                    <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto  hover:cursor-pointer relative overflow-hidden">
+                    <div className="w-full max-w-[220px] h-[222px] max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto  hover:cursor-pointer relative overflow-hidden">
                       {/* 如果有 preview，顯示 preview 圖片；否則若 user.avatarUrl 存在則顯示真實頭像，否則顯示字母色塊 */}
 
                       {previewSrc ? (
@@ -800,7 +888,7 @@ const UserPage = () => {
                             src={user.avatar_url}
                             alt={`${username} avatar`}
                             fill
-                            sizes="(max-width: 1024px) 300px, 288px"
+                            sizes="(max-width: 1024px) 222px, 220px"
                             className="object-cover"
                           />
                         </div>
@@ -849,13 +937,6 @@ const UserPage = () => {
                     className="hidden"
                   />
                   <div className="mt-2 flex items-center justify-center space-x-2">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-3 py-1.5 rounded-lg bg-primary/30 hover:bg-primary/40 transition-all duration-200 text-sm"
-                    >
-                      Change Avatar
-                    </button>
-
                     {/* 如果目前沒有 preview，但有 avatarUrl，可以提供 Remove 或 Reset 按鈕（示例） */}
                     {user.avatar_url && !previewSrc && (
                       <button
@@ -869,7 +950,7 @@ const UserPage = () => {
                 </div>
 
                 {/* User Info */}
-                <div className="text-center space-y-3">
+                <div className="text-center">
                   <div className="flex items-center justify-center space-x-2">
                     {!isEditingUsername ? (
                       <motion.div
@@ -881,7 +962,7 @@ const UserPage = () => {
                         className="group flex items-center relative px-2"
                       >
                         <h2
-                          className="text-xl font-bold text-[#222]  "
+                          className="text-[#222] type-h5"
                           style={{
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -897,7 +978,7 @@ const UserPage = () => {
                           onClick={handleEditUsername}
                           className="opacity-0 group-hover:opacity-100 transition-opacity  duration-200 p-1 hover:bg-gray-600/30 rounded absolute left-full top-1/2 -translate-y-1/2"
                         >
-                          <Edit3 className="w-4 h-4" />
+                          <EditIcon className="w-4 h-4" />
                         </button>
                       </motion.div>
                     ) : (
@@ -957,10 +1038,12 @@ const UserPage = () => {
                     )}
                   </div>
 
-                  <p className="text-gray-400">{user.email}</p>
+                  <p className="text-gray-400 type-body-t5">{user.email}</p>
+
+                  <UserPageDecoLine className="pt-[18px] pb-[20px]" />
 
                   {/* Role Badge */}
-                  <div className="flex justify-center ">
+                  <div className="flex justify-center mt-4">
                     <span
                       className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 text-white`}
                     >
@@ -1003,23 +1086,27 @@ const UserPage = () => {
 
                 {/* Stats */}
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">24</div>
-                    <div className="text-[16px] font-semibold text-[#222]">
+                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
+                    <div className="type-h3 text-[#222]  ">
+                      {String(stats.postCount).padStart(2, "0")}
+                    </div>
+                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
                       post
                     </div>
                   </div>
-                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">
-                      156
+                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
+                    <div className="type-h3 text-[#222] ">
+                      {String(stats.weaveCount).padStart(2, "0")}
                     </div>
-                    <div className="text-[16px] font-semibold text-[#222]">
+                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
                       weaved
                     </div>
                   </div>
-                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">89</div>
-                    <div className="text-[16px] font-semibold text-[#222]">
+                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
+                    <div className="type-h3 text-[#222] ">
+                      {String(stats.points).padStart(2, "0")}
+                    </div>
+                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
                       point
                     </div>
                   </div>
@@ -1035,19 +1122,20 @@ const UserPage = () => {
               className="lg:col-span-2 space-y-6"
             >
               {/* Bio Section */}
-              <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-semibold flex items-center space-x-2">
-                    <UserIcon className="w-5 h-5" />
-                    <span>About Me</span>
+                    <UserIcon className="w-5 h-5 text-megaweave-forest-dark" />
+                    <div className="type-button-b1 text-megaweave-forest-dark">
+                      About Me
+                    </div>
                   </h3>
                   {!isEditingBio ? (
                     <button
                       onClick={handleEditBio}
-                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-all duration-200 text-sm"
+                      className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
-                      <Edit3 className="w-3 h-3" />
-                      <span>Edit</span>
+                      <EditIcon className="w-4 h-4" />
                     </button>
                   ) : (
                     <div className="flex space-x-2">
@@ -1073,7 +1161,7 @@ const UserPage = () => {
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-gray-300 leading-relaxed whitespace-pre-line break-all"
+                    className="text-primary leading-relaxed whitespace-pre-line break-all"
                   >
                     {renderTextWithUrls(bio)}
                   </motion.p>
@@ -1085,27 +1173,26 @@ const UserPage = () => {
                     <textarea
                       value={tempBio}
                       onChange={(e) => setTempBio(e.target.value)}
-                      className="w-full h-32 bg-gray-700/30 border border-gray-600/30 rounded-lg px-4 py-3 text-gray-300 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none"
-                      placeholder="Tell us about yourself..."
+                      className="w-full h-32 border type-body-t3 border-gray-600/30 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none"
+                      placeholder="description"
                     />
                   </motion.div>
                 )}
               </div>
 
               {/* Contact Settings */}
-              <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="bg-white border border-primary-30 rounded-2xl p-6  transition-all duration-300">
                 <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-xl font-semibold flex items-center space-x-2">
+                  <h3 className="type-button-b1 text-megaweave-forest-dark flex items-center space-x-2">
                     <Contact className="w-5 h-5" />
                     <span>Contact Setting</span>
                   </h3>
                   {!isEditingContact ? (
                     <button
                       onClick={handleEditContact}
-                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-all duration-200 text-sm"
+                      className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
-                      <Edit3 className="w-3 h-3" />
-                      <span>Edit</span>
+                      <EditIcon className="w-4 h-4" />
                     </button>
                   ) : (
                     <div className="flex space-x-2">
@@ -1136,7 +1223,7 @@ const UserPage = () => {
                     <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium text-megaweave-forest">
                             Email
                           </FormLabel>
                         </div>
@@ -1198,7 +1285,7 @@ const UserPage = () => {
                     <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base font-medium">
+                          <FormLabel className="text-base font-medium text-megaweave-forest">
                             Phone
                           </FormLabel>
                         </div>

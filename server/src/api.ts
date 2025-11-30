@@ -11,6 +11,7 @@ import avatarAPI from "./avatar";
 import userprofileAPI from "./userprofile";
 import memberAPI from "./member";
 import commentAPI from "./comments";
+import statsAPI from "./stats";
 //* Test api
 router.post("/test", (req, res) => {
   console.log("API test called");
@@ -33,4 +34,5 @@ router.use("/avatar", avatarAPI);
 router.use("/userprofile", userprofileAPI);
 router.use("/member", memberAPI);
 router.use("/comments", commentAPI);
+router.use("/user/stats", statsAPI);
 export default router;

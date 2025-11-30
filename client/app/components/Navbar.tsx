@@ -101,7 +101,7 @@ const Navbar = () => {
     <>
       {/* 導航欄 */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-150 ease-in-out ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ease-in-out ${
           isNavbarVisible ? "translate-y-0" : "-translate-y-full"
         } ${isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg "}`}
       >

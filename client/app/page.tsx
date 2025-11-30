@@ -33,6 +33,7 @@ import LocationIcon from "./components/icons/LocationIcon";
 import DeleteIcon from "./components/icons/DeleteIcon";
 import SearchIcon from "./components/icons/SearchIcon";
 import ElfIcon from "./components/icons/ElfIcon";
+import ReuseIcon from "./components/icons/ReuseIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -334,7 +335,7 @@ const PostsApp = () => {
             }}
           >
             + Share
-            <ShareIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
+            <ReuseIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
           </Button>
         </div>
 

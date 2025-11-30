@@ -101,13 +101,9 @@ const Navbar = () => {
     <>
       {/* 導航欄 */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-150 ease-in-out ${
           isNavbarVisible ? "translate-y-0" : "-translate-y-full"
-        } ${
-          isAtTop
-            ? "bg-transparent"
-            : "bg-megaweave-red-light/20 backdrop-blur-lg shadow-lg"
-        }`}
+        } ${isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg "}`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">

@@ -313,7 +313,7 @@ const PostsApp = () => {
         </div>
 
         <div
-          className={` max-w-7xl mx-auto flex justify-between items-center px-8 py-[20px] sticky z-20 bg-primary-5 transition-all duration-300 ${
+          className={` max-w-7xl mx-auto flex justify-between items-center px-8 py-[20px] sticky z-20 bg-primary-5 transition-all duration-150 ${
             isNavbarVisible ? "top-[80px]" : "top-[0px]"
           }
          `}

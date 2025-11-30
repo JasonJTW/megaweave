@@ -4,11 +4,10 @@ import { motion } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import User from "../types/user";
-import { UserStats } from "../types/schema";
+import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User as UserIcon, LogOut, Save, X, Contact } from "lucide-react";
-
 import { useForm } from "react-hook-form";
 import {
   Form,
@@ -28,7 +27,8 @@ import CommonShareIcon from "../components/icons/CommonShareIcon";
 import WeavingIcon from "../components/icons/WeavingIcon";
 import UserPageDecoLine from "../components/Deco/UserPageDecoLine";
 import EditIcon from "../components/icons/EditIcon";
-
+import Drawer from "../components/Drawer";
+import { usePost } from "../contexts/PostContext";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
@@ -74,6 +74,8 @@ const UserPage = () => {
   const [stats, setStats] = useState<UserStats>(defaultStats);
   const router = useRouter();
   const { refetchTeamMembers } = useTeam();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const { conditions } = usePost();
 
   // Avatar preview / upload states
   const [previewSrc, setPreviewSrc] = useState<string | null>(null); // object URL for preview
@@ -226,8 +228,9 @@ const UserPage = () => {
           errorMessage.errorMessage || "Failed to fetch user stats"
         );
       }
-
       const statsData = await response.json();
+      const postsData = statsData.posts || [];
+      setPosts(postsData);
       console.log("Fetched User Stats: ", statsData);
 
       setStats({
@@ -805,7 +808,7 @@ const UserPage = () => {
   return (
     <>
       <div className="fixed inset-0 bg-primary-5 -z-10"></div>
-      <div className="min-h-screen  text-secondary px-0 sm:px-6 md:px-12 lg:px-16">
+      <div className="min-h-screen  px-0 sm:px-6 md:px-12 lg:px-16">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
@@ -1357,6 +1360,8 @@ const UserPage = () => {
             memberUserId={user.userId}
           />
         )}
+
+        <Drawer title="Share" posts={posts} conditions={conditions} />
       </div>
     </>
   );

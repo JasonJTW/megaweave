@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 // import colors from "tailwindcss/colors";
 import tailwindcssAnimate from "tailwindcss-animate";
+import plugin from "tailwindcss/plugin";
 export default {
   darkMode: ["class"],
   content: [
@@ -123,5 +124,77 @@ export default {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [
+    tailwindcssAnimate,
+    // *** 新增客製化文字樣式插件 ***
+    plugin(function ({ addUtilities }) {
+      const typeStyles = {
+        // --- Heading Styles ---
+        ".type-h1": {
+          fontSize: "4.5rem", // 72pt
+          lineHeight: "1.2",
+          fontWeight: "800", // Heavy (H)
+        },
+        ".type-h2": {
+          fontSize: "3rem", // 48pt
+          lineHeight: "1.3",
+          fontWeight: "600", // Semibold (SB)
+        },
+        ".type-h3": {
+          fontSize: "36px", // 36pt
+          lineHeight: "1",
+          fontWeight: "700", // Bold (B)
+        },
+        ".type-h4": {
+          fontSize: "1.5rem", // 24pt
+          lineHeight: "1.5",
+          fontWeight: "700", // Bold (B)
+        },
+        ".type-h5": {
+          fontSize: "1.25rem", // 20pt
+          lineHeight: "1.5",
+          fontWeight: "700", // Bold (B)
+        },
+
+        // --- Body Text Styles ---
+        ".type-body-t1": {
+          fontSize: "1.5rem", // 24pt
+          lineHeight: "1.5",
+          fontWeight: "500", // Medium (M)
+        },
+        ".type-body-t2": {
+          fontSize: "1.25rem", // 20pt
+          lineHeight: "1.5",
+          fontWeight: "500", // Medium (M)
+        },
+        ".type-body-t3": {
+          fontSize: "1.125rem", // 18pt
+          lineHeight: "1.5",
+          fontWeight: "400", // Regular (R)
+        },
+        // ... (以此類推加入 T4, T5, Button B1, B2)
+        // Body T5 範例 (包含 2% 字距)
+        ".type-body-t5": {
+          fontSize: "0.875rem", // 14pt
+          lineHeight: "1.5",
+          fontWeight: "400", // Regular (R) (假設)
+          letterSpacing: "0.02em", // 2% 字距
+        },
+        ".type-button-b1": {
+          fontSize: "18px", // 18pt
+          lineHeight: "1",
+          fontWeight: "600",
+          letterSpacing: "0.05em", // 5% 字距
+        },
+        ".type-button-b2": {
+          fontSize: "16px", // 18pt
+          lineHeight: "1",
+          fontWeight: "600",
+          letterSpacing: "0.05em", // 5% 字距
+        },
+      };
+
+      addUtilities(typeStyles);
+    }),
+  ],
 } satisfies Config;

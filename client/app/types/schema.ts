@@ -89,3 +89,9 @@ export interface Comment {
   user_id?: number;
   post_id: number;
 }
+
+export interface UserStats {
+  postCount: number;
+  weaveCount: number;
+  points: number;
+}

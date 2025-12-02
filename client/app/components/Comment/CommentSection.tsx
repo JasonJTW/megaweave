@@ -8,6 +8,7 @@ import User from "../../types/user";
 import CommentCard from "./CommentCard";
 import CommentInput from "./CommentInput";
 import CommentItem from "./CommentItem";
+import WeavingInput from "./WeavingInput";
 import {
   Comment,
   getComments,
@@ -27,6 +28,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ✅ 新增：追蹤哪個 Item Tab 正在顯示 WeavingInput
+  const [weavingInputItem, setWeavingInputItem] = useState<number | null>(null);
 
   // 取得留言數量（初始載入）
   const fetchCounts = useCallback(async () => {
@@ -78,8 +81,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const handleTabClick = (tab: TabKey) => {
     if (activeTab === tab) {
       setActiveTab(null);
+      // 關閉 Tab 時，隱藏 Weaving Input
+      setWeavingInputItem(null);
     } else {
       setActiveTab(tab);
+      // 切換 Tab 時，隱藏 Weaving Input
+      setWeavingInputItem(null);
     }
   };
 
@@ -89,6 +96,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     if (activeTab !== null) {
       fetchCommentsByTab(activeTab);
     }
+    // 成功發送索取後，關閉索取輸入框
+    setWeavingInputItem(null);
   };
 
   // 取得特定 tab 的留言列表
@@ -103,12 +112,50 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     return counts[key] || 0;
   };
 
+  // ✅ 處理 Weaving Icon 點擊 (開啟索取輸入框)
+  const handleWeavingIconClick = (itemId: number) => {
+    // 1. 如果 Tab 沒開，先展開 Tab
+    if (activeTab !== itemId) {
+      setActiveTab(itemId);
+    }
+    // 2. 顯示 Weaving Input
+    setWeavingInputItem(itemId);
+
+    // 📌 建議：這裡可以加入滾動邏輯，將視窗滾動到 WeavingInput 所在的位置。
+    // window.scrollTo(0, document.body.scrollHeight);
+  };
+
+  // ✅ 處理索取留言的提交邏輯
+  const handleWeavingSubmit = (itemId: number, quantity: number) => {
+    // 這裡調用你的 API 或服務來發送一條特殊的留言
+    // 概念性程式碼：
+    // sendWeavingComment(post.id, itemId, user.id, quantity)
+    //   .then(() => {
+    //     alert(`Successfully requested ${quantity} units for Item ID: ${itemId}`);
+    //     handleCommentSuccess();
+    //   })
+    //   .catch(error => {
+    //     alert("Failed to send request: " + error.message);
+    //     setWeavingInputItem(null); // 失敗也關閉
+    //   });
+
+    // 由於我們沒有實際的 API，這裡先用 alert 模擬成功
+    alert(
+      `[Placeholder] Successfully requested ${quantity} units for Item ID: ${itemId}`
+    );
+    handleCommentSuccess(); // 模擬成功後刷新留言並關閉輸入框
+  };
+
   // Tab 列表
-  const tabs: { key: TabKey; title: string }[] = [
-    { key: "all", title: "All" },
+  // ✅ 修改：Tabs 列表現在包含 quantity
+  // 注意：需要確認 post.items 裡面的欄位名稱是 quantity 還是 stock
+  const tabs: { key: TabKey; title: string; quantity?: number }[] = [
+    { key: "all", title: "All" }, // All 沒有 quantity
     ...(post.items?.map((item) => ({
       key: item.id as number,
       title: item.title,
+      // 假設 item 物件有 quantity 欄位，如果沒有請改為 item.stock 或對應欄位
+      quantity: item.quantity as number,
     })) || []),
   ];
 
@@ -120,8 +167,16 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
           <CommentCard
             title={tab.title}
             count={getCount(tab.key)}
+            quantity={tab.quantity}
             isOpen={activeTab === tab.key}
             onToggle={() => handleTabClick(tab.key)}
+            // ✅ 傳遞 handleWeavingIconClick
+            // 只有 Item Tab 允許 Weaving
+            onWeaving={
+              tab.key !== "all"
+                ? () => handleWeavingIconClick(tab.key as number)
+                : undefined
+            }
           />
           <AnimatePresence>
             {activeTab === tab.key && (
@@ -144,6 +199,18 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                     }
                     onSuccess={handleCommentSuccess}
                   />
+                  {/* ✅ 條件渲染 WeavingInput (只有當 activeTab 且 weavingInputItem 匹配時顯示) */}
+                  {tab.key !== "all" && weavingInputItem === tab.key && (
+                    <WeavingInput
+                      user={user}
+                      // 確保傳遞正確的庫存
+                      quantityLeft={tab.quantity ?? 0}
+                      onWeavingSubmit={(q) =>
+                        handleWeavingSubmit(tab.key as number, q)
+                      }
+                      onCancel={() => setWeavingInputItem(null)}
+                    />
+                  )}
 
                   {/* 留言列表 */}
                   <div className="mt-4">

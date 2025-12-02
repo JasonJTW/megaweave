@@ -9,61 +9,89 @@ import WeavingIcon from "../icons/WeavingIcon";
 
 interface CommentCardProps {
   title: string;
-  count?: number; // ✅ 新增：留言數量
-  isOpen?: boolean; // ✅ 新增：是否展開
-  onToggle?: () => void; // ✅ 新增：點擊展開/收合
+  count?: number;
+  quantity?: number; // ✅ 新增：剩餘數量 (Optional)
+  isOpen?: boolean;
+  onToggle?: () => void;
   onWeaving?: () => void;
 }
-
 const CommentCard: React.FC<CommentCardProps> = ({
   title,
   count = 0,
+  quantity, // ✅ 解構取出 quantity
   isOpen = false,
   onToggle,
   onWeaving,
 }) => {
+  // ✅ 新增：控制數量選單的顯示狀態
+
+  // 處理 WeavingIcon 點擊
   const handleWeavingClick = () => {
+    // 檢查是否有庫存，如果沒有，則不允許操作
+    if (quantity !== undefined && quantity <= 0) {
+      alert("Item is out of stock (Left: 00). Cannot initiate request.");
+      return;
+    }
+
     if (onWeaving) {
-      onWeaving();
+      onWeaving(); // 通知父元件開啟 Weaving Input
     } else {
-      const result = confirm("Weaving ?");
-      if (result) {
-        alert("Weaving started!");
-      } else {
-        alert("Weaving cancelled.");
-      }
+      // 預設行為（如果沒有傳遞 onWeaving prop）
+      alert("Weaving action triggered (No callback provided).");
     }
   };
 
   return (
     <div
-      className={`flex h-[36px] bg-primary-5 font-ddin px-[17px] py-[6px] items-center justify-between
+      className={`relative flex h-[36px] bg-primary-5 font-ddin px-[17px] py-[6px] items-center justify-between
       ${
         isOpen
-          ? "bg-primary-10 rounded-t-[18px] rounded-b-none" // 展開時：只有頂部圓角
-          : "rounded-[18px]" // 收合時：完整圓角
+          ? "bg-primary-10 rounded-t-[18px] rounded-b-none"
+          : "rounded-[18px]"
       }`}
     >
-      <div className="font-medium text-[21px] text-center">{title}</div>
+      {/* 標題區域 */}
+      <div className="flex items-center gap-3">
+        <div className="font-medium text-[21px] text-center leading-none">
+          {title}
+        </div>
+
+        {/* Quantity Left 標籤 */}
+        {quantity !== undefined && (
+          <div className="flex items-center justify-center bg-primary-30 h-[22px] px-[8px] rounded-[6px]">
+            <span className="text-[13px] font-bold text-[#1a1a1a] tracking-tight">
+              Left : {quantity.toString().padStart(2, "0")}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="flex gap-[10px] items-center">
         {/* 留言按鈕 + 數量 */}
         <Button
           variant="ghost"
-          className="px-0 py-0 flex items-center gap-1"
+          className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
           onClick={onToggle}
         >
           <MessageIcon className="!h-[19px] !w-[19px]" />
           {count > 0 && <span className="text-sm text-gray-600">{count}</span>}
         </Button>
 
-        {/* Weaving 按鈕 */}
-        <Button variant="ghost" className="px-0" onClick={handleWeavingClick}>
+        {/* Weaving 按鈕 (現在用於開啟數量選擇器) */}
+        <Button
+          variant="ghost"
+          className="px-0 hover:bg-transparent"
+          onClick={handleWeavingClick}
+        >
           <WeavingIcon className="!h-[19px] !w-[19px]" />
         </Button>
 
         {/* 展開/收合按鈕 */}
-        <Button variant="ghost" className="px-0" onClick={onToggle}>
+        <Button
+          variant="ghost"
+          className="px-0 hover:bg-transparent"
+          onClick={onToggle}
+        >
           <ExpandIcon
             className={`!h-[19px] !w-[19px] transition-transform ${
               isOpen ? "rotate-180" : ""

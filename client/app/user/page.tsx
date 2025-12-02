@@ -769,6 +769,9 @@ const UserPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const sharePosts = posts.filter((post) => post.type === "share");
+  const wishPosts = posts.filter((post) => post.type === "wish");
+
   if (loading || redirecting) {
     return (
       <>
@@ -1360,8 +1363,8 @@ const UserPage = () => {
             memberUserId={user.userId}
           />
         )}
-
-        <Drawer title="Share" posts={posts} conditions={conditions} />
+        <Drawer title="Share" posts={sharePosts} conditions={conditions} />
+        <Drawer title="Wish" posts={wishPosts} conditions={conditions} />
       </div>
     </>
   );

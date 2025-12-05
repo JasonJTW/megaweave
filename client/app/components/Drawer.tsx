@@ -4,6 +4,7 @@ import ExpandIcon from "./icons/ExpandIcon";
 import Feed from "./PostCard/Feed";
 import type { Post, Condition } from "../types/schema";
 import { useRouter } from "next/navigation";
+import ExpandedIcon from "./icons/ExpandedIcon";
 
 interface DrawerProps {
   title: string;
@@ -13,7 +14,7 @@ interface DrawerProps {
 
 const Drawer: React.FC<DrawerProps> = ({ title, posts, conditions }) => {
   const router = useRouter();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -35,7 +36,7 @@ const Drawer: React.FC<DrawerProps> = ({ title, posts, conditions }) => {
               damping: 15,
             }}
           >
-            <ExpandIcon />
+            {isExpanded ? <ExpandedIcon /> : <ExpandIcon />}
           </motion.div>
         </button>
       </div>

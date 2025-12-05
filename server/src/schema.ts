@@ -3,7 +3,7 @@ export const userRoles = ["user", "admin", "contributor"] as const;
 export type UserRole = (typeof userRoles)[number];
 
 export const sessionSchema = z.object({
-  userId: z.string(),
+  userId: z.number(),
   role: z.enum(userRoles),
   username: z.string().min(3),
   email: z.email(),

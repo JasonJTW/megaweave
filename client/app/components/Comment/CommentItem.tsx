@@ -108,13 +108,13 @@ const CommentItem: React.FC<CommentItemProps> = ({
             onClick={handleAvatarClick}
             className="text-[14px] leading-[14px] font-medium text-gray-900 hover:text-primary transition-colors hover:underline whitespace-nowrap" // 保持用戶名不換行
           >
-            {comment.username || `User ${comment.user_id}`}
+            {comment.username || `User ${comment.public_id}`}
           </button>
-          <div className="flex items-center justify-between w-full bg-white rounded-full h-[32px] pl-3 pr-2 mt-1">
+          <div className="flex items-center justify-between w-full bg-white rounded-[16px] min-h-[32px] pl-3 pr-2 mt-1">
             {" "}
             {/* 使用 bg-gray-50 模擬氣泡背景 */}
             {/* 留言內容 */}
-            <p className="text-sm text-gray-700 whitespace-pre-wrap break-words overflow-hidden text-ellipsis mr-2">
+            <p className="text-sm text-gray-700 break-words overflow-hidden text-ellipsis mr-2 whitespace-pre-line break-all">
               {comment.content}
             </p>
             {/* 🔥 問題 2 修正點：鎖頭和時間 */}

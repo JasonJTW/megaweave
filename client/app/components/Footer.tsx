@@ -26,7 +26,7 @@ const Footer: FC = () => {
 
           {/* 導航：兩欄布局 */}
           <div className="flex-1 md:flex-none md:mr-[45px]">
-            <div className="grid grid-cols-2 md:flex md:flex-row md:gap-[100px] text-[8px] md:text-[16pt] font-ddin font-bold">
+            <div className="grid grid-cols-2 md:flex md:flex-row md:gap-[100px] text-[12px] md:text-[16pt] font-ddin font-medium">
               <div>
                 <ul className="space-y-[2px] ">
                   <li>
@@ -45,14 +45,7 @@ const Footer: FC = () => {
                       megaweaving Team
                     </Link>
                   </li>
-                  <li>
-                    <Link
-                      href="#"
-                      className="inline-block  hover:underline transition-all duration-200"
-                    >
-                      Contact
-                    </Link>
-                  </li>
+                  <li></li>
                 </ul>
               </div>
 

@@ -1,30 +1,39 @@
 // components/Comment/WeavingInput.tsx
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import User from "../../types/user";
 import Image from "next/image";
 import UnlockIcon from "../icons/UnlockIcon";
 import { Button } from "@/components/ui/button";
 import WeavingIcon from "../icons/WeavingIcon";
+// ✅ 新增 Shadcn Select 元件
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface WeavingInputProps {
   user: User | null;
-  quantityLeft: number; // 剩餘庫存
-  onWeavingSubmit: (quantity: number) => void; // 提交索取請求
-  onCancel: () => void; // 取消/隱藏
+  type: "item" | "all";
+  quantityLeft: number;
+  onWeavingSubmit: (quantity: number | "all") => void;
+  onCancel: () => void;
 }
 
-const MAX_WEAVING_QUANTITY = 3;
+const MAX_WEAVING_QUANTITY = 20;
 
 const WeavingInput: React.FC<WeavingInputProps> = ({
   user,
+  type,
   quantityLeft,
   onWeavingSubmit,
   onCancel,
 }) => {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [showSelector, setShowSelector] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const availableQuantities = Array.from(
@@ -32,32 +41,16 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
     (_, i) => i + 1
   );
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setShowSelector(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  // 移除了 handleClickOutside 邏輯，因為 Shadcn Select 會自動處理點擊外部關閉
 
   const handleSubmit = () => {
-    if (selectedQuantity > 0) {
+    if (type === "all") {
+      onWeavingSubmit("all");
+    } else if (selectedQuantity > 0) {
       onWeavingSubmit(selectedQuantity);
     } else {
       alert("Please select a quantity.");
     }
-  };
-
-  const handleQuantitySelect = (q: number) => {
-    setSelectedQuantity(q);
-    setShowSelector(false);
   };
 
   return (
@@ -65,7 +58,7 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
       ref={containerRef}
       className="relative max-w-full mt-3 flex gap-3 py-[2px] items-start"
     >
-      {/* 1. Avatar */}
+      {/* 1. Avatar (不變) */}
       <div className="flex-shrink-0 w-[40px] h-[40px] relative">
         {user?.avatar_url ? (
           <Image
@@ -85,85 +78,67 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
 
       {/* 2. 內容區域 */}
       <div className="flex flex-col items-start flex-1 min-w-0">
-        {/* 2a. 用戶名 */}
+        {/* 2a. 用戶名 (不變) */}
         <span className="text-[14px] leading-[14px] font-medium text-gray-900 whitespace-nowrap mb-1">
-          {user?.username || "moori"} (me)
+          {user?.username} (me)
         </span>
 
-        {/* 2b. 輸入區塊 (分為左側氣泡與右側數量選擇) */}
+        {/* 2b. 輸入區塊 */}
         <div className="flex items-center gap-2">
-          {/* 左側：想索取 + 圖示 */}
+          {/* 左側：想索取 + 圖示 (不變) */}
           <div className="flex items-center bg-white rounded-[20px] h-[40px] px-4 gap-3 shadow-sm">
             <p className="text-[15px] font-medium text-gray-800 whitespace-nowrap">
               想索取
             </p>
-            {/* 圖示顏色調整為深綠色以符合設計稿 */}
-            <WeavingIcon className="h-5 w-5 text-[#3F4F3F]" />
-            <UnlockIcon className="w-5 h-5 text-[#3F4F3F]" />
+            <WeavingIcon className="h-5 w-5 text-primary" />
+            <UnlockIcon className="w-5 h-5 text-primary" />
           </div>
 
-          {/* 右側：數量選擇器 (獨立的圓角方塊) */}
+          {/* 右側：數量選擇器 或 "All" 標籤 */}
           <div className="relative">
-            <button
-              className={`flex items-center justify-between h-[40px] min-w-[56px] px-3 bg-white border rounded-[16px] transition-all duration-200
-                ${
-                  showSelector
-                    ? "border-primary ring-2 ring-primary/10"
-                    : "border-gray-300 hover:border-gray-400"
-                }
-              `}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowSelector(!showSelector);
-              }}
-            >
-              <span className="text-[16px] font-bold text-gray-800">
-                {selectedQuantity}
-              </span>
-              <svg
-                className={`w-4 h-4 text-gray-800 ml-1 transition-transform duration-200 ${
-                  showSelector ? "rotate-180" : ""
-                }`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5" // 加粗箭頭
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {/* 下拉選單 */}
-            {showSelector && availableQuantities.length > 0 && (
-              <div className="absolute top-[44px] left-0 w-full bg-white shadow-xl rounded-[12px] border border-gray-200 overflow-hidden z-50 flex flex-col items-center py-1">
-                {availableQuantities.map((q) => (
-                  <div
-                    key={q}
-                    className={`w-full py-1.5 text-sm text-center cursor-pointer hover:bg-gray-100
-                      ${
-                        q === selectedQuantity
-                          ? "font-bold text-primary bg-primary/5"
-                          : "text-gray-700"
-                      }
-                    `}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuantitySelect(q);
-                    }}
-                  >
-                    {q}
-                  </div>
-                ))}
+            {type === "all" ? (
+              // 情況一：顯示 "All" 標籤 (靜態)
+              <div className="flex items-center justify-center h-[40px] min-w-[56px] px-3 bg-white border border-gray-300 rounded-[22px] select-none">
+                <span className="text-[16px] font-medium text-gray-800">
+                  All
+                </span>
               </div>
+            ) : (
+              // ✅ 情況二：Shadcn Select 數量選擇器
+              <Select
+                value={String(selectedQuantity)}
+                onValueChange={(val) => setSelectedQuantity(Number(val))}
+              >
+                <SelectTrigger
+                  // 這裡使用了與你原本 button 幾乎一樣的 CSS
+                  className="h-[40px] min-w-[65px] px-[16px] rounded-[22px] bg-white border-gray-300 
+                  text-[16px] font-bold text-gray-800 
+                  hover:border-gray-400 focus:ring-2 focus:ring-primary/10 data-[state=open]:border-primary"
+                >
+                  <SelectValue placeholder={selectedQuantity} />
+                </SelectTrigger>
+
+                <SelectContent
+                  className="max-h-[200px] min-w-[65px] rounded-[12px]"
+                  // 加上 align="center" 讓選單對齊 Trigger 中央
+                  align="center"
+                >
+                  {availableQuantities.map((q) => (
+                    <SelectItem
+                      key={q}
+                      value={String(q)}
+                      className="cursor-pointer justify-center text-center font-medium focus:bg-primary/5 focus:text-primary"
+                    >
+                      {q}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
         </div>
 
-        {/* 2c. 操作按鈕 (Submit / Cancel) */}
+        {/* 2c. 操作按鈕 (不變) */}
         <div className="flex gap-2 mt-2 ml-1">
           <Button
             onClick={handleSubmit}

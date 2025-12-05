@@ -22,6 +22,7 @@ export interface Post {
   avatar_url?: string;
   items?: Item[];
   author_public_id: string;
+  author_user_id: number;
 }
 
 export interface CreatePostFormData {

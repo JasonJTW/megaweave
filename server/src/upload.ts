@@ -128,7 +128,7 @@ export const uploadAvatarImage = avatarUploadConfig.single("avatar");
 //* upload user avatar to db and delete old avatar in S3
 export async function updateAvatar(
   connection: PoolConnection,
-  userId: string,
+  userId: number,
   userRole: string,
   file: Express.MulterS3.File
 ): Promise<{ avatarUrl: string; oldAvatarKey?: string; avatarKey: string }> {

@@ -6,7 +6,8 @@ import MessageIcon from "../icons/MessageIcon";
 import { Button } from "@/components/ui/button";
 import ExpandIcon from "../icons/ExpandIcon";
 import WeavingIcon from "../icons/WeavingIcon";
-
+import ExpandedIcon from "../icons/ExpandedIcon";
+import { motion } from "framer-motion";
 interface CommentCardProps {
   title: string;
   count?: number;
@@ -46,13 +47,13 @@ const CommentCard: React.FC<CommentCardProps> = ({
       className={`relative flex h-[36px] bg-primary-5 font-ddin px-[17px] py-[6px] items-center justify-between
       ${
         isOpen
-          ? "bg-primary-10 rounded-t-[18px] rounded-b-none"
+          ? "bg-primary-5 rounded-t-[18px] rounded-b-none"
           : "rounded-[18px]"
       }`}
     >
       {/* 標題區域 */}
       <div className="flex items-center gap-3">
-        <div className="font-medium text-[21px] text-center leading-none">
+        <div className="flex font-medium h-auto text-[21px] text-center leading-none">
           {title}
         </div>
 
@@ -73,8 +74,10 @@ const CommentCard: React.FC<CommentCardProps> = ({
           className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
           onClick={onToggle}
         >
-          <MessageIcon className="!h-[19px] !w-[19px]" />
-          {count > 0 && <span className="text-sm text-gray-600">{count}</span>}
+          <MessageIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
+          {count > 0 && (
+            <span className="text-sm text-megaweave-forest-dark">{count}</span>
+          )}
         </Button>
 
         {/* Weaving 按鈕 (現在用於開啟數量選擇器) */}
@@ -83,7 +86,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
           className="px-0 hover:bg-transparent"
           onClick={handleWeavingClick}
         >
-          <WeavingIcon className="!h-[19px] !w-[19px]" />
+          <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
         </Button>
 
         {/* 展開/收合按鈕 */}
@@ -92,11 +95,25 @@ const CommentCard: React.FC<CommentCardProps> = ({
           className="px-0 hover:bg-transparent"
           onClick={onToggle}
         >
-          <ExpandIcon
-            className={`!h-[19px] !w-[19px] transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
+          <motion.div
+            animate={{ rotate: isOpen ? 0 : 180 }}
+            transition={{
+              type: "spring",
+              stiffness: 200,
+              damping: 15,
+            }}
+          >
+            {isOpen ? (
+              <ExpandedIcon
+                className={`!h-[19px] !w-[19px] text-megaweave-forest-dark transition-transform `}
+              />
+            ) : (
+              <ExpandIcon
+                className={`!h-[19px] !w-[19px] text-megaweave-forest-dark transition-transform 
+              `}
+              />
+            )}
+          </motion.div>
         </Button>
       </div>
     </div>

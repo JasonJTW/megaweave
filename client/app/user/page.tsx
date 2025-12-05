@@ -25,7 +25,7 @@ import ElfIcon from "../components/icons/ElfIcon";
 import ReuseIcon from "../components/icons/ReuseIcon";
 import CommonShareIcon from "../components/icons/CommonShareIcon";
 import WeavingIcon from "../components/icons/WeavingIcon";
-import UserPageDecoLine from "../components/Deco/UserPageDecoLine";
+// import UserPageDecoLine from "../components/Deco/UserPageDecoLine";
 import EditIcon from "../components/icons/EditIcon";
 import Drawer from "../components/Drawer";
 import { usePost } from "../contexts/PostContext";
@@ -1046,7 +1046,7 @@ const UserPage = () => {
 
                   <p className="text-gray-400 type-body-t5">{user.email}</p>
 
-                  <UserPageDecoLine className="pt-[18px] pb-[20px]" />
+                  {/* <UserPageDecoLine className="pt-[18px] pb-[20px]" /> */}
 
                   {/* Role Badge */}
                   <div className="flex justify-center mt-4">

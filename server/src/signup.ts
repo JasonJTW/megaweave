@@ -99,7 +99,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     //* 5. create user session
     const userSession: UserSession = {
-      userId: result.insertId.toString(),
+      userId: result.insertId,
       role: userRoles[0],
       username: user.username,
       email: user.email,

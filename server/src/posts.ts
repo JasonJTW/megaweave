@@ -1,12 +1,9 @@
 //* posts.ts
 
-import express from "express";
 import { Request, Response, Router } from "express";
 import mysql, { ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { handleError } from "./utils/errorHandler";
-import { UserSession } from "./schema";
-import { userRoles } from "./schema";
 import { getRedisClient, connectRedis } from "./utils/redis";
 import multer from "multer";
 import multerS3 from "multer-s3";
@@ -15,11 +12,9 @@ import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 import dotenv from "dotenv";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
-import { getUserSessionFromRedis } from "./session";
 import { uploadImages, insertImages } from "./upload";
 import { deleteS3Files } from "./upload";
 import likeRouter from "./like";
-import { title } from "process";
 dotenv.config();
 
 const router = Router();
@@ -294,6 +289,7 @@ router.get("/", async (req: Request, res: Response) => {
         p.*,
         u.username,
         u.public_id as author_public_id,
+        u.id as author_user_id,
         u.avatar_url,
         c.name_en as category_name_en,
         GROUP_CONCAT(i.image_url) as image_urls,

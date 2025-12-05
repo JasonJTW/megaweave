@@ -42,7 +42,7 @@ const defaultMemberValues: MemberFormValues = {
 
 interface MemberFormProps {
   isContributor: boolean;
-  memberUserId: string;
+  memberUserId: number;
 }
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;

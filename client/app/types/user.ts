@@ -1,5 +1,5 @@
 export default interface User {
-  userId: string;
+  userId: number;
   role: "admin" | "user" | "contributor";
   username: string;
   provide: string;

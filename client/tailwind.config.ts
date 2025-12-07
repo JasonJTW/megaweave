@@ -174,7 +174,7 @@ export default {
         },
         ".type-body-t4": {
           fontSize: "16px", // 16pt
-          lineHeight: "1.5",
+          lineHeight: "1",
           fontWeight: "500", // Regular (R)
         },
         // Body T5 範例 (包含 2% 字距)

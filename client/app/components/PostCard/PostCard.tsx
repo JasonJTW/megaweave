@@ -1,17 +1,21 @@
 // PostCard.tsx 重點改寫
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { User as UserIcon } from "lucide-react";
 import type { Post, Condition, Category } from "../../types/schema";
 import { Badge } from "@/components/ui/badge";
-// import TagIcon from "../icons/TagIcon";
 import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
 import BadgeIcon from "../icons/BadgeIcon";
 import type { Weave } from "@/services/weaveService";
+import AcceptIcon from "../icons/AcceptIcon";
+import CancelIcon from "../icons/CancelIcon";
+
+const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+
 interface PostCardProps {
   post: Post;
   conditions: Condition[];
@@ -21,6 +25,7 @@ interface PostCardProps {
   isActive?: boolean;
   weave?: Weave;
   currentUserId?: number;
+  onWeaveStatusChange?: () => void; // ✅ 新增：狀態改變後的回調
 }
 
 function PostCardInner({
@@ -31,19 +36,22 @@ function PostCardInner({
   isExpanded = false,
   weave,
   currentUserId,
+  onWeaveStatusChange,
 }: PostCardProps) {
   const condition = conditions.find((c) => c.level === post.condition_level);
-
   const category = categories.find((c) => c.id === post.category_id);
 
-  const imageUrls = Array.isArray(post.image_urls)
-    ? post.image_urls // 如果已經是陣列 (來自 Weaving)
-    : typeof post.image_urls === "string"
-    ? post.image_urls.split(",") // 如果是字串 (來自其他 Post API)
-    : []; // 否則為空陣列
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [localWeaveStatus, setLocalWeaveStatus] = useState(weave?.status);
 
-  // 然後您可以安全地使用 imageUrls[0]
+  const imageUrls = Array.isArray(post.image_urls)
+    ? post.image_urls
+    : typeof post.image_urls === "string"
+    ? post.image_urls.split(",")
+    : [];
+
   const imageSrc = imageUrls[0];
+
   const displayUser =
     weave && currentUserId
       ? currentUserId === weave.giver_id
@@ -58,16 +66,144 @@ function PostCardInner({
             role: "Giver",
           }
       : null;
+
+  // ✅ 完成交易
+  const handleCompleteWeave = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // 防止觸發 onPostClick
+
+    if (!weave || isProcessing) return;
+
+    // ✅ 權限檢查：giver 和 receiver 都可以完成交易
+    if (
+      currentUserId !== weave.giver_id &&
+      currentUserId !== weave.receiver_id
+    ) {
+      alert("You are not authorized to complete this weave");
+      return;
+    }
+
+    if (weave.status !== "pending") {
+      alert(`Weave is already ${weave.status}`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to complete this weave? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+
+    try {
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ status: "completed" }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.errorMessage || "Failed to complete weave");
+      }
+
+      // 更新本地狀態
+      setLocalWeaveStatus("completed");
+      alert("Weave completed successfully!");
+
+      // 通知父組件刷新數據
+      if (onWeaveStatusChange) {
+        onWeaveStatusChange();
+      }
+    } catch (error) {
+      console.error("Error completing weave:", error);
+      alert(
+        error instanceof Error ? error.message : "Failed to complete weave"
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // ✅ 取消交易
+  const handleCancelWeave = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // 防止觸發 onPostClick
+
+    if (!weave || isProcessing) return;
+
+    // 權限檢查：giver 和 receiver 都可以取消
+    if (
+      currentUserId !== weave.giver_id &&
+      currentUserId !== weave.receiver_id
+    ) {
+      alert("You are not authorized to cancel this weave");
+      return;
+    }
+
+    if (weave.status !== "pending") {
+      alert(`Weave is already ${weave.status}`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this weave?"
+    );
+    if (!confirmed) return;
+
+    setIsProcessing(true);
+
+    try {
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({ status: "cancelled" }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.errorMessage || "Failed to cancel weave");
+      }
+
+      // 更新本地狀態
+      setLocalWeaveStatus("cancelled");
+      alert("Weave cancelled successfully!");
+
+      // 通知父組件刷新數據
+      if (onWeaveStatusChange) {
+        onWeaveStatusChange();
+      }
+    } catch (error) {
+      console.error("Error cancelling weave:", error);
+      alert(error instanceof Error ? error.message : "Failed to cancel weave");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 使用本地狀態或 weave 狀態
+  const currentStatus = localWeaveStatus || weave?.status;
+
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px]  bg-white overflow-hidden transition-all duration-300 py-0 pb-4 relevant ${
+      className={`font-ddin cursor-pointer rounded-[30px] bg-white overflow-hidden transition-all duration-300 py-0 pb-4 relevant ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
         {
-          // 固定 title 高度，展開內容用 transform/opacity 顯示，避免 maxHeight reflow
-          // 如果需要讓 expanded content 覆蓋視窗，可考慮在這裡使用 position: sticky / absolute
           "--post-title-h": "72px",
         } as React.CSSProperties & Record<string, string>
       }
@@ -79,20 +215,35 @@ function PostCardInner({
           minHeight: "var(--post-title-h, 72px)",
         }}
       >
-        <h2 className="font-semibold font-ddin text-[36px] text-gray-800 truncate">
+        <h2 className="font-semibold font-ddin text-[36px] text-gray-800 truncate flex-1">
           {post.title}
         </h2>
-        <div className="hidden md:flex items-center text-gray-500 text-sm">
-          <UserIcon className="w-4 h-4 mr-1" />
-          {post.username}
-        </div>
+
+        {/* ✅ Weave 狀態標籤 (移到標題右側) */}
+        {weave && (
+          <Badge
+            className={`${
+              currentStatus === "completed"
+                ? "bg-green-500"
+                : currentStatus === "cancelled"
+                ? "bg-red-500"
+                : "bg-yellow-500"
+            } text-white font-bold ml-2`}
+          >
+            {currentStatus === "completed"
+              ? "Completed"
+              : currentStatus === "cancelled"
+              ? "Cancelled"
+              : "Pending"}
+          </Badge>
+        )}
       </div>
 
-      {/* 這塊改成用 transform/opacity 做顯示，避免變更 layout 高度 */}
       <div className="relative">
         {post.type === "share" && (
           <BadgeIcon className="absolute -top-1 right-5 z-20" />
         )}
+
         <motion.div
           className="overflow-hidden"
           initial={false}
@@ -103,47 +254,57 @@ function PostCardInner({
           style={{ pointerEvents: isExpanded ? "auto" : "none" }}
         >
           {imageSrc && (
-            <div className="relative justify-center mb-0  mx-4">
-              <div className="relative w-full h-64 md:h-80 rounded-[20px] overflow-hidden ">
+            <div className="relative justify-center mb-0 mx-4">
+              <div className="relative w-full h-64 md:h-80 rounded-[20px] overflow-hidden">
                 <Image
                   src={imageSrc}
                   alt={post.title}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 50vw"
-                  // lazy load 非首張
                   priority={false}
                 />
               </div>
-              {/* tags */}
+
               <div className="absolute w-full flex flex-row bottom-0 justify-between px-5 py-5">
-                {/* Condition tag */}
                 {post.view_count > 0 && (
-                  <div className=" flex items-center">
+                  <div className="flex items-center">
                     <Badge className="bg-[#7c7c7c] text-white font-ddin font-normal text-[14px] px-2">
-                      <EyesIcon className="mr-[4px] " />
+                      <EyesIcon className="mr-[4px]" />
                       {post.view_count}
                     </Badge>
                   </div>
                 )}
                 {condition && (
-                  <div className=" flex items-center">
+                  <div className="flex items-center">
                     <Badge>{condition.name}</Badge>
                   </div>
                 )}
               </div>
             </div>
           )}
-          {/* Category tag */}
+
           {category && (
             <div className="flex items-center mx-4 mt-[14px] leading-[34px]">
               <Badge className="h-[34px]">{category.name_en}</Badge>
             </div>
           )}
-          <div className="bg-white flex flex-col p-4 mx-4 mt-[14px]  rounded-[20px]">
+
+          <div className="bg-white flex flex-col p-4 mx-4 mt-[14px] rounded-[20px]">
             <p className="text-black text-[18px] mb-[10px] truncate">
               {post.content}
             </p>
+
+            {/* ✅ 顯示 Weave 備註 */}
+            {weave?.notes && (
+              <div className="mb-[10px] p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-gray-600 font-semibold mb-1">
+                  Notes:
+                </p>
+                <p className="text-sm text-gray-800">{weave.notes}</p>
+              </div>
+            )}
+
             <div className="min-h-[18px]">
               {post.tags && (
                 <div className="flex flex-wrap gap-0 leading-[18px]">
@@ -152,11 +313,7 @@ function PostCardInner({
                       key={i}
                       className="flex items-center bg-secondary rounded-[10pt] px-[8px] py-[5px]"
                     >
-                      {/* <TagIcon className="text-primary" /> */}
-                      <span
-                        key={i}
-                        className="text-[16px]  text-megaweave-forest-dark px-2 font-medium font-ddin tracking-wider"
-                      >
+                      <span className="text-[16px] text-megaweave-forest-dark px-2 font-medium font-ddin tracking-wider">
                         #{tag.trim()}
                       </span>
                     </div>
@@ -164,24 +321,34 @@ function PostCardInner({
                 </div>
               )}
             </div>
+
             <div className="flex flex-col gap-[6px] mt-[12px] text-[16px] font-medium leading-[18px]">
               {post.location && (
-                <div className="flex items-center gap-2  ">
+                <div className="flex items-center gap-2">
                   <LocationIcon className="text-primary" />
                   {post.location}
                 </div>
               )}
               {post.created_at && (
-                <div className="flex items-center gap-2  ">
+                <div className="flex items-center gap-2">
                   <ClockIcon className="text-primary" />
                   {new Date(post.created_at).toLocaleDateString()}
                 </div>
               )}
+
+              {/* ✅ 顯示 Weave 完成時間 */}
+              {weave?.completed_at && (
+                <div className="flex items-center gap-2 text-green-600">
+                  <ClockIcon className="text-green-600" />
+                  Completed: {new Date(weave.completed_at).toLocaleDateString()}
+                </div>
+              )}
             </div>
           </div>
-          {/* ✅ 顯示 Weave 相關用戶或原 post 用戶 */}
-          {displayUser ? (
-            <div className="bg-primary-5 min-h-[60px] rounded-[20px] px-[16px] py-[12px] flex items-center gap-2 text-gray-600 text-sm mx-4">
+
+          {/* ✅ 顯示 Weave 用戶資訊和操作按鈕 */}
+          {displayUser && (
+            <div className="bg-primary-5 min-h-[60px] rounded-[20px] px-[16px] py-[12px] flex items-center gap-2 text-gray-600 text-sm mx-4 mt-4">
               {displayUser.avatar ? (
                 <div className="w-9 h-9 rounded-full overflow-hidden relative flex-shrink-0">
                   <Image
@@ -192,23 +359,76 @@ function PostCardInner({
                   />
                 </div>
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
-                  <UserIcon className="w-4 h-4 text-gray-600" />
+                <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+                  <UserIcon className="w-5 h-5 text-gray-600" />
                 </div>
               )}
-              <div className="flex flex-col">
-                <span className="text-[#222] type-body-t4">
+
+              <div className="flex flex-col flex-1">
+                <span className="text-[#222] type-body-t4 font-semibold">
                   {displayUser.name}
                 </span>
-                <span className="text-[#222] type-body-t5">
+                <span className="text-[#666] type-body-t5">
                   {displayUser.role}
                 </span>
+                {weave && (
+                  <span className="text-[#222] type-body-t5 mt-1">
+                    {currentUserId === weave.receiver_id
+                      ? `You requested ${weave.item_title || "item"} × ${
+                          weave.quantity
+                        }`
+                      : `They requested ${weave.item_title || "item"} × ${
+                          weave.quantity
+                        }`}
+                  </span>
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="hidden md:flex items-center text-gray-500 text-sm">
-              <UserIcon className="w-4 h-4 mr-1" />
-              {post.username}
+
+              {/* ✅ 操作按鈕 - 只在 pending 狀態顯示 */}
+              {currentStatus === "pending" && (
+                <div className="text-megaweave-forest-dark flex gap-[16px] ml-auto">
+                  {/* ✅ Complete 按鈕 - giver 和 receiver 都可以看到 */}
+                  <button
+                    onClick={handleCompleteWeave}
+                    disabled={isProcessing}
+                    className={`transition-opacity ${
+                      isProcessing ? "opacity-50" : "hover:opacity-70"
+                    }`}
+                    title="Complete weave"
+                  >
+                    <AcceptIcon className="w-[18px] h-auto" />
+                  </button>
+
+                  {/* Cancel 按鈕 - giver 和 receiver 都可以看到 */}
+                  <button
+                    onClick={handleCancelWeave}
+                    disabled={isProcessing}
+                    className={`transition-opacity ${
+                      isProcessing ? "opacity-50" : "hover:opacity-70"
+                    }`}
+                    title="Cancel weave"
+                  >
+                    <CancelIcon className="w-[18px] h-auto" />
+                  </button>
+                </div>
+              )}
+
+              {/* 已完成或已取消的狀態提示 */}
+              {currentStatus !== "pending" && (
+                <div className="ml-auto">
+                  <span
+                    className={`text-sm font-semibold ${
+                      currentStatus === "completed"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {currentStatus === "completed"
+                      ? "✓ Completed"
+                      : "✗ Cancelled"}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </motion.div>
@@ -217,12 +437,12 @@ function PostCardInner({
   );
 }
 
-// memoize 以避免不必要 rerender
 export default React.memo(PostCardInner, (prev, next) => {
-  // 只有在 isExpanded 或 post.id 或 post.content 變化時才 rerender
   return (
     prev.isExpanded === next.isExpanded &&
     prev.post.id === next.post.id &&
-    prev.post.content === next.post.content
+    prev.post.content === next.post.content &&
+    prev.weave?.id === next.weave?.id &&
+    prev.weave?.status === next.weave?.status
   );
 });

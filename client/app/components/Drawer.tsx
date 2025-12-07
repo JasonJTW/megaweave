@@ -5,20 +5,38 @@ import Feed from "./PostCard/Feed";
 import type { Post, Condition } from "../types/schema";
 import { useRouter } from "next/navigation";
 import ExpandedIcon from "./icons/ExpandedIcon";
+import type { Weave } from "@/services/weaveService";
 
 interface DrawerProps {
   title: string;
   posts: Post[];
   conditions: Condition[];
+  weaves?: Weave[];
 }
 
-const Drawer: React.FC<DrawerProps> = ({ title, posts, conditions }) => {
+const Drawer: React.FC<DrawerProps> = ({
+  title,
+  posts,
+  conditions,
+  weaves,
+}) => {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
   };
+  const isWeavingTab = title === "Weaving";
+  // ✅ 1. 數據轉換：從 weaves 陣列中提取巢狀的 post 物件
+  const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
+
+  // 選擇要渲染的貼文列表
+  const postsToRender = isWeavingTab ? postsForWeaving : posts;
+
+  // 決定空的提示訊息
+  const emptyMessage = isWeavingTab
+    ? "You have no active weaving yet."
+    : `No posts in ${title} yet.`;
 
   return (
     <div className="mb-4">
@@ -75,11 +93,15 @@ const Drawer: React.FC<DrawerProps> = ({ title, posts, conditions }) => {
             ease: [0.34, 1.3, 0.64, 1],
           }}
         >
-          <Feed
-            posts={posts}
-            conditions={conditions}
-            onPostClick={(post) => router.push(`/item/${post.id}`)}
-          />
+          {postsToRender.length > 0 ? (
+            <Feed
+              posts={postsToRender}
+              conditions={conditions}
+              onPostClick={(postId) => router.push(`/posts/${postId}`)}
+            />
+          ) : (
+            <div className="py-8 text-center text-gray-500">{emptyMessage}</div>
+          )}
         </motion.div>
       </motion.div>
     </div>

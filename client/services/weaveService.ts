@@ -1,12 +1,30 @@
 // src/services/weaveService.ts
-
+const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { Post } from "../app/types/schema";
 interface CreateWeaveParams {
   postId: number;
   itemId: number | null;
   quantity: number;
   notes?: string;
 }
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+
+export interface Weave {
+  id: number;
+  post_id: number;
+  post_title: string;
+  item_title?: string;
+  thumbnail_urls: string[];
+  status: "pending" | "completed" | "cancelled";
+  giver_id: number;
+  giver_name: string;
+  giver_avatar: string;
+  receiver_id: number;
+  receiver_name: string;
+  receiver_avatar: string;
+  quantity: number;
+  created_at: string;
+  post: Post & { thumbnail_urls: string[] };
+}
 
 export const createWeave = async ({
   postId,

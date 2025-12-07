@@ -68,6 +68,97 @@ interface ItemRow extends RowDataPacket {
   title: string;
 }
 
+// 🔧 共用函數：處理 Weave 資料
+function processWeaveRows(weaveRows: WeaveOutput[]) {
+  return weaveRows.map((row) => {
+    // 提取 Post 相關資料
+    const post = {
+      id: row.post_id_original,
+      user_id: row.post_user_id,
+      title: row.post_title,
+      content: row.post_content,
+      type: row.post_type,
+      status: row.post_status_original,
+      location: row.post_location,
+      tags: row.post_tags,
+      category_id: row.post_category_id,
+      condition_level: row.post_condition_level,
+      expires_at: row.post_expires_at,
+      view_count: row.post_view_count,
+      likes_count: row.post_likes_count,
+      created_at: row.post_created_at,
+      updated_at: row.post_updated_at,
+      comment_count: row.post_comment_count,
+      // 分割 image_urls 字串成陣列
+      image_urls: row.image_urls ? row.image_urls.split(",") : [],
+    };
+
+    // 建立 Weave 物件 (手動組裝 w.* 的欄位)
+    const weave: any = {
+      id: row.id,
+      post_id: row.post_id,
+      item_id: row.item_id,
+      giver_id: row.giver_id,
+      receiver_id: row.receiver_id,
+      quantity: row.quantity,
+      status: row.status,
+      notes: row.notes,
+      completed_at: row.completed_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+
+      // JOIN 來的其他欄位
+      item_title: row.item_title,
+      giver_name: row.giver_name,
+      giver_avatar: row.giver_avatar,
+      receiver_name: row.receiver_name,
+      receiver_avatar: row.receiver_avatar,
+
+      // ✅ 內嵌 post 物件
+      post: post,
+    };
+
+    return weave;
+  });
+}
+
+// 🔧 共用 SQL 查詢字串
+const WEAVE_QUERY_BASE = `
+  SELECT 
+      w.*,
+      -- 貼文 (posts) 的所有欄位 (需重新命名避免衝突)
+      p.id AS post_id_original,
+      p.user_id AS post_user_id,
+      p.title AS post_title,
+      p.content AS post_content,
+      p.type AS post_type,
+      p.status AS post_status_original,
+      p.location AS post_location,
+      p.tags AS post_tags,
+      p.category_id AS post_category_id,
+      p.condition_level AS post_condition_level,
+      p.expires_at AS post_expires_at,
+      p.view_count AS post_view_count,
+      p.likes_count AS post_likes_count,
+      p.created_at AS post_created_at,
+      p.updated_at AS post_updated_at,
+      p.comment_count AS post_comment_count,
+      
+      -- 其他 JOIN 的欄位
+      i.title AS item_title,
+      giver.username AS giver_name,
+      giver.avatar_url AS giver_avatar,
+      receiver.username AS receiver_name,
+      receiver.avatar_url AS receiver_avatar,
+      GROUP_CONCAT(img.image_url) AS image_urls
+  FROM weaves w
+  JOIN posts p ON w.post_id = p.id
+  LEFT JOIN items i ON w.item_id = i.id
+  JOIN users giver ON w.giver_id = giver.id
+  JOIN users receiver ON w.receiver_id = receiver.id
+  LEFT JOIN images img ON p.id = img.post_id
+`;
+
 // POST /api/weaves - 索取物品（建立 Weave 請求）
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -164,41 +255,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       params.splice(0, 2, userId);
     }
 
-    // 1. 修改 SQL 查詢：根據 posts 完整 Schema 選取所有欄位並加上前綴
     const query = `
-      SELECT 
-          w.*,
-          -- 貼文 (posts) 的所有欄位 (需重新命名避免衝突)
-          p.id AS post_id_original,
-          p.user_id AS post_user_id,
-          p.title AS post_title,
-          p.content AS post_content,
-          p.type AS post_type,
-          p.status AS post_status_original,
-          p.location AS post_location,
-          p.tags AS post_tags,
-          p.category_id AS post_category_id,
-          p.condition_level AS post_condition_level,
-          p.expires_at AS post_expires_at,
-          p.view_count AS post_view_count,
-          p.likes_count AS post_likes_count,
-          p.created_at AS post_created_at,
-          p.updated_at AS post_updated_at,
-          p.comment_count AS post_comment_count,
-          
-          -- 其他 JOIN 的欄位
-          i.title AS item_title,
-          giver.username AS giver_name,
-          giver.avatar_url AS giver_avatar,
-          receiver.username AS receiver_name,
-          receiver.avatar_url AS receiver_avatar,
-          GROUP_CONCAT(img.image_url) AS image_urls
-      FROM weaves w
-      JOIN posts p ON w.post_id = p.id
-      LEFT JOIN items i ON w.item_id = i.id
-      JOIN users giver ON w.giver_id = giver.id
-      JOIN users receiver ON w.receiver_id = receiver.id
-      LEFT JOIN images img ON p.id = img.post_id
+      ${WEAVE_QUERY_BASE}
       ${whereClause}
       GROUP BY w.id
       ORDER BY w.created_at DESC
@@ -206,55 +264,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
 
-    // 2. 處理結果 (Response Mapping)：將 post 相關資料內嵌
-    const processedWeaves = weaveRows.map((row) => {
-      // 提取 Post 相關資料
-      const post = {
-        id: row.post_id_original,
-        user_id: row.post_user_id,
-        title: row.post_title,
-        content: row.post_content,
-        type: row.post_type,
-        status: row.post_status_original,
-        location: row.post_location,
-        tags: row.post_tags,
-        category_id: row.post_category_id,
-        condition_level: row.post_condition_level,
-        expires_at: row.post_expires_at,
-        view_count: row.post_view_count,
-        likes_count: row.post_likes_count,
-        created_at: row.post_created_at,
-        updated_at: row.post_updated_at,
-        comment_count: row.post_comment_count,
-        // 分割 image_urls 字串成陣列
-        image_urls: row.image_urls ? row.image_urls.split(",") : [],
-      };
-
-      // 建立 Weave 物件 (手動組裝 w.* 的欄位)
-      const weave: any = {
-        id: row.id,
-        post_id: row.post_id,
-        item_id: row.item_id,
-        giver_id: row.giver_id,
-        receiver_id: row.receiver_id,
-        quantity: row.quantity,
-        status: row.status,
-        notes: row.notes,
-        completed_at: row.completed_at,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-
-        // JOIN 來的其他欄位
-        item_title: row.item_title,
-        giver_name: row.giver_name,
-        receiver_name: row.receiver_name,
-
-        // ✅ 內嵌 post 物件
-        post: post,
-      };
-
-      return weave;
-    });
+    // 使用共用函數處理結果
+    const processedWeaves = processWeaveRows(weaveRows);
 
     return res.status(200).json({
       weaves: processedWeaves,
@@ -265,6 +276,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
   }
 });
+
 // PATCH /api/weaves/:id/status - 更新交易狀態
 router.patch(
   "/:id/status",
@@ -408,5 +420,52 @@ router.patch(
     }
   }
 );
+
+// 新增：GET /api/weaves/public/:uuid - 根據 UUID 獲取公開交易列表
+router.get("/public/:uuid", async (req: Request, res: Response) => {
+  try {
+    const { uuid } = req.params;
+
+    // 1. 驗證 UUID
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(uuid)) {
+      return res.status(400).json({ errorMessage: "Invalid user UUID format" });
+    }
+
+    // 2. 查找用戶的 internal ID
+    const userQuery = `SELECT id FROM users WHERE public_id = ?`;
+    const [userRows] = await dbPool.execute<RowDataPacket[]>(userQuery, [uuid]);
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ errorMessage: "User not found" });
+    }
+    const userId = userRows[0].id;
+
+    // 3. ✅ 使用完整的 SQL 查詢 (與 GET / 相同)
+    const query = `
+      ${WEAVE_QUERY_BASE}
+      WHERE (w.giver_id = ? OR w.receiver_id = ?)
+      GROUP BY w.id
+      ORDER BY w.created_at DESC
+    `;
+
+    const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [
+      userId,
+      userId,
+    ]);
+
+    // 4. ✅ 使用共用函數處理結果 (與 GET / 完全相同的處理邏輯)
+    const processedWeaves = processWeaveRows(weaveRows);
+
+    return res.status(200).json({
+      weaves: processedWeaves,
+      message: "Public weave list retrieved successfully",
+    });
+  } catch (error) {
+    console.error("Error retrieving public weaves:", error);
+    return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
+  }
+});
 
 export default router;

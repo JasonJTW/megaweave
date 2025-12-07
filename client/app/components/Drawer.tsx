@@ -29,6 +29,7 @@ const Drawer: React.FC<DrawerProps> = ({
   const isWeavingTab = title === "Weaving";
   // ✅ 1. 數據轉換：從 weaves 陣列中提取巢狀的 post 物件
   const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
+  console.log("postsForWeaving: ", postsForWeaving);
 
   // 選擇要渲染的貼文列表
   const postsToRender = isWeavingTab ? postsForWeaving : posts;
@@ -97,7 +98,7 @@ const Drawer: React.FC<DrawerProps> = ({
             <Feed
               posts={postsToRender}
               conditions={conditions}
-              onPostClick={(postId) => router.push(`/posts/${postId}`)}
+              onPostClick={(post) => router.push(`/item/${post.id}`)}
             />
           ) : (
             <div className="py-8 text-center text-gray-500">{emptyMessage}</div>

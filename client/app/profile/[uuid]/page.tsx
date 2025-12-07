@@ -8,9 +8,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 import { User as UserIcon, Contact, Mail, Phone } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
-
+import Drawer from "@/app/components/Drawer";
+import type { Post } from "@/app/types/schema";
+import type { Weave } from "@/services/weaveService";
+import { usePost } from "@/app/contexts/PostContext";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
 // 定義公開 Profile 的資料型別
 interface PublicProfile {
   user_id: string;
@@ -27,21 +29,34 @@ interface PublicProfile {
 const PublicProfilePage = () => {
   const params = useParams();
   const uuid = params.uuid as string;
+  const { conditions } = usePost();
 
   const [profileData, setProfileData] = useState<PublicProfile | null>(null);
   const [isContributor, setIsContributor] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  //* --- 新增 State 用於 Drawer ---
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [weaves, setWeaves] = useState<Weave[]>([]);
 
   useEffect(() => {
     if (uuid) {
-      fetchPublicProfile(uuid);
+      const init = async () => {
+        setLoading(true);
+        // 使用 Promise.all 同時發送請求，加快載入速度
+        await Promise.all([
+          fetchPublicProfile(uuid), // 原本的：抓個資
+          fetchStatsAndPosts(uuid), // 新增：抓 Posts (Share/Wish)
+          fetchPublicWeaves(uuid), // 新增：抓 Weaves
+        ]);
+        setLoading(false);
+      };
+      init();
     }
   }, [uuid]);
 
   const fetchPublicProfile = async (userId: string) => {
     try {
-      // 使用 /public/:uuid 路徑
       const response = await fetch(
         `${hostName}/api/userprofile/public/${userId}`,
         {
@@ -60,21 +75,63 @@ const PublicProfilePage = () => {
 
       setProfileData(data);
 
-      // 檢查是否為 contributor 或 admin
       if (data.role === "contributor" || data.role === "admin") {
         setIsContributor(true);
       }
-
       setError(null);
     } catch (error) {
       console.error("Error fetching profile:", error);
       setError(
         error instanceof Error ? error.message : "Failed to load profile"
       );
-    } finally {
-      setLoading(false);
+    }
+    // 注意：這裡不設定 setLoading(false)，交給 init 統一處理
+  };
+
+  // --- 2. 新增：從 Stats API 獲取 Posts ---
+  const fetchStatsAndPosts = async (userId: string) => {
+    try {
+      // 利用 stats.ts 裡面的 /public/:uuid 路由
+      const response = await fetch(
+        `${hostName}/api/user/stats/public/${userId}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        // stats API 回傳結構中有 posts 陣列
+        setPosts(data.posts || []);
+      }
+    } catch (error) {
+      console.error("Error fetching public posts:", error);
     }
   };
+
+  // --- 3. 新增：獲取 Weaves ---
+  const fetchPublicWeaves = async (userId: string) => {
+    try {
+      // 呼叫我們將在 weaves.ts 新增的公開路由
+      const response = await fetch(`${hostName}/api/weaves/public/${userId}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Fetched public weaves: ", data.weaves);
+        setWeaves(data.weaves || []);
+      }
+    } catch (error) {
+      console.error("Error fetching public weaves:", error);
+    }
+  };
+
+  // --- 篩選 Posts ---
+  const sharePosts = posts.filter((post) => post.type === "share");
+  const wishPosts = posts.filter((post) => post.type === "wish");
 
   // Loading state
   if (loading) {
@@ -129,7 +186,7 @@ const PublicProfilePage = () => {
   return (
     <>
       <div className="fixed inset-0 bg-primary-5 -z-10 font-ddin"></div>
-      <div className="min-h-screen text-secondary px-0 sm:px-6 md:px-12 lg:px-16">
+      <div className="min-h-screen  px-0 sm:px-6 md:px-12 lg:px-16">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
@@ -228,21 +285,23 @@ const PublicProfilePage = () => {
                 {/* Stats */}
                 <div className="mt-8 font-ddin grid grid-cols-3 gap-4 text-center">
                   <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">24</div>
+                    <div className="text-[36px] font-bold text-[#222] ">
+                      {posts.length}
+                    </div>
                     <div className="text-[16px] font-semibold text-[#222]">
                       post
                     </div>
                   </div>
                   <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
                     <div className="text-[36px] font-bold text-[#222] ">
-                      156
+                      {weaves.length}
                     </div>
                     <div className="text-[16px] font-semibold text-[#222]">
                       weaved
                     </div>
                   </div>
                   <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">89</div>
+                    <div className="text-[36px] font-bold text-[#222] ">-</div>
                     <div className="text-[16px] font-semibold text-[#222]">
                       point
                     </div>
@@ -331,6 +390,20 @@ const PublicProfilePage = () => {
                   </div>
                 </div>
               )}
+
+              {/* --- 4. 顯示 Drawers --- */}
+              <Drawer
+                title="Weaving"
+                posts={[]}
+                weaves={weaves}
+                conditions={conditions}
+              />
+              <Drawer
+                title="Share"
+                posts={sharePosts}
+                conditions={conditions}
+              />
+              <Drawer title="Wish" posts={wishPosts} conditions={conditions} />
             </motion.div>
           </div>
         </div>

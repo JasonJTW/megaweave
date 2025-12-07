@@ -15,6 +15,7 @@ export interface Weave {
   item_title?: string;
   thumbnail_urls: string[];
   status: "pending" | "completed" | "cancelled";
+  notes?: string;
   giver_id: number;
   giver_name: string;
   giver_avatar: string;
@@ -23,6 +24,8 @@ export interface Weave {
   receiver_avatar: string;
   quantity: number;
   created_at: string;
+  updated_at: string;
+  completed_at?: string;
   post: Post & { thumbnail_urls: string[] };
 }
 

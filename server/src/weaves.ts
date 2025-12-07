@@ -2,7 +2,7 @@ import Router, { Request, Response } from "express";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
-import { updateUserStats } from "./utils/updateUserStats"; // 引入你提供的統計函式
+import { updateUserStats } from "./utils/updateUserStats";
 
 const router = Router();
 
@@ -20,6 +20,7 @@ interface WeaveRow extends RowDataPacket {
   created_at: Date;
   updated_at: Date;
 }
+
 // 輸出型別，包含所有 post 相關欄位
 interface WeaveOutput extends RowDataPacket {
   // Weaves (w.*)
@@ -159,7 +160,7 @@ const WEAVE_QUERY_BASE = `
   LEFT JOIN images img ON p.id = img.post_id
 `;
 
-// POST /api/weaves - 索取物品（建立 Weave 請求）
+// POST /api/weaves - 索取物品(建立 Weave 請求)
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const { postId, itemId, quantity = 1, notes } = req.body;
@@ -190,7 +191,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ errorMessage: "Post is not active" });
     }
 
-    // 2. 如果有指定 Item，檢查庫存
+    // 2. 如果有指定 Item,檢查庫存
     if (itemId) {
       const itemQuery = `SELECT quantity FROM items WHERE id = ? AND post_id = ?`;
       const [items] = await dbPool.execute<RowDataPacket[]>(itemQuery, [
@@ -319,7 +320,7 @@ router.patch(
       // 邏輯 A: 取消 (Cancelled)
       // ==========================================
       if (status === "cancelled") {
-        // 權限檢查：Giver 和 Receiver 都可以取消
+        // 權限檢查:Giver 和 Receiver 都可以取消
         if (
           weave.giver_id !== Number(userId) &&
           weave.receiver_id !== Number(userId)
@@ -341,15 +342,20 @@ router.patch(
       // 邏輯 B: 完成 (Completed)
       // ==========================================
       else if (status === "completed") {
-        // 權限檢查：只有 Giver 可以確認完成 (確認已給出)
-        if (weave.giver_id !== Number(userId)) {
+        // ✅ 權限檢查: Giver 和 Receiver 都可以確認完成
+        if (
+          weave.giver_id !== Number(userId) &&
+          weave.receiver_id !== Number(userId)
+        ) {
           await connection.rollback();
           return res
             .status(403)
-            .json({ errorMessage: "Only the giver can complete the weave" });
+            .json({
+              errorMessage: "You are not authorized to complete this weave",
+            });
         }
 
-        // 如果有 item_id，需要扣庫存
+        // 如果有 item_id,需要扣庫存
         if (weave.item_id) {
           const checkItemQuery = `SELECT quantity FROM items WHERE id = ? FOR UPDATE`;
           const [items] = await connection.execute<ItemRow[]>(checkItemQuery, [
@@ -386,12 +392,8 @@ router.patch(
       await connection.commit();
 
       // ==========================================
-      // 交易提交後，執行統計數據更新
+      // 交易提交後,執行統計數據更新
       // ==========================================
-      // 這裡不需要 await 阻擋 Response，但為了讓前端能立即獲得最新積分，建議 await
-      // 只有在狀態變成 completed 時才需要更新積分？
-      // 其實 cancelled 可能不影響積分，但為了保險起見或未來擴充（如取消率），可以都跑一次
-
       if (status === "completed") {
         try {
           // 更新雙方數據
@@ -401,7 +403,7 @@ router.patch(
           ]);
         } catch (statsError) {
           console.error("Background stats update failed:", statsError);
-          // 注意：這裡不回傳 500，因為主要交易已經成功了，統計可以之後再修正
+          // 注意:這裡不回傳 500,因為主要交易已經成功了,統計可以之後再修正
         }
       }
 
@@ -421,7 +423,7 @@ router.patch(
   }
 );
 
-// 新增：GET /api/weaves/public/:uuid - 根據 UUID 獲取公開交易列表
+// ✅ 新增：GET /api/weaves/public/:uuid - 根據 UUID 獲取公開交易列表
 router.get("/public/:uuid", async (req: Request, res: Response) => {
   try {
     const { uuid } = req.params;

@@ -10,7 +10,7 @@ import { User as UserIcon, Contact, Mail, Phone } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import Drawer from "@/app/components/Drawer";
 import type { Post, UserStats } from "@/app/types/schema";
-import type { Weave } from "@/services/weaveService";
+// import type { Weave } from "@/services/weaveService";
 import { usePost } from "@/app/contexts/PostContext";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 // 定義公開 Profile 的資料型別
@@ -41,7 +41,7 @@ const PublicProfilePage = () => {
   const [error, setError] = useState<string | null>(null);
   //* --- 新增 State 用於 Drawer ---
   const [posts, setPosts] = useState<Post[]>([]);
-  const [weaves, setWeaves] = useState<Weave[]>([]);
+  // const [weaves, setWeaves] = useState<Weave[]>([]);
   const [stats, setStats] = useState<UserStats>(defaultStats);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ const PublicProfilePage = () => {
         await Promise.all([
           fetchPublicProfile(uuid), // 原本的：抓個資
           fetchStatsAndPosts(uuid), // 新增：抓 Posts (Share/Wish)
-          fetchPublicWeaves(uuid), // 新增：抓 Weaves
+          // fetchPublicWeaves(uuid), // 新增：抓 Weaves
         ]);
         setLoading(false);
       };
@@ -122,23 +122,23 @@ const PublicProfilePage = () => {
   };
 
   // --- 3. 新增：獲取 Weaves ---
-  const fetchPublicWeaves = async (userId: string) => {
-    try {
-      // 呼叫我們將在 weaves.ts 新增的公開路由
-      const response = await fetch(`${hostName}/api/weaves/public/${userId}`, {
-        method: "GET",
-        cache: "no-store",
-      });
+  // const fetchPublicWeaves = async (userId: string) => {
+  //   try {
+  //     // 呼叫我們將在 weaves.ts 新增的公開路由
+  //     const response = await fetch(`${hostName}/api/weaves/public/${userId}`, {
+  //       method: "GET",
+  //       cache: "no-store",
+  //     });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Fetched public weaves: ", data.weaves);
-        setWeaves(data.weaves || []);
-      }
-    } catch (error) {
-      console.error("Error fetching public weaves:", error);
-    }
-  };
+  //     if (response.ok) {
+  //       const data = await response.json();
+  //       console.log("Fetched public weaves: ", data.weaves);
+  //       setWeaves(data.weaves || []);
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching public weaves:", error);
+  //   }
+  // };
 
   // --- 篩選 Posts ---
   const sharePosts = posts.filter((post) => post.type === "share");
@@ -407,12 +407,12 @@ const PublicProfilePage = () => {
               )}
 
               {/* --- 4. 顯示 Drawers --- */}
-              <Drawer
+              {/* <Drawer
                 title="Weaving"
                 posts={[]}
                 weaves={weaves}
                 conditions={conditions}
-              />
+              /> */}
               <Drawer
                 title="Share"
                 posts={sharePosts}

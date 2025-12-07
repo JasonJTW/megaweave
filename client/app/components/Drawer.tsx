@@ -13,6 +13,7 @@ interface DrawerProps {
   conditions: Condition[];
   weaves?: Weave[];
   currentUserId?: number;
+  onWeaveStatusChange?: () => void;
 }
 
 const Drawer: React.FC<DrawerProps> = ({
@@ -21,6 +22,7 @@ const Drawer: React.FC<DrawerProps> = ({
   conditions,
   weaves,
   currentUserId,
+  onWeaveStatusChange,
 }) => {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -31,7 +33,7 @@ const Drawer: React.FC<DrawerProps> = ({
   const isWeavingTab = title === "Weaving";
   // ✅ 1. 數據轉換：從 weaves 陣列中提取巢狀的 post 物件
   const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
-  console.log("postsForWeaving: ", postsForWeaving);
+  // console.log("postsForWeaving: ", postsForWeaving);
 
   // 選擇要渲染的貼文列表
   const postsToRender = isWeavingTab ? postsForWeaving : posts;
@@ -103,6 +105,7 @@ const Drawer: React.FC<DrawerProps> = ({
               onPostClick={(post) => router.push(`/item/${post.id}`)}
               weaves={weaves}
               currentUserId={currentUserId}
+              onWeaveStatusChange={onWeaveStatusChange}
             />
           ) : (
             <div className="py-8 text-center text-gray-500">{emptyMessage}</div>

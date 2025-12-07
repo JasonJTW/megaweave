@@ -11,7 +11,7 @@ import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
 import BadgeIcon from "../icons/BadgeIcon";
-
+import type { Weave } from "@/services/weaveService";
 interface PostCardProps {
   post: Post;
   conditions: Condition[];
@@ -19,6 +19,8 @@ interface PostCardProps {
   onPostClick: (post: Post) => void;
   isExpanded?: boolean;
   isActive?: boolean;
+  weave?: Weave;
+  currentUserId?: number;
 }
 
 function PostCardInner({
@@ -27,6 +29,8 @@ function PostCardInner({
   categories,
   onPostClick,
   isExpanded = false,
+  weave,
+  currentUserId,
 }: PostCardProps) {
   const condition = conditions.find((c) => c.level === post.condition_level);
 
@@ -40,7 +44,20 @@ function PostCardInner({
 
   // 然後您可以安全地使用 imageUrls[0]
   const imageSrc = imageUrls[0];
-
+  const displayUser =
+    weave && currentUserId
+      ? currentUserId === weave.giver_id
+        ? {
+            name: weave.receiver_name,
+            avatar: weave.receiver_avatar,
+            role: "Receiver",
+          }
+        : {
+            name: weave.giver_name,
+            avatar: weave.giver_avatar,
+            role: "Giver",
+          }
+      : null;
   return (
     <div
       onClick={() => onPostClick(post)}
@@ -162,6 +179,38 @@ function PostCardInner({
               )}
             </div>
           </div>
+          {/* ✅ 顯示 Weave 相關用戶或原 post 用戶 */}
+          {displayUser ? (
+            <div className="bg-primary-5 min-h-[60px] rounded-[20px] px-[16px] py-[12px] flex items-center gap-2 text-gray-600 text-sm mx-4">
+              {displayUser.avatar ? (
+                <div className="w-9 h-9 rounded-full overflow-hidden relative flex-shrink-0">
+                  <Image
+                    src={displayUser.avatar}
+                    alt={displayUser.name}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+                  <UserIcon className="w-4 h-4 text-gray-600" />
+                </div>
+              )}
+              <div className="flex flex-col">
+                <span className="text-[#222] type-body-t4">
+                  {displayUser.name}
+                </span>
+                <span className="text-[#222] type-body-t5">
+                  {displayUser.role}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="hidden md:flex items-center text-gray-500 text-sm">
+              <UserIcon className="w-4 h-4 mr-1" />
+              {post.username}
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

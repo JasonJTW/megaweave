@@ -12,6 +12,7 @@ interface DrawerProps {
   posts: Post[];
   conditions: Condition[];
   weaves?: Weave[];
+  currentUserId?: number;
 }
 
 const Drawer: React.FC<DrawerProps> = ({
@@ -19,6 +20,7 @@ const Drawer: React.FC<DrawerProps> = ({
   posts,
   conditions,
   weaves,
+  currentUserId,
 }) => {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -99,6 +101,8 @@ const Drawer: React.FC<DrawerProps> = ({
               posts={postsToRender}
               conditions={conditions}
               onPostClick={(post) => router.push(`/item/${post.id}`)}
+              weaves={weaves}
+              currentUserId={currentUserId}
             />
           ) : (
             <div className="py-8 text-center text-gray-500">{emptyMessage}</div>

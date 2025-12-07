@@ -1398,6 +1398,7 @@ const UserPage = () => {
           posts={[]}
           weaves={weaves}
           conditions={conditions}
+          currentUserId={user.userId}
         />
         <Drawer title="Share" posts={sharePosts} conditions={conditions} />
         <Drawer title="Wish" posts={wishPosts} conditions={conditions} />

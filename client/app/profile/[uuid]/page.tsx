@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { User as UserIcon, Contact, Mail, Phone } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import Drawer from "@/app/components/Drawer";
-import type { Post } from "@/app/types/schema";
+import type { Post, UserStats } from "@/app/types/schema";
 import type { Weave } from "@/services/weaveService";
 import { usePost } from "@/app/contexts/PostContext";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -30,7 +30,11 @@ const PublicProfilePage = () => {
   const params = useParams();
   const uuid = params.uuid as string;
   const { conditions } = usePost();
-
+  const defaultStats: UserStats = {
+    postCount: 0,
+    weaveCount: 0,
+    points: 0,
+  };
   const [profileData, setProfileData] = useState<PublicProfile | null>(null);
   const [isContributor, setIsContributor] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,7 @@ const PublicProfilePage = () => {
   //* --- 新增 State 用於 Drawer ---
   const [posts, setPosts] = useState<Post[]>([]);
   const [weaves, setWeaves] = useState<Weave[]>([]);
+  const [stats, setStats] = useState<UserStats>(defaultStats);
 
   useEffect(() => {
     if (uuid) {
@@ -102,8 +107,14 @@ const PublicProfilePage = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Fetched stats: ", data);
         // stats API 回傳結構中有 posts 陣列
         setPosts(data.posts || []);
+        setStats({
+          postCount: data.postCount || 0,
+          weaveCount: data.weaveCount || 0,
+          points: data.points || 0,
+        });
       }
     } catch (error) {
       console.error("Error fetching public posts:", error);
@@ -195,7 +206,7 @@ const PublicProfilePage = () => {
         ></motion.header>
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Profile Card */}
             <motion.div
@@ -204,7 +215,7 @@ const PublicProfilePage = () => {
               transition={{ delay: 0.1 }}
               className="lg:col-span-1"
             >
-              <div className="bg-white border-primary-3´0 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
                 {/* Avatar */}
                 <div className="text-center mb-6">
                   <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 relative overflow-hidden">
@@ -283,26 +294,28 @@ const PublicProfilePage = () => {
 
                 {/* Stats (Optional - 可以移除或改成真實數據) */}
                 {/* Stats */}
-                <div className="mt-8 font-ddin grid grid-cols-3 gap-4 text-center">
-                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">
-                      {posts.length}
+                <div className="mt-8 grid grid-cols-3 gap-4 text-center">
+                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
+                    <div className="type-h3 text-[#222]  ">
+                      {String(stats.postCount).padStart(2, "0")}
                     </div>
-                    <div className="text-[16px] font-semibold text-[#222]">
+                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
                       post
                     </div>
                   </div>
-                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">
-                      {weaves.length}
+                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
+                    <div className="type-h3 text-[#222] ">
+                      {String(stats.weaveCount).padStart(2, "0")}
                     </div>
-                    <div className="text-[16px] font-semibold text-[#222]">
+                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
                       weaved
                     </div>
                   </div>
-                  <div className="p-3 rounded-[15px] border-primary-30 border bg-white">
-                    <div className="text-[36px] font-bold text-[#222] ">-</div>
-                    <div className="text-[16px] font-semibold text-[#222]">
+                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
+                    <div className="type-h3 text-[#222] ">
+                      {String(stats.points).padStart(2, "0")}
+                    </div>
+                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
                       point
                     </div>
                   </div>
@@ -318,18 +331,20 @@ const PublicProfilePage = () => {
               className="lg:col-span-2 space-y-6"
             >
               {/* Bio Section */}
-              <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
-                <div className="flex items-center mb-6">
+              <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+                <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-semibold flex items-center space-x-2">
-                    <UserIcon className="w-5 h-5" />
-                    <span>About Me</span>
+                    <UserIcon className="w-5 h-5 text-megaweave-forest-dark" />
+                    <div className="type-button-b1 text-megaweave-forest-dark">
+                      About Me
+                    </div>
                   </h3>
                 </div>
 
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-gray-300 leading-relaxed whitespace-pre-line break-words"
+                  className="text-primary leading-relaxed whitespace-pre-line break-words"
                 >
                   {profileData.bio ? (
                     renderTextWithUrls(profileData.bio)
@@ -343,7 +358,7 @@ const PublicProfilePage = () => {
 
               {/* Contact Information */}
               {(profileData.contact_email || profileData.contact_phone) && (
-                <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+                <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
                   <div className="flex items-center mb-6">
                     <h3 className="text-xl font-semibold flex items-center space-x-2">
                       <Contact className="w-5 h-5" />

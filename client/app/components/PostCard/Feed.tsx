@@ -2,16 +2,24 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import PostCard from "./PostCard";
 import { usePost } from "../../contexts/PostContext";
-
+import { Weave } from "@/services/weaveService";
 import type { Post, Condition } from "../../types/schema";
 
 interface FeedProps {
   posts: Post[];
   conditions: Condition[];
   onPostClick: (post: Post) => void;
+  weaves?: Weave[];
+  currentUserId?: number;
 }
 
-export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
+export default function Feed({
+  posts,
+  conditions,
+  onPostClick,
+  weaves,
+  currentUserId,
+}: FeedProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const pendingIndexRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -28,6 +36,17 @@ export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
   useEffect(() => {
     cardRefs.current = cardRefs.current.slice(0, posts.length);
   }, [posts.length]);
+
+  const postIdToWeaveMap = useCallback(() => {
+    if (!weaves) return new Map();
+    const map = new Map<number, Weave>();
+    weaves.forEach((weave) => {
+      map.set(weave.post.id, weave);
+    });
+    return map;
+  }, [weaves]);
+
+  const weaveMap = postIdToWeaveMap();
 
   // parameters you can tune
   const HYSTERESIS_PX = 80; // 當新卡片只比舊卡片接近不到這距離（px）就忽略
@@ -177,26 +196,31 @@ export default function Feed({ posts, conditions, onPostClick }: FeedProps) {
 
   return (
     <div className="feed-snap snap-y snap-mandatory">
-      {posts.map((p, i) => (
-        <div
-          key={p.id}
-          data-index={i}
-          ref={(el) => {
-            cardRefs.current[i] = el;
-          }}
-          className="snap-child snap-center px-4"
-        >
-          <PostCard
-            post={p}
-            conditions={conditions}
-            categories={categories}
-            onPostClick={handlePostClick}
-            // isExpanded={activeIndex === i}
-            isExpanded={true} // always expanded for now
-          />
-        </div>
-      ))}
-      {/* <div className="h-[40vh]" aria-hidden="true" /> */}
+      {posts.map((p, i) => {
+        // ✅ 取得對應的 weave 資料
+        const weave = weaveMap.get(p.id);
+
+        return (
+          <div
+            key={p.id}
+            data-index={i}
+            ref={(el) => {
+              cardRefs.current[i] = el;
+            }}
+            className="snap-child snap-center px-4"
+          >
+            <PostCard
+              post={p}
+              conditions={conditions}
+              categories={categories}
+              onPostClick={handlePostClick}
+              isExpanded={true}
+              weave={weave} // ✅ 傳遞 weave 資料
+              currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

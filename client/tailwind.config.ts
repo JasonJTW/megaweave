@@ -172,7 +172,11 @@ export default {
           lineHeight: "1.5",
           fontWeight: "400", // Regular (R)
         },
-        // ... (以此類推加入 T4, T5, Button B1, B2)
+        ".type-body-t4": {
+          fontSize: "16px", // 16pt
+          lineHeight: "1.5",
+          fontWeight: "500", // Regular (R)
+        },
         // Body T5 範例 (包含 2% 字距)
         ".type-body-t5": {
           fontSize: "0.875rem", // 14pt

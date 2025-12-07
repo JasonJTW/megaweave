@@ -15,6 +15,51 @@ interface WeaveRow extends RowDataPacket {
   receiver_id: number;
   quantity: number;
   status: "pending" | "completed" | "cancelled";
+  notes: string | null;
+  completed_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+// 輸出型別，包含所有 post 相關欄位
+interface WeaveOutput extends RowDataPacket {
+  // Weaves (w.*)
+  id: number;
+  post_id: number;
+  item_id: number | null;
+  giver_id: number;
+  receiver_id: number;
+  quantity: number;
+  status: "pending" | "completed" | "cancelled";
+  notes: string | null;
+  completed_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+
+  // Posts (p.* - 全部加上 post_ 前綴)
+  post_id_original: number;
+  post_user_id: number;
+  post_title: string;
+  post_content: string;
+  post_type: "seek" | "wish" | "share" | "commons";
+  post_status_original: "active" | "inactive" | "expired";
+  post_location: string | null;
+  post_tags: string | null;
+  post_category_id: number;
+  post_condition_level: number;
+  post_expires_at: Date | null;
+  post_view_count: number;
+  post_likes_count: number;
+  post_created_at: Date;
+  post_updated_at: Date;
+  post_comment_count: number;
+
+  // JOIN 來的其他欄位
+  item_title: string | null;
+  giver_name: string;
+  giver_avatar: string;
+  receiver_name: string;
+  receiver_avatar: string;
+  image_urls: string;
 }
 
 interface ItemRow extends RowDataPacket {
@@ -106,33 +151,48 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { role } = req.query; // 'giver' | 'receiver' | undefined
+    const { role } = req.query;
 
-    let whereClause = "";
-    const params: any[] = [];
+    let whereClause = `WHERE (w.giver_id = ? OR w.receiver_id = ?)`;
+    const params: (string | number)[] = [userId, userId];
 
     if (role === "giver") {
-      whereClause = "WHERE w.giver_id = ?";
-      params.push(userId);
+      whereClause = `WHERE w.giver_id = ?`;
+      params.splice(0, 2, userId);
     } else if (role === "receiver") {
-      whereClause = "WHERE w.receiver_id = ?";
-      params.push(userId);
-    } else {
-      whereClause = "WHERE w.giver_id = ? OR w.receiver_id = ?";
-      params.push(userId, userId);
+      whereClause = `WHERE w.receiver_id = ?`;
+      params.splice(0, 2, userId);
     }
 
-    // 修正：加入 images table 並使用 GROUP_CONCAT 避免重複 row
+    // 1. 修改 SQL 查詢：根據 posts 完整 Schema 選取所有欄位並加上前綴
     const query = `
       SELECT 
-        w.*,
-        p.title as post_title,
-        i.title as item_title,
-        giver.username as giver_name,
-        giver.avatar_url as giver_avatar,
-        receiver.username as receiver_name,
-        receiver.avatar_url as receiver_avatar,
-        GROUP_CONCAT(img.thumbnail_url) as thumbnail_urls
+          w.*,
+          -- 貼文 (posts) 的所有欄位 (需重新命名避免衝突)
+          p.id AS post_id_original,
+          p.user_id AS post_user_id,
+          p.title AS post_title,
+          p.content AS post_content,
+          p.type AS post_type,
+          p.status AS post_status_original,
+          p.location AS post_location,
+          p.tags AS post_tags,
+          p.category_id AS post_category_id,
+          p.condition_level AS post_condition_level,
+          p.expires_at AS post_expires_at,
+          p.view_count AS post_view_count,
+          p.likes_count AS post_likes_count,
+          p.created_at AS post_created_at,
+          p.updated_at AS post_updated_at,
+          p.comment_count AS post_comment_count,
+          
+          -- 其他 JOIN 的欄位
+          i.title AS item_title,
+          giver.username AS giver_name,
+          giver.avatar_url AS giver_avatar,
+          receiver.username AS receiver_name,
+          receiver.avatar_url AS receiver_avatar,
+          GROUP_CONCAT(img.image_url) AS image_urls
       FROM weaves w
       JOIN posts p ON w.post_id = p.id
       LEFT JOIN items i ON w.item_id = i.id
@@ -144,23 +204,67 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       ORDER BY w.created_at DESC
     `;
 
-    const [weaves] = await dbPool.execute<RowDataPacket[]>(query, params);
+    const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
 
-    // 處理 thumbnail_urls 字串轉陣列
-    const processedWeaves = weaves.map((weave: any) => ({
-      ...weave,
-      thumbnail_urls: weave.thumbnail_urls
-        ? weave.thumbnail_urls.split(",")
-        : [],
-    }));
+    // 2. 處理結果 (Response Mapping)：將 post 相關資料內嵌
+    const processedWeaves = weaveRows.map((row) => {
+      // 提取 Post 相關資料
+      const post = {
+        id: row.post_id_original,
+        user_id: row.post_user_id,
+        title: row.post_title,
+        content: row.post_content,
+        type: row.post_type,
+        status: row.post_status_original,
+        location: row.post_location,
+        tags: row.post_tags,
+        category_id: row.post_category_id,
+        condition_level: row.post_condition_level,
+        expires_at: row.post_expires_at,
+        view_count: row.post_view_count,
+        likes_count: row.post_likes_count,
+        created_at: row.post_created_at,
+        updated_at: row.post_updated_at,
+        comment_count: row.post_comment_count,
+        // 分割 image_urls 字串成陣列
+        image_urls: row.image_urls ? row.image_urls.split(",") : [],
+      };
 
-    return res.status(200).json({ weaves: processedWeaves });
+      // 建立 Weave 物件 (手動組裝 w.* 的欄位)
+      const weave: any = {
+        id: row.id,
+        post_id: row.post_id,
+        item_id: row.item_id,
+        giver_id: row.giver_id,
+        receiver_id: row.receiver_id,
+        quantity: row.quantity,
+        status: row.status,
+        notes: row.notes,
+        completed_at: row.completed_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+
+        // JOIN 來的其他欄位
+        item_title: row.item_title,
+        giver_name: row.giver_name,
+        receiver_name: row.receiver_name,
+
+        // ✅ 內嵌 post 物件
+        post: post,
+      };
+
+      return weave;
+    });
+
+    return res.status(200).json({
+      weaves: processedWeaves,
+      message: "Weave list retrieved successfully",
+    });
   } catch (error) {
-    console.error("Error fetching weaves:", error);
-    return res.status(500).json({ errorMessage: "Failed to fetch weaves" });
+    console.error("Error retrieving weaves:", error);
+    return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
   }
 });
-
 // PATCH /api/weaves/:id/status - 更新交易狀態
 router.patch(
   "/:id/status",
@@ -180,7 +284,7 @@ router.patch(
 
       // 鎖定該筆交易紀錄
       const weaveQuery = `SELECT * FROM weaves WHERE id = ? FOR UPDATE`;
-      const [weaves] = await connection.execute<WeaveRow[]>(weaveQuery, [
+      const [weaves] = await connection.execute<WeaveOutput[]>(weaveQuery, [
         weaveId,
       ]);
 

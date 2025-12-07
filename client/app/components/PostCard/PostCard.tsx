@@ -32,6 +32,15 @@ function PostCardInner({
 
   const category = categories.find((c) => c.id === post.category_id);
 
+  const imageUrls = Array.isArray(post.image_urls)
+    ? post.image_urls // 如果已經是陣列 (來自 Weaving)
+    : typeof post.image_urls === "string"
+    ? post.image_urls.split(",") // 如果是字串 (來自其他 Post API)
+    : []; // 否則為空陣列
+
+  // 然後您可以安全地使用 imageUrls[0]
+  const imageSrc = imageUrls[0];
+
   return (
     <div
       onClick={() => onPostClick(post)}
@@ -76,11 +85,11 @@ function PostCardInner({
           transition={{ duration: 0.6, ease: "easeIn" }}
           style={{ pointerEvents: isExpanded ? "auto" : "none" }}
         >
-          {post.image_urls && post.image_urls.length > 0 && (
+          {imageSrc && (
             <div className="relative justify-center mb-0  mx-4">
               <div className="relative w-full h-64 md:h-80 rounded-[20px] overflow-hidden ">
                 <Image
-                  src={post.image_urls.split(",")[0]}
+                  src={imageSrc}
                   alt={post.title}
                   fill
                   className="object-cover"

@@ -29,6 +29,7 @@ import WeavingIcon from "../components/icons/WeavingIcon";
 import EditIcon from "../components/icons/EditIcon";
 import Drawer from "../components/Drawer";
 import { usePost } from "../contexts/PostContext";
+import type { Weave } from "@/services/weaveService";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
@@ -75,6 +76,7 @@ const UserPage = () => {
   const router = useRouter();
   const { refetchTeamMembers } = useTeam();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [weaves, setWeaves] = useState<Weave[]>([]);
   const { conditions } = usePost();
 
   // Avatar preview / upload states
@@ -241,6 +243,32 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error fetching user stats:", error);
       // 這裡可以選擇不設置錯誤，讓 stats 保持為 defaultStats (0, 0, 0)
+    }
+  };
+
+  const fetchWeaves = async () => {
+    try {
+      const response = await fetchWithTimeout(
+        `${hostName}/api/weaves`, // 預設抓取所有相關 (giver + receiver)
+        {
+          cache: "no-store",
+          method: "GET",
+          credentials: "include",
+        },
+        10000
+      );
+
+      if (!response.ok) {
+        // 如果不是 200，僅 log 錯誤但不阻擋頁面渲染 (非核心致命錯誤)
+        console.warn("Failed to fetch weaves history");
+        return;
+      }
+
+      const data = await response.json();
+      console.log("Fetched Weaves:", data.weaves);
+      setWeaves(data.weaves || []);
+    } catch (error) {
+      console.error("Error fetching weaves:", error);
     }
   };
 
@@ -752,6 +780,7 @@ const UserPage = () => {
         getContactPhone();
         getUsername();
         fetchStats();
+        fetchWeaves();
       }
     };
     init();
@@ -1363,6 +1392,13 @@ const UserPage = () => {
             memberUserId={user.userId}
           />
         )}
+
+        <Drawer
+          title="Weaving"
+          posts={[]}
+          weaves={weaves}
+          conditions={conditions}
+        />
         <Drawer title="Share" posts={sharePosts} conditions={conditions} />
         <Drawer title="Wish" posts={wishPosts} conditions={conditions} />
       </div>

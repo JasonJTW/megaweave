@@ -7,16 +7,16 @@ import User from "../types/user";
 import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { User as UserIcon, LogOut, Save, X, Contact } from "lucide-react";
-import { useForm } from "react-hook-form";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
+import { User as UserIcon, LogOut, Save, X } from "lucide-react";
+// import { useForm } from "react-hook-form";
+// import {
+//   Form,
+//   FormControl,
+//   FormField,
+//   FormItem,
+//   FormLabel,
+// } from "@/components/ui/form";
+// import { Switch } from "@/components/ui/switch";
 import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import MemberForm from "../memberForm";
@@ -31,24 +31,24 @@ import Drawer from "../components/Drawer";
 import { usePost } from "../contexts/PostContext";
 import type { Weave } from "@/services/weaveService";
 // 定義表單資料型別（無需 zod）
-type ContactSettingsValues = {
-  email?: string; // 可選填的電子郵件
-  phone?: string; // 可選填的電話號碼
-  emailVisible: boolean; // 是否公開 toggle
-  phoneVisible: boolean;
-};
+// type ContactSettingsValues = {
+//   email?: string; // 可選填的電子郵件
+//   phone?: string; // 可選填的電話號碼
+//   emailVisible: boolean; // 是否公開 toggle
+//   phoneVisible: boolean;
+// };
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 const processHostName = process.env.NEXT_PUBLIC_PROCESS_HOSTNAME;
 const userNameMaxLength =
   Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
 
-const defaultContactValues: ContactSettingsValues = {
-  email: "",
-  phone: "",
-  emailVisible: false,
-  phoneVisible: false,
-};
+// const defaultContactValues: ContactSettingsValues = {
+//   email: "",
+//   phone: "",
+//   emailVisible: false,
+//   phoneVisible: false,
+// };
 
 const defaultStats: UserStats = {
   postCount: 0,
@@ -65,11 +65,11 @@ const UserPage = () => {
   const [isContributor, setIsContributor] = useState(false);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  // const [contactEmail, setContactEmail] = useState("");
+  // const [contactPhone, setContactPhone] = useState("");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
-  const [isEditingContact, setIsEditingContact] = useState(false);
+  // const [isEditingContact, setIsEditingContact] = useState(false);
   const [tempBio, setTempBio] = useState("");
   const [tempUsername, setTempUsername] = useState("");
   const [stats, setStats] = useState<UserStats>(defaultStats);
@@ -88,14 +88,14 @@ const UserPage = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousPreviewRef = useRef<string | null>(null); // store previous object URL so we can revoke it
 
-  const contactForm = useForm<ContactSettingsValues>({
-    defaultValues: defaultContactValues,
-  });
+  // const contactForm = useForm<ContactSettingsValues>({
+  //   defaultValues: defaultContactValues,
+  // });
 
-  const onContactFormSubmit = (data: ContactSettingsValues) => {
-    console.log("Contact settings updated:", data);
-    // 這裡可以添加 API 調用來保存設定
-  };
+  // const onContactFormSubmit = (data: ContactSettingsValues) => {
+  //   console.log("Contact settings updated:", data);
+  //   // 這裡可以添加 API 調用來保存設定
+  // };
 
   const fetchWithTimeout = async (
     url: string,
@@ -527,103 +527,103 @@ const UserPage = () => {
     }
   };
 
-  const insertContactEmail = async (contactEmail: string) => {
-    try {
-      const response = await fetch(
-        `${hostName}/api/userprofile/contact_email`,
-        {
-          cache: "no-store",
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contact_email: contactEmail,
-          }),
-        }
-      );
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error("Failed to update profile: ", result.errorMessage);
-      }
-      const result = await response.json();
-      console.log("Update profile Success: ", result);
-    } catch (error) {
-      console.error("Error update profile: ", error);
-      setError(
-        error instanceof Error ? error.message : "Error update contact email"
-      );
-      throw error;
-    }
-  };
+  // const insertContactEmail = async (contactEmail: string) => {
+  //   try {
+  //     const response = await fetch(
+  //       `${hostName}/api/userprofile/contact_email`,
+  //       {
+  //         cache: "no-store",
+  //         method: "POST",
+  //         credentials: "include",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({
+  //           contact_email: contactEmail,
+  //         }),
+  //       }
+  //     );
+  //     if (!response.ok) {
+  //       const result = await response.json();
+  //       throw new Error("Failed to update profile: ", result.errorMessage);
+  //     }
+  //     const result = await response.json();
+  //     console.log("Update profile Success: ", result);
+  //   } catch (error) {
+  //     console.error("Error update profile: ", error);
+  //     setError(
+  //       error instanceof Error ? error.message : "Error update contact email"
+  //     );
+  //     throw error;
+  //   }
+  // };
 
-  const insertContactPhone = async (contactPhone: string) => {
-    try {
-      const response = await fetch(
-        `${hostName}/api/userprofile/contact_phone`,
-        {
-          cache: "no-store",
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contact_phone: contactPhone,
-          }),
-        }
-      );
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error("Failed to update profile: ", result.errorMessage);
-      }
-      const result = await response.json();
-      console.log("Update profile Success: ", result);
-    } catch (error) {
-      console.error("Error update profile: ", error);
-      setError(
-        error instanceof Error ? error.message : "Error update contact phone"
-      );
-      throw error;
-    }
-  };
+  // const insertContactPhone = async (contactPhone: string) => {
+  //   try {
+  //     const response = await fetch(
+  //       `${hostName}/api/userprofile/contact_phone`,
+  //       {
+  //         cache: "no-store",
+  //         method: "POST",
+  //         credentials: "include",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({
+  //           contact_phone: contactPhone,
+  //         }),
+  //       }
+  //     );
+  //     if (!response.ok) {
+  //       const result = await response.json();
+  //       throw new Error("Failed to update profile: ", result.errorMessage);
+  //     }
+  //     const result = await response.json();
+  //     console.log("Update profile Success: ", result);
+  //   } catch (error) {
+  //     console.error("Error update profile: ", error);
+  //     setError(
+  //       error instanceof Error ? error.message : "Error update contact phone"
+  //     );
+  //     throw error;
+  //   }
+  // };
 
-  const getContactEmail = async () => {
-    const response = await fetch(`${hostName}/api/userprofile/contact_email`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const result = await response.json();
-      console.error("Error fetching userprofile:", result.errorMessage);
-      setError(result.errMessage);
-      return;
-    }
-    const result = await response.json();
-    const emailValue = result.contactEmail || "";
-    setContactEmail(emailValue);
-    contactForm.setValue("email", emailValue);
-  };
+  // const getContactEmail = async () => {
+  //   const response = await fetch(`${hostName}/api/userprofile/contact_email`, {
+  //     cache: "no-store",
+  //     method: "GET",
+  //     credentials: "include",
+  //   });
+  //   if (!response.ok) {
+  //     const result = await response.json();
+  //     console.error("Error fetching userprofile:", result.errorMessage);
+  //     setError(result.errMessage);
+  //     return;
+  //   }
+  //   const result = await response.json();
+  //   const emailValue = result.contactEmail || "";
+  //   setContactEmail(emailValue);
+  //   contactForm.setValue("email", emailValue);
+  // };
 
-  const getContactPhone = async () => {
-    const response = await fetch(`${hostName}/api/userprofile/contact_phone`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const result = await response.json();
-      console.error("Error fetching userprofile:", result.errorMessage);
-      setError(result.errMessage);
-      return;
-    }
-    const result = await response.json();
-    const phoneValue = result.contactPhone || "";
-    setContactPhone(phoneValue);
-    contactForm.setValue("phone", phoneValue);
-  };
+  // const getContactPhone = async () => {
+  //   const response = await fetch(`${hostName}/api/userprofile/contact_phone`, {
+  //     cache: "no-store",
+  //     method: "GET",
+  //     credentials: "include",
+  //   });
+  //   if (!response.ok) {
+  //     const result = await response.json();
+  //     console.error("Error fetching userprofile:", result.errorMessage);
+  //     setError(result.errMessage);
+  //     return;
+  //   }
+  //   const result = await response.json();
+  //   const phoneValue = result.contactPhone || "";
+  //   setContactPhone(phoneValue);
+  //   contactForm.setValue("phone", phoneValue);
+  // };
 
   const handleSaveBio = () => {
     setBio(tempBio);
@@ -643,44 +643,44 @@ const UserPage = () => {
     setIsEditingBio(true);
   };
 
-  const handleSaveContact = async () => {
-    const formData = contactForm.getValues();
-    console.log("Contact form data:", formData);
+  // const handleSaveContact = async () => {
+  //   const formData = contactForm.getValues();
+  //   console.log("Contact form data:", formData);
 
-    try {
-      if (formData.email !== contactEmail) {
-        await insertContactEmail(formData.email || "");
-      }
-      if (formData.phone !== contactPhone) {
-        await insertContactPhone(formData.phone || "");
-      }
-      setContactEmail(formData.email || "");
-      setContactPhone(formData.phone || "");
-      setError(null);
-      setIsEditingContact(false);
-    } catch (error) {
-      console.error("Error saving contact info:", error);
-      setError(
-        error instanceof Error ? error.message : "Error saving contact info"
-      );
-    }
-  };
+  //   try {
+  //     if (formData.email !== contactEmail) {
+  //       await insertContactEmail(formData.email || "");
+  //     }
+  //     if (formData.phone !== contactPhone) {
+  //       await insertContactPhone(formData.phone || "");
+  //     }
+  //     setContactEmail(formData.email || "");
+  //     setContactPhone(formData.phone || "");
+  //     setError(null);
+  //     setIsEditingContact(false);
+  //   } catch (error) {
+  //     console.error("Error saving contact info:", error);
+  //     setError(
+  //       error instanceof Error ? error.message : "Error saving contact info"
+  //     );
+  //   }
+  // };
 
-  const handleCancelContact = () => {
-    contactForm.setValue("email", contactEmail);
-    contactForm.setValue("phone", contactPhone);
-    setIsEditingContact(false);
-  };
+  // const handleCancelContact = () => {
+  //   contactForm.setValue("email", contactEmail);
+  //   contactForm.setValue("phone", contactPhone);
+  //   setIsEditingContact(false);
+  // };
 
-  const handleEditContact = () => {
-    contactForm.reset({
-      email: contactEmail,
-      phone: contactPhone,
-      emailVisible: contactForm.getValues("emailVisible"),
-      phoneVisible: contactForm.getValues("phoneVisible"),
-    });
-    setIsEditingContact(true);
-  };
+  // const handleEditContact = () => {
+  //   contactForm.reset({
+  //     email: contactEmail,
+  //     phone: contactPhone,
+  //     emailVisible: contactForm.getValues("emailVisible"),
+  //     phoneVisible: contactForm.getValues("phoneVisible"),
+  //   });
+  //   setIsEditingContact(true);
+  // };
 
   const handleSaveUsername = async () => {
     try {
@@ -776,8 +776,8 @@ const UserPage = () => {
       const success = await fetchUser();
       if (success) {
         getBio();
-        getContactEmail();
-        getContactPhone();
+        // getContactEmail();
+        // getContactPhone();
         getUsername();
         fetchStats();
         fetchWeaves();
@@ -1216,7 +1216,7 @@ const UserPage = () => {
               </div>
 
               {/* Contact Settings */}
-              <div className="bg-white border border-primary-30 rounded-2xl p-6  transition-all duration-300">
+              {/* <div className="bg-white border border-primary-30 rounded-2xl p-6  transition-all duration-300">
                 <div className="flex items-center justify-between mb-8">
                   <h3 className="type-button-b1 text-megaweave-forest-dark flex items-center space-x-2">
                     <Contact className="w-5 h-5" />
@@ -1254,7 +1254,7 @@ const UserPage = () => {
                     onSubmit={contactForm.handleSubmit(onContactFormSubmit)}
                     className="space-y-6"
                   >
-                    {/* Email Section */}
+
                     <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -1263,7 +1263,7 @@ const UserPage = () => {
                           </FormLabel>
                         </div>
 
-                        {/* EmailVisible */}
+
                         <FormField
                           control={contactForm.control}
                           name="emailVisible"
@@ -1292,7 +1292,7 @@ const UserPage = () => {
                         />
                       </div>
 
-                      {/* EmailInput */}
+
                       <FormField
                         control={contactForm.control}
                         name="email"
@@ -1316,7 +1316,7 @@ const UserPage = () => {
                       />
                     </div>
 
-                    {/* Phone Section */}
+
                     <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -1325,7 +1325,7 @@ const UserPage = () => {
                           </FormLabel>
                         </div>
 
-                        {/* PhoneVisible */}
+
                         <FormField
                           control={contactForm.control}
                           name="phoneVisible"
@@ -1354,7 +1354,7 @@ const UserPage = () => {
                         />
                       </div>
 
-                      {/* PhoneInput */}
+
                       <FormField
                         control={contactForm.control}
                         name="phone"
@@ -1380,7 +1380,7 @@ const UserPage = () => {
                     </div>
                   </form>
                 </Form>
-              </div>
+              </div> */}
             </motion.div>
           </div>
         </div>

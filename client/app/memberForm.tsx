@@ -24,6 +24,7 @@ import {
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { TeamMember } from "./teamMembers";
 import { useTeam } from "./contexts/TeamContext";
+import EditIcon from "./components/icons/EditIcon";
 
 // Member Form 資料型別
 type MemberFormValues = {
@@ -269,7 +270,7 @@ const MemberForm: React.FC<MemberFormProps> = ({
         animate={{ opacity: 1, y: 0 }}
         className="max-w-6xl mx-auto px-6 py-4"
       >
-        <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6">
+        <div className="bg-white border border-primary-30 rounded-2xl p-6">
           <div className="flex items-center justify-center py-8">
             <div className="w-8 h-8 border-2 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin"></div>
           </div>
@@ -285,7 +286,7 @@ const MemberForm: React.FC<MemberFormProps> = ({
       transition={{ delay: 0.3 }}
       className="max-w-6xl mx-auto px-6 py-4"
     >
-      <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700/30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+      <div className="bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
         {/* Error Alert */}
         {error && (
           <Alert className="mb-6 bg-red-950/50 border-red-500/30">
@@ -304,10 +305,9 @@ const MemberForm: React.FC<MemberFormProps> = ({
           {!isEditingMember ? (
             <button
               onClick={handleEditMember}
-              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-700/50 hover:bg-gray-600/50 transition-all duration-200 text-sm"
+              className="flex items-center space-x-1 px-3 py-1.5 transition-all duration-200 text-sm"
             >
-              <Edit3 className="w-3 h-3" />
-              <span>Edit</span>
+              <EditIcon className="w-4 h-4" />
             </button>
           ) : (
             <div className="flex space-x-2">

@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
-import { User as UserIcon, Contact, Mail, Phone } from "lucide-react";
+import { User as UserIcon } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import Drawer from "@/app/components/Drawer";
 import type { Post, UserStats } from "@/app/types/schema";
@@ -357,8 +357,8 @@ const PublicProfilePage = () => {
               </div>
 
               {/* Contact Information */}
-              {(profileData.contact_email || profileData.contact_phone) && (
-                <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+              {/* {(profileData.contact_email || profileData.contact_phone) && ( */}
+              {/* <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
                   <div className="flex items-center mb-6">
                     <h3 className="text-xl font-semibold flex items-center space-x-2">
                       <Contact className="w-5 h-5" />
@@ -367,7 +367,7 @@ const PublicProfilePage = () => {
                   </div>
 
                   <div className="space-y-4">
-                    {/* Email */}
+
                     {profileData.contact_email && (
                       <div className="p-4 bg-megaweave-blue/10 rounded-lg">
                         <div className="flex items-center space-x-3">
@@ -385,7 +385,7 @@ const PublicProfilePage = () => {
                       </div>
                     )}
 
-                    {/* Phone */}
+
                     {profileData.contact_phone && (
                       <div className="p-4 bg-megaweave-blue/10 rounded-lg">
                         <div className="flex items-center space-x-3">
@@ -403,8 +403,8 @@ const PublicProfilePage = () => {
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                </div> */}
+              {/* )} */}
 
               {/* --- 4. 顯示 Drawers --- */}
               {/* <Drawer

@@ -81,7 +81,7 @@ const monitorInterval = setInterval(() => {
           : "0%",
     };
 
-    console.log("📊 Pool Status:", status);
+    // console.log("📊 Pool Status:", status);
 
     // ⚠️ 警告：如果使用率過高或有排隊，發出警告
     if (inUse >= 18 || queueLength > 0) {

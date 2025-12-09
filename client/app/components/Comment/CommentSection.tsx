@@ -9,6 +9,7 @@ import CommentCard from "./CommentCard";
 import CommentInput from "./CommentInput";
 import CommentItem from "./CommentItem";
 import { createWeave } from "@/services/weaveService";
+import { useRouter } from "next/navigation";
 // ✅ 引入 WeavingInput
 import WeavingInput from "./WeavingInput";
 import {
@@ -25,6 +26,7 @@ interface CommentSectionProps {
 type TabKey = "all" | number;
 
 const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey | null>(null);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -138,13 +140,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       const targetQuantity = typeof quantity === "number" ? quantity : 1;
 
       // 3. 發送請求 (使用 fetch)
-      await createWeave({
+      const newWeave = await createWeave({
         postId: post.id,
         itemId: targetItemId,
         quantity: targetQuantity,
         // notes: "..." // 如果未來你有輸入備註的需求，可以加在這裡
       });
-
+      console.log("newWeave:", newWeave);
+      router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
       // 4. 成功處理
       alert("Request sent successfully!"); // 建議未來改用 Toast 元件
       handleCommentSuccess(); // 重新整理列表並關閉輸入框

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import User from "../types/user";
 import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
@@ -27,9 +27,9 @@ import CommonShareIcon from "../components/icons/CommonShareIcon";
 import WeavingIcon from "../components/icons/WeavingIcon";
 // import UserPageDecoLine from "../components/Deco/UserPageDecoLine";
 import EditIcon from "../components/icons/EditIcon";
-import Drawer from "../components/Drawer";
 import { usePost } from "../contexts/PostContext";
 import type { Weave } from "@/services/weaveService";
+import DrawerWrapper from "@/components/DrawerWrapper";
 // 定義表單資料型別（無需 zod）
 // type ContactSettingsValues = {
 //   email?: string; // 可選填的電子郵件
@@ -87,8 +87,6 @@ const UserPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousPreviewRef = useRef<string | null>(null); // store previous object URL so we can revoke it
-  const searchParams = useSearchParams();
-  const highlightWeaveId = searchParams.get("highlightWeaveId");
   // const contactForm = useForm<ContactSettingsValues>({
   //   defaultValues: defaultContactValues,
   // });
@@ -1394,18 +1392,13 @@ const UserPage = () => {
           />
         )}
 
-        <Drawer
-          title="Weaving"
-          posts={[]}
+        <DrawerWrapper
           weaves={weaves}
+          sharePosts={sharePosts}
+          wishPosts={wishPosts}
           conditions={conditions}
           currentUserId={user.userId}
-          highlightWeaveId={
-            highlightWeaveId ? Number(highlightWeaveId) : undefined
-          }
         />
-        <Drawer title="Share" posts={sharePosts} conditions={conditions} />
-        <Drawer title="Wish" posts={wishPosts} conditions={conditions} />
       </div>
     </>
   );

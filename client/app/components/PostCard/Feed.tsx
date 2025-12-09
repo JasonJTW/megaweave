@@ -12,6 +12,7 @@ interface FeedProps {
   weaves?: Weave[];
   currentUserId?: number;
   onWeaveStatusChange?: () => void;
+  highlightWeaveId?: number;
 }
 
 export default function Feed({
@@ -21,6 +22,7 @@ export default function Feed({
   weaves,
   currentUserId,
   onWeaveStatusChange,
+  highlightWeaveId,
 }: FeedProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const pendingIndexRef = useRef<number | null>(null);
@@ -34,6 +36,26 @@ export default function Feed({
   useEffect(() => {
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
+
+  useEffect(() => {
+    if (!highlightWeaveId || !weaves) return;
+
+    // 1. 找到該 weave 在陣列中的 index
+    const targetIndex = weaves.findIndex((w) => w.id === highlightWeaveId);
+
+    if (targetIndex !== -1 && cardRefs.current[targetIndex]) {
+      // 2. 稍微延遲以確保 DOM 渲染完畢 (特別是剛從 Drawer 展開動畫結束後)
+      setTimeout(() => {
+        cardRefs.current[targetIndex]?.scrollIntoView({
+          behavior: "smooth",
+          block: "center", // 將卡片置中
+        });
+
+        // (選用) 這裡可以加上一個閃爍動畫的 class 來提示使用者是哪一張
+        // cardRefs.current[targetIndex].classList.add("highlight-flash");
+      }, 300); // 300ms 大約等 Drawer 展開動畫跑完
+    }
+  }, [highlightWeaveId, weaves]); // 依賴項
 
   useEffect(() => {
     cardRefs.current = cardRefs.current.slice(0, posts.length);
@@ -200,11 +222,21 @@ export default function Feed({
     <div className="feed-snap snap-y snap-mandatory">
       {posts.map((p, i) => {
         // ✅ 取得對應的 weave 資料
-        const weave = weaveMap.get(p.id);
+        // ✅ 修正邏輯：
+        // 1. 如果 weaves 存在且索引 i 的 weave 對應當前 post，直接使用該 weave (解決 Map 覆蓋問題)
+        // 2. 否則回退使用 Map 查找 (保留給一般 Feed 使用)
+        const directWeave =
+          weaves && weaves[i] && weaves[i].post.id === p.id ? weaves[i] : null;
+        const weave = directWeave || weaveMap.get(p.id);
+
+        // ✅ 修正 Key：
+        // 如果有 weave，使用 weave.id (唯一)；否則使用 post.id
+        // 加上前綴以確保完全不衝突
+        const uniqueKey = weave ? `weave-${weave.id}` : `post-${p.id}`;
 
         return (
           <div
-            key={p.id}
+            key={uniqueKey}
             data-index={i}
             ref={(el) => {
               cardRefs.current[i] = el;

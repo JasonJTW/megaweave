@@ -30,7 +30,7 @@ interface PostCardProps {
 
 function PostCardInner({
   post,
-  conditions,
+  // conditions,
   categories,
   onPostClick,
   isExpanded = false,
@@ -38,7 +38,7 @@ function PostCardInner({
   currentUserId,
   onWeaveStatusChange,
 }: PostCardProps) {
-  const condition = conditions.find((c) => c.level === post.condition_level);
+  // const condition = conditions.find((c) => c.level === post.condition_level);
   const category = categories.find((c) => c.id === post.category_id);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -199,12 +199,12 @@ function PostCardInner({
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px] bg-white overflow-hidden transition-all duration-300 py-0 pb-4 relevant ${
+      className={`font-ddin cursor-pointer rounded-[30px] bg-white overflow-hidden transition-all duration-300 py-0 pb-4 mt-4 relevant ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
         {
-          "--post-title-h": "72px",
+          "--post-title-h": "12px",
         } as React.CSSProperties & Record<string, string>
       }
     >
@@ -215,10 +215,6 @@ function PostCardInner({
           minHeight: "var(--post-title-h, 72px)",
         }}
       >
-        <h2 className="font-semibold font-ddin text-[36px] text-gray-800 truncate flex-1">
-          {post.title}
-        </h2>
-
         {/* ✅ Weave 狀態標籤 (移到標題右側) */}
         {weave && (
           <Badge
@@ -275,14 +271,17 @@ function PostCardInner({
                     </Badge>
                   </div>
                 )}
-                {condition && (
+                {/* {condition && (
                   <div className="flex items-center">
                     <Badge>{condition.name}</Badge>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           )}
+          <h2 className="font-semibold mx-4 font-ddin text-[36px] text-gray-800 truncate flex-1">
+            {post.title}
+          </h2>
 
           {category && (
             <div className="flex items-center mx-4 mt-[14px] leading-[34px]">
@@ -305,7 +304,7 @@ function PostCardInner({
               </div>
             )}
 
-            <div className="min-h-[18px]">
+            {/* <div className="min-h-[18px]">
               {post.tags && (
                 <div className="flex flex-wrap gap-0 leading-[18px]">
                   {post.tags.split(",").map((tag, i) => (
@@ -320,7 +319,7 @@ function PostCardInner({
                   ))}
                 </div>
               )}
-            </div>
+            </div> */}
 
             <div className="flex flex-col gap-[6px] mt-[12px] text-[16px] font-medium leading-[18px]">
               {post.location && (

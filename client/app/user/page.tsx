@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import User from "../types/user";
 import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
@@ -87,7 +87,8 @@ const UserPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousPreviewRef = useRef<string | null>(null); // store previous object URL so we can revoke it
-
+  const searchParams = useSearchParams();
+  const highlightWeaveId = searchParams.get("highlightWeaveId");
   // const contactForm = useForm<ContactSettingsValues>({
   //   defaultValues: defaultContactValues,
   // });
@@ -1399,6 +1400,9 @@ const UserPage = () => {
           weaves={weaves}
           conditions={conditions}
           currentUserId={user.userId}
+          highlightWeaveId={
+            highlightWeaveId ? Number(highlightWeaveId) : undefined
+          }
         />
         <Drawer title="Share" posts={sharePosts} conditions={conditions} />
         <Drawer title="Wish" posts={wishPosts} conditions={conditions} />

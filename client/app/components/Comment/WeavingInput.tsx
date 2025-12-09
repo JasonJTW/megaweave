@@ -88,7 +88,7 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
           {/* 左側：想索取 + 圖示 (不變) */}
           <div className="flex items-center bg-white rounded-[20px] h-[40px] px-4 gap-3 shadow-sm">
             <p className="text-[15px] font-medium text-gray-800 whitespace-nowrap">
-              想索取
+              Request
             </p>
             <WeavingIcon className="h-5 w-5 text-primary" />
             <UnlockIcon className="w-5 h-5 text-primary" />

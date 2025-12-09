@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import ExpandIcon from "./icons/ExpandIcon";
 import Feed from "./PostCard/Feed";
@@ -14,6 +14,7 @@ interface DrawerProps {
   weaves?: Weave[];
   currentUserId?: number;
   onWeaveStatusChange?: () => void;
+  highlightWeaveId?: number;
 }
 
 const Drawer: React.FC<DrawerProps> = ({
@@ -23,10 +24,17 @@ const Drawer: React.FC<DrawerProps> = ({
   weaves,
   currentUserId,
   onWeaveStatusChange,
+  highlightWeaveId,
 }) => {
   const router = useRouter();
-  const [isExpanded, setIsExpanded] = useState(false);
-
+  const shouldAutoExpand =
+    weaves?.some((w) => w.id === highlightWeaveId) ?? false;
+  const [isExpanded, setIsExpanded] = useState(shouldAutoExpand);
+  useEffect(() => {
+    if (shouldAutoExpand) {
+      setIsExpanded(true);
+    }
+  }, [shouldAutoExpand]);
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
   };
@@ -106,6 +114,7 @@ const Drawer: React.FC<DrawerProps> = ({
               weaves={weaves}
               currentUserId={currentUserId}
               onWeaveStatusChange={onWeaveStatusChange}
+              highlightWeaveId={highlightWeaveId}
             />
           ) : (
             <div className="py-8 text-center text-gray-500">{emptyMessage}</div>

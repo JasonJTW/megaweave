@@ -15,6 +15,8 @@ import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { uploadImages, insertImages } from "./upload";
 import { deleteS3Files } from "./upload";
 import likeRouter from "./like";
+import { shouldIncrementView } from "./utils/viewCounter";
+import { getUserFromCookie } from "./session";
 dotenv.config();
 
 const router = Router();
@@ -351,12 +353,6 @@ router.get("/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ errorMessage: "Invalid post ID" });
     }
 
-    // 更新瀏覽次數
-    await dbPool.execute(
-      "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
-      [postId]
-    );
-
     // 獲取貼文詳情
     const postQuery = `
       SELECT 
@@ -378,7 +374,50 @@ router.get("/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ errorMessage: "Post not found" });
     }
 
-    // 獲取貼文圖片
+    // 暫存貼文資料
+    let postData = rows[0];
+
+    // 2. 瀏覽計數邏輯處理
+    try {
+      // 嘗試獲取當前瀏覽者的 Session (檢查是否登入)
+      const session = await getUserFromCookie(req);
+      const currentUserId = session?.userId;
+      console.log("viewCounter_userID: ", currentUserId);
+
+      // 獲取 IP 作為未登入者的標識
+      // 注意: 如果有經過 Nginx 或 Cloudflare，可能需要用 req.headers['x-forwarded-for']
+      const ip = req.ip || req.headers["x-forwarded-for"] || "unknown_ip";
+
+      // 決定識別碼：有登入用 ID，沒登入用 IP
+      const viewerIdentifier = currentUserId
+        ? `user:${currentUserId}`
+        : `ip:${ip}`;
+      const isAuthor = currentUserId && currentUserId === postData.user_id;
+
+      // 條件：不是作者 且 通過 Redis 冷卻檢查
+      if (!isAuthor) {
+        const shouldCount = await shouldIncrementView(
+          postId,
+          viewerIdentifier as string
+        );
+
+        if (shouldCount) {
+          // 更新資料庫
+          await dbPool.execute(
+            "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
+            [postId]
+          );
+
+          // 重要：手動更新記憶體中的 postData，讓回傳給前端的數據即時顯示 +1
+          postData.view_count += 1;
+        }
+      }
+    } catch (viewError) {
+      // 瀏覽計數出錯不應影響貼文顯示，僅 log 錯誤
+      console.error("View count logic failed:", viewError);
+    }
+
+    // 3. 獲取關聯資料 (圖片與 Items)
     const imagesQuery =
       "SELECT * FROM images WHERE post_id = ? ORDER BY created_at";
     const [images] = await dbPool.execute<RowDataPacket[]>(imagesQuery, [

@@ -65,7 +65,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     if (!postId) return;
     setLoading(true);
     try {
-      const response = await fetch(`${hostName}/api/posts/${postId}`);
+      const response = await fetch(`${hostName}/api/posts/${postId}`, {
+        credentials: "include",
+        method: "GET",
+      });
       const data = await response.json();
 
       if (response.ok) {

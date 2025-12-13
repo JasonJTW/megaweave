@@ -220,6 +220,10 @@ jobs:
           echo "📥 Production dependencies installed"
 
       - name: Build client
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }} # 👈 將 Token 從 Secrets 傳入
+          SENTRY_ORG: megaweaving
+          SENTRY_PROJECT: javascript-nextjs
         run: |
           cd ~/megaweave/client
           npm run build

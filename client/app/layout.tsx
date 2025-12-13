@@ -13,10 +13,9 @@ import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 import Footer from "./components/Footer";
+import PlausibleProvider from "next-plausible";
 dotenv.config();
 // const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
-
-const plausibleDomain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN;
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -89,11 +88,6 @@ export default function RootLayout({
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544"
           crossOrigin="anonymous"
         ></script>
-        <Script
-          src="https://plausible.io/js/script.js"
-          data-domain={plausibleDomain}
-          strategy="afterInteractive"
-        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
@@ -149,7 +143,15 @@ export default function RootLayout({
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
           >
             <TeamProvider>
-              <PostProvider>{children}</PostProvider>
+              <PostProvider>
+                <PlausibleProvider
+                  domain="megaweave.net"
+                  trackLocalhost={true}
+                  enabled={true}
+                >
+                  {children}
+                </PlausibleProvider>
+              </PostProvider>
             </TeamProvider>
           </GoogleOAuthProvider>
           <Footer />

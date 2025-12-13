@@ -1,4 +1,4 @@
-import {withSentryConfig} from "@sentry/nextjs";
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  turbopack: {
+    root: __dirname,
   },
 };
 

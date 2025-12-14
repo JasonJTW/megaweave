@@ -11,6 +11,33 @@ export default {
   ],
   theme: {
     extend: {
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        // 🚨 這是最關鍵的部分 🚨
+        in: {
+          "0%": { opacity: "0", transform: "scale(0.95)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        out: {
+          "0%": { opacity: "1", transform: "scale(1)" },
+          "100%": { opacity: "0", transform: "scale(0.95)" },
+        },
+      },
+      animation: {
+        // 重新定義或確認有這些標準的動畫工具類
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        // 這些是 animate-in / animate-out 的後備或基礎定義
+        in: "in 0.15s ease-out",
+        out: "out 0.15s ease-in",
+      },
       fontFamily: {
         ddin: ["var(--font-ddin-pro)"],
       },

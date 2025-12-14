@@ -25,9 +25,36 @@ const MemberPage = () => {
   } = useTeam();
 
   const [member, setMember] = useState<TeamMember | null>(null);
-  // const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // 新增：控制按鈕顯示/隱藏的狀態
+  const [isNavVisible, setIsNavVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  // 新增：滾動偵測
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      // 向下滾動且滾動超過 100px 時隱藏
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        setIsNavVisible(false);
+      }
+      // 向上滾動時顯示
+      else if (currentScrollY < lastScrollY) {
+        setIsNavVisible(true);
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [lastScrollY]);
 
   useEffect(() => {
     if (teamLoading) {
@@ -47,7 +74,6 @@ const MemberPage = () => {
       return;
     }
 
-    // 從 context 中獲取成員數據
     const foundMember = getMemberById(memberId);
     if (!foundMember) {
       setError("Member not found");
@@ -56,7 +82,6 @@ const MemberPage = () => {
     }
 
     setMember(foundMember);
-    // setCurrentIndex(getMemberIndex(memberId));
     setError(null);
     setLoading(false);
   }, [
@@ -86,11 +111,9 @@ const MemberPage = () => {
     }
   };
 
-  // 檢查是否可以導航
   const canGoPrevious = !!getPrevMember(memberId);
   const canGoNext = !!getNextMember(memberId);
 
-  // Loading 狀態
   if (loading) {
     return (
       <>
@@ -105,7 +128,6 @@ const MemberPage = () => {
     );
   }
 
-  // Error 狀態
   if (error || !member) {
     return (
       <>
@@ -131,8 +153,14 @@ const MemberPage = () => {
     <>
       <div className="fixed inset-0 bg-primary-75 -z-10"></div>
       <div className="min-h-screen bg-primary-75 overflow-hidden relative">
-        {/* Navigation Controls */}
-        <div className="fixed top-8 left-8 z-50">
+        {/* Navigation Controls - 添加動畫效果 */}
+        <div
+          className={`fixed top-20 left-8 z-50 transition-all duration-300 ease-in-out ${
+            isNavVisible
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-20 opacity-0 pointer-events-none"
+          }`}
+        >
           <Button
             variant="ghost"
             size="sm"
@@ -149,7 +177,13 @@ const MemberPage = () => {
           </Button>
         </div>
 
-        <div className="fixed top-8 right-8 z-50 flex gap-4">
+        <div
+          className={`fixed top-20 right-8 z-50 flex gap-4 transition-all duration-300 ease-in-out ${
+            isNavVisible
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-20 opacity-0 pointer-events-none"
+          }`}
+        >
           <Button
             variant="ghost"
             size="sm"
@@ -192,11 +226,6 @@ const MemberPage = () => {
             <div className="space-y-8">
               {/* Member Image */}
               <div className="relative">
-                {/* <img
-                src={member.avatar_url}
-                alt={member.member_name}
-                className="w-full aspect-[3/4] object-cover bg-gray-200 rounded-xl shadow-lg"
-              /> */}
                 <div className="relative w-full aspect-[3/4]">
                   <Image
                     src={member.avatar_url}
@@ -207,9 +236,6 @@ const MemberPage = () => {
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                 </div>
-                {/* <div className="absolute top-4 left-4 bg-black text-white px-4 py-2 text-sm rounded-full">
-                  {member.title}
-                </div> */}
               </div>
 
               {/* Member Name and Department */}
@@ -221,7 +247,6 @@ const MemberPage = () => {
               </div>
 
               {/* Contact Information */}
-
               {member.email && (
                 <div className="mb-3">
                   <p className="text-sm text-secondary/75 uppercase tracking-wide mb-1">

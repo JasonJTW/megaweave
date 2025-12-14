@@ -7,6 +7,7 @@ import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
 import { usePathname } from "next/navigation";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   Menu,
   Info,
@@ -15,7 +16,13 @@ import {
   // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -198,6 +205,12 @@ const Navbar = () => {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-80 sm:w-96">
+                  <VisuallyHidden>
+                    <SheetTitle>Navigation Menu</SheetTitle>
+                    <SheetDescription>
+                      Browse through the navigation options
+                    </SheetDescription>
+                  </VisuallyHidden>
                   <div className="space-y-2">
                     {mobileNavItems.map((item, index) => {
                       const Icon = item.icon;

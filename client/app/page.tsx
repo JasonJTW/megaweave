@@ -18,7 +18,6 @@ import User from "./types/user";
 import { useRouter } from "next/navigation";
 // const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 import IconGrid from "./components/IconGrid";
-import ShareIcon from "./components/icons/ShareIcon";
 import AddIcon from "./components/icons/AddIcon";
 import { Input } from "@/components/ui/input";
 import {
@@ -52,6 +51,8 @@ const PostsApp = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
+  const categoryInteractionLockRef = useRef(false);
 
   // 創建貼文狀態
   const [postType, setPostType] = useState<Post["type"]>("share");
@@ -123,7 +124,7 @@ const PostsApp = () => {
       if (searchTerm) params.append("search", searchTerm);
       if (selectedCategory) params.append("category_id", selectedCategory);
       if (selectedLocation) params.append("location", selectedLocation);
-
+      if (postFilterType) params.append("type", postFilterType);
       const response = await fetch(`${hostName}/api/posts?${params}`);
       const data: PostsResponse = await response.json();
 
@@ -139,7 +140,14 @@ const PostsApp = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchTerm, selectedCategory, selectedLocation, hostName]);
+  }, [
+    currentPage,
+    searchTerm,
+    selectedCategory,
+    selectedLocation,
+    hostName,
+    postFilterType,
+  ]);
 
   const handleCreatePostButtonClick = (postType: Post["type"]) => {
     if (!user) {
@@ -303,6 +311,42 @@ const PostsApp = () => {
     };
   }, [selectedImages]);
 
+  useEffect(() => {
+    if (!isMenuOpen) return; // 只在選單打開時監聽
+
+    const handleMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+
+      // 1. 檢查點擊是否發生在主選單 (motion.div) 內部
+      const isInsideMenu = menuRef.current && menuRef.current.contains(target);
+
+      // 2. 檢查點擊是否發生在任何 Radix UI Portal 內容內部 (如 SelectContent)
+      // Radix UI 的 Portal 內容通常會有一個 data 屬性，例如 data-radix-popper-content 或 data-state="open"
+      // 最常見的方式是檢查 Select 的內容是否是點擊目標的祖先元素。
+      const isInsideRadixPortal =
+        target.closest("[data-radix-popper-content]") ||
+        target.closest(".radix-select-content");
+
+      const isInsideFeed = target.closest(".feed-snap");
+
+      // 邏輯：
+      // 如果點擊不在主選單內，AND 點擊也不在任何彈出的 Radix Portal 內
+      // 說明這是真正的「外部點擊」，應該關閉主選單。
+      if (!isInsideMenu && !isInsideRadixPortal && !isInsideFeed) {
+        // 這裡使用 event.preventDefault() 可以防止點擊事件繼續傳播到更下方的頁面物件
+        event.preventDefault();
+        setIsMenuOpen(false);
+      }
+    };
+
+    // 監聽 mousedown 事件
+    document.addEventListener("mousedown", handleMouseDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+    };
+  }, [isMenuOpen]); // isMenuOpen 狀態改變時重新運行
+
   return (
     <>
       <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
@@ -339,142 +383,185 @@ const PostsApp = () => {
           </Button>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
-          <div className="flex justify-between items-center">
-            {/* 選單面板 */}
-            <AnimatePresence>
-              {isMenuOpen && (
-                <>
-                  {/* 背景遮罩 */}
+        <>
+          {/* 選單面板 */}
+          <AnimatePresence>
+            {isMenuOpen && (
+              <>
+                {/* 👇 新增這一塊（非常重要） */}
+                {/* {isCategoryOpen && (
                   <div
-                    className="fixed inset-0 z-40 bg-transparent"
-                    onClick={() => setIsMenuOpen(false)}
+                    className="fixed inset-0 z-[55]"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                   />
-                  <motion.div
-                    ref={menuRef}
-                    initial={{
-                      scale: 0,
-                      opacity: 0,
-                      x: 0,
-                      y: 30,
-                      filter: "blur(20px)",
-                    }}
-                    animate={{
-                      scale: 1,
-                      opacity: 1,
-                      x: 0,
-                      y: 0,
-                      filter: "blur(0px)",
-                    }}
-                    exit={{
-                      scale: 0,
-                      opacity: 0,
-                      x: 0,
-                      y: 30,
-                      filter: "blur(20px)",
-                    }}
-                    transition={{
-                      scale: {
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 30,
-                        mass: 0.8,
-                      },
-                      opacity: { duration: 0.2 }, // opacity 提前結束
-                      y: {
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 30,
-                        mass: 0.8,
-                      },
-                    }}
-                    className="fixed bottom-24 right-8 z-50 max-w-6xl bg-megaweave-forest-dark/80 backdrop-blur-sm rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right"
-                  >
-                    {/* Search Input */}
-                    <div className="relative mb-4">
-                      {/* 搜索框 */}
-                      <Input
-                        type="text"
-                        placeholder="Search"
-                        className="w-full   py-2 "
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
+                )} */}
+                {/* 背景遮罩 */}
+                <div
+                  className="fixed inset-0 z-[45] bg-black/55"
+                  // onClick={() => setIsMenuOpen(false)}
+                />
+                <motion.div
+                  ref={menuRef}
+                  initial={{
+                    scale: 0,
+                    opacity: 0,
+                    x: 0,
+                    y: 30,
+                    filter: "blur(20px)",
+                  }}
+                  animate={{
+                    scale: 1,
+                    opacity: 1,
+                    x: 0,
+                    y: 0,
+                    filter: "blur(0px)",
+                  }}
+                  exit={{
+                    scale: 0,
+                    opacity: 0,
+                    x: 0,
+                    y: 30,
+                    filter: "blur(20px)",
+                  }}
+                  transition={{
+                    scale: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 30,
+                      mass: 0.8,
+                    },
+                    opacity: { duration: 0.2 }, // opacity 提前結束
+                    y: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 30,
+                      mass: 0.8,
+                    },
+                  }}
+                  className="fixed bottom-24 right-8 left-8 sm:left-auto z-[60] bg-megaweave-forest-dark/80 backdrop-blur-[3px] rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right flex-col"
+                >
+                  {/* Search Input */}
+                  <div className="relative mb-4">
+                    {/* 搜索框 */}
+                    <Input
+                      type="text"
+                      placeholder="Search"
+                      className="w-full py-2"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
 
-                      <button
-                        className="absolute right-4 top-1/2 -translate-y-1/2"
-                        onClick={() => setSearchTerm("")}
+                    <button
+                      className="absolute right-4 top-1/2 -translate-y-1/2"
+                      onClick={() => setSearchTerm("")}
+                    >
+                      <DeleteIcon className="w-[18px] h-[18px]" />
+                    </button>
+                  </div>
+
+                  {/* Filter Buttons Row 1 */}
+                  <div className="flex gap-[10px] mb-4">
+                    <div className="w-1/2">
+                      <Select
+                        onOpenChange={(open) => {
+                          if (open) {
+                            categoryInteractionLockRef.current = true;
+                          } else {
+                            // ⏱ 延遲一個 tick 再解鎖（關鍵）
+                            requestAnimationFrame(() => {
+                              categoryInteractionLockRef.current = false;
+                            });
+                          }
+                        }}
+                        value={selectedCategory || ""}
+                        onValueChange={(value) => {
+                          setSelectedCategory(value);
+                          console.log(value);
+                        }}
                       >
-                        <DeleteIcon className="w-[18px] h-[18px]" />
-                      </button>
+                        <SelectTrigger className="w-full min-w-0">
+                          <SelectValue placeholder="Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name_en}
+                            </SelectItem>
+                          ))}
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCategory("");
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        </SelectContent>
+                      </Select>
                     </div>
-
-                    {/* Filter Buttons Row 1 */}
-                    <div className="flex gap-4 mb-4">
-                      <div className="w-1/2">
-                        <Select
-                          value={selectedCategory}
-                          onValueChange={(value) => {
-                            setSelectedCategory(value);
-                            console.log(value);
-                          }}
-                        >
-                          <SelectTrigger className="w-full min-w-0">
-                            <SelectValue placeholder="Category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem
-                                key={cat.id}
-                                value={cat.id.toString()}
-                              >
-                                {cat.name_en}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="w-1/2">
-                        <Input
-                          className="text-megaweave-forest-dark w-full "
-                          type="text"
-                          placeholder="Location"
-                          value={selectedLocation}
-                          onChange={(e) => setSelectedLocation(e.target.value)}
-                        />
-                      </div>
+                    <div className="w-1/2">
+                      <Input
+                        className="text-megaweave-forest-dark w-full "
+                        type="text"
+                        placeholder="Location"
+                        value={selectedLocation}
+                        onChange={(e) => setSelectedLocation(e.target.value)}
+                      />
                     </div>
+                  </div>
 
-                    {/* Filter Buttons Row 2 */}
-                    <div className="flex gap-4 mb-4">
-                      <Button className="flex-1 bg-white text-megaweave-forest-dark  flex items-center justify-center gap-2 ">
-                        <ElfIcon className="w-5 h-5" /> Wish Only
-                      </Button>
-                      <Button className="flex-1 bg-white text-megaweave-forest-dark flex items-center justify-center gap-2">
-                        <ShareIcon className="w-5 h-5" /> Share Only
-                      </Button>
-                    </div>
-
-                    {/* Close Overdue Items Button */}
-                    <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
-                      Close Overdue Items
+                  {/* Filter Buttons Row 2 */}
+                  <div className="flex gap-[10px] mb-4">
+                    <Button
+                      className={`flex-1 ${
+                        postFilterType == "wish" ? "bg-primary-50" : "bg-white"
+                      } text-megaweave-forest-dark  flex items-center justify-center gap-2 px-1`}
+                      onClick={() => {
+                        if (postFilterType == "wish") {
+                          setPostFilterType("");
+                        } else setPostFilterType("wish");
+                      }}
+                    >
+                      Wish Only
+                      <ElfIcon className="w-5 h-5 flex-shrink-0" />
                     </Button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-            <Button
-              onClick={() => {
-                setIsMenuOpen(!isMenuOpen);
-              }}
-              className={
-                " fixed bottom-6 right-8 z-40 w-14 h-12 rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "
-              }
-            >
-              <SearchIcon className=" text-white" />
-            </Button>
-          </div>
-        </div>
+                    <Button
+                      className={`flex-1 ${
+                        postFilterType == "share" ? "bg-primary-50" : "bg-white"
+                      } text-megaweave-forest-dark  flex items-center justify-center gap-2 px-1`}
+                      onClick={() => {
+                        if (postFilterType == "share") {
+                          setPostFilterType("");
+                        } else setPostFilterType("share");
+                      }}
+                    >
+                      Share Only
+                      <ReuseIcon className="w-5 h-5 flex-shrink-0" />
+                    </Button>
+                  </div>
+
+                  {/* Close Overdue Items Button */}
+                  <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
+                    Close Overdue Items
+                  </Button>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+          <Button
+            onClick={() => {
+              setIsMenuOpen(!isMenuOpen);
+            }}
+            className={
+              " fixed bottom-6 right-8 z-50 w-[70px] h-[60px] rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "
+            }
+          >
+            <SearchIcon className=" text-white" />
+          </Button>
+        </>
 
         {/* Error message and posts*/}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
@@ -494,7 +581,10 @@ const PostsApp = () => {
             <Feed
               posts={posts}
               conditions={conditions}
-              onPostClick={(post) => router.push(`/item/${post.id}`)}
+              onPostClick={(post) => {
+                if (categoryInteractionLockRef.current) return;
+                router.push(`/item/${post.id}`);
+              }}
             />
           )}
 

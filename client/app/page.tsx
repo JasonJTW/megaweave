@@ -72,6 +72,7 @@ const PostsApp = () => {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const fetchUser = async () => {
     try {
@@ -320,6 +321,9 @@ const PostsApp = () => {
       // 1. 檢查點擊是否發生在主選單 (motion.div) 內部
       const isInsideMenu = menuRef.current && menuRef.current.contains(target);
 
+      const isInsideSearchButton =
+        searchButtonRef.current && searchButtonRef.current.contains(target);
+
       // 2. 檢查點擊是否發生在任何 Radix UI Portal 內容內部 (如 SelectContent)
       // Radix UI 的 Portal 內容通常會有一個 data 屬性，例如 data-radix-popper-content 或 data-state="open"
       // 最常見的方式是檢查 Select 的內容是否是點擊目標的祖先元素。
@@ -332,7 +336,12 @@ const PostsApp = () => {
       // 邏輯：
       // 如果點擊不在主選單內，AND 點擊也不在任何彈出的 Radix Portal 內
       // 說明這是真正的「外部點擊」，應該關閉主選單。
-      if (!isInsideMenu && !isInsideRadixPortal && !isInsideFeed) {
+      if (
+        !isInsideMenu &&
+        !isInsideRadixPortal &&
+        !isInsideSearchButton &&
+        !isInsideFeed
+      ) {
         // 這裡使用 event.preventDefault() 可以防止點擊事件繼續傳播到更下方的頁面物件
         event.preventDefault();
         setIsMenuOpen(false);
@@ -400,7 +409,7 @@ const PostsApp = () => {
                 )} */}
                 {/* 背景遮罩 */}
                 <div
-                  className="fixed inset-0 z-[45] bg-black/55"
+                  className="fixed inset-0 z-[45] bg-transparent"
                   // onClick={() => setIsMenuOpen(false)}
                 />
                 <motion.div
@@ -552,8 +561,9 @@ const PostsApp = () => {
             )}
           </AnimatePresence>
           <Button
+            ref={searchButtonRef}
             onClick={() => {
-              setIsMenuOpen(!isMenuOpen);
+              setIsMenuOpen((pref) => !pref);
             }}
             className={
               " fixed bottom-6 right-8 z-50 w-[70px] h-[60px] rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "

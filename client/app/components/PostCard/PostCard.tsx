@@ -39,6 +39,7 @@ function PostCardInner({
   onWeaveStatusChange,
 }: PostCardProps) {
   // const condition = conditions.find((c) => c.level === post.condition_level);
+
   const category = categories.find((c) => c.id === post.category_id);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -209,7 +210,7 @@ function PostCardInner({
       }
     >
       <div
-        className="flex items-center justify-between px-4 py-3"
+        className="flex items-center justify-between px-4 py-2"
         style={{
           height: "var(--post-title-h, 72px)",
           minHeight: "var(--post-title-h, 72px)",
@@ -284,15 +285,13 @@ function PostCardInner({
           </h2>
 
           {category && (
-            <div className="flex items-center mx-4 mt-[14px] leading-[34px]">
+            <div className="flex items-center mx-4 mt-[8px] leading-[34px]">
               <Badge className="h-[34px]">{category.name_en}</Badge>
             </div>
           )}
 
-          <div className="bg-white flex flex-col p-4 mx-4 mt-[14px] rounded-[20px]">
-            <p className="text-black text-[18px] mb-[10px] truncate">
-              {post.content}
-            </p>
+          <div className="bg-white flex flex-col p-4 mx-4 rounded-[20px]">
+            <p className="text-black text-[18px] truncate">{post.content}</p>
 
             {/* ✅ 顯示 Weave 備註 */}
             {weave?.notes && (

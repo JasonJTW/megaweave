@@ -358,7 +358,7 @@ function SigninForm() {
             <div className="grid grid-rows-2 gap-4">
               <Button
                 variant={"outline"}
-                className="w-full hover:bg-primary-30 transition-all duration-200 "
+                className="w-full hover:bg-primary-30 transition-all duration-200 plausible-event-name=SigninWithGoogle"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
@@ -397,7 +397,7 @@ function SigninForm() {
               </div>
               <Button
                 variant={"outline"}
-                className="w-full hover:bg-primary-30 transition-all duration-200"
+                className="w-full hover:bg-primary-30 transition-all duration-200 plausible-event-name=SigninWithFacebook"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >

@@ -148,6 +148,7 @@ export default function RootLayout({
                   domain="megaweave.net"
                   trackLocalhost={true}
                   enabled={true}
+                  taggedEvents={true}
                 >
                   {children}
                 </PlausibleProvider>

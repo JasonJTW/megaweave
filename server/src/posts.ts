@@ -263,6 +263,7 @@ router.get("/", async (req: Request, res: Response) => {
     const location = req.query.location as string;
     const status = (req.query.status as string) || "active";
     const search = req.query.search as string;
+    const type = req.query.type as string;
 
     let whereConditions = ["p.status = ?"];
     let queryParams: any[] = [status];
@@ -284,6 +285,10 @@ router.get("/", async (req: Request, res: Response) => {
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
+    if (type) {
+      whereConditions.push("p.type = ?");
+      queryParams.push(type);
+    }
     const whereClause = whereConditions.join(" AND ");
 
     const postsQuery = `

@@ -555,19 +555,44 @@ const TeamInfoPage = () => {
                   />
                 </svg>
               </div>
+              {/* Key Frame Section */}
 
-              {/* Partner Section */}
               <div className="mt-2 md:mt-20">
-                <h2 className="text-4xl sm:text-[50px] md:text-[80px] text-black mb-2 pb-10 pt-6 border-b border-megaweave-stone font-bold font-ddin relative">
-                  ABOUT US{" "}
-                  {/*
-                  <sup className="absolute text-xl top-6 ml-3">
-                    {teamMembers.length < 10
-                      ? String(teamMembers.length).padStart(2, "0")
-                      : teamMembers.length}
-                  </sup>
-                  */}
-                </h2>
+                <div className="flex items-center justify-center h-full">
+                  <img src="/assets/KeyFrame.svg"/>
+                </div>
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-20 font-bold font-ddin relative">
+                    大量交織 megaweaving
+                </h3>
+                <div className="flex items-center justify-center h-full">
+                  <img src="/assets/megaweaving.svg"/>
+                </div>
+
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-60 font-bold font-ddin relative">
+                    資源 Resources
+                </h3>
+                <div className="flex items-center justify-center h-full">
+                  <img src="/assets/Resources.svg"/>
+                </div>
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-60 font-bold font-ddin relative">
+                    橋接 Bridging
+                </h3>
+                <div className="flex items-center justify-center h-full">
+                  <img src="/assets/Bridging.svg"/>
+                </div>
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-60 font-bold font-ddin relative">
+                    織友 Weaver
+                </h3>
+                <div className="flex items-center justify-center h-full mb-100">
+                  <img src="/assets/Weaver.svg"/>
+                </div>
+                
+              </div>
+              {/* Partner Section */}
+              <div className="mt-10 md:mt-80">
+                <div className="flex items-center justify-center h-full">
+                  <img src="/assets/OurTeam.svg"/>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 mt-8 items-center justify-center">
                   {teamMembers.map((member) => (
@@ -578,6 +603,30 @@ const TeamInfoPage = () => {
                     />
                   ))}
                 </div>
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-black mb-2 pb-10 pt-6 font-bold font-ddin relative">
+                    OUR PARTNER
+                </h3>
+                <h4 className="text-xl sm:text-[14px] md:text-[40px] text-black mb-2 pb-10 pt-6 font-bold font-ddin relative">
+                  Green Sofa 綠沙發
+                </h4>
+              </div>
+
+
+              {/* Timeline Section */}
+              <div>
+                {/* Timeline in mobile & small */}
+                <div className="md:hidden flex items-center justify-center h-full">
+                  <img src="/assets/Timeline-title.svg"/>
+                </div>
+                <div className="block md:hidden items-center justify-center h-full pt-20">
+                  <img src="/assets/Timeline-narrow.svg"/>
+                </div>
+              
+                {/* Timeline in md & large */}
+                <div className="hidden md:flex lg:flex items-center justify-center h-full pt-20">
+                  <img src="/assets/Timeline-wide.svg"/>
+                </div>
+
               </div>
             </div>
           </div>

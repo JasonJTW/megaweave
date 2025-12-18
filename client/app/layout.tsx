@@ -64,8 +64,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Megaweaving",
+  title: "megaweaving",
   description: "Create by megaweavingHQ",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "megaweaving", // 主畫面上顯示的名稱
+  },
   icons: {
     icon: "/favicon.ico",
     apple: "/apple-touch-icon.png",

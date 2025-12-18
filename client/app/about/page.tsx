@@ -41,8 +41,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
   const svgList = [
     <div key="shape-1" className="w-1/3 absolute -top-[2%] -right-[2%]">
       <svg
-        width="100%"
-        height="auto"
+        className="w-full h-auto"
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -71,8 +70,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
 
     <div key="shape-2" className="w-1/3 absolute top-[40%] -right-[18%]">
       <svg
-        width="100%"
-        height="auto"
+        className="w-full h-auto"
         viewBox="0 0 115 94"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -87,6 +85,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
           fill="white"
           fontSize="18"
           className="font-ddin font-bold"
+          textAnchor="middle"
           dominantBaseline="middle"
           fontWeight="bold"
         >
@@ -101,8 +100,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
 
     <div key="shape-3" className="w-1/3 absolute top-[10%] -right-[18%]">
       <svg
-        width="100%"
-        height="auto"
+        className="w-full h-auto"
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -131,8 +129,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
 
     <div key="shape-4" className="w-1/3 absolute -top-[4%] left-0">
       <svg
-        width="100%"
-        height="auto"
+        className="w-full h-auto"
         viewBox="0 0 112 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -161,8 +158,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
 
     <div key="shape-5" className="w-1/3 absolute bottom-[40%] -left-[17%]">
       <svg
-        width="100%"
-        height="auto"
+        className="w-full h-auto"
         viewBox="0 0 130 91"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -191,8 +187,7 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
 
     <div key="shape-6" className="w-1/3 absolute top-[12%] -left-[17%]">
       <svg
-        width="100%"
-        height="auto"
+        className="w-full h-auto"
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"

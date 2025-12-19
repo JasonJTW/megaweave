@@ -1,5 +1,5 @@
-// components/BadgeIcon.tsx
-export default function BadgeIcon({ className }: { className?: string }) {
+// components/ShareBadgeIcon.tsx
+export default function ShareBadgeIcon({ className }: { className?: string }) {
   return (
     <svg
       width="50"

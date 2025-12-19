@@ -66,6 +66,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "megaweaving",
   description: "Create by megaweavingHQ",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

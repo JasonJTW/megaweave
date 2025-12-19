@@ -343,8 +343,8 @@ const TeamInfoPage = () => {
   return (
     <>
       <div className="fixed inset-0 -z-10 bg-primary-5  "></div>
-      <div className="min-h-screen bg-primary-5 overflow-hidden px-4 sm:px-8 md:px-16 lg:px-24 xl:px-32">
-        <div className="px-10 md:px-20 flex flex-col">
+      <div className="min-h-screen bg-primary-5 overflow-hidden sm:px-8 md:px-16 lg:px-24 xl:px-32">
+        <div className="md:px-20 flex flex-col">
           {/* Header */}
           <div className="pt-20 pb-20">
             <div className="max-w-full mx-auto text-center">
@@ -669,33 +669,33 @@ const TeamInfoPage = () => {
               </div>
               {/* Key Frame Section */}
 
-              <div className="mt-2 md:mt-20">
+              <div className="mx-10 mt-2 md:mt-20">
                 <div className="flex items-center justify-center h-full">
                   <img src="/assets/KeyFrame.svg" />
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-20 font-bold font-ddin relative">
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-[#333333] mb-[27px] pb-30 pt-20 font-bold font-ddin relative">
                   大量交織 megaweaving
                 </h3>
                 <div className="flex items-center justify-center h-full">
                   <img src="/assets/megaweaving.svg" />
                 </div>
 
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-60 font-bold font-ddin relative">
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-[#333333]  pb-[27px] pt-[60px] font-bold font-ddin relative">
                   資源 Resources
                 </h3>
                 <div className="flex items-center justify-center h-full">
                   <img src="/assets/Resources.svg" />
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-60 font-bold font-ddin relative">
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-[#333333]  mb-[27px] pt-[50px] font-bold font-ddin relative">
                   橋接 Bridging
                 </h3>
                 <div className="flex items-center justify-center h-full">
                   <img src="/assets/Bridging.svg" />
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-20 pb-30 pt-60 font-bold font-ddin relative">
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-[26px] pb-30 pt-[50px] font-bold font-ddin relative">
                   織友 Weaver
                 </h3>
-                <div className="flex items-center justify-center h-full mb-100">
+                <div className="flex items-center justify-center h-full mb-[100px]">
                   <img src="/assets/Weaver.svg" />
                 </div>
               </div>
@@ -714,21 +714,24 @@ const TeamInfoPage = () => {
                     />
                   ))}
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-black mb-2 pb-10 pt-6 font-bold font-ddin relative">
+                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-black mb-2 pt-6 font-bold font-ddin relative">
                   OUR PARTNER
                 </h3>
-                <h4 className="text-xl sm:text-[14px] md:text-[40px] text-black mb-2 pb-10 pt-6 font-bold font-ddin relative">
-                  Green Sofa 綠沙發
+                <h4 className="text-xl sm:text-[14px] md:text-[40px] text-black font-bold font-ddin relative">
+                  FAB DAO Green Sofa 綠沙發
+                </h4>
+                <h4 className="text-xl sm:text-[14px] md:text-[40px] text-black font-bold font-ddin relative mb-[90px]">
+                  FAB DAO 行動客廳
                 </h4>
               </div>
 
               {/* Timeline Section */}
               <div>
                 {/* Timeline in mobile & small */}
-                <div className="md:hidden flex items-center justify-center h-full">
+                <div className="md:hidden flex items-center justify-center h-full w-full">
                   <img src="/assets/Timeline-title.svg" />
                 </div>
-                <div className="block md:hidden items-center justify-center h-full pt-20">
+                <div className="flex md:hidden items-center justify-center h-full pt-12">
                   <img src="/assets/Timeline-narrow.svg" />
                 </div>
 

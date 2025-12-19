@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
-import BadgeIcon from "../icons/BadgeIcon";
+import ShareBadgeIcon from "../icons/ShareBadgeIcon";
 import type { Weave } from "@/services/weaveService";
 import AcceptIcon from "../icons/AcceptIcon";
 import CancelIcon from "../icons/CancelIcon";
+import SeekBadgeIcon from "../icons/WishBadgeIcon";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -238,7 +239,10 @@ function PostCardInner({
 
       <div className="relative">
         {post.type === "share" && (
-          <BadgeIcon className="absolute -top-1 right-5 z-20" />
+          <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
+        )}
+        {post.type === "wish" && (
+          <SeekBadgeIcon className="absolute -top-1 right-5 z-20" />
         )}
 
         <motion.div

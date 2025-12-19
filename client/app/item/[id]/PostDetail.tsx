@@ -16,7 +16,7 @@ import User from "../../types/user";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import EyesIcon from "../../components/icons/EyesIcon";
-import BadgeIcon from "@/app/components/icons/BadgeIcon";
+import BadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import ClockIcon from "@/app/components/icons/ClockIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";

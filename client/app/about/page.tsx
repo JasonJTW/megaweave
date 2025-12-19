@@ -346,16 +346,16 @@ const TeamInfoPage = () => {
       <div className="min-h-screen bg-primary-5 overflow-hidden sm:px-8 md:px-16 lg:px-24 xl:px-32">
         <div className="md:px-20 flex flex-col">
           {/* Header */}
-          <div className="pt-20 pb-20">
-            <div className="max-w-full mx-auto text-center">
-              <h1 className="text-5xl sm:text-[50px] md:text-[110px] lg:text-[130px] xl:text-[160px] font-bold leading-none text-primary font-ddin">
+          <div className="pt-10 pb-6">
+            <div className="w-fit mx-auto">
+              <h1 className="text-5xl sm:text-[50px] md:text-[110px] lg:text-[130px] xl:text-[160px] font-bold leading-none text-primary font-ddin text-center">
                 MEGAWEAVING
               </h1>
-            </div>
-            <div className="max-w-full mx-auto md:text-center">
-              <h2 className="text-2xl md:text-5xl text-primary-75 md:text-dark leading-relaxed mt-[20px] md:mt-[60px] mb-4 font-ddin font-medium">
-                {/* TODO: why margin top doesn't work??  and Font seems a little diff */}
-                Weaving Commons of Shared Resources.
+              <h2 className="text-2xl md:text-5xl text-primary-75 md:text-dark leading-relaxed mt-[20px] md:mt-[60px] font-ddin font-medium text-left">
+                Weaving Commons of
+              </h2>
+              <h2 className="text-2xl md:text-5xl text-primary-75 md:text-dark leading-relaxed md:mt-[60px] mb-4 font-ddin font-medium text-left">
+                Shared Resources.
               </h2>
             </div>
           </div>

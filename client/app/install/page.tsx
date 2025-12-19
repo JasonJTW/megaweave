@@ -44,7 +44,6 @@ export default function InstallPage() {
         </h1>
       </div>
 
-      {/* 下半部：模仿截圖的導引框 */}
       <div className="w-full max-w-sm flex flex-col items-center">
         <div className="mx-10 flex flex-col items-end">
           <div className="flex mt-10 mb-1 relative bg-primary-15 rounded-2xl px-2 py-6 text-center ">
@@ -57,7 +56,8 @@ export default function InstallPage() {
               <span className="inline-block align-baseline px-1">
                 <MoreIcon className="text-primary mr-1" />
               </span>{" "}
-              icon and select &quot;Add to Home Screen&quot; to add a shortcut.
+              icon and select &quot;...Share&quot; and then &quot;Add to Home
+              Screen&quot; to add a shortcut.
             </p>
           </div>
           <div className="bg-primary-15 w-[18px] h-[18px] rounded-full mb-1"></div>

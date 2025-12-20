@@ -6,7 +6,7 @@ import { updateUserStats } from "./utils/updateUserStats";
 
 const router = Router();
 
-// 定義 Weave 的資料庫結構型別
+// 1. 定義型別
 interface WeaveRow extends RowDataPacket {
   id: number;
   post_id: number;
@@ -15,15 +15,15 @@ interface WeaveRow extends RowDataPacket {
   receiver_id: number;
   quantity: number;
   status: "pending" | "completed" | "cancelled";
+  giver_confirmed: boolean | number;
+  receiver_confirmed: boolean | number;
   notes: string | null;
   completed_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
 
-// 輸出型別，包含所有 post 相關欄位
 interface WeaveOutput extends RowDataPacket {
-  // Weaves (w.*)
   id: number;
   post_id: number;
   item_id: number | null;
@@ -31,12 +31,12 @@ interface WeaveOutput extends RowDataPacket {
   receiver_id: number;
   quantity: number;
   status: "pending" | "completed" | "cancelled";
+  giver_confirmed: number;
+  receiver_confirmed: number;
   notes: string | null;
   completed_at: Date | null;
   created_at: Date;
   updated_at: Date;
-
-  // Posts (p.* - 全部加上 post_ 前綴)
   post_id_original: number;
   post_user_id: number;
   post_title: string;
@@ -53,8 +53,6 @@ interface WeaveOutput extends RowDataPacket {
   post_created_at: Date;
   post_updated_at: Date;
   post_comment_count: number;
-
-  // JOIN 來的其他欄位
   item_title: string | null;
   giver_name: string;
   giver_avatar: string;
@@ -69,10 +67,9 @@ interface ItemRow extends RowDataPacket {
   title: string;
 }
 
-// 🔧 共用函數：處理 Weave 資料
+// 2. 共用函數與 SQL
 function processWeaveRows(weaveRows: WeaveOutput[]) {
   return weaveRows.map((row) => {
-    // 提取 Post 相關資料
     const post = {
       id: row.post_id_original,
       user_id: row.post_user_id,
@@ -90,12 +87,10 @@ function processWeaveRows(weaveRows: WeaveOutput[]) {
       created_at: row.post_created_at,
       updated_at: row.post_updated_at,
       comment_count: row.post_comment_count,
-      // 分割 image_urls 字串成陣列
       image_urls: row.image_urls ? row.image_urls.split(",") : [],
     };
 
-    // 建立 Weave 物件 (手動組裝 w.* 的欄位)
-    const weave: any = {
+    return {
       id: row.id,
       post_id: row.post_id,
       item_id: row.item_id,
@@ -107,27 +102,21 @@ function processWeaveRows(weaveRows: WeaveOutput[]) {
       completed_at: row.completed_at,
       created_at: row.created_at,
       updated_at: row.updated_at,
-
-      // JOIN 來的其他欄位
       item_title: row.item_title,
       giver_name: row.giver_name,
       giver_avatar: row.giver_avatar,
       receiver_name: row.receiver_name,
       receiver_avatar: row.receiver_avatar,
-
-      // ✅ 內嵌 post 物件
+      giver_confirmed: Boolean(row.giver_confirmed),
+      receiver_confirmed: Boolean(row.receiver_confirmed),
       post: post,
     };
-
-    return weave;
   });
 }
 
-// 🔧 共用 SQL 查詢字串
 const WEAVE_QUERY_BASE = `
   SELECT 
       w.*,
-      -- 貼文 (posts) 的所有欄位 (需重新命名避免衝突)
       p.id AS post_id_original,
       p.user_id AS post_user_id,
       p.title AS post_title,
@@ -144,8 +133,6 @@ const WEAVE_QUERY_BASE = `
       p.created_at AS post_created_at,
       p.updated_at AS post_updated_at,
       p.comment_count AS post_comment_count,
-      
-      -- 其他 JOIN 的欄位
       i.title AS item_title,
       giver.username AS giver_name,
       giver.avatar_url AS giver_avatar,
@@ -160,7 +147,10 @@ const WEAVE_QUERY_BASE = `
   LEFT JOIN images img ON p.id = img.post_id
 `;
 
-// POST /api/weaves - 索取物品(建立 Weave 請求)
+// 3. 路由定義
+
+// ✅ [補回] POST / - 索取物品
+// ✅ 完整版：POST /api/weaves - 建立交易請求
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const { postId, itemId, quantity = 1, notes } = req.body;
@@ -171,61 +161,65 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     }
 
     // 1. 檢查 Post 是否存在
-    const postQuery = `SELECT user_id, status, title FROM posts WHERE id = ?`;
-    const [posts] = await dbPool.execute<RowDataPacket[]>(postQuery, [postId]);
+    const [posts] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT user_id, status FROM posts WHERE id = ?`,
+      [postId]
+    );
 
     if (posts.length === 0) {
       return res.status(404).json({ errorMessage: "Post not found" });
     }
 
-    const post = posts[0];
-    const giverId = post.user_id;
+    const giverId = posts[0].user_id;
 
+    // 安全檢查：不能索取自己的物品
     if (giverId === receiverId) {
       return res
         .status(400)
         .json({ errorMessage: "Cannot weave your own post" });
     }
 
-    if (post.status !== "active") {
-      return res.status(400).json({ errorMessage: "Post is not active" });
+    // 狀態檢查：只有 Active 的貼文可以交易
+    if (posts[0].status !== "active") {
+      return res
+        .status(400)
+        .json({ errorMessage: "This post is no longer active" });
     }
 
-    // 2. 如果有指定 Item,檢查庫存
+    // 2. 🔥 重要：處理指定 Item 的邏輯
     if (itemId) {
-      const itemQuery = `SELECT quantity FROM items WHERE id = ? AND post_id = ?`;
-      const [items] = await dbPool.execute<RowDataPacket[]>(itemQuery, [
-        itemId,
-        postId,
-      ]);
+      // 檢查該 Item 是否真的屬於這則貼文，且庫存是否足夠
+      const [items] = await dbPool.execute<RowDataPacket[]>(
+        `SELECT quantity, title FROM items WHERE id = ? AND post_id = ?`,
+        [itemId, postId]
+      );
 
       if (items.length === 0) {
         return res
           .status(404)
-          .json({ errorMessage: "Item not found in this post" });
+          .json({ errorMessage: "Selected item does not exist in this post" });
       }
 
       if (items[0].quantity < quantity) {
-        return res
-          .status(400)
-          .json({ errorMessage: "Requested quantity exceeds available stock" });
+        return res.status(400).json({
+          errorMessage: `Requested quantity (${quantity}) exceeds available stock (${items[0].quantity})`,
+        });
       }
     }
 
-    // 3. 建立 Weave 紀錄
-    const insertQuery = `
-      INSERT INTO weaves (post_id, item_id, giver_id, receiver_id, quantity, status, notes)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?)
-    `;
-
-    const [result] = await dbPool.execute<ResultSetHeader>(insertQuery, [
-      postId,
-      itemId || null,
-      giverId,
-      receiverId,
-      quantity,
-      notes || null,
-    ]);
+    // 3. 建立 Weave 紀錄 (預設狀態為 pending)
+    const [result] = await dbPool.execute<ResultSetHeader>(
+      `INSERT INTO weaves (post_id, item_id, giver_id, receiver_id, quantity, status, notes)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+      [
+        postId,
+        itemId || null, // 如果沒指定 item，存為 null
+        giverId,
+        receiverId,
+        quantity,
+        notes || null,
+      ]
+    );
 
     return res.status(201).json({
       message: "Weave request sent successfully",
@@ -233,18 +227,15 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Error creating weave:", error);
-    return res
-      .status(500)
-      .json({ errorMessage: "Failed to create weave request" });
+    return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
 
-// GET /api/weaves - 獲取我的交易列表 (包含圖片)
+// GET / - 獲取我的交易列表
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { role } = req.query;
-
     let whereClause = `WHERE (w.giver_id = ? OR w.receiver_id = ?)`;
     const params: (string | number)[] = [userId, userId];
 
@@ -256,29 +247,15 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       params.splice(0, 2, userId);
     }
 
-    const query = `
-      ${WEAVE_QUERY_BASE}
-      ${whereClause}
-      GROUP BY w.id
-      ORDER BY w.created_at DESC
-    `;
-
+    const query = `${WEAVE_QUERY_BASE} ${whereClause} GROUP BY w.id ORDER BY w.created_at DESC`;
     const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
-
-    // 使用共用函數處理結果
-    const processedWeaves = processWeaveRows(weaveRows);
-
-    return res.status(200).json({
-      weaves: processedWeaves,
-      message: "Weave list retrieved successfully",
-    });
+    return res.status(200).json({ weaves: processWeaveRows(weaveRows) });
   } catch (error) {
-    console.error("Error retrieving weaves:", error);
     return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
   }
 });
 
-// PATCH /api/weaves/:id/status - 更新交易狀態
+// PATCH /:id/status - 更新狀態 (新版雙向確認)
 router.patch(
   "/:id/status",
   requireAuth,
@@ -286,187 +263,109 @@ router.patch(
     const connection = await dbPool.getConnection();
     try {
       await connection.beginTransaction();
-
       const weaveId = req.params.id;
-      const { status } = req.body; // 'completed' | 'cancelled'
-      const userId = req.user!.userId;
+      const { status } = req.body;
+      const userId = Number(req.user!.userId);
 
-      if (!["completed", "cancelled"].includes(status)) {
-        return res.status(400).json({ errorMessage: "Invalid status" });
-      }
-
-      // 鎖定該筆交易紀錄
-      const weaveQuery = `SELECT * FROM weaves WHERE id = ? FOR UPDATE`;
-      const [weaves] = await connection.execute<WeaveOutput[]>(weaveQuery, [
-        weaveId,
-      ]);
+      const [weaves] = await connection.execute<WeaveRow[]>(
+        `SELECT * FROM weaves WHERE id = ? FOR UPDATE`,
+        [weaveId]
+      );
 
       if (weaves.length === 0) {
         await connection.rollback();
-        return res.status(404).json({ errorMessage: "Weave not found" });
+        return res.status(404).json({ errorMessage: "Not found" });
       }
-
       const weave = weaves[0];
-
-      // 防止重複操作
       if (weave.status !== "pending") {
         await connection.rollback();
-        return res
-          .status(400)
-          .json({ errorMessage: `Weave is already ${weave.status}` });
+        return res.status(400).json({ errorMessage: "Already closed" });
       }
 
-      // ==========================================
-      // 邏輯 A: 取消 (Cancelled)
-      // ==========================================
       if (status === "cancelled") {
-        // 權限檢查:Giver 和 Receiver 都可以取消
-        if (
-          weave.giver_id !== Number(userId) &&
-          weave.receiver_id !== Number(userId)
-        ) {
-          await connection.rollback();
-          return res.status(403).json({
-            errorMessage: "You are not authorized to cancel this weave",
-          });
-        }
-
-        // 更新狀態
         await connection.execute(
           `UPDATE weaves SET status = 'cancelled' WHERE id = ?`,
           [weaveId]
         );
-      }
+      } else if (status === "completed") {
+        const isGiver = weave.giver_id === userId;
+        const isReceiver = weave.receiver_id === userId;
+        if (!isGiver && !isReceiver) throw new Error("Unauthorized");
 
-      // ==========================================
-      // 邏輯 B: 完成 (Completed)
-      // ==========================================
-      else if (status === "completed") {
-        // ✅ 權限檢查: Giver 和 Receiver 都可以確認完成
-        if (
-          weave.giver_id !== Number(userId) &&
-          weave.receiver_id !== Number(userId)
-        ) {
-          await connection.rollback();
-          return res
-            .status(403)
-            .json({
-              errorMessage: "You are not authorized to complete this weave",
-            });
-        }
-
-        // 如果有 item_id,需要扣庫存
-        if (weave.item_id) {
-          const checkItemQuery = `SELECT quantity FROM items WHERE id = ? FOR UPDATE`;
-          const [items] = await connection.execute<ItemRow[]>(checkItemQuery, [
-            weave.item_id,
-          ]);
-
-          if (items.length === 0) {
-            await connection.rollback();
-            return res
-              .status(404)
-              .json({ errorMessage: "Item no longer exists" });
-          }
-
-          if (items[0].quantity < weave.quantity) {
-            await connection.rollback();
-            return res.status(400).json({ errorMessage: "Insufficient stock" });
-          }
-
-          // 執行扣庫存
-          await connection.execute(
-            `UPDATE items SET quantity = quantity - ? WHERE id = ?`,
-            [weave.quantity, weave.item_id]
-          );
-        }
-
-        // 更新 Weave 狀態
+        const confirmField = isGiver ? "giver_confirmed" : "receiver_confirmed";
         await connection.execute(
-          `UPDATE weaves SET status = 'completed', completed_at = NOW() WHERE id = ?`,
+          `UPDATE weaves SET ${confirmField} = 1 WHERE id = ?`,
           [weaveId]
         );
-      }
 
-      // 提交交易 (Commit)
-      await connection.commit();
+        const [check] = await connection.execute<WeaveRow[]>(
+          `SELECT giver_confirmed, receiver_confirmed FROM weaves WHERE id = ?`,
+          [weaveId]
+        );
 
-      // ==========================================
-      // 交易提交後,執行統計數據更新
-      // ==========================================
-      if (status === "completed") {
-        try {
-          // 更新雙方數據
-          await Promise.all([
-            updateUserStats(weave.giver_id.toString()),
-            updateUserStats(weave.receiver_id.toString()),
-          ]);
-        } catch (statsError) {
-          console.error("Background stats update failed:", statsError);
-          // 注意:這裡不回傳 500,因為主要交易已經成功了,統計可以之後再修正
+        if (
+          Boolean(check[0].giver_confirmed) &&
+          Boolean(check[0].receiver_confirmed)
+        ) {
+          if (weave.item_id) {
+            await connection.execute(
+              `UPDATE items SET quantity = quantity - ? WHERE id = ?`,
+              [weave.quantity, weave.item_id]
+            );
+          }
+          await connection.execute(
+            `UPDATE weaves SET status = 'completed', completed_at = NOW() WHERE id = ?`,
+            [weaveId]
+          );
+        } else {
+          await connection.commit();
+          return res.status(200).json({
+            message: "Waiting",
+            newStatus: "pending",
+            fullyCompleted: false,
+          });
         }
       }
 
+      await connection.commit();
+      if (status === "completed") {
+        updateUserStats(weave.giver_id.toString()).catch(console.error);
+        updateUserStats(weave.receiver_id.toString()).catch(console.error);
+      }
       return res.status(200).json({
-        message: `Weave ${status} successfully`,
+        message: "Success",
         newStatus: status,
+        fullyCompleted: status === "completed",
       });
     } catch (error) {
       if (connection) await connection.rollback();
-      console.error("Error updating weave status:", error);
-      return res
-        .status(500)
-        .json({ errorMessage: "Failed to update weave status" });
+      res.status(500).json({ errorMessage: "Server error" });
     } finally {
-      if (connection) connection.release();
+      connection.release();
     }
   }
 );
 
-// ✅ 新增：GET /api/weaves/public/:uuid - 根據 UUID 獲取公開交易列表
+// ✅ [補回] GET /public/:uuid - 公開交易紀錄
 router.get("/public/:uuid", async (req: Request, res: Response) => {
   try {
     const { uuid } = req.params;
-
-    // 1. 驗證 UUID
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(uuid)) {
-      return res.status(400).json({ errorMessage: "Invalid user UUID format" });
-    }
-
-    // 2. 查找用戶的 internal ID
-    const userQuery = `SELECT id FROM users WHERE public_id = ?`;
-    const [userRows] = await dbPool.execute<RowDataPacket[]>(userQuery, [uuid]);
-
-    if (userRows.length === 0) {
+    const [userRows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT id FROM users WHERE public_id = ?`,
+      [uuid]
+    );
+    if (userRows.length === 0)
       return res.status(404).json({ errorMessage: "User not found" });
-    }
+
     const userId = userRows[0].id;
-
-    // 3. ✅ 使用完整的 SQL 查詢 (與 GET / 相同)
-    const query = `
-      ${WEAVE_QUERY_BASE}
-      WHERE (w.giver_id = ? OR w.receiver_id = ?)
-      GROUP BY w.id
-      ORDER BY w.created_at DESC
-    `;
-
+    const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) GROUP BY w.id ORDER BY w.created_at DESC`;
     const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [
       userId,
       userId,
     ]);
-
-    // 4. ✅ 使用共用函數處理結果 (與 GET / 完全相同的處理邏輯)
-    const processedWeaves = processWeaveRows(weaveRows);
-
-    return res.status(200).json({
-      weaves: processedWeaves,
-      message: "Public weave list retrieved successfully",
-    });
+    return res.status(200).json({ weaves: processWeaveRows(weaveRows) });
   } catch (error) {
-    console.error("Error retrieving public weaves:", error);
-    return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
+    res.status(500).json({ errorMessage: "Failed" });
   }
 });
 

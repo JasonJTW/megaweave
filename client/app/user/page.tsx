@@ -800,6 +800,8 @@ const UserPage = () => {
   const sharePosts = posts.filter((post) => post.type === "share");
   const wishPosts = posts.filter((post) => post.type === "wish");
 
+  console.log("Fetched UserId: ", user?.userId);
+
   if (loading || redirecting) {
     return (
       <>

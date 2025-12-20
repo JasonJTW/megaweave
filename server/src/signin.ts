@@ -260,7 +260,7 @@ router.post("/", async (req: Request, res: Response) => {
       username: foundUser.username,
       email: foundUser.email,
       role: foundUser.role,
-      userId: foundUser.id.toString(),
+      userId: Number(foundUser.id),
       provider: "native",
       avatar_url: foundUser.avatar_url || null,
       avatar_key: foundUser.avatar_key || null,

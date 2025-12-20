@@ -46,6 +46,22 @@ function PostCardInner({
   const [isProcessing, setIsProcessing] = useState(false);
   const [localWeaveStatus, setLocalWeaveStatus] = useState(weave?.status);
 
+  // ✅ 新增：追蹤雙方的確認狀態
+  const [localGiverConfirmed, setLocalGiverConfirmed] = useState(
+    !!weave?.giver_confirmed
+  );
+  const [localReceiverConfirmed, setLocalReceiverConfirmed] = useState(
+    !!weave?.receiver_confirmed
+  );
+
+  // 判斷當前使用者角色與是否已確認
+  const isGiver = currentUserId === weave?.giver_id;
+  const isReceiver = currentUserId === weave?.receiver_id;
+  const hasIConfirmed = isGiver ? localGiverConfirmed : localReceiverConfirmed;
+  const hasOtherConfirmed = isGiver
+    ? localReceiverConfirmed
+    : localGiverConfirmed;
+
   const imageUrls = Array.isArray(post.image_urls)
     ? post.image_urls
     : typeof post.image_urls === "string"
@@ -71,63 +87,53 @@ function PostCardInner({
 
   // ✅ 完成交易
   const handleCompleteWeave = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // 防止觸發 onPostClick
+    e.stopPropagation();
+    if (!weave || isProcessing || hasIConfirmed) return;
 
-    if (!weave || isProcessing) return;
-
-    // ✅ 權限檢查：giver 和 receiver 都可以完成交易
-    if (
-      currentUserId !== weave.giver_id &&
-      currentUserId !== weave.receiver_id
-    ) {
+    if (!isGiver && !isReceiver) {
       alert("You are not authorized to complete this weave");
       return;
     }
 
-    if (weave.status !== "pending") {
-      alert(`Weave is already ${weave.status}`);
-      return;
-    }
+    const confirmMessage = isReceiver
+      ? "Have you physically received the item? This action cannot be undone once both parties confirm."
+      : "Have you handed over or shipped the item? The transaction will close once the receiver also confirms.";
 
-    const confirmed = window.confirm(
-      "Are you sure you want to complete this weave? This action cannot be undone."
-    );
+    const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
 
     setIsProcessing(true);
-
     try {
       const response = await fetch(
         `${hostName}/api/weaves/${weave.id}/status`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ status: "completed" }),
         }
       );
 
       const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.errorMessage || "Failed to update");
 
-      if (!response.ok) {
-        throw new Error(data.errorMessage || "Failed to complete weave");
+      // ✅ 根據後端 newStatus 判斷是否全案完成
+      if (data.newStatus === "completed") {
+        setLocalWeaveStatus("completed");
+        setLocalGiverConfirmed(true);
+        setLocalReceiverConfirmed(true);
+        alert("Transaction fully completed!");
+      } else {
+        // 僅單方面確認成功
+        if (isGiver) setLocalGiverConfirmed(true);
+        if (isReceiver) setLocalReceiverConfirmed(true);
+        alert("Your confirmation received. Waiting for the other party.");
       }
 
-      // 更新本地狀態
-      setLocalWeaveStatus("completed");
-      alert("Weave completed successfully!");
-
-      // 通知父組件刷新數據
-      if (onWeaveStatusChange) {
-        onWeaveStatusChange();
-      }
+      if (onWeaveStatusChange) onWeaveStatusChange();
     } catch (error) {
-      console.error("Error completing weave:", error);
-      alert(
-        error instanceof Error ? error.message : "Failed to complete weave"
-      );
+      alert(error instanceof Error ? error.message : "Error occurred");
     } finally {
       setIsProcessing(false);
     }
@@ -232,6 +238,8 @@ function PostCardInner({
               ? "Completed"
               : currentStatus === "cancelled"
               ? "Cancelled"
+              : hasIConfirmed
+              ? "Waiting for other"
               : "Pending"}
           </Badge>
         )}
@@ -373,7 +381,36 @@ function PostCardInner({
                 <span className="text-[#666] type-body-t5">
                   {displayUser.role}
                 </span>
-                {weave && (
+                {/* ✅ 強化後的提示訊息 */}
+                {currentStatus === "pending" && (
+                  <div className="mt-1 flex flex-col gap-1">
+                    {!hasIConfirmed ? (
+                      // 使用者尚未點擊 Complete
+                      <span className="text-orange-500 text-xs font-medium">
+                        {isReceiver
+                          ? "Received the item? Click the checkmark to confirm."
+                          : "Handed over the item? Click the checkmark to confirm."}
+                      </span>
+                    ) : !hasOtherConfirmed ? (
+                      // 使用者已點擊，正在等對方
+                      <span className="text-blue-600 text-xs mt-1 animate-pulse">
+                        {isReceiver
+                          ? `Received confirmed. Waiting for ${displayUser.name} to confirm handover...`
+                          : `Handover confirmed. Waiting for ${displayUser.name} to confirm receipt...`}
+                      </span>
+                    ) : null}
+
+                    {/* 對方已經點了，提醒我快點點 */}
+                    {!hasIConfirmed && hasOtherConfirmed && (
+                      <span className="text-green-600 text-xs font-bold">
+                        {isReceiver
+                          ? `${displayUser.name} confirmed handover. Please confirm receipt!`
+                          : `${displayUser.name} confirmed receipt. Please confirm handover!`}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* {weave && (
                   <span className="text-[#222] type-body-t5 mt-1">
                     {currentUserId === weave.receiver_id
                       ? `You requested ${weave.item_title || "item"} × ${
@@ -383,7 +420,7 @@ function PostCardInner({
                           weave.quantity
                         }`}
                   </span>
-                )}
+                )} */}
               </div>
 
               {/* ✅ 操作按鈕 - 只在 pending 狀態顯示 */}
@@ -392,13 +429,21 @@ function PostCardInner({
                   {/* ✅ Complete 按鈕 - giver 和 receiver 都可以看到 */}
                   <button
                     onClick={handleCompleteWeave}
-                    disabled={isProcessing}
-                    className={`transition-opacity ${
-                      isProcessing ? "opacity-50" : "hover:opacity-70"
-                    }`}
-                    title="Complete weave"
+                    disabled={isProcessing || hasIConfirmed}
+                    className={`transition-all ${
+                      hasIConfirmed
+                        ? "text-green-500"
+                        : "text-megaweave-forest-dark "
+                    } ${isProcessing ? "opacity-50" : ""}`}
+                    title={
+                      hasIConfirmed ? "You have confirmed" : "Complete weave"
+                    }
                   >
-                    <AcceptIcon className="w-[18px] h-auto" />
+                    <AcceptIcon
+                      className={`w-[18px] h-auto ${
+                        hasIConfirmed ? "stroke-[3px]" : ""
+                      }`}
+                    />
                   </button>
 
                   {/* Cancel 按鈕 - giver 和 receiver 都可以看到 */}
@@ -415,7 +460,7 @@ function PostCardInner({
                 </div>
               )}
 
-              {/* 已完成或已取消的狀態提示 */}
+              {/* 最終狀態提示 */}
               {currentStatus !== "pending" && (
                 <div className="ml-auto">
                   <span
@@ -443,8 +488,8 @@ export default React.memo(PostCardInner, (prev, next) => {
   return (
     prev.isExpanded === next.isExpanded &&
     prev.post.id === next.post.id &&
-    prev.post.content === next.post.content &&
-    prev.weave?.id === next.weave?.id &&
-    prev.weave?.status === next.weave?.status
+    prev.weave?.status === next.weave?.status &&
+    prev.weave?.giver_confirmed === next.weave?.giver_confirmed &&
+    prev.weave?.receiver_confirmed === next.weave?.receiver_confirmed
   );
 });

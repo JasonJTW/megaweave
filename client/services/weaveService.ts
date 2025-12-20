@@ -15,6 +15,8 @@ export interface Weave {
   item_title?: string;
   thumbnail_urls: string[];
   status: "pending" | "completed" | "cancelled";
+  giver_confirmed: boolean;
+  receiver_confirmed: boolean;
   notes?: string;
   giver_id: number;
   giver_name: string;

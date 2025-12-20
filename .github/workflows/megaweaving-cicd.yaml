@@ -26,9 +26,66 @@ jobs:
             client:
               - 'client/**'
 
+    # 新增：部署前清理空間
+  pre-deploy-cleanup:
+    name: Pre-Deploy Cleanup
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any-changed == 'true'
+    runs-on: self-hosted
+    steps:
+      - name: Check disk space
+        run: |
+          echo "📊 當前磁碟使用："
+          df -h /
+          USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
+          echo "磁碟使用率: ${USAGE}%"
+
+          if [ $USAGE -gt 85 ]; then
+            echo "⚠️  磁碟使用率超過 85%，開始清理..."
+            
+            # 清理 npm 快取
+            npm cache clean --force
+            
+            # 清理系統日誌
+            sudo journalctl --vacuum-time=3d
+            
+            # 清理 APT
+            sudo apt-get clean
+            
+            # 清理舊備份（只保留最新 1 個）
+            cd ~
+            ls -dt megaweave.backup.* 2>/dev/null | tail -n +2 | xargs -r rm -rf
+            
+            # 清理 GitHub Actions 工作目錄
+            find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \;
+            
+            # 清理臨時文件
+            sudo rm -rf /tmp/npm-*
+            
+            echo "✅ 清理完成"
+            df -h /
+          else
+            echo "✅ 磁碟空間充足"
+          fi
+
+      - name: Check memory
+        run: |
+          echo "💾 當前記憶體使用："
+          free -h
+
+          # 如果 swap 使用超過 30%，清理快取
+          SWAP_USAGE=$(free | grep Swap | awk '{print ($3/$2)*100}' | cut -d. -f1)
+          if [ ! -z "$SWAP_USAGE" ] && [ $SWAP_USAGE -gt 30 ]; then
+            echo "⚠️  Swap 使用率: ${SWAP_USAGE}%，清理快取..."
+            sudo sync
+            sudo sysctl -w vm.drop_caches=3
+            echo "✅ 快取已清理"
+            free -h
+          fi
+
   create-backup:
     name: Create Backup
-    needs: detect-changes
+    needs: [detect-changes, pre-deploy-cleanup]
     if: needs.detect-changes.outputs.any-changed == 'true'
     runs-on: self-hosted
     outputs:
@@ -52,9 +109,9 @@ jobs:
       - name: Cleanup old backups
         run: |
           cd ~
-          # 保留最近 3 個備份，刪除更舊的
-          ls -dt megaweave.backup.* 2>/dev/null | tail -n +4 | xargs -r rm -rf
-          echo "🧹 Cleaned up old backups (keeping last 3)"
+          # 保留最近 2 個備份，刪除更舊的
+          ls -dt megaweave.backup.* 2>/dev/null | tail -n +3 | xargs -r rm -rf
+          echo "🧹 Cleaned up old backups (keeping last 2)"
 
   deploy-server:
     name: Deploy Backend
@@ -224,10 +281,22 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }} # 👈 將 Token 從 Secrets 傳入
           SENTRY_ORG: megaweaving
           SENTRY_PROJECT: javascript-nextjs
+          # 限制 Node.js 記憶體使用
+          NODE_OPTIONS: "--max-old-space-size=1536"
         run: |
           cd ~/megaweave/client
+
+          # 清理舊的 .next
+          rm -rf .next
+
+          # 安裝依賴
+          npm ci
+
+          echo "🔨 Starting build..."
+          free -h
           npm run build
           echo "📦 Client built successfully"
+          free -h
 
       - name: Clean up dev dependencies
         run: |
@@ -253,10 +322,50 @@ jobs:
             sudo journalctl -u megaweave-fe.service --lines=20 --no-pager
             exit 1
           fi
+  post-deploy-cleanup:
+    name: Post-Deploy Cleanup
+    needs: [detect-changes, deploy-server, deploy-client]
+    if: always() && needs.detect-changes.outputs.any-changed == 'true'
+    runs-on: self-hosted
+    steps:
+      - name: Clean up workspace
+        run: |
+          echo "🧹 清理 Actions 工作空間..."
+
+          # 清理當前專案的 node_modules 和 .next
+          find ~/github-runner/actions-runner/_work -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null
+          find ~/github-runner/actions-runner/_work -type d -name ".next" -exec rm -rf {} + 2>/dev/null
+
+          # 清理 npm 快取
+          npm cache clean --force
+
+          # 清理臨時文件
+          sudo rm -rf /tmp/npm-*
+          sudo rm -rf /tmp/v8-*
+
+          # 清理 3 天前的工作目錄（更激進）
+          find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \;
+
+          echo "✅ 清理完成"
+
+      - name: Final disk check
+        run: |
+          echo "📊 最終磁碟狀態："
+          df -h /
+          echo ""
+          echo "💾 記憶體狀態："
+          free -h
 
   deployment-summary:
     name: Deployment Summary
-    needs: [detect-changes, create-backup, deploy-server, deploy-client]
+    needs:
+      [
+        detect-changes,
+        create-backup,
+        deploy-server,
+        deploy-client,
+        post-deploy-cleanup,
+      ]
     if: always() && needs.detect-changes.outputs.any-changed == 'true' && !contains(needs.*.result, 'failure')
     runs-on: self-hosted
 
@@ -288,6 +397,9 @@ jobs:
             echo "  - Frontend: skipped (no changes)"
           fi
           echo ""
+          echo "📊 System status:"
+          df -h / | tail -1
+          echo ""
           echo "🎉 Deployment completed successfully!"
 
   deployment-failure:
@@ -312,5 +424,9 @@ jobs:
           if [ "${{ needs.deploy-client.result }}" == "failure" ]; then
             echo "  - ❌ Frontend deployment failed"
           fi
+          echo ""
+          echo "📊 Current system status:"
+          df -h /
+          free -h
           echo ""
           echo "🔧 Please check the job logs above for details"

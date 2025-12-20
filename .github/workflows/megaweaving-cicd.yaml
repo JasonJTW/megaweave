@@ -52,9 +52,9 @@ jobs:
       - name: Cleanup old backups
         run: |
           cd ~
-          # 保留最近 5 個備份，刪除更舊的
+          # 保留最近 3 個備份，刪除更舊的
           ls -dt megaweave.backup.* 2>/dev/null | tail -n +4 | xargs -r rm -rf
-          echo "🧹 Cleaned up old backups (keeping last 5)"
+          echo "🧹 Cleaned up old backups (keeping last 3)"
 
   deploy-server:
     name: Deploy Backend

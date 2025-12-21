@@ -409,7 +409,7 @@ router.post("/facebook", async (req: Request, res: Response) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      userId: user.id.toString(),
+      userId: Number(user.id),
       provider: "facebook",
       avatar_url: user.avatar_url || null,
       avatar_key: user.avatar_key || null,

@@ -10,9 +10,10 @@ import { usePathname } from "next/navigation";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   Menu,
-  Info,
+  // Info,
   // Mail,
   GalleryHorizontalEnd,
+  SquarePlus,
   // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -84,11 +85,17 @@ const Navbar = () => {
     },
     {
       href: "/about",
-      title: "About",
-      description: "Navigate to About",
-      icon: Info,
+      title: "About Us",
+      description: "About Megaweaving",
+      icon: TeamIcon,
     },
-    ...teamMenuItems,
+    {
+      href: "/install",
+      title: "Install",
+      description: "Add to Home Screen",
+      icon: SquarePlus,
+    },
+    // ...teamMenuItems,
     // {
     //   href: "/contact",
     //   title: "Contact",

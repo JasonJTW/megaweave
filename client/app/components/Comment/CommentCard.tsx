@@ -44,7 +44,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
   return (
     <div
-      className={`relative flex h-[36px] bg-primary-5 font-ddin px-[17px] py-[6px] items-center justify-between
+      className={`relative flex min-h-[36px] bg-primary-5 font-ddin px-[17px] py-[6px] items-center justify-between gap-3
       ${
         isOpen
           ? "bg-primary-5 rounded-t-[18px] rounded-b-none"
@@ -52,22 +52,22 @@ const CommentCard: React.FC<CommentCardProps> = ({
       }`}
     >
       {/* 標題區域 */}
-      <div className="flex items-center gap-3">
-        <div className="flex font-medium h-auto text-[21px] text-center leading-none">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="font-medium h-auto text-[20px] text-left leading-[1.1]">
           {title}
         </div>
 
         {/* Quantity Left 標籤 */}
         {quantity !== undefined && (
-          <div className="flex items-center justify-center bg-primary-30 h-[22px] px-[8px] rounded-[6px]">
-            <span className="text-[13px] font-bold text-[#1a1a1a] tracking-tight">
+          <div className="flex-shrink-0 flex items-center justify-center bg-primary-30 h-[22px] px-[8px] rounded-[6px]">
+            <span className="text-[13px] font-bold text-[#1a1a1a] tracking-tight whitespace-nowrap">
               Left : {quantity.toString().padStart(2, "0")}
             </span>
           </div>
         )}
       </div>
 
-      <div className="flex gap-[10px] items-center">
+      <div className="flex gap-[10px] items-center flex-shrink-0">
         {/* 留言按鈕 + 數量 */}
         <Button
           variant="ghost"

@@ -65,7 +65,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
     if (diffHours < 24) return `${diffHours} hrs ago`;
     if (diffDays < 7) return `${diffDays} days ago`;
 
-    return date.toLocaleDateString("zh-TW", {
+    return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
     });
@@ -74,10 +74,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
   return (
     // 移除 `py-3`，讓外部容器控制間距
     <div className="relative max-w-full mt-3">
-      <div className="flex gap-2  py-[2px] px-0 items-center">
+      <div className="flex gap-2  py-[2px] px-0 items-start">
         {/* avatar*/}
         <div
-          className="flex-shrink-0 w-[36px] h-[36px] relative cursor-pointer hover:opacity-80 transition-opacity mt-[2px]" // 調整大小和 mt 讓其與文字頂部對齊
+          className="flex-shrink-0 w-[36px] h-[36px] relative cursor-pointer hover:opacity-80 transition-opacity mt-[8px]" // 調整大小和 mt 讓其與文字頂部對齊
           onClick={handleAvatarClick}
           role="button"
           tabIndex={0}
@@ -114,7 +114,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             {" "}
             {/* 使用 bg-gray-50 模擬氣泡背景 */}
             {/* 留言內容 */}
-            <p className="text-sm text-gray-700 break-words overflow-hidden text-ellipsis mr-2 whitespace-pre-line break-all">
+            <p className="py-2 text-sm text-gray-700 break-words overflow-hidden text-ellipsis mx-2 whitespace-pre-line break-all">
               {comment.content}
             </p>
             {/* 🔥 問題 2 修正點：鎖頭和時間 */}

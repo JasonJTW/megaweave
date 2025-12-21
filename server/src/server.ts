@@ -23,7 +23,7 @@ const HOSTNAME = process.env.HOSTNAME || "localhost";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
 const NODE_ENV = process.env.NODE_ENV;
 const limiter = rateLimit({
-  windowMs: 1 * 10 * 1000, // 10 seconds
+  windowMs: 1 * 5 * 1000, // 5 seconds
   limit: 20,
   // Limit each IP to 100 requests per `window` (here, per 15 minutes).
   message: {

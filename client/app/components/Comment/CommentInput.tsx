@@ -18,6 +18,8 @@ interface CommentInputProps {
   autoFocus?: boolean;
 }
 
+const MAX_CHARACTER_LIMIT = 200; // comment words limit
+
 const CommentInput: React.FC<CommentInputProps> = ({
   postId,
   itemId,
@@ -116,7 +118,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
         </div>
 
         {/* 輸入框 */}
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -125,12 +127,25 @@ const CommentInput: React.FC<CommentInputProps> = ({
             onFocus={handleNotLogIn}
             autoFocus={autoFocus}
             disabled={isSubmitting}
+            maxLength={MAX_CHARACTER_LIMIT}
             rows={parentId ? 2 : 3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg 
             focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
             disabled:bg-gray-100 disabled:cursor-not-allowed
             resize-none text-sm"
           />
+          {/* ✅ 增加字數提示計數器 */}
+          {user && (
+            <div
+              className={`text-[10px] text-right mt-0.5 ${
+                content.length >= MAX_CHARACTER_LIMIT
+                  ? "text-red-500 font-bold"
+                  : "text-gray-400"
+              }`}
+            >
+              {content.length} / {MAX_CHARACTER_LIMIT}
+            </div>
+          )}
         </div>
       </div>
 

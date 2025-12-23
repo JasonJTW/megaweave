@@ -1,6 +1,7 @@
 //* forms/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { usePullToRefresh } from "use-pull-to-refresh";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
@@ -40,6 +41,7 @@ const PostsApp = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
@@ -48,7 +50,9 @@ const PostsApp = () => {
 
   // 搜索和篩選狀態
   const [currentPage, setCurrentPage] = useState(1);
+
   const [searchTerm, setSearchTerm] = useState("");
+
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
   const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
@@ -112,43 +116,62 @@ const PostsApp = () => {
   }, []);
 
   // 使用 useCallback 來記憶化 fetchPosts 函數
-  const fetchPosts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: "12",
-      });
-
-      if (searchTerm) params.append("search", searchTerm);
-      if (selectedCategory) params.append("category_id", selectedCategory);
-      if (selectedLocation) params.append("location", selectedLocation);
-      if (postFilterType) params.append("type", postFilterType);
-      const response = await fetch(`${hostName}/api/posts?${params}`);
-      const data: PostsResponse = await response.json();
-
-      if (response.ok) {
-        setPosts(data.posts);
-        setPagination(data.pagination);
+  const fetchPosts = useCallback(
+    async (isPullRefresh = false) => {
+      console.log(isPullRefresh ? "Pull refreshing..." : "Loading posts...");
+      if (isPullRefresh) {
+        setRefreshing(true);
       } else {
-        setError("Fetch posts failed");
+        setLoading(true);
       }
-    } catch (error) {
-      console.error("Internal server error:", error);
-      setError("Internal server error, please try again later.");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    currentPage,
-    searchTerm,
-    selectedCategory,
-    selectedLocation,
-    hostName,
-    postFilterType,
-  ]);
+      setError(null);
+
+      try {
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          limit: "12",
+        });
+
+        if (searchTerm) params.append("search", searchTerm);
+        if (selectedCategory) params.append("category_id", selectedCategory);
+        if (selectedLocation) params.append("location", selectedLocation);
+        if (postFilterType) params.append("type", postFilterType);
+        const response = await fetch(`${hostName}/api/posts?${params}`);
+        const data: PostsResponse = await response.json();
+
+        if (response.ok) {
+          setPosts(data.posts);
+          setPagination(data.pagination);
+        } else {
+          setError("Fetch posts failed");
+        }
+      } catch (error) {
+        console.error("Internal server error:", error);
+        setError("Internal server error, please try again later.");
+      } finally {
+        setRefreshing(false);
+        setLoading(false);
+      }
+    },
+    [
+      currentPage,
+      searchTerm,
+      selectedCategory,
+      selectedLocation,
+      hostName,
+      postFilterType,
+    ]
+  );
+
+  // mobile 下拉刷新功能，fetchPosts宣告後才啟動
+  usePullToRefresh({
+    onRefresh: () => fetchPosts(true),
+    refreshThreshold: 60,
+    isDisabled:
+      typeof window !== "undefined"
+        ? window.innerWidth >= 768 || showCreateForm
+        : true,
+  });
 
   const handleCreatePostButtonClick = (postType: Post["type"]) => {
     if (!user) {
@@ -582,8 +605,20 @@ const PostsApp = () => {
             </div>
           )}
 
+          {/* 下拉刷新時顯示的頂部 Spinner (不會隱藏 Feed) */}
+          {refreshing && (
+            <div className="flex justify-center py-4 transition-all animate-in fade-in slide-in-from-top-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          )}
+
+          {/* 邏輯判斷：
+            如果是「一般載入(loading)」且「目前沒有貼文」，才顯示中央大 Spinner。
+            如果是「下拉刷新」，loading 會是 false (因為我們改用 refreshing 狀態)，
+            所以 Feed 會被保留。
+        */}
           {/* 貼文網格 */}
-          {loading ? (
+          {loading && posts.length === 0 ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>

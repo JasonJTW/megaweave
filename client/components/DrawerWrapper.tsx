@@ -13,6 +13,7 @@ interface DrawerWrapperProps {
   wishPosts: Post[];
   conditions: Condition[];
   currentUserId: number;
+  fetchWeaves?: () => void;
 }
 
 const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
@@ -21,6 +22,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
   wishPosts,
   conditions,
   currentUserId,
+  fetchWeaves,
 }) => {
   // 💥 只有在這個 Client Component 內才呼叫 useSearchParams
   const searchParams = useSearchParams();
@@ -38,7 +40,8 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
         weaves={weaves}
         conditions={conditions}
         currentUserId={currentUserId}
-        highlightWeaveId={parsedHighlightId} // 傳遞給 Weaving Drawer
+        highlightWeaveId={parsedHighlightId}
+        fetchWeaves={fetchWeaves} // 傳遞給 Weaving Drawer
       />
       {/* 其他 Drawer 不處理 highlight 邏輯 */}
       <Drawer title="Share" posts={sharePosts} conditions={conditions} />

@@ -216,15 +216,15 @@ function PostCardInner({
         } as React.CSSProperties & Record<string, string>
       }
     >
-      <div
-        className="flex items-center justify-between px-4 py-2"
-        style={{
-          height: "var(--post-title-h, 72px)",
-          minHeight: "var(--post-title-h, 72px)",
-        }}
-      >
-        {/* ✅ Weave 狀態標籤 (移到標題右側) */}
-        {weave && (
+      {/* ✅ Weave 狀態標籤 (移到標題右側) */}
+      {weave && (
+        <div
+          className="flex items-center  px-4 pt-6 pb-6"
+          style={{
+            height: "var(--post-title-h, 72px)",
+            minHeight: "var(--post-title-h, 72px)",
+          }}
+        >
           <Badge
             className={`${
               currentStatus === "completed"
@@ -232,7 +232,7 @@ function PostCardInner({
                 : currentStatus === "cancelled"
                 ? "bg-red-500"
                 : "bg-yellow-500"
-            } text-white font-bold ml-2`}
+            } text-white font-bold `}
           >
             {currentStatus === "completed"
               ? "Completed"
@@ -242,8 +242,8 @@ function PostCardInner({
               ? "Waiting for other"
               : "Pending"}
           </Badge>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="relative">
         {post.type === "share" && (

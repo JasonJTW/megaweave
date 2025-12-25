@@ -6,6 +6,7 @@ import type { Post, Condition } from "../types/schema";
 import { useRouter } from "next/navigation";
 import ExpandedIcon from "./icons/ExpandedIcon";
 import type { Weave } from "@/services/weaveService";
+import { LucideRefreshCcw } from "lucide-react";
 
 interface DrawerProps {
   title: string;
@@ -15,6 +16,7 @@ interface DrawerProps {
   currentUserId?: number;
   onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
+  fetchWeaves?: () => void;
 }
 
 const Drawer: React.FC<DrawerProps> = ({
@@ -25,6 +27,7 @@ const Drawer: React.FC<DrawerProps> = ({
   currentUserId,
   onWeaveStatusChange,
   highlightWeaveId,
+  fetchWeaves,
 }) => {
   const router = useRouter();
   const shouldAutoExpand =
@@ -106,19 +109,28 @@ const Drawer: React.FC<DrawerProps> = ({
             ease: [0.34, 1.3, 0.64, 1],
           }}
         >
-          {postsToRender.length > 0 ? (
-            <Feed
-              posts={postsToRender}
-              conditions={conditions}
-              onPostClick={(post) => router.push(`/item/${post.id}`)}
-              weaves={weaves}
-              currentUserId={currentUserId}
-              onWeaveStatusChange={onWeaveStatusChange}
-              highlightWeaveId={highlightWeaveId}
-            />
-          ) : (
-            <div className="py-8 text-center text-gray-500">{emptyMessage}</div>
-          )}
+          <div className="">
+            <div className="text-right">
+              <button className="px-4" onClick={fetchWeaves}>
+                <LucideRefreshCcw />
+              </button>
+            </div>
+            {postsToRender.length > 0 ? (
+              <Feed
+                posts={postsToRender}
+                conditions={conditions}
+                onPostClick={(post) => router.push(`/item/${post.id}`)}
+                weaves={weaves}
+                currentUserId={currentUserId}
+                onWeaveStatusChange={onWeaveStatusChange}
+                highlightWeaveId={highlightWeaveId}
+              />
+            ) : (
+              <div className="py-8 text-center text-gray-500">
+                {emptyMessage}
+              </div>
+            )}
+          </div>
         </motion.div>
       </motion.div>
     </div>

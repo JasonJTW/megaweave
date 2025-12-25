@@ -1,11 +1,11 @@
 //* forms/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { usePullToRefresh } from "use-pull-to-refresh";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { X } from "lucide-react";
+import { LucideLoader2, X } from "lucide-react";
 import { useNavbar } from "./contexts/NavBarContext";
 import {
   Post,
@@ -123,20 +123,24 @@ const PostsApp = () => {
         setRefreshing(true);
       } else {
         setLoading(true);
+        setError(null);
       }
-      setError(null);
 
       try {
         const params = new URLSearchParams({
           page: currentPage.toString(),
           limit: "12",
         });
+        const delay = isPullRefresh ? 800 : 1;
 
         if (searchTerm) params.append("search", searchTerm);
         if (selectedCategory) params.append("category_id", selectedCategory);
         if (selectedLocation) params.append("location", selectedLocation);
         if (postFilterType) params.append("type", postFilterType);
-        const response = await fetch(`${hostName}/api/posts?${params}`);
+        const [response] = await Promise.all([
+          fetch(`${hostName}/api/posts?${params}`),
+          new Promise((resolve) => setTimeout(resolve, delay)),
+        ]);
         const data: PostsResponse = await response.json();
 
         if (response.ok) {
@@ -163,14 +167,17 @@ const PostsApp = () => {
     ]
   );
 
+  const MAXIMUM_PULL_LENGTH = 240;
+  const REFRESH_THRESHOLD = 180;
+
   // mobile 下拉刷新功能，fetchPosts宣告後才啟動
-  usePullToRefresh({
+  const { isRefreshing, pullPosition } = usePullToRefresh({
     onRefresh: () => fetchPosts(true),
-    refreshThreshold: 60,
-    isDisabled:
-      typeof window !== "undefined"
-        ? window.innerWidth >= 768 || showCreateForm
-        : true,
+    maximumPullLength: MAXIMUM_PULL_LENGTH,
+    refreshThreshold: REFRESH_THRESHOLD,
+    // isDisabled:
+    //   typeof window !== "undefined"
+    //     ? window.innerWidth >= 768 || showCreateForm
   });
 
   const handleCreatePostButtonClick = (postType: Post["type"]) => {
@@ -387,6 +394,23 @@ const PostsApp = () => {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
           {!showCreateForm && <IconGrid />}
+        </div>
+
+        <div
+          style={{
+            top: (isRefreshing ? REFRESH_THRESHOLD : pullPosition) / 3,
+            opacity: isRefreshing || pullPosition > 0 ? 1 : 0,
+          }}
+          className="bg-base-100 fixed inset-x-1/2 z-30 h-8 w-8 -translate-x-1/2 rounded-full p-2 shadow"
+        >
+          <div
+            className={`h-full w-full ${isRefreshing ? "animate-spin" : ""}`}
+            style={
+              !isRefreshing ? { transform: `rotate(${pullPosition}deg)` } : {}
+            }
+          >
+            <LucideLoader2 className="h-full w-full" />
+          </div>
         </div>
 
         <div

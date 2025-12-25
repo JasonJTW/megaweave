@@ -1400,6 +1400,7 @@ const UserPage = () => {
           wishPosts={wishPosts}
           conditions={conditions}
           currentUserId={user.userId}
+          fetchWeaves={fetchWeaves}
         />
       </div>
     </>

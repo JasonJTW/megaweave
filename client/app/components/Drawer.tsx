@@ -16,7 +16,7 @@ interface DrawerProps {
   currentUserId?: number;
   onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
-  fetchWeaves?: () => void;
+  fetchWeaves?: () => void | Promise<void>;
 }
 
 const Drawer: React.FC<DrawerProps> = ({
@@ -33,11 +33,34 @@ const Drawer: React.FC<DrawerProps> = ({
   const shouldAutoExpand =
     weaves?.some((w) => w.id === highlightWeaveId) ?? false;
   const [isExpanded, setIsExpanded] = useState(shouldAutoExpand);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   useEffect(() => {
     if (shouldAutoExpand) {
       setIsExpanded(true);
     }
   }, [shouldAutoExpand]);
+
+  const handleRefresh = async () => {
+    if (!fetchWeaves) return;
+    setIsRefreshing(true);
+    const minSpinTime = 500;
+    const startTime = Date.now();
+
+    try {
+      await fetchWeaves();
+    } catch (error) {
+      console.error("Refresh failed", error);
+    } finally {
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime < minSpinTime) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, minSpinTime - elapsedTime)
+        );
+      }
+      setIsRefreshing(false);
+    }
+  };
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
   };
@@ -111,8 +134,21 @@ const Drawer: React.FC<DrawerProps> = ({
         >
           <div className="">
             <div className="text-right">
-              <button className="px-4" onClick={fetchWeaves}>
-                <LucideRefreshCcw />
+              <button
+                className="px-4"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+              >
+                <motion.div
+                  animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                  transition={
+                    isRefreshing
+                      ? { duration: 1, ease: "linear", repeat: Infinity }
+                      : { duration: 0 } // 當停止時直接歸位，避免逆時針旋轉回 0
+                  }
+                >
+                  <LucideRefreshCcw />
+                </motion.div>
               </button>
             </div>
             {postsToRender.length > 0 ? (

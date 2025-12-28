@@ -8,6 +8,7 @@ import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { User as UserIcon, LogOut, Save, X } from "lucide-react";
+import toast from "react-hot-toast";
 // import { useForm } from "react-hook-form";
 // import {
 //   Form,
@@ -61,7 +62,6 @@ const UserPage = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isContributor, setIsContributor] = useState(false);
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -142,7 +142,7 @@ const UserPage = () => {
 
         // 處理 500 等伺服器錯誤
         if (response.status >= 500) {
-          setError("Server is currently unavailable. Please try again later.");
+          toast.error("Server is currently unavailable. Please try again later.");
           setLoading(false);
           return false;
         }
@@ -164,11 +164,10 @@ const UserPage = () => {
         setIsContributor(true);
       }
       setLoading(false);
-      setError(null);
       return true;
     } catch (error) {
       console.error("Error fetching user data:", error);
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
       setLoading(false);
@@ -185,7 +184,7 @@ const UserPage = () => {
     if (!response.ok) {
       const result = await response.json();
       console.error("Error fetching userprofile:", result.errorMessage);
-      setError(result.errMessage);
+      toast.error(result.errMessage);
       return;
     }
     const result = await response.json();
@@ -202,7 +201,7 @@ const UserPage = () => {
     if (!response.ok) {
       const error = await response.json();
       console.error("Error fetching userprofile:", error.errorMessage);
-      setError(error.errMessage);
+      toast.error(error.errMessage);
       return;
     }
 
@@ -279,7 +278,7 @@ const UserPage = () => {
     // validation (example: limit 5MB)
     const maxSizeMB = 5;
     if (file.size / 1024 / 1024 > maxSizeMB) {
-      setError(`Selected file is larger than ${maxSizeMB} MB`);
+      toast.error(`Selected file is larger than ${maxSizeMB} MB`);
       // clear input
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
@@ -298,7 +297,6 @@ const UserPage = () => {
     previousPreviewRef.current = url;
     setPreviewSrc(url);
     setSelectedAvatarFile(file);
-    setError(null);
   };
 
   const handleCancelAvatarPreview = () => {
@@ -370,7 +368,7 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        setError(result.errorMessage || "Failed to update user session");
+        toast.error(result.errorMessage || "Failed to update user session");
         throw new Error(result.errorMessage || "Failed to update user session");
       }
       const result = await response.json();
@@ -386,7 +384,6 @@ const UserPage = () => {
     if (!selectedAvatarFile) return;
 
     setUploadingAvatar(true);
-    setError(null);
 
     try {
       // Optional: compress before upload (uncomment if desired)
@@ -465,7 +462,7 @@ const UserPage = () => {
       }
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      setError(error instanceof Error ? error.message : "Upload failed");
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploadingAvatar(false);
     }
@@ -493,7 +490,7 @@ const UserPage = () => {
       console.log("Update username Success: ", result);
     } catch (error) {
       console.error("Error update username: ", error);
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "Error update username"
       );
       throw error;
@@ -521,7 +518,7 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      setError(error instanceof Error ? error.message : "Error update profile");
+      toast.error(error instanceof Error ? error.message : "Error update profile");
       throw error;
     }
   };
@@ -689,14 +686,13 @@ const UserPage = () => {
       // 同时更新 user 对象中的 username
       if (user) {
         setUser({ ...user, username: tempUsername });
-        setError(null);
       }
     } catch (error) {
       console.error("Error saving username:", error);
       // 如果保存失败，恢复原来的值
       setUsername(username || "");
       setTempUsername(username || "");
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "Error saving username"
       );
     }
@@ -727,7 +723,7 @@ const UserPage = () => {
       setUser((prev) => (prev ? { ...prev, avatar_url: undefined } : prev));
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Failed to remove avatar");
+      toast.error(err instanceof Error ? err.message : "Failed to remove avatar");
     }
   };
 
@@ -749,7 +745,7 @@ const UserPage = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          alert("You are not signed in");
+          toast.error("You are not signed in");
           return;
         }
 
@@ -764,7 +760,7 @@ const UserPage = () => {
       router.push("/");
     } catch (error) {
       console.error("Error signing out:", error);
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
     }
@@ -822,17 +818,7 @@ const UserPage = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
-        <Alert className="max-w-md bg-red-950/50 border-red-500/30">
-          <AlertDescription className="text-red-300">
-            Error fetching user data: {error}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+
 
   if (!user) {
     return null;
@@ -863,11 +849,7 @@ const UserPage = () => {
           </div>
         </motion.header>
 
-        {error && (
-          <div className="max-w-6xl mx-auto px-6 py-4">
-            <Alert className="bg-red-950/50 border-red-500/30"> {error} </Alert>
-          </div>
-        )}
+
 
         {/*icons*/}
         <div className="max-w-6xl mx-auto">
@@ -1401,6 +1383,7 @@ const UserPage = () => {
           conditions={conditions}
           currentUserId={user.userId}
           fetchWeaves={fetchWeaves}
+          fetchStats={fetchStats}
         />
       </div>
     </>

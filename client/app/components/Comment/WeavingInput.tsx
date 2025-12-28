@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import toast from "react-hot-toast";
 
 interface WeavingInputProps {
   user: User | null;
@@ -49,7 +50,7 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
     } else if (selectedQuantity > 0) {
       onWeavingSubmit(selectedQuantity);
     } else {
-      alert("Please select a quantity.");
+      toast.error("Please select a quantity.");
     }
   };
 

@@ -102,10 +102,8 @@ export default function RootLayout({
           position="top-center"
           containerStyle={{ top: "100px" }}
           toastOptions={{
-            duration: 5000, // 預設顯示 5 秒
+            duration: 5000,
             style: {
-              background: "#f56565", // Tailwind bg-red-500
-              color: "#fff",
               borderRadius: "15px",
               padding: "0.5rem 1rem",
               fontSize: "14px",
@@ -113,9 +111,25 @@ export default function RootLayout({
               boxShadow:
                 "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
             },
-            iconTheme: {
-              primary: "#fff",
-              secondary: "#f56565",
+            success: {
+              style: {
+                background: "#48bb78",
+                color: "#fff",
+              },
+              iconTheme: {
+                primary: "#fff",
+                secondary: "#48bb78",
+              },
+            },
+            error: {
+              style: {
+                background: "#f56565",
+                color: "#fff",
+              },
+              iconTheme: {
+                primary: "#fff",
+                secondary: "#f56565",
+              },
             },
           }}
         />

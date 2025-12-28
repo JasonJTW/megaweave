@@ -41,7 +41,7 @@ interface WeaveOutput extends RowDataPacket {
   post_user_id: number;
   post_title: string;
   post_content: string;
-  post_type: "seek" | "wish" | "share" | "commons";
+  post_type: "wish" | "share" | "commons";
   post_status_original: "active" | "inactive" | "expired";
   post_location: string | null;
   post_tags: string | null;
@@ -154,7 +154,6 @@ const WEAVE_QUERY_BASE = `
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const { postId, itemId, quantity = 1, notes } = req.body;
-    const receiverId = req.user!.userId;
 
     if (!postId) {
       return res.status(400).json({ errorMessage: "Post ID is required" });
@@ -162,7 +161,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     // 1. 檢查 Post 是否存在
     const [posts] = await dbPool.execute<RowDataPacket[]>(
-      `SELECT user_id, status FROM posts WHERE id = ?`,
+      `SELECT user_id, status, type FROM posts WHERE id = ?`,
       [postId]
     );
 
@@ -170,10 +169,26 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ errorMessage: "Post not found" });
     }
 
-    const giverId = posts[0].user_id;
+    const postOwnerId = posts[0].user_id;
+    const postType = posts[0].type;
+    const initiatorId = req.user!.userId;
 
-    // 安全檢查：不能索取自己的物品
-    if (giverId === receiverId) {
+    let giverId: number;
+    let receiverId: number;
+
+    // 根據 Post Type 決定誰是 Giver / Receiver
+    if (postType === "wish") {
+      // 如果是 Wish (許願)，發起交易的人 (Initiator) 是給予者 (Giver)，貼文者 (Post Owner) 是接收者 (Receiver)
+      giverId = initiatorId;
+      receiverId = postOwnerId;
+    } else {
+      // 如果是 Share / Commons，貼文者 (Post Owner) 是給予者 (Giver)，發起交易的人 (Initiator) 是接收者 (Receiver)
+      giverId = postOwnerId;
+      receiverId = initiatorId;
+    }
+
+    // 安全檢查：不能索取/贈送自己的物品 (雖然邏輯上 giverId/receiverId 不會同，但 initiatorId == postOwnerId 還是要擋)
+    if (postOwnerId === initiatorId) {
       return res
         .status(400)
         .json({ errorMessage: "Cannot weave your own post" });

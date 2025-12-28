@@ -13,6 +13,7 @@ import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
 import { useRouter } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
+import toast from "react-hot-toast";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 export default function Signup() {
   const router = useRouter();
@@ -154,7 +155,7 @@ export default function Signup() {
 
       /// Add a 5-second delay to inspect the button text
       // await new Promise((resolve) => setTimeout(resolve, 300));
-      alert(`Welcome to MegaWeave🥳🎉! ${username}`);
+      toast.success(`Welcome to MegaWeave🥳🎉! ${username}`);
       handleSignupSuccess();
     } catch (error) {
       console.log(error);

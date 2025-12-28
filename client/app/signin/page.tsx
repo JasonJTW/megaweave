@@ -13,6 +13,7 @@ import { siFacebook, siGoogle } from "simple-icons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Image from "next/image";
+import toast from "react-hot-toast";
 
 function SigninForm() {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -22,9 +23,6 @@ function SigninForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [signinError, setSigninError] = useState<string | null>(null);
-  const [signupError, setSignupError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,12 +41,10 @@ function SigninForm() {
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
     console.log("Credential Response:", credentialResponse);
 
-    /// clear previous errors
-    setSigninError(null);
     setLoading(true);
 
     if (!credentialResponse.credential) {
-      setSigninError("Google sign in failed. Please try again.");
+      toast.error("Google sign in failed. Please try again.");
       setLoading(false);
       return;
     }
@@ -65,7 +61,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        setSigninError(data.errorMessage || "Google sign in failed");
+        toast.error(data.errorMessage || "Google sign in failed");
         return;
       }
 
@@ -73,7 +69,7 @@ function SigninForm() {
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
-      setSigninError(
+      toast.error(
         error instanceof Error
           ? error.message
           : "An unexpected error occurred during Google sign in"
@@ -106,7 +102,7 @@ function SigninForm() {
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error fetching user data:", error);
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
     } finally {
@@ -119,7 +115,7 @@ function SigninForm() {
     setLoading(true);
 
     if (!email || !password) {
-      setSigninError("All fields are required.");
+      toast.error("All fields are required.");
       setLoading(false);
       return;
     }
@@ -136,16 +132,15 @@ function SigninForm() {
       console.log("data:", data);
       // /// handle error
       if (!response.ok) {
-        setSigninError(data.errorMessage || "Sign in failed");
+        toast.error(data.errorMessage || "Sign in failed");
         console.error("Sign in failed", data.errorMessage);
         return;
       }
       /// Sign in success
-      setSigninError(null);
       console.log("response data:", data);
       handleSigninSignupSuccess();
     } catch (error) {
-      setSigninError(
+      toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
     } finally {
@@ -175,12 +170,10 @@ function SigninForm() {
 
   const handleFacebookLogin = () => {
     if (!isFBReady || !window.FB) {
-      setSigninError("Facebook SDK is not ready. Please try again.");
+      toast.error("Facebook SDK is not ready. Please try again.");
       return;
     }
 
-    /// clear previous errors
-    setSigninError(null);
     setLoading(true);
 
     window.FB.login(
@@ -190,7 +183,7 @@ function SigninForm() {
 
           if (!accessToken) {
             console.error("Facebook login failed or no access token received");
-            setSigninError("Facebook login failed: No access token received");
+            toast.error("Facebook login failed: No access token received");
             setLoading(false);
             return;
           }
@@ -198,10 +191,10 @@ function SigninForm() {
           console.log("Facebook login successful:", response.authResponse);
           sendToYourBackend(accessToken);
         } else if (response.status === "not_authorized") {
-          setSigninError("Facebook login failed: App not authorized");
+          toast.error("Facebook login failed: App not authorized");
           setLoading(false);
         } else {
-          setSigninError("Facebook login was cancelled or failed");
+          toast.error("Facebook login was cancelled or failed");
           setLoading(false);
         }
       },
@@ -224,7 +217,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        setSigninError(data.errorMessage || "Facebook sign in failed");
+        toast.error(data.errorMessage || "Facebook sign in failed");
         return;
       }
 
@@ -232,7 +225,7 @@ function SigninForm() {
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
-      setSigninError(
+      toast.error(
         error instanceof Error
           ? error.message
           : "An unexpected error occurred during Facebook sign in"
@@ -256,7 +249,7 @@ function SigninForm() {
 
     /// Validate input
     if (!username || !email || !password) {
-      setSignupError("All fields are required.");
+      toast.error("All fields are required.");
       setLoading(false);
       return;
     }
@@ -278,7 +271,7 @@ function SigninForm() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        setSignupError(data.errorMessage || "Sign in failed");
+        toast.error(data.errorMessage || "Sign in failed");
         if (data.details) {
           console.error("ErrorDetails", data.details);
         }
@@ -288,11 +281,11 @@ function SigninForm() {
 
       /// Add a 5-second delay to inspect the button text
       // await new Promise((resolve) => setTimeout(resolve, 300));
-      alert(`Welcome to MegaWeave🥳🎉! ${username}`);
+      toast.success(`Welcome to MegaWeave🥳🎉! ${username}`);
       handleSigninSignupSuccess();
     } catch (error) {
       console.log(error);
-      setSignupError(
+      toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
     } finally {
@@ -311,11 +304,6 @@ function SigninForm() {
           className="w-full max-w-md"
         >
           <div className="bg-secondary rounded-2xl  p-8 space-y-6">
-            {(signinError || signupError || error) && (
-              <div className="text-red-400 text-sm justify-self-end">
-                * {signinError || error}
-              </div>
-            )}
 
             {/* icon */}
             <div className="flex w-full justify-center">
@@ -379,6 +367,7 @@ function SigninForm() {
                   viewBox="0 0 24 24"
                   className="w-5 h-5 mr-2"
                   fill="currentColor"
+                  style={{ display: "inline-block", verticalAlign: "middle" }}
                 >
                   <path d={siGoogle.path} />
                 </svg>
@@ -390,7 +379,7 @@ function SigninForm() {
                   onSuccess={handleGoogleSignin}
                   onError={() => {
                     console.log("Signin with google Failed");
-                    setSigninError("Google sign in failed. Please try again.");
+                    toast.error("Google sign in failed. Please try again.");
                     setLoading(false);
                   }}
                 />
@@ -406,6 +395,7 @@ function SigninForm() {
                   viewBox="0 0 24 24"
                   className="w-5 h-5 mr-2"
                   fill="currentColor"
+                  style={{ display: "inline-block", verticalAlign: "middle" }}
                 >
                   <path d={siFacebook.path} />
                 </svg>

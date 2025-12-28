@@ -12,6 +12,7 @@ import { createWeave } from "@/services/weaveService";
 import { useRouter } from "next/navigation";
 // ✅ 引入 WeavingInput
 import WeavingInput from "./WeavingInput";
+import toast from "react-hot-toast";
 import {
   Comment,
   getComments,
@@ -31,7 +32,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   // ✅ 新增：追蹤哪個 Tab 正在顯示 WeavingInput
   const [weavingInputItem, setWeavingInputItem] = useState<TabKey | null>(null);
 
@@ -50,15 +50,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     async (tab: TabKey) => {
       try {
         setIsLoading(true);
-        setError(null);
-
         const res = await getComments(post.id, tab);
         setComments(res.comments);
       } catch (err: unknown) {
         if (err instanceof Error) {
-          setError(err.message);
+          toast.error(err.message);
         } else {
-          setError("Error fetching comments");
+          toast.error("Error fetching comments");
         }
       } finally {
         setIsLoading(false);
@@ -119,14 +117,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   ) => {
     //* check login
     if (!user) {
-      alert("Please log in to request items.");
+      toast.error("Please log in to request items.");
       return;
     }
 
     // 防止自己索取自己的文章 (雖然前端檢查了，後端 weaves.ts 也會擋，但前端擋住體驗較好)
     if (user.userId === post.author_user_id) {
       // 假設 user 物件裡有 id，post 裡有 user_id
-      alert("You cannot request your own items.");
+      toast.error("You cannot request your own items.");
       return;
     }
     try {
@@ -149,15 +147,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       console.log("newWeave:", newWeave);
       router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
       // 4. 成功處理
-      alert("Request sent successfully!"); // 建議未來改用 Toast 元件
+      toast.success("Request sent successfully!"); // 建議未來改用 Toast 元件
       handleCommentSuccess(); // 重新整理列表並關閉輸入框
     } catch (err: unknown) {
       console.error("Error creating weave:", err);
       // 顯示錯誤訊息 (例如庫存不足、文章非 active 等)
       if (err instanceof Error) {
-        alert(err.message);
+        toast.error(err.message);
       } else {
-        alert("An unexpected error occurred.");
+        toast.error("An unexpected error occurred.");
       }
     }
   };
@@ -238,10 +236,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                       <div className="py-4 text-center text-gray-500">
                         <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                         <p className="mt-2 text-sm">Loading...</p>
-                      </div>
-                    ) : error ? (
-                      <div className="py-4 text-center text-red-500 text-sm">
-                        {error}
                       </div>
                     ) : getTabComments(tab.key).length === 0 ? (
                       <div className="py-4 text-center text-gray-500 text-sm">

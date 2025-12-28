@@ -135,8 +135,6 @@ export default {
         "megaweave-forest":
           "linear-gradient(135deg, #233519 0%, #3E6330 35%, #587635 100%)",
         "megaweave-warm": "linear-gradient(135deg, #D2CEB4 0%, #B2A986 100%)",
-        "megaweave-gold":
-          "linear-gradient(135deg, #D5AB1C 0%, #A17624 35%, #D2CEB4 100%)",
         "megaweave-earth":
           "linear-gradient(135deg, #54160F 0%, #D14C41 50%, #D5AB1C 100%)",
         "megaweave-nature":

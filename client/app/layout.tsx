@@ -102,7 +102,7 @@ export default function RootLayout({
           position="top-center"
           containerStyle={{ top: "100px" }}
           toastOptions={{
-            duration: 5000,
+            duration: 3500,
             style: {
               borderRadius: "15px",
               padding: "0.5rem 1rem",
@@ -110,6 +110,12 @@ export default function RootLayout({
               fontWeight: 500,
               boxShadow:
                 "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+            },
+            blank: {
+              style: {
+                background: "#9eb098", // 例如設定成藍色
+                color: "#fff",
+              },
             },
             success: {
               style: {

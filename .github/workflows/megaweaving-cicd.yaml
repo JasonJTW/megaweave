@@ -60,7 +60,7 @@ jobs:
             find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \;
             
             # 清理臨時文件
-            sudo rm -rf /tmp/npm-*
+            sudo rm -rf /tmp/npm-* 2>/dev/null || true
             
             echo "✅ 清理完成"
             df -h /
@@ -73,14 +73,16 @@ jobs:
           echo "💾 當前記憶體使用："
           free -h
 
-          # 如果 swap 使用超過 30%，清理快取
-          SWAP_USAGE=$(free | grep Swap | awk '{print ($3/$2)*100}' | cut -d. -f1)
-          if [ ! -z "$SWAP_USAGE" ] && [ $SWAP_USAGE -gt 30 ]; then
-            echo "⚠️  Swap 使用率: ${SWAP_USAGE}%，清理快取..."
-            sudo sync
-            sudo sysctl -w vm.drop_caches=3
-            echo "✅ 快取已清理"
-            free -h
+          SWAP_TOTAL=$(free | grep Swap | awk '{print $2}')
+          if [ "$SWAP_TOTAL" != "0" ]; then
+            SWAP_USAGE=$(free | grep Swap | awk '{if($2>0) print int(($3/$2)*100); else print 0}')
+            if [ $SWAP_USAGE -gt 30 ]; then
+              echo "⚠️ Swap 使用率: ${SWAP_USAGE}%，清理快取..."
+              sudo sync
+              sudo sysctl -w vm.drop_caches=3
+              echo "✅ 快取已清理"
+              free -h
+            fi
           fi
 
   create-backup:
@@ -269,7 +271,6 @@ jobs:
           # Make sure .env file exists
           if [ -f .env.production ]; then
             echo "✅ .env.production found"
-            cat .env.production
           else
             echo "❌ .env.production not found!"
             exit 1
@@ -322,6 +323,7 @@ jobs:
             sudo journalctl -u megaweave-fe.service --lines=20 --no-pager
             exit 1
           fi
+
   post-deploy-cleanup:
     name: Post-Deploy Cleanup
     needs: [detect-changes, deploy-server, deploy-client]
@@ -332,19 +334,28 @@ jobs:
         run: |
           echo "🧹 清理 Actions 工作空間..."
 
-          # 清理當前專案的 node_modules 和 .next
-          find ~/github-runner/actions-runner/_work -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null
-          find ~/github-runner/actions-runner/_work -type d -name ".next" -exec rm -rf {} + 2>/dev/null
+          # 等待一下確保所有服務都已啟動
+          sleep 3
+
+          # 只清理當前 repository 的工作目錄（更精確的路徑）
+          WORK_DIR="${GITHUB_WORKSPACE}"
+          if [ -d "$WORK_DIR" ]; then
+            echo "清理當前工作目錄: $WORK_DIR"
+            cd ~  # 先離開工作目錄
+            rm -rf "$WORK_DIR/server/node_modules" 2>/dev/null || true
+            rm -rf "$WORK_DIR/client/node_modules" 2>/dev/null || true
+            rm -rf "$WORK_DIR/client/.next" 2>/dev/null || true
+          fi
 
           # 清理 npm 快取
           npm cache clean --force
 
           # 清理臨時文件
-          sudo rm -rf /tmp/npm-*
-          sudo rm -rf /tmp/v8-*
+          sudo rm -rf /tmp/npm-* 2>/dev/null || true
+          sudo rm -rf /tmp/v8-* 2>/dev/null || true
 
           # 清理 3 天前的工作目錄（更激進）
-          find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \;
+          find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \; 2>/dev/null || true
 
           echo "✅ 清理完成"
 

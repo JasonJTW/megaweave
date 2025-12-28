@@ -2,26 +2,39 @@
 
 import express from "express";
 import cookieParser from "cookie-parser";
-const app = express();
 import apiRoutes from "./api";
 import cors from "cors";
 import dotenv from "dotenv";
 import https from "https";
+import http from "http";
 import path from "path";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
-import { connectRedis, disconnectRedis } from "./utils/redis";
+import { connectRedis, disconnectRedis, getRedisClient } from "./utils/redis";
 import { closeDatabase } from "./utils/db";
+import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
 
 dotenv.config();
 
+const app = express();
 const CORS_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
   : ["https://localhost:3000"];
 const PORT = parseInt(process.env.PORT || "8443");
-const HOSTNAME = process.env.HOSTNAME || "localhost";
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
 const NODE_ENV = process.env.NODE_ENV;
+app.use(express.json());
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: CORS_ORIGINS,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
 const limiter = rateLimit({
   windowMs: 1 * 5 * 1000, // 5 seconds
   limit: 20,
@@ -34,16 +47,6 @@ const limiter = rateLimit({
 });
 console.log("Cors Origins:", CORS_ORIGINS);
 // Apply the rate limiting middleware to all requests.
-app.use(express.json());
-app.use(cookieParser());
-app.use(
-  cors({
-    origin: CORS_ORIGINS,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
 
 if (NODE_ENV !== "development") {
   app.use(limiter);
@@ -61,8 +64,17 @@ app.use("/api", apiRoutes);
 
 async function startServer() {
   try {
-    await connectRedis(); // 先連接 Redis
-    let server: https.Server | ReturnType<typeof app.listen>;
+    await connectRedis();
+    const redisClient = getRedisClient();
+
+    //* 1.Get Redis clients for Socket.IO adapter
+    const pubClient = redisClient;
+    const subClient = redisClient.duplicate();
+    await subClient.connect();
+    console.log("✅ Redis subscriber client connected for Socket.IO adapter");
+
+    let server: https.Server | http.Server;
+
     if (ENABLE_HTTPS) {
       // HTTPS 服務器啟動邏輯...
       const CERT_PATH = process.env.CERT_PATH;
@@ -84,18 +96,49 @@ async function startServer() {
         },
         app
       );
-
-      server.listen(PORT, () => {
-        console.log(`Secure server listening on port ${PORT}`);
-      });
     } else {
-      server = app.listen(PORT, () => {
-        console.log(`Server listening on Port ${PORT}`);
-      });
+      server = http.createServer(app);
     }
+    //* 2.Socket.IO setup
+    const io = new Server(server, {
+      cors: {
+        origin: CORS_ORIGINS,
+        credentials: true,
+      },
+    });
+
+    //* 3.Attach Redis adapter to Socket.IO
+    io.adapter(createAdapter(pubClient, subClient));
+
+    //* 4.Socket.IO connection handling
+    io.on("connection", (socket) => {
+      console.log(`🔌 New client connected: ${socket.id}`);
+
+      //* 讓客戶端告知 User ID 並加入 Room
+      socket.on("join_room", (userId: string) => {
+        const roomName = `user_${userId}`;
+        socket.join(roomName);
+        console.log(`👤User ${userId} joined room: ${roomName}`);
+      });
+      socket.on("disconnect", () => {
+        console.log(`❌ Client disconnected: ${socket.id}`);
+      });
+    });
+    //* 5.將 io 實例存入 app，讓以後的 API Route 可以透過 req.app.get("io") 取得
+    app.set("io", io);
+
+    //* start server
+    server.listen(PORT, () => {
+      console.log(
+        `${ENABLE_HTTPS ? "Secure " : ""}Server listening on port ${PORT}`
+      );
+    });
 
     const shutdown = async (signal: string) => {
       console.log(`\n${signal} received, shutting down gracefully...`);
+
+      //* Close Socket.IO server
+      io.close();
 
       // 1. 停止接受新請求
       server.close(async () => {
@@ -105,6 +148,13 @@ async function startServer() {
         try {
           console.log("\n=== Starting graceful shutdown sequence ===");
 
+          //* Step 0: Disconnect subClient for Socket.IO adapter
+          console.log(
+            "\n📍 Step 0/2: Disconnecting Socket.IO Redis subscriber..."
+          );
+          await subClient.quit();
+
+          console.log("✅ Socket.IO Redis subscriber disconnected");
           // Step 1: 關閉 Redis
           console.log("\n📍 Step 1/2: Closing Redis...");
           await disconnectRedis();

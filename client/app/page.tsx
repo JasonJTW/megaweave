@@ -420,22 +420,22 @@ const PostsApp = () => {
          `}
         >
           <Button
-            className="bg-primary-15  border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] mr-[10px] shadow-none duration-150"
+            className="bg-megaweave-red-dark  border-megaweave-red-light border-[2px] text-[#efd0c4] py-[32px] mr-[10px] shadow-none duration-150"
             onClick={() => {
               handleCreatePostButtonClick("wish");
             }}
           >
             + Wish
-            <ElfIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
+            <ElfIcon className="text-[#efd0c4] !w-[18px] !h-[18px]" />
           </Button>
           <Button
-            className="bg-primary-15 border-primary-30 border-[2px] text-megaweave-forest-dark py-[32px] shadow-none duration-150"
+            className="bg-megaweave-gold border-megaweave-gold-light border-[2px] text-[#fbe7c6] py-[32px] shadow-none duration-150"
             onClick={() => {
               handleCreatePostButtonClick("share");
             }}
           >
             + Share
-            <ReuseIcon className="text-megaweave-forest-dark !w-[18px] !h-[18px]" />
+            <ReuseIcon className="text-[#fbe7c6] !w-[18px] !h-[18px]" />
           </Button>
         </div>
 

@@ -20,6 +20,7 @@ import BadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import ClockIcon from "@/app/components/icons/ClockIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";
+import toast from "react-hot-toast";
 
 type PostDetailProps = {
   postId: string;
@@ -35,7 +36,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // 互動狀態
   const [isLiked, setIsLiked] = useState(false);
@@ -88,11 +88,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
           }
         }
       } else {
-        setError("無法載入貼文");
+        toast.error("Failed to fetch post");
       }
     } catch (error) {
       console.error("Error fetching post:", error);
-      setError("載入貼文時發生錯誤");
+      toast.error("Failed to fetch post");
     } finally {
       setLoading(false);
     }
@@ -114,7 +114,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // 處理按讚
   const handleLike = async () => {
     if (!user) {
-      alert("請先登入才能按讚");
+      toast.error("Please log in to like");
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`
       );
@@ -185,7 +185,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       });
     } catch (error) {
       console.error(error);
-      alert("Failed to share");
+      toast.error("Failed to share");
     }
   };
 
@@ -265,18 +265,18 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     );
   }
 
-  if (error || !post) {
+  if (!post) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {error || "找不到貼文"}
+            {"Post not found"}
           </h2>
           <Button
             onClick={() => router.back()}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            返回上一頁
+            Back
           </Button>
         </div>
       </div>

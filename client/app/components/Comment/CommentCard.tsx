@@ -8,6 +8,7 @@ import ExpandIcon from "../icons/ExpandIcon";
 import WeavingIcon from "../icons/WeavingIcon";
 import ExpandedIcon from "../icons/ExpandedIcon";
 import { motion } from "framer-motion";
+import toast from "react-hot-toast";
 interface CommentCardProps {
   title: string;
   count?: number;
@@ -30,7 +31,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
   const handleWeavingClick = () => {
     // 檢查是否有庫存，如果沒有，則不允許操作
     if (quantity !== undefined && quantity <= 0) {
-      alert("Item is out of stock (Left: 00). Cannot initiate request.");
+      toast.error("Item is out of stock (Left: 00). Cannot initiate request.");
       return;
     }
 
@@ -38,7 +39,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
       onWeaving(); // 通知父元件開啟 Weaving Input
     } else {
       // 預設行為（如果沒有傳遞 onWeaving prop）
-      alert("Weaving action triggered (No callback provided).");
+      toast.success("Weaving action triggered (No callback provided).");
     }
   };
 

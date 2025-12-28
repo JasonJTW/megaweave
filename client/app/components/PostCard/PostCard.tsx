@@ -14,6 +14,7 @@ import type { Weave } from "@/services/weaveService";
 import AcceptIcon from "../icons/AcceptIcon";
 import CancelIcon from "../icons/CancelIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
+import toast from "react-hot-toast";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -91,7 +92,7 @@ function PostCardInner({
     if (!weave || isProcessing || hasIConfirmed) return;
 
     if (!isGiver && !isReceiver) {
-      alert("You are not authorized to complete this weave");
+      toast.error("You are not authorized to complete this weave");
       return;
     }
 
@@ -123,17 +124,17 @@ function PostCardInner({
         setLocalWeaveStatus("completed");
         setLocalGiverConfirmed(true);
         setLocalReceiverConfirmed(true);
-        alert("Transaction fully completed!");
+        toast.success("Transaction fully completed!");
       } else {
         // 僅單方面確認成功
         if (isGiver) setLocalGiverConfirmed(true);
         if (isReceiver) setLocalReceiverConfirmed(true);
-        alert("Your confirmation received. Waiting for the other party.");
+        toast.success("Your confirmation received. Waiting for the other party.");
       }
 
       if (onWeaveStatusChange) onWeaveStatusChange();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Error occurred");
+      toast.error(error instanceof Error ? error.message : "Error occurred");
     } finally {
       setIsProcessing(false);
     }
@@ -150,12 +151,12 @@ function PostCardInner({
       currentUserId !== weave.giver_id &&
       currentUserId !== weave.receiver_id
     ) {
-      alert("You are not authorized to cancel this weave");
+      toast.error("You are not authorized to cancel this weave");
       return;
     }
 
     if (weave.status !== "pending") {
-      alert(`Weave is already ${weave.status}`);
+      toast.error(`Weave is already ${weave.status}`);
       return;
     }
 
@@ -187,7 +188,7 @@ function PostCardInner({
 
       // 更新本地狀態
       setLocalWeaveStatus("cancelled");
-      alert("Weave cancelled successfully!");
+      toast.success("Weave cancelled successfully!");
 
       // 通知父組件刷新數據
       if (onWeaveStatusChange) {
@@ -195,7 +196,7 @@ function PostCardInner({
       }
     } catch (error) {
       console.error("Error cancelling weave:", error);
-      alert(error instanceof Error ? error.message : "Failed to cancel weave");
+      toast.error(error instanceof Error ? error.message : "Failed to cancel weave");
     } finally {
       setIsProcessing(false);
     }
@@ -207,7 +208,7 @@ function PostCardInner({
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px] bg-white overflow-hidden transition-all duration-300 py-0 pb-4 mt-4 relevant ${
+      className={`font-ddin cursor-pointer rounded-[30px] bg-white  transition-all duration-300 py-0 pb-4 mt-4 relevant ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -219,7 +220,7 @@ function PostCardInner({
       {/* ✅ Weave 狀態標籤 (移到標題右側) */}
       {weave && (
         <div
-          className="flex items-center  px-4 pt-6 pb-6"
+          className="flex items-center  px-4 pt-6 pb-2"
           style={{
             height: "var(--post-title-h, 72px)",
             minHeight: "var(--post-title-h, 72px)",
@@ -245,7 +246,7 @@ function PostCardInner({
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative pt-4">
         {post.type === "share" && (
           <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
         )}

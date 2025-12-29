@@ -165,6 +165,11 @@ export default function RootLayout({
              }(document, 'script', 'facebook-jssdk'));
           `}
           </Script>
+          <Script
+            id="google-maps"
+            strategy="afterInteractive"
+            src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`}
+          />
           <GoogleOAuthProvider
             clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
           >

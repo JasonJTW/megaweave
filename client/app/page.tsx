@@ -5,7 +5,7 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { LucideLoader2, X } from "lucide-react";
+import { CloudCog, LucideLoader2, X } from "lucide-react";
 import { useNavbar } from "./contexts/NavBarContext";
 import {
   Post,
@@ -77,6 +77,42 @@ const PostsApp = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  const locationInputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteInstanceRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  useEffect(() => {
+    if (!showCreateForm || !locationInputRef.current || autocompleteInstanceRef.current) {
+      return;
+    }
+
+    // Initialize the traditional Autocomplete
+    const autocomplete = new google.maps.places.Autocomplete(locationInputRef.current, {
+      types: ["address"], // Street-level precision
+      componentRestrictions: { country: "tw" }, // Restrict to Taiwan
+      fields: ["address_components", "formatted_address", "geometry", "place_id"],
+    });
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (place && (place.formatted_address || place.name)) {
+        console.log("Place selected:", place);
+        setCreateFormData((prev) => ({
+          ...prev,
+          location: place.formatted_address || place.name || "",
+        }));
+      }
+    });
+
+    autocompleteInstanceRef.current = autocomplete;
+
+    return () => {
+      if (autocompleteInstanceRef.current) {
+        google.maps.event.clearInstanceListeners(autocompleteInstanceRef.current);
+        autocompleteInstanceRef.current = null;
+      }
+    };
+  }, [showCreateForm]);
 
   const fetchUser = async () => {
     try {
@@ -314,6 +350,8 @@ const PostsApp = () => {
       }));
     }
   }, [categories, createFormData.categoryId]);
+
+  
 
   // 獲取貼文
   useEffect(() => {
@@ -886,15 +924,10 @@ const PostsApp = () => {
                   <div className="flex items-center gap-[5px]">
                     <LocationIcon className="w-[24px] h-[24px] text-primary" />
                     <Input
+                      ref={locationInputRef}
                       type="text"
                       placeholder="Location (City)"
-                      value={createFormData.location}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          location: e.target.value,
-                        })
-                      }
+                      defaultValue={createFormData.location}
                     />
                   </div>
 

@@ -248,3 +248,49 @@
   bottom: 0;
   overflow: auto; /* 若你想在 expanded content 內部可滾動，否則保持 hidden */
 }
+
+/* Google Map Places Autocomplete Dropdown Styling */
+.pac-container {
+  z-index: 10000 !important;
+  background-color: white;
+  border: 1px solid hsl(220 13% 91%);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  margin-top: 4px;
+  font-family: inherit;
+}
+
+.pac-container .pac-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-top: 1px solid hsl(220 13% 91%);
+}
+
+.pac-container .pac-item:first-child {
+  border-top: none;
+}
+
+.pac-container .pac-item:hover,
+.pac-container .pac-item.pac-item-selected {
+  background-color: hsl(220 14.3% 95.9%);
+}
+
+.pac-container .pac-item .pac-icon {
+  margin-right: 8px;
+}
+
+.pac-container .pac-item .pac-item-query {
+  font-weight: 500;
+  color: hsl(224 71.4% 4.1%);
+}
+
+.pac-container .pac-item .pac-matched {
+  font-weight: 600;
+}
+
+/* Hide the Google logo at bottom of dropdown */
+.pac-container::after {
+  display: none !important;
+}

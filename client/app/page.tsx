@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
 import { CloudCog, LucideLoader2, X } from "lucide-react";
+import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
 import {
   Post,
@@ -42,7 +43,7 @@ const PostsApp = () => {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
 
@@ -138,7 +139,7 @@ const PostsApp = () => {
       setUser(userData.user);
     } catch (error) {
       console.error("Error fetching user data:", error);
-      setError(
+      toast.error(
         error instanceof Error ? error.message : "An unexpected error occurred"
       );
     } finally {
@@ -159,7 +160,6 @@ const PostsApp = () => {
         setRefreshing(true);
       } else {
         setLoading(true);
-        setError(null);
       }
 
       try {
@@ -183,11 +183,11 @@ const PostsApp = () => {
           setPosts(data.posts);
           setPagination(data.pagination);
         } else {
-          setError("Fetch posts failed");
+          toast.error("Fetch posts failed");
         }
       } catch (error) {
         console.error("Internal server error:", error);
-        setError("Internal server error, please try again later.");
+        toast.error("Internal server error, please try again later.");
       } finally {
         setRefreshing(false);
         setLoading(false);
@@ -237,12 +237,12 @@ const PostsApp = () => {
       !createFormData.conditionLevel ||
       !createFormData.categoryId
     ) {
-      setError("Required fields cannot be empty.");
+      toast.error("Required fields cannot be empty.");
       return;
     }
 
     setIsCreating(true);
-    setError(null);
+
 
     try {
       const formData = new FormData();
@@ -294,14 +294,11 @@ const PostsApp = () => {
         fetchPosts(); // 重新獲取貼文列表
       } else {
         const errorData = await response.json();
-        setError(errorData.errorMessage || "Failed to create post");
-        if (errorData.errorMessage) {
-          console.log("error message:", errorData.errorMessage);
-        }
+        toast.error(errorData.errorMessage || "Failed to create post");
       }
     } catch (error) {
       console.error("Network error:", error);
-      setError("Network error, please try again later.");
+      toast.error("Network error, please try again later.");
     } finally {
       setIsCreating(false);
     }
@@ -313,18 +310,18 @@ const PostsApp = () => {
 
     // 限制最多 5 張圖片
     if (selectedImages.length + files.length > 5) {
-      setError("Limit of 5 images exceeded");
+      toast.error("Limit of 5 images exceeded");
       return;
     }
 
     // 檢查文件大小和類型
     const validFiles = files.filter((file) => {
       if (file.size > 10 * 1024 * 1024) {
-        setError(`${file.name} exceeds 10MB size limit`);
+        toast.error(`${file.name} exceeds 10MB size limit`);
         return false;
       }
       if (!file.type.startsWith("image/")) {
-        setError(`${file.name} Not a valid image file`);
+        toast.error(`${file.name} Not a valid image file`);
         return false;
       }
       return true;
@@ -335,9 +332,7 @@ const PostsApp = () => {
 
   // 移除選中的圖片
   const removeImage = (index: number) => {
-    if (selectedImages.length == 1) {
-      setError(null);
-    }
+
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -661,11 +656,7 @@ const PostsApp = () => {
         {/* Error message and posts*/}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
           {/* 錯誤提示 */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-              {error}
-            </div>
-          )}
+
 
           {/* 下拉刷新時顯示的頂部 Spinner (不會隱藏 Feed) */}
           {refreshing && (
@@ -749,20 +740,13 @@ const PostsApp = () => {
                     onClick={() => {
                       setSelectedImages([]);
                       setShowCreateForm(false);
-                      setError(null);
                     }}
                     className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-1"
                   >
                     <DeleteIcon />
                   </button>
                 </div>
-                {/* 錯誤提示 */}
-                {/* //TODO: Make this disappear after 3 seconds */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-                    {error}
-                  </div>
-                )}
+
                 {/* 圖片上傳區域 */}
                 <div>
                   {/* 圖片上傳按鈕 */}

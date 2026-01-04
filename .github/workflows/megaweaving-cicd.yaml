@@ -231,7 +231,7 @@ jobs:
       - name: Install client dependencies
         run: |
           cd client
-          npm install
+          npm ci --prefer-offline --no-audit
 
       - name: Run client tests
         run: |

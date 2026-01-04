@@ -334,10 +334,11 @@ function PostCardInner({
             </div> */}
 
             <div className="flex flex-col gap-[6px] mt-[12px] text-[16px] font-medium leading-[18px]">
-              {post.location && (
+              {(post.province || post.city || post.route || post.full_address) && (
                 <div className="flex items-center gap-2">
                   <LocationIcon className="text-primary" />
-                  {post.location}
+                  {[post.province, post.city, post.route].filter(Boolean).join("") ||
+                    post.full_address}
                 </div>
               )}
               {post.created_at && (

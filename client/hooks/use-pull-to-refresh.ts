@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export const DEFAULT_MAXIMUM_PULL_LENGTH = 240;
-export const DEFAULT_REFRESH_THRESHOLD = 180;
+export const DEFAULT_REFRESH_THRESHOLD = 140;
 
 export type UsePullToRefreshParams = {
   onRefresh: () => void | Promise<void>;
@@ -58,6 +58,7 @@ export const usePullToRefresh: UsePullToRefresh = ({
 
       if (currentPullLength <= maximumPullLength)
         setPullPosition(() => currentPullLength);
+      console.log(currentPullLength);
     },
     [isDisabled, maximumPullLength, pullStartPosition]
   );

@@ -115,7 +115,7 @@ const Navbar = () => {
     <>
       {/* 導航欄 */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-200 ease-in-out ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-100 ease-in-out ${
           isNavbarVisible ? "translate-y-0" : "-translate-y-full"
         } ${isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg "}`}
       >
@@ -203,15 +203,15 @@ const Navbar = () => {
                     className={cn(
                       "p-2 transition-all duration-200",
                       isAtTop
-                        ? "text-megaweave-forest-dark hover:bg-white/10 hover:text-megaweave-forest-light"
-                        : "text-gray-900 hover:bg-gray-100"
+                        ? "text-megaweave-forest-dark "
+                        : "text-gray-900 "
                     )}
                   >
                     <Menu className="h-6 w-6" />
                     <span className="sr-only">Open menu</span>
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-80 sm:w-96">
+                <SheetContent side="right">
                   <VisuallyHidden>
                     <SheetTitle>Navigation Menu</SheetTitle>
                     <SheetDescription>
@@ -228,13 +228,13 @@ const Navbar = () => {
                           href={item.href}
                           onClick={() => setIsMobileMenuOpen(false)}
                           className={cn(
-                            "flex items-start space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
+                            "flex items-start space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-[16px] transition-all duration-200 group",
                             isActivePath(item.href)
-                              ? "text-gray-900 bg-gray-100 border border-gray-200"
-                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                              ? "text-gray-900 bg-primary-30 "
+                              : "text-white "
                           )}
                         >
-                          <div className="flex-shrink-0 mt-0.5">
+                          <div className="flex-shrink-0 mt-3">
                             <Icon className="w-5 h-5 transition-transform group-hover:scale-110" />
                           </div>
                           <div className="flex-1 min-w-0">

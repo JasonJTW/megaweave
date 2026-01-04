@@ -16,7 +16,8 @@ import User from "../../types/user";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import EyesIcon from "../../components/icons/EyesIcon";
-import BadgeIcon from "@/app/components/icons/ShareBadgeIcon";
+import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
+import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import ClockIcon from "@/app/components/icons/ClockIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";
@@ -332,7 +333,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <>
                   <div className="relative">
                     {post.type === "share" && (
-                      <BadgeIcon className="absolute -top-1 right-5 z-20" />
+                      <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
+                    )}
+                    {post.type === "wish" && (
+                      <WishBadgeIcon className="absolute -top-1 right-5 z-20" />
                     )}
                     <div className="bg-white rounded-[20px] shadow-sm overflow-hidden relative">
                       <ImageGallery images={images} />
@@ -392,10 +396,15 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 )}
               </div>
               <div className="flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
-                {post.location && (
+                {(post.province ||
+                  post.city ||
+                  post.route ||
+                  post.full_address) && (
                   <div className="flex items-center gap-2  ">
                     <LocationIcon className="text-primary" />
-                    {post.location}
+                    {[post.province, post.city, post.route]
+                      .filter(Boolean)
+                      .join("") || post.full_address}
                   </div>
                 )}
                 {post.created_at && (

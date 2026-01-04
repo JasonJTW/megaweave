@@ -76,7 +76,14 @@ const CreatePostSchema = z.object({
     .min(1, "Content is required")
     .max(2000, "Content too long"),
   status: z.enum(["active", "inactive", "expired"]).default("active"),
-  location: z.string().max(100).optional(),
+  place_id: z.string().optional(),
+  full_address: z.string().optional(),
+  province: z.string().optional(),
+  city: z.string().optional(),
+  route: z.string().optional(),
+  zip: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
   type: z.enum(["wish", "share", "commons"]),
   tags: z.string().max(500).optional(),
   categoryId: z.number().int().positive("Invalid category ID"),
@@ -101,6 +108,50 @@ async function validateCategory(categoryId: number): Promise<boolean> {
   return rows.length > 0;
 }
 
+// 查找或創建地點
+async function findOrCreateLocation(
+  connection: any,
+  locationData: {
+    place_id: string;
+    full_address: string;
+    province?: string;
+    city?: string;
+    route?: string;
+    zip?: string;
+    lat: number;
+    lng: number;
+  }
+): Promise<number> {
+  // 1. 檢查地點是否存在
+  const checkQuery = "SELECT id FROM locations WHERE place_id = ?";
+  const [rows] = await connection.execute(checkQuery, [locationData.place_id]);
+
+  if ((rows as any[]).length > 0) {
+    return (rows as any[])[0].id;
+  }
+
+  // 2. 插入新地點
+  const insertQuery = `
+    INSERT INTO locations (
+      place_id, full_address, province, city, 
+      route, zip_code, lat, lng
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const [result] = await connection.execute(insertQuery, [
+    locationData.place_id,
+    locationData.full_address,
+    locationData.province || null,
+    locationData.city || null,
+    locationData.route || null,
+    locationData.zip || null,
+    locationData.lat,
+    locationData.lng,
+  ]);
+
+  return (result as any).insertId;
+}
+
 //* Create post API
 router.post(
   "/",
@@ -119,11 +170,12 @@ router.post(
     // 1. 驗證輸入數據
     let validationResult: CreatePostSchemaType | undefined;
     try {
-      // 處理數字字段
       const postData = {
         ...req.body,
         categoryId: parseInt(req.body.categoryId),
         conditionLevel: parseInt(req.body.conditionLevel),
+        lat: req.body.lat ? parseFloat(req.body.lat) : undefined,
+        lng: req.body.lng ? parseFloat(req.body.lng) : undefined,
         items: items ? JSON.parse(items) : undefined,
       };
 
@@ -153,9 +205,30 @@ router.post(
       await connection.beginTransaction();
 
       // 4. 插入貼文記錄
+      // 4. 處理地點
+      let locationId = null;
+      if (
+        validationResult.place_id &&
+        validationResult.full_address &&
+        validationResult.lat !== undefined &&
+        validationResult.lng !== undefined
+      ) {
+        locationId = await findOrCreateLocation(connection, {
+          place_id: validationResult.place_id,
+          full_address: validationResult.full_address,
+          province: validationResult.province,
+          city: validationResult.city,
+          route: validationResult.route,
+          zip: validationResult.zip,
+          lat: validationResult.lat,
+          lng: validationResult.lng,
+        });
+      }
+
+      // 5. 插入貼文記錄
       const postInsertQuery = `
       INSERT INTO posts (
-        user_id, title, content, status, type, location, tags, 
+        user_id, title, content, status, type, location_id, tags, 
         category_id, condition_level, expires_at, created_at, updated_at, view_count, likes_count
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
     `;
@@ -166,7 +239,7 @@ router.post(
         validationResult.content,
         validationResult.status,
         validationResult.type,
-        validationResult.location || null,
+        locationId,
         validationResult.tags || null,
         validationResult.categoryId,
         validationResult.conditionLevel,
@@ -212,10 +285,12 @@ router.post(
         p.*,
         u.username,
         c.name_en as category_name_en,
+        l.place_id, l.full_address, l.province, l.city, l.lat, l.lng,
         GROUP_CONCAT(i.image_url) as image_urls
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
       WHERE p.id = ?
       GROUP BY p.id
@@ -261,6 +336,8 @@ router.get("/", async (req: Request, res: Response) => {
 
     const category_id = req.query.category_id as string;
     const location = req.query.location as string;
+    const city = req.query.city as string;
+    const province = req.query.province as string;
     const status = (req.query.status as string) || "active";
     const search = req.query.search as string;
     const type = req.query.type as string;
@@ -273,9 +350,25 @@ router.get("/", async (req: Request, res: Response) => {
       queryParams.push(parseInt(category_id));
     }
 
-    if (location) {
-      whereConditions.push("p.location LIKE ?");
-      queryParams.push(`%${location}%`);
+    // Optimize location search using indexes
+    if (city || province) {
+      if (city && province) {
+         // Best case: Use composite index (province, city)
+         whereConditions.push("l.province = ? AND l.city = ?");
+         queryParams.push(province, city);
+      } else if (province) {
+         // Use index on province (first part of composite index)
+         whereConditions.push("l.province = ?");
+         queryParams.push(province);
+      } else if (city) {
+         // City only (might not fully use composite index but better than LIKE)
+         whereConditions.push("l.city = ?");
+         queryParams.push(city);
+      }
+    } else if (location) {
+      // Fallback to legacy search (inefficient but needed for manual input)
+      whereConditions.push("(l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)");
+      queryParams.push(`%${location}%`, `%${location}%`, `%${location}%`);
     }
 
     if (search) {
@@ -299,11 +392,13 @@ router.get("/", async (req: Request, res: Response) => {
         u.id as author_user_id,
         u.avatar_url,
         c.name_en as category_name_en,
+        l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.image_url) as image_urls,
         GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
       WHERE ${whereClause}
       GROUP BY p.id
@@ -323,6 +418,7 @@ router.get("/", async (req: Request, res: Response) => {
       SELECT COUNT(DISTINCT p.id) as total
       FROM posts p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN locations l ON p.location_id = l.id
       WHERE ${whereClause}
     `;
 
@@ -366,10 +462,12 @@ router.get("/:id", async (req: Request, res: Response) => {
         u.public_id as author_public_id,
         u.email,
         u.avatar_url,
-        c.name_en as category_name_en
+        c.name_en as category_name_en,
+        l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN locations l ON p.location_id = l.id
       WHERE p.id = ?
     `;
 

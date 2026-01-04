@@ -7,7 +7,8 @@ import User from "../types/user";
 import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { User as UserIcon, LogOut, Save, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { User as UserIcon, LogOut, Save, X, ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 // import { useForm } from "react-hook-form";
 // import {
@@ -836,7 +837,13 @@ const UserPage = () => {
         >
           <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-9xl font-ddin font-extrabold tracking-wide"></h1>
+              <Button
+                variant="ghost"
+                onClick={() => router.back()}
+                className="p-4"
+              >
+                <ArrowLeft className="w-8 h-8" />
+              </Button>
             </div>
 
             <button
@@ -924,25 +931,7 @@ const UserPage = () => {
                         </div>
                       )}
 
-                      {/* 如果有 preview，顯示 Save / Cancel 按鈕 */}
-                      {previewSrc && !uploadingAvatar && (
-                        <div className="absolute bottom-3 right-3 flex space-x-2">
-                          <button
-                            onClick={uploadAvatar}
-                            className="px-3 py-1 rounded-lg bg-green-600/20 hover:bg-green-600/30 text-sm text-green-400 flex items-center space-x-2"
-                          >
-                            <Save className="w-4 h-4" />
-                            <span>Upload</span>
-                          </button>
-                          <button
-                            onClick={handleCancelAvatarPreview}
-                            className="px-3 py-1 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 text-sm text-gray-300 flex items-center space-x-2"
-                          >
-                            <X className="w-4 h-4" />
-                            <span>Cancel</span>
-                          </button>
-                        </div>
-                      )}
+                     
                     </div>
                   </div>
 
@@ -964,6 +953,25 @@ const UserPage = () => {
                         Remove
                       </button>
                     )}
+                     {/* 如果有 preview，顯示 Save / Cancel 按鈕 */}
+                      {previewSrc && !uploadingAvatar && (
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={uploadAvatar}
+                            className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
+                          >
+                            <Save className="w-4 h-4 mr-1" />
+                            <span>Upload</span>
+                          </button>
+                          <button
+                            onClick={handleCancelAvatarPreview}
+                            className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>Cancel</span>
+                          </button>
+                        </div>
+                      )}
                   </div>
                 </div>
 

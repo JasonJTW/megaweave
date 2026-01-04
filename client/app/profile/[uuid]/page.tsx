@@ -6,7 +6,9 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
-import { User as UserIcon } from "lucide-react";
+import { User as UserIcon, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import Drawer from "@/app/components/Drawer";
 import type { Post, UserStats } from "@/app/types/schema";
@@ -28,6 +30,7 @@ interface PublicProfile {
 
 const PublicProfilePage = () => {
   const params = useParams();
+  const router = useRouter();
   const uuid = params.uuid as string;
   const { conditions } = usePost();
   const defaultStats: UserStats = {
@@ -202,8 +205,18 @@ const PublicProfilePage = () => {
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className=""
-        ></motion.header>
+          className="py-4 px-6"
+        >
+          <div className="flex items-start min-w-full">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="p-4 text-left w-8"
+            >
+              <ArrowLeft className="w-8 h-8" />
+            </Button>
+          </div>
+        </motion.header>
 
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">

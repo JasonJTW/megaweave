@@ -1,11 +1,15 @@
 //* forms/page.tsx
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import {
+  usePullToRefresh,
+  DEFAULT_MAXIMUM_PULL_LENGTH,
+  DEFAULT_REFRESH_THRESHOLD,
+} from "@/hooks/use-pull-to-refresh";
 import { Button } from "@/components/ui/button";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { CloudCog, LucideLoader2, X } from "lucide-react";
+import { LucideLoader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
 import {
@@ -56,6 +60,8 @@ const PostsApp = () => {
 
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [searchCity, setSearchCity] = useState("");
+  const [searchProvince, setSearchProvince] = useState(""); // Add province state
   const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
   const categoryInteractionLockRef = useRef(false);
 
@@ -80,27 +86,85 @@ const PostsApp = () => {
   const searchButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const locationInputRef = useRef<HTMLInputElement | null>(null);
-  const autocompleteInstanceRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const searchLocationInputRef = useRef<HTMLInputElement | null>(null); // Add ref for search input
+  const autocompleteInstanceRef =
+    useRef<google.maps.places.Autocomplete | null>(null);
+  const autocompleteSearchInstanceRef =
+    useRef<google.maps.places.Autocomplete | null>(null); // Add ref for search autocomplete
+
+  const extractAddress = (place: google.maps.places.PlaceResult) => {
+    const components = place.address_components || [];
+    let province = "";
+    let city = "";
+    let route = ""; // 新增 route
+    let zip = "";
+
+    components.forEach((comp) => {
+      const types = comp.types;
+      // 縣市
+      if (types.includes("administrative_area_level_1")) {
+        province = comp.long_name;
+      }
+      // 鄉鎮市區
+      if (
+        types.includes("sublocality_level_1") ||
+        types.includes("administrative_area_level_2")
+      ) {
+        city = comp.long_name;
+      }
+      // 街道名稱
+      if (types.includes("route")) {
+        route = comp.long_name;
+      }
+      // 郵遞區號
+      if (types.includes("postal_code")) {
+        zip = comp.long_name;
+      }
+    });
+
+    return { province, city, route, zip };
+  };
 
   useEffect(() => {
-    if (!showCreateForm || !locationInputRef.current || autocompleteInstanceRef.current) {
+    if (
+      !showCreateForm ||
+      !locationInputRef.current ||
+      autocompleteInstanceRef.current
+    ) {
       return;
     }
 
     // Initialize the traditional Autocomplete
-    const autocomplete = new google.maps.places.Autocomplete(locationInputRef.current, {
-      types: ["address"], // Street-level precision
-      componentRestrictions: { country: "tw" }, // Restrict to Taiwan
-      fields: ["address_components", "formatted_address", "geometry", "place_id"],
-    });
+    const autocomplete = new google.maps.places.Autocomplete(
+      locationInputRef.current,
+      {
+        types: ["address"], // Street-level precision
+        componentRestrictions: { country: "tw" }, // Restrict to Taiwan
+        fields: [
+          "address_components",
+          "formatted_address",
+          "geometry",
+          "place_id",
+        ],
+      }
+    );
 
     autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
-      if (place && (place.formatted_address || place.name)) {
+      if (place && place.geometry && place.geometry.location) {
+        const { province, city, route, zip } = extractAddress(place);
+
         console.log("Place selected:", place);
         setCreateFormData((prev) => ({
           ...prev,
           location: place.formatted_address || place.name || "",
+          place_id: place.place_id,
+          province,
+          city,
+          route,
+          zip,
+          lat: place.geometry!.location!.lat(),
+          lng: place.geometry!.location!.lng(),
         }));
       }
     });
@@ -109,11 +173,56 @@ const PostsApp = () => {
 
     return () => {
       if (autocompleteInstanceRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteInstanceRef.current);
+        google.maps.event.clearInstanceListeners(
+          autocompleteInstanceRef.current
+        );
         autocompleteInstanceRef.current = null;
       }
     };
   }, [showCreateForm]);
+
+  // Add useEffect for Search Autocomplete
+  useEffect(() => {
+    if (
+      !isMenuOpen ||
+      !searchLocationInputRef.current ||
+      autocompleteSearchInstanceRef.current
+    ) {
+      return;
+    }
+
+    const autocomplete = new google.maps.places.Autocomplete(
+      searchLocationInputRef.current,
+      {
+        types: ["(regions)"], // Restrict to regions (cities/provinces)
+        componentRestrictions: { country: "tw" },
+        fields: ["address_components", "formatted_address", "name"],
+      }
+    );
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (place && place.address_components) {
+        const { province, city } = extractAddress(place);
+        console.log("Search Place:", { province, city });
+        
+        setSelectedLocation(place.name || place.formatted_address || "");
+        setSearchCity(city);
+        setSearchProvince(province);
+      }
+    });
+
+    autocompleteSearchInstanceRef.current = autocomplete;
+
+    return () => {
+      if (autocompleteSearchInstanceRef.current) {
+        google.maps.event.clearInstanceListeners(
+          autocompleteSearchInstanceRef.current
+        );
+        autocompleteSearchInstanceRef.current = null;
+      }
+    };
+  }, [isMenuOpen]);
 
   const fetchUser = async () => {
     try {
@@ -171,7 +280,12 @@ const PostsApp = () => {
 
         if (searchTerm) params.append("search", searchTerm);
         if (selectedCategory) params.append("category_id", selectedCategory);
-        if (selectedLocation) params.append("location", selectedLocation);
+        // Optimize search params
+        if (selectedLocation) {
+           params.append("location", selectedLocation);
+           if (searchCity) params.append("city", searchCity);
+           if (searchProvince) params.append("province", searchProvince);
+        }
         if (postFilterType) params.append("type", postFilterType);
         const [response] = await Promise.all([
           fetch(`${hostName}/api/posts?${params}`),
@@ -196,21 +310,21 @@ const PostsApp = () => {
     [
       currentPage,
       searchTerm,
+      searchTerm,
       selectedCategory,
       selectedLocation,
+      searchCity, // Add to dependency array
+      searchProvince, // Add to dependency array
       hostName,
       postFilterType,
     ]
   );
 
-  const MAXIMUM_PULL_LENGTH = 240;
-  const REFRESH_THRESHOLD = 180;
-
   // mobile 下拉刷新功能，fetchPosts宣告後才啟動
   const { isRefreshing, pullPosition } = usePullToRefresh({
     onRefresh: () => fetchPosts(true),
-    maximumPullLength: MAXIMUM_PULL_LENGTH,
-    refreshThreshold: REFRESH_THRESHOLD,
+    maximumPullLength: DEFAULT_MAXIMUM_PULL_LENGTH,
+    refreshThreshold: DEFAULT_REFRESH_THRESHOLD,
     // isDisabled:
     //   typeof window !== "undefined"
     //     ? window.innerWidth >= 768 || showCreateForm
@@ -243,7 +357,6 @@ const PostsApp = () => {
 
     setIsCreating(true);
 
-
     try {
       const formData = new FormData();
 
@@ -251,6 +364,30 @@ const PostsApp = () => {
       formData.append("title", createFormData.title);
       formData.append("content", createFormData.content);
       formData.append("location", createFormData.location);
+      if (createFormData.place_id) {
+        formData.append("place_id", createFormData.place_id);
+      }
+      if (createFormData.location) {
+        formData.append("full_address", createFormData.location);
+      }
+      if (createFormData.province) {
+        formData.append("province", createFormData.province);
+      }
+      if (createFormData.city) {
+        formData.append("city", createFormData.city);
+      }
+      if (createFormData.route) {
+        formData.append("route", createFormData.route);
+      }
+      if (createFormData.zip) {
+        formData.append("zip", createFormData.zip);
+      }
+      if (createFormData.lat !== undefined && createFormData.lat !== null) {
+        formData.append("lat", createFormData.lat.toString());
+      }
+      if (createFormData.lng !== undefined && createFormData.lng !== null) {
+        formData.append("lng", createFormData.lng.toString());
+      }
       formData.append("tags", createFormData.tags);
       formData.append("categoryId", createFormData.categoryId!.toString());
       formData.append(
@@ -332,7 +469,6 @@ const PostsApp = () => {
 
   // 移除選中的圖片
   const removeImage = (index: number) => {
-
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -345,8 +481,6 @@ const PostsApp = () => {
       }));
     }
   }, [categories, createFormData.categoryId]);
-
-  
 
   // 獲取貼文
   useEffect(() => {
@@ -431,7 +565,7 @@ const PostsApp = () => {
 
         <div
           style={{
-            top: (isRefreshing ? REFRESH_THRESHOLD : pullPosition) / 3,
+            top: (isRefreshing ? DEFAULT_REFRESH_THRESHOLD : pullPosition) / 3,
             opacity: isRefreshing || pullPosition > 0 ? 1 : 0,
           }}
           className="bg-base-100 fixed inset-x-1/2 z-30 h-8 w-8 -translate-x-1/2 rounded-full p-2 shadow"
@@ -591,15 +725,23 @@ const PostsApp = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="w-1/2">
-                      <Input
-                        className="text-megaweave-forest-dark w-full "
-                        type="text"
-                        placeholder="Location"
-                        value={selectedLocation}
-                        onChange={(e) => setSelectedLocation(e.target.value)}
-                      />
-                    </div>
+                      <div className="w-1/2">
+                        <Input
+                          ref={searchLocationInputRef}
+                          className="text-megaweave-forest-dark w-full "
+                          type="text"
+                          placeholder="Location"
+                          value={selectedLocation}
+                          onChange={(e) => {
+                            setSelectedLocation(e.target.value);
+                            // Clear city/province if user types manually to fallback to text search
+                            if (!e.target.value) {
+                                setSearchCity("");
+                                setSearchProvince("");
+                            }
+                          }}
+                        />
+                      </div>
                   </div>
 
                   {/* Filter Buttons Row 2 */}
@@ -656,7 +798,6 @@ const PostsApp = () => {
         {/* Error message and posts*/}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
           {/* 錯誤提示 */}
-
 
           {/* 下拉刷新時顯示的頂部 Spinner (不會隱藏 Feed) */}
           {refreshing && (
@@ -786,6 +927,14 @@ const PostsApp = () => {
                           </div>
                         </div>
                       ))}
+                      {selectedImages.length < 5 && (
+                        <label
+                          htmlFor="image-upload"
+                          className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors border-2 border-dashed border-gray-300"
+                        >
+                          <AddIcon className="w-8 h-8 text-gray-400" />
+                        </label>
+                      )}
                     </div>
                   )}
 

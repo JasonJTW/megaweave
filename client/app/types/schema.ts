@@ -23,6 +23,14 @@ export interface Post {
   items?: Item[];
   author_public_id: string;
   author_user_id: number;
+  place_id?: string;
+  province?: string;
+  city?: string;
+  route?: string;
+  full_address?: string;
+  zip_code?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface CreatePostFormData {
@@ -34,6 +42,13 @@ export interface CreatePostFormData {
   conditionLevel: number | null;
   type: Post["type"];
   items?: ItemInput[];
+  place_id?: string;
+  province?: string;
+  city?: string;
+  route?: string;
+  zip?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface Item {

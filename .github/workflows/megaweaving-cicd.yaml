@@ -3,7 +3,7 @@ name: Megaweave CI/CD
 on:
   push:
     branches: [main]
-
+  workflow_dispatch:
 jobs:
   detect-changes:
     name: Detect Changes
@@ -118,7 +118,8 @@ jobs:
   deploy-server:
     name: Deploy Backend
     needs: [detect-changes, create-backup]
-    if: needs.detect-changes.outputs.server-changed == 'true'
+    if: always() && 
+    (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.server-changed == 'true')
     runs-on: self-hosted
 
     steps:

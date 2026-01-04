@@ -30,7 +30,7 @@ jobs:
   pre-deploy-cleanup:
     name: Pre-Deploy Cleanup
     needs: detect-changes
-    if: needs.detect-changes.outputs.any-changed == 'true'
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.any-changed == 'true')
     runs-on: self-hosted
     steps:
       - name: Check disk space
@@ -88,7 +88,7 @@ jobs:
   create-backup:
     name: Create Backup
     needs: [detect-changes, pre-deploy-cleanup]
-    if: needs.detect-changes.outputs.any-changed == 'true'
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.any-changed == 'true')
     runs-on: self-hosted
     outputs:
       backup-created: ${{ steps.backup.outputs.backup-created }}
@@ -118,8 +118,7 @@ jobs:
   deploy-server:
     name: Deploy Backend
     needs: [detect-changes, create-backup]
-    if: always() && 
-    (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.server-changed == 'true')
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.server-changed == 'true')
     runs-on: self-hosted
 
     steps:
@@ -217,7 +216,7 @@ jobs:
   deploy-client:
     name: Deploy Frontend
     needs: [detect-changes, create-backup]
-    if: needs.detect-changes.outputs.client-changed == 'true'
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.client-changed == 'true')
     runs-on: self-hosted
 
     steps:

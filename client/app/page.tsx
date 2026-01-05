@@ -60,6 +60,7 @@ const PostsApp = () => {
 
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
+  const [locationInput, setLocationInput] = useState(""); // Decoupled input state
   const [searchCity, setSearchCity] = useState("");
   const [searchProvince, setSearchProvince] = useState(""); // Add province state
   const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
@@ -138,7 +139,7 @@ const PostsApp = () => {
     const autocomplete = new google.maps.places.Autocomplete(
       locationInputRef.current,
       {
-        types: ["address"], // Street-level precision
+        types: ["geocode"], // Street-level precision
         componentRestrictions: { country: "tw" }, // Restrict to Taiwan
         fields: [
           "address_components",
@@ -194,9 +195,12 @@ const PostsApp = () => {
     const autocomplete = new google.maps.places.Autocomplete(
       searchLocationInputRef.current,
       {
-        types: ["(regions)"], // Restrict to regions (cities/provinces)
+        types: ["geocode"], // Restrict to regions (cities/provinces)
         componentRestrictions: { country: "tw" },
-        fields: ["address_components", "formatted_address", "name"],
+        fields: ["address_components",
+          "formatted_address",
+          "geometry",
+          "place_id",],
       }
     );
 
@@ -206,7 +210,9 @@ const PostsApp = () => {
         const { province, city } = extractAddress(place);
         console.log("Search Place:", { province, city });
         
-        setSelectedLocation(place.name || place.formatted_address || "");
+        const address = place.name || place.formatted_address || "";
+        setLocationInput(address);
+        setSelectedLocation(address);
         setSearchCity(city);
         setSearchProvince(province);
       }
@@ -686,8 +692,8 @@ const PostsApp = () => {
                   </div>
 
                   {/* Filter Buttons Row 1 */}
-                  <div className="flex gap-[10px] mb-4">
-                    <div className="w-1/2">
+                  <div className="flex flex-col gap-[10px] mb-4">
+                    <div className="w-full">
                       <Select
                         onOpenChange={(open) => {
                           if (open) {
@@ -725,19 +731,31 @@ const PostsApp = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                      <div className="w-1/2">
+                      <div className="w-full">
                         <Input
                           ref={searchLocationInputRef}
                           className="text-megaweave-forest-dark w-full "
                           type="text"
                           placeholder="Location"
-                          value={selectedLocation}
+                          value={locationInput}
                           onChange={(e) => {
-                            setSelectedLocation(e.target.value);
-                            // Clear city/province if user types manually to fallback to text search
+                            setLocationInput(e.target.value);
+                            // Clear actual search filter if user clears input
                             if (!e.target.value) {
+                                setSelectedLocation("");
                                 setSearchCity("");
                                 setSearchProvince("");
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                setSelectedLocation(locationInput);
+                                // Reset specific city/province if manually typed, or keep if logic allows. 
+                                // For now, let's assume manual type means general text search or we should clear the specific geo-filters unless we want to keep them.
+                                // Simplest: If they hit enter, they mean "search for this text".
+                                // Ideally we might want to Geocode it, but here we just pass it as location param.
+                                // Warning: If they typed "Taipei" but didn't pick from list, searchCity might be empty.
+                                // The backend handles `location` param as a text match if city/province absent.
                             }
                           }}
                         />

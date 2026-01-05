@@ -28,6 +28,7 @@ interface PostCardProps {
   weave?: Weave;
   currentUserId?: number;
   onWeaveStatusChange?: () => void; // ✅ 新增：狀態改變後的回調
+  onCategoryClick?: (categoryId: number) => void;
 }
 
 function PostCardInner({
@@ -39,6 +40,7 @@ function PostCardInner({
   weave,
   currentUserId,
   onWeaveStatusChange,
+  onCategoryClick,
 }: PostCardProps) {
   // const condition = conditions.find((c) => c.level === post.condition_level);
 
@@ -298,8 +300,18 @@ function PostCardInner({
           </h2>
 
           {category && (
-            <div className="flex items-center mx-4 mt-[8px] leading-[34px]">
-              <Badge className="h-[34px]">{category.name_en}</Badge>
+            <div
+              className="flex items-center mx-4 mt-[8px] leading-[34px] cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onCategoryClick && category) {
+                  onCategoryClick(category.id);
+                }
+              }}
+            >
+              <Badge className="h-[34px] transition-colors">
+                {category.name_en}
+              </Badge>
             </div>
           )}
 

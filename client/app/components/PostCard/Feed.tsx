@@ -13,6 +13,7 @@ interface FeedProps {
   currentUserId?: number;
   onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
+  onCategoryClick?: (categoryId: number) => void;
 }
 
 export default function Feed({
@@ -23,6 +24,7 @@ export default function Feed({
   currentUserId,
   onWeaveStatusChange,
   highlightWeaveId,
+  onCategoryClick,
 }: FeedProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const pendingIndexRef = useRef<number | null>(null);
@@ -252,6 +254,7 @@ export default function Feed({
               weave={weave} // ✅ 傳遞 weave 資料
               currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
               onWeaveStatusChange={onWeaveStatusChange}
+              onCategoryClick={onCategoryClick}
             />
           </div>
         );

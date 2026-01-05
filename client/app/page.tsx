@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import IconGrid from "./components/IconGrid";
 import AddIcon from "./components/icons/AddIcon";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectTrigger,
@@ -587,29 +588,46 @@ const PostsApp = () => {
         </div>
 
         <div
-          className={` max-w-7xl mx-auto flex justify-between items-center px-8 py-[20px] sticky z-20 bg-primary-5 transition-all duration-150 ${
+          className={` max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 bg-primary-5 transition-all duration-150 ${
             isNavbarVisible ? "top-[80px]" : "top-[0px]"
           }
          `}
         >
-          <Button
-            className="bg-megaweave-red-dark  border-megaweave-red-light border-[2px] text-[#efd0c4] py-[32px] mr-[10px] shadow-none duration-150"
-            onClick={() => {
-              handleCreatePostButtonClick("wish");
-            }}
-          >
-            + Wish
-            <ElfIcon className="text-[#efd0c4] !w-[18px] !h-[18px]" />
-          </Button>
-          <Button
-            className="bg-megaweave-gold border-megaweave-gold-light border-[2px] text-[#fbe7c6] py-[32px] shadow-none duration-150"
-            onClick={() => {
-              handleCreatePostButtonClick("share");
-            }}
-          >
-            + Share
-            <ReuseIcon className="text-[#fbe7c6] !w-[18px] !h-[18px]" />
-          </Button>
+          <div className="flex justify-between items-center w-full">
+            <Button
+              className="bg-megaweave-red-dark  border-megaweave-red-light border-[2px] text-[#efd0c4] py-[32px] mr-[10px] shadow-none duration-150"
+              onClick={() => {
+                handleCreatePostButtonClick("wish");
+              }}
+            >
+              + Wish
+              <ElfIcon className="text-[#efd0c4] !w-[18px] !h-[18px]" />
+            </Button>
+            <Button
+              className="bg-megaweave-gold border-megaweave-gold-light border-[2px] text-[#fbe7c6] py-[32px] shadow-none duration-150"
+              onClick={() => {
+                handleCreatePostButtonClick("share");
+              }}
+            >
+              + Share
+              <ReuseIcon className="text-[#fbe7c6] !w-[18px] !h-[18px]" />
+            </Button>
+          </div>
+
+          {/* Active Category Filter Tag - Sticky underneath buttons */}
+          {selectedCategory && (
+            <div className="flex justify-start mt-2">
+              <Badge
+                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                onClick={() => setSelectedCategory("")}
+              >
+                <span>
+                 Category: {categories.find((c) => c.id.toString() === selectedCategory)?.name_en || "Unknown"}
+                </span>
+                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+              </Badge>
+            </div>
+          )}
         </div>
 
         <>
@@ -841,6 +859,10 @@ const PostsApp = () => {
               onPostClick={(post) => {
                 if (categoryInteractionLockRef.current) return;
                 router.push(`/item/${post.id}`);
+              }}
+              onCategoryClick={(categoryId) => {
+                setSelectedCategory(categoryId.toString());
+                window.scrollTo({ top: 0, behavior: "smooth" });
               }}
             />
           )}

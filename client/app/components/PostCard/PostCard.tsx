@@ -301,18 +301,18 @@ function PostCardInner({
             {post.title}
           </h2>
 
-          {category && (
+          {(category || post.category_name_en) && (
             <div
               className="flex items-center mx-4 mt-[8px] leading-[34px] cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
-                if (onCategoryClick && category) {
-                  onCategoryClick(category.id);
+                if (onCategoryClick) {
+                  onCategoryClick(post.category_id);
                 }
               }}
             >
               <Badge className="h-[34px] transition-colors">
-                {category.name_en}
+                {category?.name_en || post.category_name_en}
               </Badge>
             </div>
           )}

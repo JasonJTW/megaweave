@@ -900,7 +900,7 @@ const PostsApp = () => {
             conditions={conditions}
             onPostClick={(post) => {
               if (categoryInteractionLockRef.current) return;
-              router.push(`/post/${post.id}`);
+              router.push(`/item/${post.id}`);
             }}
             weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
             currentUserId={user?.userId}

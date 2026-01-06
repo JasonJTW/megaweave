@@ -29,6 +29,7 @@ interface PostCardProps {
   currentUserId?: number;
   onWeaveStatusChange?: () => void; // ✅ 新增：狀態改變後的回調
   onCategoryClick?: (categoryId: number) => void;
+  onLocationClick?: (type: "province" | "city" | "route", value: string) => void;
 }
 
 function PostCardInner({
@@ -41,6 +42,7 @@ function PostCardInner({
   currentUserId,
   onWeaveStatusChange,
   onCategoryClick,
+  onLocationClick,
 }: PostCardProps) {
   // const condition = conditions.find((c) => c.level === post.condition_level);
 
@@ -346,11 +348,58 @@ function PostCardInner({
             </div> */}
 
             <div className="flex flex-col gap-[6px] mt-[12px] text-[16px] font-medium leading-[18px]">
-              {(post.province || post.city || post.route || post.full_address) && (
-                <div className="flex items-center gap-2">
-                  <LocationIcon className="text-primary" />
-                  {[post.province, post.city, post.route].filter(Boolean).join("") ||
-                    post.full_address}
+              {(post.province ||
+                post.city ||
+                post.route ||
+                post.full_address) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <LocationIcon className="text-primary flex-shrink-0" />
+                  <span className="text-[16px] text-gray-700">
+                    {post.province && (
+                      <span
+                        className="cursor-pointer hover:underline hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onLocationClick)
+                            onLocationClick("province", post.province!);
+                        }}
+                      >
+                        {post.province}
+                      </span>
+                    )}
+                    {post.province && (post.city || post.route) && ", "}
+                    {post.city && (
+                      <span
+                        className="cursor-pointer hover:underline hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onLocationClick)
+                            onLocationClick("city", post.city!);
+                        }}
+                      >
+                        {post.city}
+                      </span>
+                    )}
+                    {post.city && post.route && ", "}
+                    {post.route && (
+                      <span
+                        className="cursor-pointer hover:underline hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onLocationClick)
+                            onLocationClick("route", post.route!);
+                        }}
+                      >
+                        {post.route}
+                      </span>
+                    )}
+                    {!post.province &&
+                      !post.city &&
+                      !post.route &&
+                      post.full_address && (
+                        <span>{post.full_address}</span>
+                      )}
+                  </span>
                 </div>
               )}
               {post.created_at && (

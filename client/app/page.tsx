@@ -288,11 +288,9 @@ const PostsApp = () => {
         if (searchTerm) params.append("search", searchTerm);
         if (selectedCategory) params.append("category_id", selectedCategory);
         // Optimize search params
-        if (selectedLocation) {
-           params.append("location", selectedLocation);
-           if (searchCity) params.append("city", searchCity);
-           if (searchProvince) params.append("province", searchProvince);
-        }
+        if (selectedLocation) params.append("location", selectedLocation);
+        if (searchCity) params.append("city", searchCity);
+        if (searchProvince) params.append("province", searchProvince);
         if (postFilterType) params.append("type", postFilterType);
         const [response] = await Promise.all([
           fetch(`${hostName}/api/posts?${params}`),
@@ -615,19 +613,63 @@ const PostsApp = () => {
           </div>
 
           {/* Active Category Filter Tag - Sticky underneath buttons */}
-          {selectedCategory && (
-            <div className="flex justify-start mt-2">
+          <div className="flex flex-wrap gap-2 mt-2 justify-start">
+            {selectedCategory && (
               <Badge
                 className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
                 onClick={() => setSelectedCategory("")}
               >
                 <span>
-                 Category: {categories.find((c) => c.id.toString() === selectedCategory)?.name_en || "Unknown"}
+                  Category:{" "}
+                  {categories.find((c) => c.id.toString() === selectedCategory)
+                    ?.name_en || "Unknown"}
                 </span>
                 <X className="w-3 h-3 hover:text-red-300 transition-colors" />
               </Badge>
-            </div>
-          )}
+            )}
+            {searchProvince && (
+              <Badge
+                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                onClick={() => {
+                  setSearchProvince("");
+                  // Clear location input if it matches ONLY this province to avoid confusion
+                  // But usually user wants to clear the specific filter.
+                  // For now, allow independent clearing.
+                }}
+              >
+                <span>Province: {searchProvince}</span>
+                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+              </Badge>
+            )}
+            {searchCity && (
+              <Badge
+                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                onClick={() => {
+                  setSearchCity("");
+                }}
+              >
+                <span>City: {searchCity}</span>
+                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+              </Badge>
+            )}
+             {selectedLocation && (
+              <Badge
+                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                onClick={() => {
+                  setSelectedLocation("");
+                  setLocationInput(""); // Clear the input too as it's likely a direct text search
+                }}
+              >
+                <span>Location: {selectedLocation}</span>
+                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+              </Badge>
+            )}
+             {/* If we have specific route filter via handleLocationClick, we might want to show it.
+                But based on current code, 'selectedLocation' holds the general text or precise location string
+                sent to backend as 'location' param if city/province are not enough or as supplement.
+                The handleLocationClick below will set 'selectedLocation' for 'route' click.
+             */}
+          </div>
         </div>
 
         <>
@@ -854,17 +896,39 @@ const PostsApp = () => {
             </div>
           ) : (
             <Feed
-              posts={posts}
-              conditions={conditions}
-              onPostClick={(post) => {
-                if (categoryInteractionLockRef.current) return;
-                router.push(`/item/${post.id}`);
-              }}
-              onCategoryClick={(categoryId) => {
-                setSelectedCategory(categoryId.toString());
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-            />
+            posts={posts}
+            conditions={conditions}
+            onPostClick={(post) => {
+              if (categoryInteractionLockRef.current) return;
+              router.push(`/post/${post.id}`);
+            }}
+            weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
+            currentUserId={user?.userId}
+            onWeaveStatusChange={() => {
+              fetchPosts(); // 重新抓取資料
+            }}
+            onCategoryClick={(categoryId) => {
+              setSelectedCategory(categoryId.toString());
+              // window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            onLocationClick={(type, value) => {
+              // Handle clickable location parts
+              console.log("Location clicked:", type, value);
+              if (type === "province") {
+                 setSearchProvince(value);
+                 setSearchCity(""); 
+                 setSelectedLocation(""); 
+                 setLocationInput(value); 
+              } else if (type === "city") {
+                 setSearchCity(value);
+                 setSelectedLocation("");
+                 setLocationInput(value);
+              } else if (type === "route") {
+                 setSelectedLocation(value);
+                 setLocationInput(value);
+              }
+            }}
+          />
           )}
 
           {/* 分頁 */}

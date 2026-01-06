@@ -14,6 +14,7 @@ interface FeedProps {
   onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
   onCategoryClick?: (categoryId: number) => void;
+  onLocationClick?: (type: "province" | "city" | "route", value: string) => void;
 }
 
 export default function Feed({
@@ -25,6 +26,7 @@ export default function Feed({
   onWeaveStatusChange,
   highlightWeaveId,
   onCategoryClick,
+  onLocationClick,
 }: FeedProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const pendingIndexRef = useRef<number | null>(null);
@@ -255,6 +257,7 @@ export default function Feed({
               currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
               onWeaveStatusChange={onWeaveStatusChange}
               onCategoryClick={onCategoryClick}
+              onLocationClick={onLocationClick}
             />
           </div>
         );

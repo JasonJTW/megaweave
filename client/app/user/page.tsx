@@ -88,6 +88,7 @@ const UserPage = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousPreviewRef = useRef<string | null>(null); // store previous object URL so we can revoke it
+
   // const contactForm = useForm<ContactSettingsValues>({
   //   defaultValues: defaultContactValues,
   // });

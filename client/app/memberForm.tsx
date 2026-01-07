@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 
 import {
@@ -20,6 +20,7 @@ import {
   IdCardLanyard,
   Mail,
   Globe2,
+  ChevronDown,
 } from "lucide-react";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { TeamMember } from "./teamMembers";
@@ -63,6 +64,7 @@ const MemberForm: React.FC<MemberFormProps> = ({
   const memberNameMaxLength =
     Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
   const { refetchTeamMembers } = useTeam();
+  const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
 
   // Form state
   const memberForm = useForm<MemberFormValues>({
@@ -218,11 +220,13 @@ const MemberForm: React.FC<MemberFormProps> = ({
   };
 
   // Event handlers
-  const handleEditMember = () => {
+  const handleEditMember = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsEditingMember(true);
   };
 
-  const handleSaveMember = async () => {
+  const handleSaveMember = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const formData = memberForm.getValues();
       await saveMemberData(formData);
@@ -234,7 +238,8 @@ const MemberForm: React.FC<MemberFormProps> = ({
     }
   };
 
-  const handleCancelMember = () => {
+  const handleCancelMember = (e: React.MouseEvent) => {
+    e.stopPropagation();
     // Reset form to original values
     memberForm.reset({
       title: member?.title || "",
@@ -247,7 +252,19 @@ const MemberForm: React.FC<MemberFormProps> = ({
   };
 
   const onMemberFormSubmit = async () => {
-    await handleSaveMember();
+    // Correctly call the save handler, but since this is form submit, propagation might be tricky.
+    // However, the button inside form is "submit" types usually or managed by handleSaveMember on click.
+    // The handleSaveMember is already handling the logic.
+    // Just make sure to pass a fake event or handle differently if needed,
+    // but here we just call the logic directly since it's onSubmit.
+    try {
+        const formData = memberForm.getValues();
+        await saveMemberData(formData);
+        await refetchTeamMembers();
+        await setIsEditingMember(false);
+    } catch (error) {
+        console.log("Error saving member data, staying in edit mode.", error);
+    }
   };
 
   // Load data on component mount
@@ -263,342 +280,357 @@ const MemberForm: React.FC<MemberFormProps> = ({
     return null;
   }
 
-  if (loading) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-6xl mx-auto px-6 py-4"
-      >
-        <div className="bg-white border border-primary-30 rounded-2xl p-6">
-          <div className="flex items-center justify-center py-8">
-            <div className="w-8 h-8 border-2 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin"></div>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className="max-w-6xl mx-auto px-6 py-4"
-    >
-      <div className="bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
-        {/* Error Alert */}
-        {error && (
-          <Alert className="mb-6 bg-red-950/50 border-red-500/30">
-            <AlertDescription className="text-red-300">
-              {error}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Header */}
-        <div className="flex justify-between mb-6">
-          <h3 className="text-xl font-semibold flex items-center space-x-2">
+    <div className="max-w-6xl mx-auto px-6">
+      <div
+        className={`transition-all duration-300 w-full bg-white border border-primary-30 rounded-[30px] ${
+          isMemberFormOpen
+            ? ""
+            : "overflow-hidden hover:border-gray-600/40 "
+        }`}
+      >
+        <div
+          onClick={() => setIsMemberFormOpen(!isMemberFormOpen)}
+          className={`w-full px-6 flex items-center justify-between transition-colors cursor-pointer ${
+            isMemberFormOpen
+              ? "py-4 hover:bg-transparent"
+              : "py-4 hover:bg-gray-50 bg-white"
+          }`}
+        >
+          <h3 className="text-xl font-semibold flex items-center space-x-2 text-megaweave-forest-dark">
             <Users className="w-5 h-5" />
-            <span>Member Information</span>
+            <span className="type-button-b1">Member Information</span>
           </h3>
-          {!isEditingMember ? (
-            <button
-              onClick={handleEditMember}
-              className="flex items-center space-x-1 px-3 py-1.5 transition-all duration-200 text-sm"
-            >
-              <EditIcon className="w-4 h-4" />
-            </button>
-          ) : (
-            <div className="flex space-x-2">
-              <button
-                onClick={handleSaveMember}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
-              >
-                <Save className="w-3 h-3" />
-                <span>Save</span>
-              </button>
-              <button
-                onClick={handleCancelMember}
-                className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
-              >
-                <X className="w-3 h-3" />
-                <span>Cancel</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Avatar and name */}
-          <div className="flex-row items-center mb-8 min-w-64">
-            {/* Avatar */}
-            <div className="text-center mb-2">
-              <div className="relative">
-                <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative">
-                  {membername.charAt(0)}
-                  <div className="absolute -bottom-3 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Member Name */}
-            <div className="text-center space-y-3">
-              <div className="flex items-center justify-center space-x-2">
-                {!isEditingMembername ? (
-                  <motion.div
-                    key="display"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    transition={{ duration: 0.2 }}
-                    className="group flex items-center relative px-2"
+          <div className="flex items-center space-x-4">
+            {/* Header Buttons (Edit/Save/Cancel) */}
+            {isMemberFormOpen && (
+              <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                {!isEditingMember ? (
+                  <button
+                    onClick={handleEditMember}
+                    className="flex items-center space-x-1 px-3 py-1.5 transition-all duration-200 text-sm"
                   >
-                    <h2
-                      className="text-2xl font-bold  "
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2, // 最多顯示兩行
-                        WebkitBoxOrient: "vertical",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {membername}
-                    </h2>
-                    <button
-                      onClick={handleEditMembername}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity  duration-200 p-1 hover:bg-gray-600/30 rounded absolute left-full top-1/2 -translate-y-1/2"
-                    >
-                      <Edit3
-                        className="w-4 style={{
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      display: '-webkit-box',
-                                      WebkitLineClamp: 2, // 最多顯示兩行
-                                      WebkitBoxOrient: 'vertical',
-                                      wordBreak: 'break-word'
-                                    }}h-4 text-gray-400"
-                      />
-                    </button>
-                  </motion.div>
+                    <EditIcon className="w-4 h-4" />
+                  </button>
                 ) : (
-                  <motion.div
-                    key="edit"
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex flex-col items-center w-full"
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1, duration: 0.2 }}
-                      className="flex mb-1 justify-end w-full space-x-2"
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleSaveMember}
+                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
                     >
-                      <button
-                        onClick={handleSaveMembername}
-                        className="p-1 hover:bg-green-600/30 rounded text-green-400 transition-colors duration-200"
-                      >
-                        <Save className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleCancelMembername}
-                        className="p-1 hover:bg-gray-600/30 rounded text-gray-400 transition-colors duration-200"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </motion.div>
-                    <textarea
-                      value={tempMembername}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\n/g, ""); // 防止換行
-                        if (value.length <= memberNameMaxLength) {
-                          setTempMembername(value);
-                        }
-                      }}
-                      maxLength={memberNameMaxLength}
-                      rows={tempMembername.length > 15 ? 2 : 1}
-                      className="text-xl font-bold bg-gray-700/30 border border-gray-600/30 rounded px-2 py-1 text-center w-full focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none overflow-hidden"
-                      style={{
-                        wordBreak: "break-word",
-                        overflowWrap: "break-word",
-                        lineHeight: "1.2",
-                      }}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        // 防止 Enter 鍵換行
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleSaveMembername();
-                        }
-                      }}
-                    />
-                  </motion.div>
+                      <Save className="w-3 h-3" />
+                      <span>Save</span>
+                    </button>
+                    <button
+                      onClick={handleCancelMember}
+                      className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
+                    >
+                      <X className="w-3 h-3" />
+                      <span>Cancel</span>
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Form */}
-          <div className="flex-1 w-full">
-            <Form {...memberForm}>
-              <form
-                onSubmit={memberForm.handleSubmit(onMemberFormSubmit)}
-                className="space-y-6 "
-              >
-                {/* Title  */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Title */}
-                  <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <IdCardLanyard className="w-4 h-4" />
-                        <FormLabel className="text-base font-medium">
-                          Title
-                        </FormLabel>
-                      </div>
-                    </div>
-                    <FormField
-                      control={memberForm.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            {isEditingMember ? (
-                              <input
-                                {...field}
-                                type="text"
-                                placeholder="Enter your title"
-                                className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                              />
-                            ) : (
-                              <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center">
-                                {field.value || "No title provided"}
-                              </div>
-                            )}
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  {/* Location */}
-                  <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="w-4 h-4" />
-                        <FormLabel className="text-base font-medium">
-                          Location
-                        </FormLabel>
-                      </div>
-                    </div>
-                    <FormField
-                      control={memberForm.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            {isEditingMember ? (
-                              <input
-                                {...field}
-                                type="text"
-                                placeholder="Enter your location"
-                                className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                              />
-                            ) : (
-                              <div className="text-gray-300 rounded-lg">
-                                {field.value || "No location provided"}
-                              </div>
-                            )}
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {/* Social Links */}
-                <div className="space-y-6">
-                  <h4 className="text-lg font-medium flex items-center space-x-2">
-                    <Globe className="w-4 h-4" />
-                    <span>Social Links</span>
-                  </h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Email */}
-                    <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <Mail className="w-4 h-4" />
-                        <FormLabel className="text-base font-medium">
-                          Email
-                        </FormLabel>
-                      </div>
-                      <FormField
-                        control={memberForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              {isEditingMember ? (
-                                <input
-                                  {...field}
-                                  type="email"
-                                  placeholder="https://Email.com/in/username"
-                                  className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                                />
-                              ) : (
-                                <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center">
-                                  {field.value || "No Email provided"}
-                                </div>
-                              )}
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    {/* Website */}
-                    <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <Globe2 className="w-4 h-4" />
-                        <FormLabel className="text-base font-medium">
-                          Website
-                        </FormLabel>
-                      </div>
-                      <FormField
-                        control={memberForm.control}
-                        name="website"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              {isEditingMember ? (
-                                <input
-                                  {...field}
-                                  type="url"
-                                  placeholder="https://your-website.com"
-                                  className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 break-all"
-                                />
-                              ) : (
-                                <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center break-all">
-                                  {renderTextWithUrls(
-                                    field.value || "No website provided"
-                                  )}
-                                </div>
-                              )}
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </Form>
+            )}
+            
+            <ChevronDown
+              className={`w-6 h-6 text-gray-400 transition-transform duration-300 ${
+                isMemberFormOpen ? "rotate-180" : ""
+              }`}
+            />
           </div>
         </div>
+        
+        <motion.div
+          initial={false}
+          animate={{
+            height: isMemberFormOpen ? "auto" : 0,
+            opacity: isMemberFormOpen ? 1 : 0,
+          }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="overflow-hidden"
+        >
+          <div className={`${isMemberFormOpen ? "px-6 pb-6 pt-2" : "px-6"}`}>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-2 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <>
+                {/* Error Alert */}
+                {error && (
+                  <Alert className="mb-6 bg-red-950/50 border-red-500/30">
+                    <AlertDescription className="text-red-300">
+                      {error}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex flex-col lg:flex-row gap-8">
+                  {/* Avatar and name */}
+                  <div className="flex-row items-center mb-8 min-w-64">
+                    {/* Avatar */}
+                    <div className="text-center mb-2">
+                      <div className="relative">
+                        <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 hover:cursor-pointer relative">
+                          {membername.charAt(0)}
+                          <div className="absolute -bottom-3 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-gray-800"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Member Name */}
+                    <div className="text-center space-y-3">
+                      <div className="flex items-center justify-center space-x-2">
+                        {!isEditingMembername ? (
+                          <motion.div
+                            key="display"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            transition={{ duration: 0.2 }}
+                            className="group flex items-center relative px-2"
+                          >
+                            <h2
+                              className="text-2xl font-bold  "
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2, // 最多顯示兩行
+                                WebkitBoxOrient: "vertical",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {membername}
+                            </h2>
+                            <button
+                              onClick={handleEditMembername}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity  duration-200 p-1 hover:bg-gray-600/30 rounded absolute left-full top-1/2 -translate-y-1/2"
+                            >
+                              <Edit3 className="w-4 h-4 text-gray-400" />
+                            </button>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="edit"
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex flex-col items-center w-full"
+                          >
+                            <motion.div
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.1, duration: 0.2 }}
+                              className="flex mb-1 justify-end w-full space-x-2"
+                            >
+                              <button
+                                onClick={handleSaveMembername}
+                                className="p-1 hover:bg-green-600/30 rounded text-green-400 transition-colors duration-200"
+                              >
+                                <Save className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={handleCancelMembername}
+                                className="p-1 hover:bg-gray-600/30 rounded text-gray-400 transition-colors duration-200"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </motion.div>
+                            <textarea
+                              value={tempMembername}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/\n/g, ""); // 防止換行
+                                if (value.length <= memberNameMaxLength) {
+                                  setTempMembername(value);
+                                }
+                              }}
+                              maxLength={memberNameMaxLength}
+                              rows={tempMembername.length > 15 ? 2 : 1}
+                              className="text-xl font-bold bg-gray-700/30 border border-gray-600/30 rounded px-2 py-1 text-center w-full focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none overflow-hidden"
+                              style={{
+                                wordBreak: "break-word",
+                                overflowWrap: "break-word",
+                                lineHeight: "1.2",
+                              }}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                // 防止 Enter 鍵換行
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleSaveMembername();
+                                }
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form */}
+                  <div className="flex-1 w-full">
+                    <Form {...memberForm}>
+                      <form
+                        onSubmit={memberForm.handleSubmit(onMemberFormSubmit)}
+                        className="space-y-6 "
+                      >
+                        {/* Title  */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Title */}
+                          <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <IdCardLanyard className="w-4 h-4" />
+                                <FormLabel className="text-base font-medium">
+                                  Title
+                                </FormLabel>
+                              </div>
+                            </div>
+                            <FormField
+                              control={memberForm.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    {isEditingMember ? (
+                                      <input
+                                        {...field}
+                                        type="text"
+                                        placeholder="Enter your title"
+                                        className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                                      />
+                                    ) : (
+                                      <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center">
+                                        {field.value || "No title provided"}
+                                      </div>
+                                    )}
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          {/* Location */}
+                          <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <MapPin className="w-4 h-4" />
+                                <FormLabel className="text-base font-medium">
+                                  Location
+                                </FormLabel>
+                              </div>
+                            </div>
+                            <FormField
+                              control={memberForm.control}
+                              name="location"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    {isEditingMember ? (
+                                      <input
+                                        {...field}
+                                        type="text"
+                                        placeholder="Enter your location"
+                                        className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                                      />
+                                    ) : (
+                                      <div className="text-gray-300 rounded-lg">
+                                        {field.value || "No location provided"}
+                                      </div>
+                                    )}
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Social Links */}
+                        <div className="space-y-6">
+                          <h4 className="text-lg font-medium flex items-center space-x-2">
+                            <Globe className="w-4 h-4" />
+                            <span>Social Links</span>
+                          </h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Email */}
+                            <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
+                              <div className="flex items-center space-x-2">
+                                <Mail className="w-4 h-4" />
+                                <FormLabel className="text-base font-medium">
+                                  Email
+                                </FormLabel>
+                              </div>
+                              <FormField
+                                control={memberForm.control}
+                                name="email"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      {isEditingMember ? (
+                                        <input
+                                          {...field}
+                                          type="email"
+                                          placeholder="https://Email.com/in/username"
+                                          className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+                                        />
+                                      ) : (
+                                        <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center">
+                                          {field.value || "No Email provided"}
+                                        </div>
+                                      )}
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            {/* Website */}
+                            <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
+                              <div className="flex items-center space-x-2">
+                                <Globe2 className="w-4 h-4" />
+                                <FormLabel className="text-base font-medium">
+                                  Website
+                                </FormLabel>
+                              </div>
+                              <FormField
+                                control={memberForm.control}
+                                name="website"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      {isEditingMember ? (
+                                        <input
+                                          {...field}
+                                          type="url"
+                                          placeholder="https://your-website.com"
+                                          className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 break-all"
+                                        />
+                                      ) : (
+                                        <div className="text-gray-300 rounded-lg min-h-[2.5rem] flex items-center break-all">
+                                          {renderTextWithUrls(
+                                            field.value || "No website provided"
+                                          )}
+                                        </div>
+                                      )}
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </form>
+                    </Form>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </motion.div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

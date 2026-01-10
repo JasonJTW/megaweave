@@ -40,7 +40,7 @@ export default function NotificationTest({ userId }: { userId: number }) {
 
   return (
     <div className="w-full max-w-2xl mx-auto font-ddin">
-      <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 overflow-hidden">
+      <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/20 overflow-hidden">
         {/* Header */}
         <div className="p-6 border-b border-megaweave-sand bg-gradient-to-r from-megaweave-cream to-white">
           <div className="flex items-center justify-between">
@@ -81,7 +81,7 @@ export default function NotificationTest({ userId }: { userId: number }) {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="flex flex-col items-center justify-center py-12 text-center text-megaweave-stone"
+                    className="flex flex-col items-center justify-center py-12 text-center text-primary-75"
                  >
                     <div className="w-16 h-16 bg-megaweave-sand/20 rounded-full flex items-center justify-center mb-4">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-50">
@@ -90,7 +90,6 @@ export default function NotificationTest({ userId }: { userId: number }) {
                         </svg>
                     </div>
                     <p className="text-lg font-medium">No notifications yet</p>
-                    <p className="text-sm opacity-70">New messages will appear here instantly</p>
                  </motion.div>
               ) : (
                 notifications.map((n, i) => (
@@ -100,10 +99,10 @@ export default function NotificationTest({ userId }: { userId: number }) {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 20 }}
-                    className="group flex gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all duration-300 hover:border-megaweave-gold/30"
+                    className="group flex gap-4 p-4 bg-white rounded-xl border border-slate-100 transition-all duration-300 hover:border-megaweave-gold/30"
                   >
-                    <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-megaweave-cream to-megaweave-sand text-megaweave-gold">
-                      <MessageIcon className="w-5 h-5 text-megaweave-gold" />
+                    <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full text-primary-50">
+                      <MessageIcon className="w-5 h-5 text-primary-50" />
                     </div>
                     <div className="flex-1">
                       <p className="text-megaweave-brown font-medium leading-relaxed">

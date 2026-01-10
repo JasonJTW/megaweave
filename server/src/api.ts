@@ -14,6 +14,7 @@ import commentAPI from "./comments";
 import statsAPI from "./stats";
 import weavesAPI from "./weaves";
 import healthAPI from "./health";
+import notificationsAPI from "./notifications";
 //* Test api
 router.post("/test", (req, res) => {
   console.log("API test called");
@@ -39,5 +40,5 @@ router.use("/comments", commentAPI);
 router.use("/user/stats", statsAPI);
 router.use("/weaves", weavesAPI);
 router.use("/health", healthAPI);
-
+router.use("/notification", notificationsAPI)
 export default router;

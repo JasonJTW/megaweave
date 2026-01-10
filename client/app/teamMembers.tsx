@@ -45,7 +45,6 @@ export async function getTeamMembers() {
       throw new Error(error.errorMessage || "Failed to fetch team members");
     }
     const data = await response.json();
-    console.log("teamMembers data: ", data);
     return data as TeamMember[];
   } catch (error) {
     console.error("Error fetching team members:", error);

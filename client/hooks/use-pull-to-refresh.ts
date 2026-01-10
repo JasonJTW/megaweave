@@ -58,7 +58,6 @@ export const usePullToRefresh: UsePullToRefresh = ({
 
       if (currentPullLength <= maximumPullLength)
         setPullPosition(() => currentPullLength);
-      console.log(currentPullLength);
     },
     [isDisabled, maximumPullLength, pullStartPosition]
   );

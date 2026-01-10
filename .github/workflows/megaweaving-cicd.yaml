@@ -329,9 +329,13 @@ jobs:
     needs: [detect-changes, deploy-server, deploy-client]
     if: always() && needs.detect-changes.outputs.any-changed == 'true'
     runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
     steps:
       - name: Clean up workspace
         run: |
+          cd ~
           echo "🧹 清理 Actions 工作空間..."
 
           # 等待一下確保所有服務都已啟動
@@ -341,7 +345,6 @@ jobs:
           WORK_DIR="${GITHUB_WORKSPACE}"
           if [ -d "$WORK_DIR" ]; then
             echo "清理當前工作目錄: $WORK_DIR"
-            cd ~  # 先離開工作目錄
             rm -rf "$WORK_DIR/server/node_modules" 2>/dev/null || true
             rm -rf "$WORK_DIR/client/node_modules" 2>/dev/null || true
             rm -rf "$WORK_DIR/client/.next" 2>/dev/null || true
@@ -361,6 +364,7 @@ jobs:
 
       - name: Final disk check
         run: |
+          cd ~
           echo "📊 最終磁碟狀態："
           df -h /
           echo ""
@@ -415,7 +419,7 @@ jobs:
 
   deployment-failure:
     name: Deployment Failed
-    needs: [detect-changes, create-backup, deploy-server, deploy-client]
+    needs: [detect-changes, create-backup, deploy-server, deploy-client, post-deploy-cleanup]
     if: always() && needs.detect-changes.outputs.any-changed == 'true' && contains(needs.*.result, 'failure')
     runs-on: self-hosted
 

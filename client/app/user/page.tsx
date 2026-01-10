@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import User from "../types/user";
 import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { User as UserIcon, LogOut, Save, X, ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
@@ -144,7 +143,9 @@ const UserPage = () => {
 
         // 處理 500 等伺服器錯誤
         if (response.status >= 500) {
-          toast.error("Server is currently unavailable. Please try again later.");
+          toast.error(
+            "Server is currently unavailable. Please try again later."
+          );
           setLoading(false);
           return false;
         }
@@ -261,6 +262,7 @@ const UserPage = () => {
       if (!response.ok) {
         // 如果不是 200，僅 log 錯誤但不阻擋頁面渲染 (非核心致命錯誤)
         console.warn("Failed to fetch weaves history");
+        toast.error("Failed to fetch weaves history");
         return;
       }
 
@@ -269,6 +271,7 @@ const UserPage = () => {
       setWeaves(data.weaves || []);
     } catch (error) {
       console.error("Error fetching weaves:", error);
+      toast.error("Error connecting to server");
     }
   };
 
@@ -520,7 +523,9 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      toast.error(error instanceof Error ? error.message : "Error update profile");
+      toast.error(
+        error instanceof Error ? error.message : "Error update profile"
+      );
       throw error;
     }
   };
@@ -725,7 +730,9 @@ const UserPage = () => {
       setUser((prev) => (prev ? { ...prev, avatar_url: undefined } : prev));
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to remove avatar");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to remove avatar"
+      );
     }
   };
 
@@ -820,8 +827,6 @@ const UserPage = () => {
     );
   }
 
-
-
   if (!user) {
     return null;
   }
@@ -856,8 +861,6 @@ const UserPage = () => {
             </button>
           </div>
         </motion.header>
-
-
 
         {/*icons*/}
         <div className="max-w-6xl mx-auto">
@@ -931,8 +934,6 @@ const UserPage = () => {
                           <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
                         </div>
                       )}
-
-                     
                     </div>
                   </div>
 
@@ -954,25 +955,25 @@ const UserPage = () => {
                         Remove
                       </button>
                     )}
-                     {/* 如果有 preview，顯示 Save / Cancel 按鈕 */}
-                      {previewSrc && !uploadingAvatar && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={uploadAvatar}
-                            className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
-                          >
-                            <Save className="w-4 h-4 mr-1" />
-                            <span>Upload</span>
-                          </button>
-                          <button
-                            onClick={handleCancelAvatarPreview}
-                            className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
-                          >
-                            <X className="w-4 h-4" />
-                            <span>Cancel</span>
-                          </button>
-                        </div>
-                      )}
+                    {/* 如果有 preview，顯示 Save / Cancel 按鈕 */}
+                    {previewSrc && !uploadingAvatar && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={uploadAvatar}
+                          className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
+                        >
+                          <Save className="w-4 h-4 mr-1" />
+                          <span>Upload</span>
+                        </button>
+                        <button
+                          onClick={handleCancelAvatarPreview}
+                          className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
+                        >
+                          <X className="w-4 h-4" />
+                          <span>Cancel</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 

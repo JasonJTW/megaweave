@@ -129,17 +129,17 @@ export default {
       },
 
       // Custom gradients for easier use
-      backgroundImage: {
-        "megaweave-primary":
-          "linear-gradient(135deg, #A17624 0%, #D5AB1C 100%)",
-        "megaweave-forest":
-          "linear-gradient(135deg, #233519 0%, #3E6330 35%, #587635 100%)",
-        "megaweave-warm": "linear-gradient(135deg, #D2CEB4 0%, #B2A986 100%)",
-        "megaweave-earth":
-          "linear-gradient(135deg, #54160F 0%, #D14C41 50%, #D5AB1C 100%)",
-        "megaweave-nature":
-          "linear-gradient(135deg, #233519 0%, #587635 50%, #D2CEB4 100%)",
-      },
+      // backgroundImage: {
+      //   "megaweave-primary":
+      //     "linear-gradient(135deg, #A17624 0%, #D5AB1C 100%)",
+      //   "megaweave-forest":
+      //     "linear-gradient(135deg, #233519 0%, #3E6330 35%, #587635 100%)",
+      //   "megaweave-warm": "linear-gradient(135deg, #D2CEB4 0%, #B2A986 100%)",
+      //   "megaweave-earth":
+      //     "linear-gradient(135deg, #54160F 0%, #D14C41 50%, #D5AB1C 100%)",
+      //   "megaweave-nature":
+      //     "linear-gradient(135deg, #233519 0%, #587635 50%, #D2CEB4 100%)",
+      // },
 
       borderRadius: {
         lg: "var(--radius)",

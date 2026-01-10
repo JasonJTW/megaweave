@@ -1,6 +1,7 @@
 // client/hooks/useSocket.ts
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 export const useSocket = (userId: string | null) => {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -10,12 +11,12 @@ export const useSocket = (userId: string | null) => {
     if (!userId) return;
 
     // 建立連線 (請換成你的伺服器網址)
-    const socketInstance = io("https://localhost:8443", {
+    const socketInstance = io(hostName, {
       withCredentials: true,
     });
 
     socketInstance.on("connect", () => {
-      console.log("✅ Connected to Server, ID:", socketInstance.id);
+      console.log("✅ Connected to Socket Server, ID:", socketInstance.id);
       setIsConnected(true);
 
       // 測試：連線成功後立即加入房間

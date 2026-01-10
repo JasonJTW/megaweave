@@ -14,6 +14,7 @@ import {
   // Mail,
   GalleryHorizontalEnd,
   SquarePlus,
+  Bell,
   // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -82,6 +83,12 @@ const Navbar = () => {
       title: "Profile",
       description: "User Profile",
       icon: UserIcon,
+    },
+    {
+      href: "/notifications",
+      title: "Notifications",
+      description: "Notifications",
+      icon: Bell,
     },
     {
       href: "/about",
@@ -195,6 +202,10 @@ const Navbar = () => {
                 <UserIcon className="h-[16px] w-[18px]" />
                 <span className="sr-only">Profile</span>
               </Link>
+              <Link href="/notifications" className="">
+                <Bell className="h-[16px] w-[18px] text-black" fill="black" />
+                <span className="sr-only">Notifications</span>
+              </Link>
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -249,6 +260,7 @@ const Navbar = () => {
                   </div>
                 </SheetContent>
               </Sheet>
+              
             </div>
           </div>
         </div>

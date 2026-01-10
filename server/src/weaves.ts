@@ -123,7 +123,7 @@ const WEAVE_QUERY_BASE = `
       p.content AS post_content,
       p.type AS post_type,
       p.status AS post_status_original,
-      p.location AS post_location,
+      l.full_address AS post_location, 
       p.tags AS post_tags,
       p.category_id AS post_category_id,
       p.condition_level AS post_condition_level,
@@ -141,6 +141,7 @@ const WEAVE_QUERY_BASE = `
       GROUP_CONCAT(img.image_url) AS image_urls
   FROM weaves w
   JOIN posts p ON w.post_id = p.id
+  LEFT JOIN locations l ON p.location_id = l.id
   LEFT JOIN items i ON w.item_id = i.id
   JOIN users giver ON w.giver_id = giver.id
   JOIN users receiver ON w.receiver_id = receiver.id
@@ -266,6 +267,10 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
     return res.status(200).json({ weaves: processWeaveRows(weaveRows) });
   } catch (error) {
+    console.error("Error retrieving weaves:", error);
+    if (error instanceof Error) {
+       console.error(error.stack);
+    }
     return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
   }
 });

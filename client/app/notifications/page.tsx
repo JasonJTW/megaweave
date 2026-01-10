@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import NotificationTest from "../components/NotificationTest";
+import NotificationTest from "@/app/components/NotificationTest";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import User from "../types/user";
@@ -42,6 +42,14 @@ export default function NotificationsPage() {
     fetchUser();
   }, [hostName, router]);
 
+  // Redirect to signin if user is not authenticated after loading
+  useEffect(() => {
+    if (!loading && !user) {
+      toast.error("Please sign in to view notifications");
+      router.push("/signin");
+    }
+  }, [loading, user, router]);
+
   if (loading) {
     return (
       <div className="min-h-screen pt-24 pb-12 px-4 flex items-center justify-center bg-megaweave-cream">
@@ -54,17 +62,16 @@ export default function NotificationsPage() {
   }
 
   if (!user) {
-    return null; // Handle not logged in / redirecting
+    return null;
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 bg-gradient-to-b from-megaweave-cream to-megaweave-sand/30">
+  <>
+    <div className="bg-[#f5f4f3] inset-0 "/>
+    <div className="min-h-screen pt-8 pb-12 px-4 font-ddin">
       <div className="max-w-7xl mx-auto">
         <div className="mb-10 text-center">
-          <h1 className="type-h2 text-megaweave-forest-dark mb-3">Notification Center</h1>
-          <p className="type-body-t2 text-megaweave-stone max-w-2xl mx-auto">
-            Stay updated with the latest activities and announcements from your team.
-          </p>
+          <h1 className="type-h4 text-megaweave-forest-dark mb-3">Notification</h1>
         </div>
         
         <div className="w-full">
@@ -72,5 +79,6 @@ export default function NotificationsPage() {
         </div>
       </div>
     </div>
+  </>
   );
 }

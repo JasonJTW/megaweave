@@ -60,7 +60,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/api", apiRoutes);
 
 async function startServer() {
   try {
@@ -126,6 +125,17 @@ async function startServer() {
     });
     //* 5.將 io 實例存入 app，讓以後的 API Route 可以透過 req.app.get("io") 取得
     app.set("io", io);
+
+    //* 6. Add middleware to inject io into res.locals for all routes
+    app.use((req, res, next) => {
+      res.locals.io = io;
+      next();
+    });
+
+    app.use("/api", apiRoutes);
+
+
+
 
     //* start server
     server.listen(PORT, () => {

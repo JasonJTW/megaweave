@@ -3,6 +3,7 @@ import { RowDataPacket, ResultSetHeader } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { updateUserStats } from "./utils/updateUserStats";
+import { createNotification } from "./utils/notificationService";
 
 const router = Router();
 
@@ -172,7 +173,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     const postOwnerId = posts[0].user_id;
     const postType = posts[0].type;
-    const initiatorId = req.user!.userId;
+    const initiatorId = Number(req.user!.userId);
 
     let giverId: number;
     let receiverId: number;
@@ -237,9 +238,67 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       ]
     );
 
+    let notificationSent = false;
+    let debugInfo = {};
+
+    // Notification Logic
+    try {
+      console.log("🔔 [Weave] Starting notification logic...");
+      const targetUserId = (initiatorId === giverId) ? receiverId : giverId;
+      console.log(`🔔 [Weave] Initiator: ${initiatorId}, Giver: ${giverId}, Receiver: ${receiverId}`);
+      console.log(`🔔 [Weave] Target User ID: ${targetUserId} (Type: ${typeof targetUserId})`);
+      
+      const io = res.locals.io;
+      console.log(`🔔 [Weave] Socket.IO instance found: ${!!io}`);
+      
+      if (io) {
+        const [postInfo] = await dbPool.execute<RowDataPacket[]>(
+            "SELECT title, type FROM posts WHERE id = ?", 
+            [postId]
+        );
+        
+        const postTitle = postInfo[0]?.title || "Item";
+        const postType = postInfo[0]?.type;
+        const initiatorName = req.user?.username || "Someone";
+        
+        let notifTitle = "New Weave Request";
+        let notifContent = `User ${initiatorName} sent a weave request for "${postTitle}"`;
+
+        if (postType === 'wish') {
+          notifTitle = "New Share Offer"; 
+          notifContent = `${initiatorName} wants to share "${postTitle}" with you!`;
+        } else {
+          notifTitle = "New Wish Request";
+          notifContent = `${initiatorName} is wishing for your "${postTitle}"`;
+        }
+
+        console.log(`🔔 [Weave] Creating notification: ${notifTitle} for User ${targetUserId}`);
+
+        const notif = await createNotification(io, {
+          recipient_id: targetUserId,
+          sender_id: initiatorId,
+          type: "ORDER_UPDATE",
+          title: notifTitle,
+          content: notifContent,
+          link: `/profile/${targetUserId}?tab=weaves`, 
+        });
+        
+        console.log("🔔 [Weave] Notification created successfully:", notif.id);
+        notificationSent = true;
+        debugInfo = { targetUserId, notif };
+      } else {
+        console.error("🔔 [Weave] Socket.IO instance MISSING");
+      }
+    } catch (e) {
+      console.error("🔔 [Weave] Notification failed with error:", e);
+      debugInfo = { error: String(e) };
+    }
+
     return res.status(201).json({
       message: "Weave request sent successfully",
       weaveId: result.insertId,
+      notificationSent,
+      debugInfo
     });
   } catch (error) {
     console.error("Error creating weave:", error);
@@ -348,6 +407,78 @@ router.patch(
       }
 
       await connection.commit();
+      
+      // Notification Logic for Status Update
+      try {
+        const io = res.locals.io;
+        if (io) {
+           // Need to get details: Post Title, Other Party ID
+           // We have 'weave' object but it doesn't have post title.
+           // We need to fetch details.
+           const [details] = await dbPool.execute<RowDataPacket[]>(
+             `SELECT p.title, p.id as post_id 
+              FROM posts p 
+              WHERE p.id = ?`,
+             [weave.post_id]
+           );
+           
+           if (details.length > 0) {
+             const postTitle = details[0].title;
+             const postId = details[0].post_id;
+             const actorName = req.user?.username || "Someone"; // The one who triggered this action
+             
+             // Determine recipient (the other party)
+             const isActorGiver = (weave.giver_id === userId);
+             const recipientId = isActorGiver ? weave.receiver_id : weave.giver_id;
+             
+             if (status === "cancelled") {
+                await createNotification(io, {
+                  recipient_id: recipientId,
+                  sender_id: userId,
+                  type: "ORDER_UPDATE",
+                  title: "Weave Cancelled",
+                  content: `${actorName} cancelled the weave for "${postTitle}"`,
+                  link: `/profile/${recipientId}?tab=weaves`,
+                });
+             } else if (status === "completed") {
+                // If fully completed
+                const [check] = await dbPool.execute<RowDataPacket[]>(
+                    `SELECT status FROM weaves WHERE id = ?`, 
+                    [weaveId]
+                );
+                
+                if (check[0]?.status === 'completed') {
+                    // Notify BOTH about completion
+                    // 1. Notify the other party
+                    await createNotification(io, {
+                      recipient_id: recipientId,
+                      sender_id: userId,
+                      type: "ORDER_UPDATE",
+                      title: "Weave Completed",
+                      content: `Weave for "${postTitle}" is successfully completed!`,
+                      link: `/profile/${recipientId}?tab=weaves`,
+                    });
+                    
+                    // 2. Notify the actor too? Maybe not needed as they just clicked it.
+                    // But maybe good for confirmation. User didn't ask for self-notification.
+                } else {
+                    // Just one side confirmed. Notify the other side.
+                     await createNotification(io, {
+                      recipient_id: recipientId,
+                      sender_id: userId,
+                      type: "ORDER_UPDATE",
+                      title: "Weave Confirmed",
+                      content: `${actorName} confirmed the weave for "${postTitle}". Waiting for your confirmation.`,
+                      link: `/profile/${recipientId}?tab=weaves`,
+                    });
+                }
+             }
+           }
+        }
+      } catch (e) {
+         console.error("Weave update notification failed", e);
+      }
+
       if (status === "completed") {
         updateUserStats(weave.giver_id.toString()).catch(console.error);
         updateUserStats(weave.receiver_id.toString()).catch(console.error);

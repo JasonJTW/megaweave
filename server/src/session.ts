@@ -163,7 +163,7 @@ export async function getUserSessionFromRedis(
       return null;
     }
 
-    console.log("Redis session user:", user);
+    // console.log("Redis session user:", user);
     return user;
   } catch (error) {
     console.error("Error retrieving user session:", error);

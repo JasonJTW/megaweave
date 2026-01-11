@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavbar } from "../contexts/NavBarContext";
+import { useSocket } from "@/hooks/useSocket";
 import Link from "next/link";
 import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
@@ -54,6 +55,88 @@ const Navbar = () => {
   const { isNavbarVisible, isAtTop } = useNavbar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const [userId, setUserId] = useState<number | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Custom socket hook usage inside component after we have userId
+  // But hooks must be top level. 
+  // Solution: pass userId to a wrapper or just use the hook with skipped connection if null?
+  // Let's check useSocket signature. Assuming it handles null/empty string gracefully or we pass string.
+  
+  // Since we don't know userId yet, we can't call useSocket at top level safely if it depends on it immediately?
+  // Usually hooks are fine.
+  
+  // Let's implement fetchUser first.
+  useEffect(() => {
+    const fetchUserAndNotifications = async () => {
+        try {
+            const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+            // 1. Fetch User
+            const userRes = await fetch(`${hostName}/api/currentUser`, { credentials: 'include' });
+            if (userRes.ok) {
+                const userData = await userRes.json();
+                if (userData.user) {
+                    setUserId(userData.user.userId);
+                    
+                    // 2. Fetch Unread Count
+                    const notifRes = await fetch(`${hostName}/api/notifications?limit=1`, { credentials: 'include' });
+                    if (notifRes.ok) {
+                        const notifData = await notifRes.json();
+                        setUnreadCount(notifData.unreadCount || 0);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Navbar setup failed", e);
+        }
+    };
+    fetchUserAndNotifications();
+  }, []);
+
+  // Socket listener
+  // We can't conditionally call hooks, so useSocket must always be called.
+  // Assuming useSocket handles empty string gracefully (doesn't connect).
+  const { socket } = useSocket(userId ? userId.toString() : "");
+
+  useEffect(() => {
+    if (!socket || !userId) return;
+
+    const handleNewNotification = () => {
+        setUnreadCount(prev => prev + 1);
+    };
+
+    socket.on("new_notification", handleNewNotification);
+
+    return () => {
+        socket.off("new_notification", handleNewNotification);
+    };
+  }, [socket, userId]);
+
+  // Listen for local read updates
+  useEffect(() => {
+    const handleLocalUpdate = () => {
+        // Option 1: Decrement count (if we know how many were read)
+        // Option 2: Re-fetch count. Safer.
+        const fetchCount = async () => {
+            try {
+                const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+                const notifRes = await fetch(`${hostName}/api/notifications?limit=1`, { credentials: 'include' });
+                if (notifRes.ok) {
+                    const notifData = await notifRes.json();
+                    setUnreadCount(notifData.unreadCount || 0);
+                }
+            } catch (e) {
+                console.error("Failed to update notification count");
+            }
+        };
+        fetchCount();
+    };
+
+    window.addEventListener('notification_update', handleLocalUpdate);
+    return () => {
+        window.removeEventListener('notification_update', handleLocalUpdate);
+    };
+  }, []);
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
@@ -145,6 +228,16 @@ const Navbar = () => {
             </Link>
 
             {/* desktop nav item */}
+            <div className="hidden md:flex items-center space-x-6 mr-6">
+                <Link href="/notifications" className="relative group p-2 text-gray-700 hover:bg-primary-30 rounded-full transition-all">
+                    <Bell className="w-[20px] h-[20px]" />
+                    {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                    )}
+                </Link>
+            </div>
             <div className="font-ddin">
               <NavigationMenu>
                 <NavigationMenuList>
@@ -202,9 +295,14 @@ const Navbar = () => {
                 <UserIcon className="h-[16px] w-[18px]" />
                 <span className="sr-only">Profile</span>
               </Link>
-              <Link href="/notifications" className="">
-                <Bell className="h-[16px] w-[18px] text-black" fill="black" />
+              <Link href="/notifications" className="relative group">
+                <Bell className="h-[16px] w-[18px] text-black transition-transform group-hover:scale-110" fill="black" />
                 <span className="sr-only">Notifications</span>
+                 {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
               </Link>
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>

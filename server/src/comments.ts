@@ -2,6 +2,7 @@
 import express, { Request, Response } from "express";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import dbPool from "./utils/db";
+import { createNotification } from "./utils/notificationService";
 
 const router = express.Router();
 
@@ -141,7 +142,6 @@ router.post("/", async (req: Request, res: Response) => {
 
     await connection.commit();
 
-    // 🔥 返回新留言時也 JOIN users 獲取完整資訊
     const [newCommentRows] = await connection.execute<CommentRow[]>(
       `SELECT 
         c.*,
@@ -155,6 +155,63 @@ router.post("/", async (req: Request, res: Response) => {
     );
 
     const newComment = newCommentRows[0];
+
+    // Notification Logic
+    try {
+      // 1. Fetch Post details (Owner & Title)
+      const [postRows] = await connection.execute<RowDataPacket[]>(
+        "SELECT user_id, title FROM posts WHERE id = ?",
+        [post_id]
+      );
+
+      if (postRows.length > 0) {
+        const post = postRows[0];
+        
+        // Notify Post Owner if commenter is not the owner
+        if (post.user_id !== user_id) {
+          const io = req.app.get("io"); // Get io from app
+          if (io) {
+            // Get commenter name
+            const commenterName = newComment.username || "Someone";
+            
+            await createNotification(io, {
+              recipient_id: post.user_id,
+              sender_id: user_id,
+              type: "COMMENT",
+              title: "New Comment",
+              content: `${commenterName} commented on your post "${post.title}"`,
+              link: `/item/${post_id}#comment-${newComment.id}`,
+            });
+          }
+        }
+        
+        // Optional: Notify parent comment author if reply
+        if (parent_id) {
+           const [parentComment] = await connection.execute<RowDataPacket[]>(
+             "SELECT user_id FROM comments WHERE id = ?",
+             [parent_id]
+           );
+           
+           if (parentComment.length > 0 && parentComment[0].user_id !== user_id && parentComment[0].user_id !== post.user_id) {
+             const io = req.app.get("io");
+             if (io) {
+                const commenterName = newComment.username || "Someone";
+                await createNotification(io, {
+                  recipient_id: parentComment[0].user_id,
+                  sender_id: user_id,
+                  type: "COMMENT",
+                  title: "New Reply",
+                  content: `${commenterName} replied to your comment`,
+                  link: `/item/${post_id}#comment-${newComment.id}`,
+                });
+             }
+           }
+        }
+      }
+    } catch (notifError) {
+      console.error("Failed to send comment notification:", notifError);
+      // Don't fail the request if notification fails
+    }
 
     res.status(201).json({
       message: "Comment created",
@@ -286,6 +343,26 @@ router.get("/counts", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Error fetching comment counts:", err);
     res.status(500).json({ message: "Failed to fetch counts" });
+  }
+});
+
+// GET /comments/:id - Get single comment (for context)
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    const commentId = req.params.id;
+    const [rows] = await dbPool.execute<CommentRow[]>(
+      "SELECT id, post_id, item_id FROM comments WHERE id = ?",
+      [commentId]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+    
+    return res.json({ comment: rows[0] });
+  } catch (error) {
+    console.error("Error fetching comment:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

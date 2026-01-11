@@ -151,7 +151,7 @@ router.get("/custom_name", requireAuth, async (req: Request, res: Response) => {
   try {
     query = `SELECT custom_name FROM user_profiles WHERE user_id = ?`;
     const [rows] = await dbPool.query(query, [userId]);
-    console.log("custom_name rows:", rows);
+    // console.log("custom_name rows:", rows);
     const customName = (rows as RowDataPacket[])[0]?.custom_name;
 
     return res.status(200).json({ custom_name: customName });

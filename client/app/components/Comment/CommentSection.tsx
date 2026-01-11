@@ -77,6 +77,55 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     }
   }, [activeTab, fetchCommentsByTab]);
 
+  // Deep linking logic
+  useEffect(() => {
+    const handleDeepLink = async () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith("#comment-")) {
+        const commentId = hash.substring(9); // remove '#comment-'
+        try {
+          // Fetch comment to get item_id
+          const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+          const res = await fetch(`${hostName}/api/comments/${commentId}`);
+          if (res.ok) {
+            const data = await res.json();
+            const itemId = data.comment.item_id;
+            const targetTab = itemId === null ? "all" : itemId;
+            
+            setActiveTab(targetTab);
+            
+            // Wait for comments to load and render, then scroll
+            // We need to poll or use a ref mechanism, but a simple timeout works for now
+            // better: relying on 'comments' dependency in another effect
+          }
+        } catch (e) {
+            console.error("Deep link failed", e);
+        }
+      }
+    };
+    
+    handleDeepLink();
+  }, []);
+
+  // Scroll to hash when comments are updated
+  useEffect(() => {
+    if (!isLoading && activeTab !== null) {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith("#comment-")) {
+            const id = hash.substring(1);
+            // Check if element exists
+            setTimeout(() => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.scrollIntoView({ behavior: "smooth", block: "center" });
+                    element.classList.add("bg-yellow-50", "transition-colors", "duration-1000");
+                    setTimeout(() => element.classList.remove("bg-yellow-50"), 2000);
+                }
+            }, 300); // delay after render
+        }
+    }
+  }, [isLoading, comments, activeTab]);
+
   // 處理 tab 點擊
   const handleTabClick = (tab: TabKey) => {
     if (activeTab === tab) {

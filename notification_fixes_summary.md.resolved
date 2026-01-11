@@ -1,0 +1,118 @@
+# Notification System Fixes & Improvements Summary
+
+This document summarizes the debugging and implementation work done to fix the notification system, including deep linking for comments and missing notifications for Weave requests.
+
+## 1. 404 Errors on Notification API
+**Issue:** The frontend was requesting `/notifications` but the backend registered the route as `/notification`.
+**Fix:** Updated [server/src/api.ts](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/server/src/api.ts) to match the plural form.
+
+```typescript
+// server/src/api.ts
+import notificationsRouter from "./notifications";
+
+// Fixed route path
+router.use("/notifications", notificationsRouter);
+```
+
+## 2. Navbar Unread Badge Synchronization
+**Issue:** The navbar unread count didn't update when notifications were marked as read on the Notifications page.
+**Fix:** implemented a custom event system to sync state across components.
+
+**Frontend ([components/Notification.tsx](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/client/app/components/Notification.tsx)):** Dispatch event when reading.
+```tsx
+// Dispatch global event after marking read
+window.dispatchEvent(new Event('notification_update'));
+```
+
+**Frontend ([components/Navbar.tsx](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/client/app/components/Navbar.tsx)):** Listen for event and re-fetch.
+```tsx
+useEffect(() => {
+    const handleLocalUpdate = () => {
+        // Re-fetch unread count...
+    };
+    window.addEventListener('notification_update', handleLocalUpdate);
+    return () => window.removeEventListener('notification_update', handleLocalUpdate);
+}, []);
+```
+
+## 3. Comment Deep Linking & Auto-Scroll
+**Issue:** Clicking a comment notification didn't scroll to the specific comment, especially if it was inside a collapsed tab (e.g., specific item tab).
+**Fix:** Implemented full deep linking support.
+
+**Backend ([server/src/comments.ts](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/server/src/comments.ts)):**
+1. Added anchor hash to notification links.
+```typescript
+link: `/item/${post_id}#comment-${newComment.id}`
+```
+2. Added endpoint to look up which item/tab a comment belongs to.
+```typescript
+// GET /comments/:id
+router.get("/:id", async (req, res) => {
+    // Returns comment details including item_id
+});
+```
+
+**Frontend ([CommentSection.tsx](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/client/app/components/Comment/CommentSection.tsx)):** Handle URL hash on load.
+```tsx
+// Check for #comment-ID hash
+const handleDeepLink = async () => {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith("#comment-")) {
+        const commentId = hash.substring(9);
+        // 1. Fetch check which tab this comment is in
+        const res = await fetch(`.../api/comments/${commentId}`);
+        // 2. Switch to that tab
+        setActiveTab(targetTab); 
+        // 3. Scroll to element after render
+        setTimeout(() => {
+             document.getElementById(commentId).scrollIntoView(...);
+        }, 500);
+    }
+};
+```
+
+**Frontend ([CommentItem.tsx](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/client/app/components/Comment/CommentItem.tsx)):** Add ID to DOM element.
+```tsx
+<div id={`comment-${comment.id}`} className="...">
+    {/* Comment content */}
+</div>
+```
+
+## 4. Weave Notification Fixes
+**Issue A: Missing Notifications (Schema Validation)**
+`z.url()` was rejecting relative paths like `/profile/123`.
+**Fix:** Relaxed validation in [server/src/utils/notificationService.ts](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/server/src/utils/notificationService.ts).
+```typescript
+// Changed from z.url() to z.string()
+link: z.string().optional().nullable(),
+```
+
+**Issue B: Missing Notifications (ID Type Mismatch)**
+Notifications weren't sending because strictly comparing string `userId` (from session) with number [id](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/client/app/contexts/NavBarContext.tsx#16-50) (from DB) failed.
+**Fix:** Cast ID to number in [server/src/weaves.ts](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/server/src/weaves.ts).
+```typescript
+// Ensure ID is a number for comparison
+const initiatorId = Number(req.user!.userId);
+const targetUserId = (initiatorId === giverId) ? receiverId : giverId;
+```
+
+**Issue C: Socket.IO Instance Access**
+`req.app.get("io")` was returning undefined in the Weave endpoint context.
+**Fix:** Used `res.locals.io` which is reliably set by middleware in [server/src/weaves.ts](file:///Users/zhangjunhao/Desktop/Git-repos/Megaweave/server/src/weaves.ts).
+```typescript
+// Use res.locals to access socket instance
+const io = res.locals.io;
+```
+
+**Issue D: Correct Message Content**
+Notifications were generic.
+**Fix:** Differentiated between 'Wish' and 'Share' post types.
+```typescript
+if (postType === 'wish') {
+  notifTitle = "New Share Offer"; 
+  notifContent = `${initiatorName} wants to share...`;
+} else {
+  notifTitle = "New Wish Request";
+  notifContent = `${initiatorName} is wishing for...`;
+}
+```

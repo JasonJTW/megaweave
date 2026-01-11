@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import NotificationTest from "@/app/components/NotificationTest";
+import NotificationList from "@/app/components/Notification";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import User from "../types/user";
@@ -75,7 +75,7 @@ export default function NotificationsPage() {
         </div>
         
         <div className="w-full">
-          <NotificationTest userId={user.userId} />
+          <NotificationList userId={user.userId} />
         </div>
       </div>
     </div>

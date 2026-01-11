@@ -1,8 +1,8 @@
-/// like.ts
 import { Request, Response, Router } from "express";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { RowDataPacket } from "mysql2";
+import { createNotification } from "./utils/notificationService";
 
 const router = Router({ mergeParams: true });
 
@@ -31,6 +31,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   const postId = parseInt(req.params.id, 10);
   const userId = req.user?.userId;
+  const username = req.user?.username;
 
   if (!userId) {
     return res.status(401).json({ errorMessage: "Please signin first" });
@@ -72,15 +73,42 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         [postId]
       );
 
+      // Fetch post details for notification
+      const [postRows] = await connection.execute<RowDataPacket[]>(
+        "SELECT user_id, title FROM posts WHERE id = ?",
+        [postId]
+      );
+
       await connection.commit();
+
+      // Trigger notification if liker is not the owner
+      if (postRows.length > 0) {
+        const post = postRows[0];
+        if (post.user_id !== userId) {
+          const io = res.locals.io;
+          if (io) {
+            createNotification(io, {
+              recipient_id: post.user_id,
+              sender_id: userId,
+              type: "LIKE",
+              title: "New Like",
+              content: `${username} liked your post "${post.title}"`,
+              link: `/item/${postId}`,
+            }).catch((err) =>
+              console.error("Failed to create like notification:", err)
+            );
+          }
+        }
+      }
+
       return res.json({ liked: true });
     }
   } catch (error) {
-    await connection.rollback();
+    if (connection) await connection.rollback();
     console.error(error);
     res.status(500).json({ errorMessage: "Server error" });
   } finally {
-    connection.release();
+    if (connection) connection.release();
   }
 });
 

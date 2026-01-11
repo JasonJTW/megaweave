@@ -40,5 +40,5 @@ router.use("/comments", commentAPI);
 router.use("/user/stats", statsAPI);
 router.use("/weaves", weavesAPI);
 router.use("/health", healthAPI);
-router.use("/notification", notificationsAPI)
+router.use("/notifications", notificationsAPI)
 export default router;

@@ -73,7 +73,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
   return (
     // 移除 `py-3`，讓外部容器控制間距
-    <div className="relative max-w-full mt-3">
+    <div 
+      id={`comment-${comment.id}`}
+      className="relative max-w-full mt-3"
+    >
       <div className="flex gap-2  py-[2px] px-0 items-start">
         {/* avatar*/}
         <div

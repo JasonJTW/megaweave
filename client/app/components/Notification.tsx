@@ -19,7 +19,7 @@ interface NotificationItem {
 }
 
 export default function NotificationList({ userId }: { userId: number }) {
-  const { socket, isConnected } = useSocket(userId.toString());
+  const { socket } = useSocket(userId.toString());
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -49,7 +49,7 @@ export default function NotificationList({ userId }: { userId: number }) {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewNotification = (data: any) => {
+    const handleNewNotification = (data: Omit<NotificationItem, 'is_read'> & { created_at?: string }) => {
         // Optimistically add to list
         const newNotif: NotificationItem = {
             ...data,
@@ -104,6 +104,7 @@ export default function NotificationList({ userId }: { userId: number }) {
           toast.success("All marked as read");
       } catch (error) {
           toast.error("Failed to mark all read");
+          console.error("Error marking all read", error);
       }
   };
 

@@ -4,11 +4,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 interface NavbarContextType {
   isNavbarVisible: boolean;
   isAtTop: boolean;
+  showNavbar: () => void;
 }
 
 const NavbarContext = createContext<NavbarContextType>({
   isNavbarVisible: true,
   isAtTop: true,
+  showNavbar: () => {},
 });
 
 export const useNavbar = () => useContext(NavbarContext);
@@ -41,8 +43,12 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => window.removeEventListener("scroll", controlNavbar);
   }, [lastScrollY]);
 
+  const showNavbar = () => {
+    setIsNavbarVisible(true);
+  };
+
   return (
-    <NavbarContext.Provider value={{ isNavbarVisible, isAtTop }}>
+    <NavbarContext.Provider value={{ isNavbarVisible, isAtTop, showNavbar }}>
       {children}
     </NavbarContext.Provider>
   );

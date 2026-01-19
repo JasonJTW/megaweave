@@ -8,6 +8,7 @@ import Script from "next/script";
 import { TeamProvider } from "./contexts/TeamContext";
 import { PostProvider } from "./contexts/PostContext";
 import { NavbarProvider } from "./contexts/NavBarContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import Navbar from "./components/Navbar";
 import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
@@ -140,6 +141,7 @@ export default function RootLayout({
           }}
         />
         <NavbarProvider>
+          <NotificationProvider>
           <Navbar />
 
           {/* Facebook SDK */}
@@ -187,6 +189,7 @@ export default function RootLayout({
             </TeamProvider>
           </GoogleOAuthProvider>
           <Footer />
+          </NotificationProvider>
         </NavbarProvider>
       </body>
     </html>

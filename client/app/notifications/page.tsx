@@ -55,7 +55,9 @@ export default function NotificationsPage() {
       <div className="min-h-screen pt-24 pb-12 px-4 flex items-center justify-center bg-megaweave-cream">
         <div className="animate-pulse flex flex-col items-center">
           <div className="w-12 h-12 border-4 border-megaweave-forest border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-megaweave-forest font-medium">Loading notifications...</p>
+          <p className="text-megaweave-forest font-medium">
+            Loading notifications...
+          </p>
         </div>
       </div>
     );
@@ -66,19 +68,21 @@ export default function NotificationsPage() {
   }
 
   return (
-  <>
-    <div className="bg-[#f5f4f3] inset-0 "/>
-    <div className="min-h-screen pt-8 pb-12 px-4 font-ddin">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-10 text-center">
-          <h1 className="type-h4 text-megaweave-forest-dark mb-3">Notification</h1>
-        </div>
-        
-        <div className="w-full">
-          <NotificationList userId={user.userId} />
+    <>
+      <div className="bg-[#f5f4f3] inset-0 " />
+      <div className="min-h-screen pt-8 pb-12 px-4 font-ddin">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-10 text-center">
+            <h1 className="type-h4 text-megaweave-forest-dark mb-3">
+              Notification
+            </h1>
+          </div>
+
+          <div className="w-full">
+            <NotificationList />
+          </div>
         </div>
       </div>
-    </div>
-  </>
+    </>
   );
 }

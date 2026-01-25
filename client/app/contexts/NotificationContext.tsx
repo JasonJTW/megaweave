@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useEffect } from "react";
+import useSWR from "swr";
 import { useSocket } from "@/hooks/useSocket";
 import toast from "react-hot-toast";
 import { useNavbar } from "./NavBarContext";
@@ -28,6 +29,9 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+// Generic fetcher for SWR
+const fetcher = (url: string) => fetch(url, { credentials: "include" }).then(res => res.json());
+
 export const useNotification = () => {
     const context = useContext(NotificationContext);
     if (!context) {
@@ -37,65 +41,45 @@ export const useNotification = () => {
 };
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [userId, setUserId] = useState<number | null>(null);
-
     // Consume Navbar context
     const { showNavbar } = useNavbar();
 
     const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-    // 1. Fetch current user to get userId for socket
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const res = await fetch(`${hostName}/api/currentUser`, { credentials: 'include' });
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.user) {
-                        setUserId(data.user.userId);
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to fetch user for notifications", error);
-            }
-        };
-        fetchUser();
-    }, [hostName]);
+    //* 1. Fetch current user using SWR to keep auth state in sync
+    const { data: userData, isLoading: isUserLoading } = useSWR(
+        `${hostName}/api/currentUser`,
+        fetcher
+    );
+    
+    const userId = userData?.user?.userId || null;
+    const isUserFetching = isUserLoading;
 
     // 2. Setup Socket
     const { socket } = useSocket(userId ? userId.toString() : "");
 
-    // 3. Fetch Initial Notifications & Count
-    const refreshNotifications = useCallback(async () => {
-        try {
-            // Fetch list
-            const listRes = await fetch(`${hostName}/api/notifications`, { credentials: "include" });
-            if (listRes.ok) {
-                const data = await listRes.json();
-                setNotifications(data.notifications);
-                
-                if (data.unreadCount !== undefined) {
-                    setUnreadCount(data.unreadCount);
-                } else {
-                    setUnreadCount(data.notifications.filter((n: NotificationItem) => !n.is_read).length);
-                }
-            }
-        } catch (error) {
-            console.error("Failed to fetch notifications", error);
-        } finally {
-            setLoading(false);
+    // 3. Use SWR for Notifications
+    const { data, isLoading, mutate: mutateNotifications } = useSWR(
+        userId ? `${hostName}/api/notifications` : null,
+        fetcher,
+        {
+            revalidateOnFocus: true, 
+            dedupingInterval: 5000,   
         }
-    }, [hostName]);
+    );
 
-    // Initial load
-    useEffect(() => {
-        if (userId) {
-            refreshNotifications();
-        }
-    }, [userId, refreshNotifications]);
+    const notifications = data?.notifications || [];
+    const unreadCount = data?.unreadCount !== undefined ? data.unreadCount : 0;
+    
+    // Loading is true only if we are initial fetching user OR if SWR is initial loading (and user exists)
+    // SWR's isLoading is true when there is no data and request is validating.
+    // If key is null (userId null), isLoading is false.
+    const loading = isUserFetching || (userId !== null && isLoading);
+
+    // Wrapper for refresh to match context interface
+    const refreshNotifications = async () => {
+        await mutateNotifications();
+    };
 
     // 4. Socket Listener
     useEffect(() => {
@@ -108,8 +92,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 is_read: false
             };
 
-            setNotifications(prev => [newNotif, ...prev]);
-            setUnreadCount(prev => prev + 1);
+            // Optimistic update via SWR
+            mutateNotifications((prevData: { notifications: NotificationItem[], unreadCount: number } | undefined) => {
+                const currentList = prevData?.notifications || [];
+                const currentCount = prevData?.unreadCount || 0;
+                
+                return {
+                    notifications: [newNotif, ...currentList],
+                    unreadCount: currentCount + 1
+                };
+            }, false); // false = do not revalidate immediately
             
             // Auto-show navbar and toast
             showNavbar();
@@ -121,29 +113,46 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return () => {
             socket.off("new_notification", handleNewNotification);
         };
-    }, [socket, showNavbar]);
+    }, [socket, showNavbar, mutateNotifications]);
 
     // 5. Actions
     const markAsRead = async (id: number) => {
         // Optimistic update
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        mutateNotifications((prevData: { notifications: NotificationItem[], unreadCount: number } | undefined) => {
+            if (!prevData) return undefined;
+            return {
+                ...prevData,
+                notifications: prevData.notifications.map((n: NotificationItem) => 
+                    n.id === id ? { ...n, is_read: true } : n
+                ),
+                unreadCount: Math.max(0, (prevData.unreadCount || 0) - 1)
+            };
+        }, false);
 
         try {
             await fetch(`${hostName}/api/notifications/${id}/read`, {
                 method: 'PATCH',
                 credentials: 'include'
             });
+            // Optionally revalidate here to ensure sync
+             mutateNotifications(); 
         } catch (error) {
             console.error("Failed to mark as read", error);
             // Revert on error? For now, keep simple.
+             mutateNotifications(); 
         }
     };
 
     const markAllAsRead = async () => {
         // Optimistic
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
+        mutateNotifications((prevData: { notifications: NotificationItem[], unreadCount: number } | undefined) => {
+            if (!prevData) return undefined;
+            return {
+                ...prevData,
+                notifications: prevData.notifications.map((n: NotificationItem) => ({ ...n, is_read: true })),
+                unreadCount: 0
+            };
+        }, false);
 
         try {
             await fetch(`${hostName}/api/notifications/read-all`, {
@@ -151,9 +160,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 credentials: 'include'
             });
             toast.success("All marked as read");
+             mutateNotifications(); 
         } catch (error) {
             console.error("Failed to mark all read", error);
             toast.error("Failed to mark all read");
+             mutateNotifications(); 
         }
     };
 

@@ -21,6 +21,7 @@ import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import ClockIcon from "@/app/components/icons/ClockIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";
+import { MessageButton } from "@/app/components/Chat/MessageButton";
 import toast from "react-hot-toast";
 
 type PostDetailProps = {
@@ -55,6 +56,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       if (response.ok) {
         const userData = await response.json();
         setUser(userData.user);
+        console.log(userData.user);
       }
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -465,6 +467,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 >
                   <MessageIcon className="w-5 h-5 text-dark" />
                 </Button>
+                {post.user_id && user?.userId !== post.user_id && (
+                    <MessageButton
+                        recipientId={post.user_id}
+                        recipientName={post.username || "User"}
+                        className="ml-2 border-0 hover:bg-transparent text-gray-500 hover:text-primary p-0 h-auto"
+                    />
+                )}
               </div>
 
               {/* 評論區 */}

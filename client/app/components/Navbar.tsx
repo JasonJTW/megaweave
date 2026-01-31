@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useNavbar } from "../contexts/NavBarContext";
-
+import { useConversations } from "@/hooks/useChat";
 import Link from "next/link";
 import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
@@ -16,6 +16,8 @@ import {
   GalleryHorizontalEnd,
   SquarePlus,
   Bell,
+  MessageSquare,
+
   // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,11 +55,14 @@ type NavigationItem = {
 
 import { useNotification } from "../contexts/NotificationContext";
 
+// cleaned up
 const Navbar = () => {
   const { isNavbarVisible, isAtTop } = useNavbar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { unreadCount } = useNotification();
+  const { unreadCount } = useNotification(); // Notifications
+  const { conversations } = useConversations(); // Chat messages
+  const messageUnreadCount = conversations.reduce((acc, c) => acc + c.unread_count, 0);
   
   // Clean up unused state and effects
   // Removed: userId, isMobileMenuOpen (kept), unreadCount (local), fetchUserAndNotifications, useSocket, window listener
@@ -154,6 +159,14 @@ const Navbar = () => {
 
             {/* desktop nav item */}
             <div className="hidden md:flex items-center space-x-6 mr-6">
+                <Link href="/messages" className="relative group p-2 text-gray-700 hover:bg-primary-30 rounded-full transition-all">
+                    <MessageSquare className="w-[20px] h-[20px]" />
+                    {messageUnreadCount > 0 && (
+                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                          {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                        </span>
+                    )}
+                </Link>
                 <Link href="/notifications" className="relative group p-2 text-gray-700 hover:bg-primary-30 rounded-full transition-all">
                     <Bell className="w-[20px] h-[20px]" />
                     {unreadCount > 0 && (
@@ -219,6 +232,15 @@ const Navbar = () => {
               <Link href="/user" className="">
                 <UserIcon className="h-[16px] w-[18px]" />
                 <span className="sr-only">Profile</span>
+              </Link>
+              <Link href="/messages" className="relative group mr-2">
+                <MessageSquare className="h-[16px] w-[18px] text-black transition-transform group-hover:scale-110" />
+                <span className="sr-only">Messages</span>
+                 {messageUnreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                      {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                    </span>
+                  )}
               </Link>
               <Link href="/notifications" className="relative group">
                 <Bell className="h-[16px] w-[18px] text-black transition-transform group-hover:scale-110" fill="black" />

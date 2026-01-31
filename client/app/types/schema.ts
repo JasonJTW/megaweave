@@ -2,6 +2,7 @@
 
 export interface Post {
   id: number;
+  user_id: number;
   title: string;
   content: string;
   type: "wish" | "share" | "commons";
@@ -110,4 +111,40 @@ export interface UserStats {
   postCount: number;
   weaveCount: number;
   points: number;
+}
+
+export interface Conversation {
+  id: number;
+  user1_id: number;
+  user2_id: number;
+  last_message_at: string;
+  created_at: string;
+  updated_at: string;
+  other_user_id: number;
+  other_username: string;
+  other_avatar_url?: string;
+  last_message_content?: string;
+  unread_count: number;
+}
+
+export interface Message {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+  sender_name?: string;
+  sender_avatar?: string;
+}
+
+export interface User {
+  id?: number;
+  userId: number;
+  username: string;
+  email: string;
+  role: string;
+  public_id: string;
+  avatar_url?: string;
+  avatar_key?: string;
 }

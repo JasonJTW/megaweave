@@ -20,8 +20,8 @@ import {
 } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 
-import User from "./types/user";
 import { useRouter } from "next/navigation";
+import { useUser } from "./contexts/UserContext";
 // const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 import IconGrid from "./components/IconGrid";
 import AddIcon from "./components/icons/AddIcon";
@@ -43,7 +43,7 @@ import ReuseIcon from "./components/icons/ReuseIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useUser();
   const [posts, setPosts] = useState<Post[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(false);
@@ -148,7 +148,7 @@ const PostsApp = () => {
           "geometry",
           "place_id",
         ],
-      }
+      },
     );
 
     autocomplete.addListener("place_changed", () => {
@@ -176,7 +176,7 @@ const PostsApp = () => {
     return () => {
       if (autocompleteInstanceRef.current) {
         google.maps.event.clearInstanceListeners(
-          autocompleteInstanceRef.current
+          autocompleteInstanceRef.current,
         );
         autocompleteInstanceRef.current = null;
       }
@@ -198,11 +198,13 @@ const PostsApp = () => {
       {
         types: ["geocode"], // Restrict to regions (cities/provinces)
         componentRestrictions: { country: "tw" },
-        fields: ["address_components",
+        fields: [
+          "address_components",
           "formatted_address",
           "geometry",
-          "place_id",],
-      }
+          "place_id",
+        ],
+      },
     );
 
     autocomplete.addListener("place_changed", () => {
@@ -210,7 +212,7 @@ const PostsApp = () => {
       if (place && place.address_components) {
         const { province, city } = extractAddress(place);
         console.log("Search Place:", { province, city });
-        
+
         const address = place.name || place.formatted_address || "";
         setLocationInput(address);
         setSelectedLocation(address);
@@ -224,49 +226,14 @@ const PostsApp = () => {
     return () => {
       if (autocompleteSearchInstanceRef.current) {
         google.maps.event.clearInstanceListeners(
-          autocompleteSearchInstanceRef.current
+          autocompleteSearchInstanceRef.current,
         );
         autocompleteSearchInstanceRef.current = null;
       }
     };
   }, [isMenuOpen]);
 
-  const fetchUser = async () => {
-    try {
-      const response = await fetch(`${hostName}/api/currentUser`, {
-        cache: "no-store",
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const errorMessage = await response.json();
-        if (response.status === 401) {
-          //* User not authenticated
-          setUser(null);
-          return; // User not authenticated, no need to set error
-        } else {
-          console.error("Error fetching user data:", errorMessage.errorMessage);
-          throw new Error(` ${errorMessage.errorMessage}`);
-        }
-      }
-      const userData = await response.json();
-      console.log("Fetched User: ", userData);
-      setUser(userData.user);
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // No longer need local fetchUser as we use useUser() hook
 
   // 使用 useCallback 來記憶化 fetchPosts 函數
   const fetchPosts = useCallback(
@@ -315,14 +282,13 @@ const PostsApp = () => {
     [
       currentPage,
       searchTerm,
-      searchTerm,
       selectedCategory,
       selectedLocation,
       searchCity, // Add to dependency array
       searchProvince, // Add to dependency array
       hostName,
       postFilterType,
-    ]
+    ],
   );
 
   // mobile 下拉刷新功能，fetchPosts宣告後才啟動
@@ -348,7 +314,7 @@ const PostsApp = () => {
   //! 創建貼文
   const handleCreatePost = async () => {
     const itemsInvalid = createFormData.items?.some(
-      (item) => !item.title.trim() || !item.quantity || item.quantity < 1
+      (item) => !item.title.trim() || !item.quantity || item.quantity < 1,
     );
     if (
       !createFormData.title.trim() ||
@@ -397,7 +363,7 @@ const PostsApp = () => {
       formData.append("categoryId", createFormData.categoryId!.toString());
       formData.append(
         "conditionLevel",
-        createFormData.conditionLevel.toString()
+        createFormData.conditionLevel.toString(),
       );
       formData.append("type", postType);
 
@@ -652,7 +618,7 @@ const PostsApp = () => {
                 <X className="w-3 h-3 hover:text-red-300 transition-colors" />
               </Badge>
             )}
-             {selectedLocation && (
+            {selectedLocation && (
               <Badge
                 className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
                 onClick={() => {
@@ -664,7 +630,7 @@ const PostsApp = () => {
                 <X className="w-3 h-3 hover:text-red-300 transition-colors" />
               </Badge>
             )}
-             {/* If we have specific route filter via handleLocationClick, we might want to show it.
+            {/* If we have specific route filter via handleLocationClick, we might want to show it.
                 But based on current code, 'selectedLocation' holds the general text or precise location string
                 sent to backend as 'location' param if city/province are not enough or as supplement.
                 The handleLocationClick below will set 'selectedLocation' for 'route' click.
@@ -791,35 +757,35 @@ const PostsApp = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                      <div className="w-full">
-                        <Input
-                          ref={searchLocationInputRef}
-                          className="text-megaweave-forest-dark w-full "
-                          type="text"
-                          placeholder="Location"
-                          value={locationInput}
-                          onChange={(e) => {
-                            setLocationInput(e.target.value);
-                            // Clear actual search filter if user clears input
-                            if (!e.target.value) {
-                                setSelectedLocation("");
-                                setSearchCity("");
-                                setSearchProvince("");
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                setSelectedLocation(locationInput);
-                                // Reset specific city/province if manually typed, or keep if logic allows. 
-                                // For now, let's assume manual type means general text search or we should clear the specific geo-filters unless we want to keep them.
-                                // Simplest: If they hit enter, they mean "search for this text".
-                                // Ideally we might want to Geocode it, but here we just pass it as location param.
-                                // Warning: If they typed "Taipei" but didn't pick from list, searchCity might be empty.
-                                // The backend handles `location` param as a text match if city/province absent.
-                            }
-                          }}
-                        />
-                      </div>
+                    <div className="w-full">
+                      <Input
+                        ref={searchLocationInputRef}
+                        className="text-megaweave-forest-dark w-full "
+                        type="text"
+                        placeholder="Location"
+                        value={locationInput}
+                        onChange={(e) => {
+                          setLocationInput(e.target.value);
+                          // Clear actual search filter if user clears input
+                          if (!e.target.value) {
+                            setSelectedLocation("");
+                            setSearchCity("");
+                            setSearchProvince("");
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            setSelectedLocation(locationInput);
+                            // Reset specific city/province if manually typed, or keep if logic allows.
+                            // For now, let's assume manual type means general text search or we should clear the specific geo-filters unless we want to keep them.
+                            // Simplest: If they hit enter, they mean "search for this text".
+                            // Ideally we might want to Geocode it, but here we just pass it as location param.
+                            // Warning: If they typed "Taipei" but didn't pick from list, searchCity might be empty.
+                            // The backend handles `location` param as a text match if city/province absent.
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* Filter Buttons Row 2 */}
@@ -896,39 +862,39 @@ const PostsApp = () => {
             </div>
           ) : (
             <Feed
-            posts={posts}
-            conditions={conditions}
-            onPostClick={(post) => {
-              if (categoryInteractionLockRef.current) return;
-              router.push(`/item/${post.id}`);
-            }}
-            weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
-            currentUserId={user?.userId}
-            onWeaveStatusChange={() => {
-              fetchPosts(); // 重新抓取資料
-            }}
-            onCategoryClick={(categoryId) => {
-              setSelectedCategory(categoryId.toString());
-              // window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            onLocationClick={(type, value) => {
-              // Handle clickable location parts
-              console.log("Location clicked:", type, value);
-              if (type === "province") {
-                 setSearchProvince(value);
-                 setSearchCity(""); 
-                 setSelectedLocation(""); 
-                 setLocationInput(value); 
-              } else if (type === "city") {
-                 setSearchCity(value);
-                 setSelectedLocation("");
-                 setLocationInput(value);
-              } else if (type === "route") {
-                 setSelectedLocation(value);
-                 setLocationInput(value);
-              }
-            }}
-          />
+              posts={posts}
+              conditions={conditions}
+              onPostClick={(post) => {
+                if (categoryInteractionLockRef.current) return;
+                router.push(`/item/${post.id}`);
+              }}
+              weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
+              currentUserId={user?.userId}
+              onWeaveStatusChange={() => {
+                fetchPosts(); // 重新抓取資料
+              }}
+              onCategoryClick={(categoryId) => {
+                setSelectedCategory(categoryId.toString());
+                window.scrollTo({ top: 300, behavior: "smooth" });
+              }}
+              onLocationClick={(type, value) => {
+                // Handle clickable location parts
+                console.log("Location clicked:", type, value);
+                if (type === "province") {
+                  setSearchProvince(value);
+                  setSearchCity("");
+                  setSelectedLocation("");
+                  setLocationInput(value);
+                } else if (type === "city") {
+                  setSearchCity(value);
+                  setSelectedLocation("");
+                  setLocationInput(value);
+                } else if (type === "route") {
+                  setSelectedLocation(value);
+                  setLocationInput(value);
+                }
+              }}
+            />
           )}
 
           {/* 分頁 */}
@@ -938,22 +904,25 @@ const PostsApp = () => {
                 <button
                   onClick={() => setCurrentPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   previous page
                 </button>
 
                 {Array.from(
                   { length: pagination.totalPages },
-                  (_, i) => i + 1
+                  (_, i) => i + 1,
                 ).map((page) => (
                   <button
                     key={page}
-                    onClick={() => setCurrentPage(page)}
+                    onClick={() => {
+                      setCurrentPage(page);
+                      window.scrollTo({ top: 300, behavior: "smooth" });
+                    }}
                     className={`px-4 py-2 border rounded-lg ${
                       currentPage === page
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "border-gray-300 hover:bg-gray-50"
+                        ? "bg-primary text-white border-primary"
+                        : "border-gray-300 "
                     }`}
                   >
                     {page}
@@ -1108,7 +1077,7 @@ const PostsApp = () => {
 
                           {createFormData.conditionLevel !== null &&
                             conditions.find(
-                              (c) => c.level === createFormData.conditionLevel
+                              (c) => c.level === createFormData.conditionLevel,
                             )?.name}
                         </SelectValue>
                       </SelectTrigger>

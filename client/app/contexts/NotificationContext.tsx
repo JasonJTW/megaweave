@@ -6,6 +6,8 @@ import { useSocket } from "@/hooks/useSocket";
 import toast from "react-hot-toast";
 import { useNavbar } from "./NavBarContext";
 
+import { useUser } from "./UserContext";
+
 export interface NotificationItem {
   id: number;
   type: "LIKE" | "COMMENT" | "ORDER_UPDATE" | "SYSTEM";
@@ -43,16 +45,12 @@ export const useNotification = () => {
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // Consume Navbar context
     const { showNavbar } = useNavbar();
+    // Consume User context
+    const { user, loading: isUserLoading } = useUser();
 
     const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-    //* 1. Fetch current user using SWR to keep auth state in sync
-    const { data: userData, isLoading: isUserLoading } = useSWR(
-        `${hostName}/api/currentUser`,
-        fetcher
-    );
-    
-    const userId = userData?.user?.userId || null;
+    const userId = user?.userId || null;
     const isUserFetching = isUserLoading;
 
     // 2. Setup Socket

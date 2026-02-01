@@ -22,6 +22,7 @@ import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import MemberForm from "../memberForm";
 import { useTeam } from "../contexts/TeamContext";
+import { useUser } from "../contexts/UserContext";
 import ElfIcon from "../components/icons/ElfIcon";
 import ReuseIcon from "../components/icons/ReuseIcon";
 import CommonShareIcon from "../components/icons/CommonShareIcon";
@@ -59,8 +60,11 @@ const defaultStats: UserStats = {
 
 const UserPage = () => {
   //* Get user data from cookie session
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: userLoading, mutate } = useUser();
+  // const [user, setUser] = useState<User | null>(null);
+  // const [loading, setLoading] = useState(true);
+  const loading = userLoading;
+
   const [redirecting, setRedirecting] = useState(false);
   const [isContributor, setIsContributor] = useState(false);
   const [username, setUsername] = useState("");
@@ -121,62 +125,14 @@ const UserPage = () => {
     }
   };
 
-  const fetchUser = async () => {
-    try {
-      const response = await fetchWithTimeout(
-        `${hostName}/api/currentUser`,
-        {
-          cache: "no-store",
-          method: "GET",
-          credentials: "include",
-        },
-        10000 //? 10 seconds timeout
-      );
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          setLoading(false);
-          setRedirecting(true);
-          router.push("/signin");
-          return false;
-        }
-
-        // 處理 500 等伺服器錯誤
-        if (response.status >= 500) {
-          toast.error(
-            "Server is currently unavailable. Please try again later."
-          );
-          setLoading(false);
-          return false;
-        }
-
-        const errorMessage = await response.json();
-        throw new Error(
-          errorMessage.errorMessage || "Failed to fetch user data"
-        );
-      }
-
-      const userData = await response.json();
-      console.log("Fetched User: ", userData);
-      setUser(userData.user);
-      setUsername(userData.user.username);
-      if (
-        userData.user.role === "contributor" ||
-        userData.user.role === "admin"
-      ) {
+  useEffect(() => {
+    if (user) {
+      setUsername(user.username);
+      if (user.role === "contributor" || user.role === "admin") {
         setIsContributor(true);
       }
-      setLoading(false);
-      return true;
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
-      setLoading(false);
-      return false;
     }
-  };
+  }, [user]);
 
   const getBio = async () => {
     const response = await fetch(`${hostName}/api/userprofile/bio`, {
@@ -379,7 +335,7 @@ const UserPage = () => {
       const result = await response.json();
       const updatedUser = result.updatedUser;
       // alert(`User session updated: ${JSON.stringify(updatedUser)}`);
-      setUser(updatedUser);
+      await mutate((data: { user: User | null } | undefined) => (data ? { ...data, user: updatedUser } : { user: updatedUser }), false);
     } catch (error) {
       console.error("Error updating user session:", error);
     }
@@ -432,15 +388,17 @@ const UserPage = () => {
       console.log("Avatar uploaded successfully:", result);
 
       // 更新本地 user 狀態 (顯示新的頭像)
-      setUser((prev) =>
-        prev
-          ? {
-              ...prev,
-              avatar_url: result.avatarUrl,
-              avatar_key: result.avatarKey,
-            }
-          : prev
-      );
+      await mutate((data: { user: User | null } | undefined) => {
+        if (!data?.user) return data;
+        return {
+           ...data,
+           user: {
+             ...data.user,
+             avatar_url: result.avatarUrl,
+             avatar_key: result.avatarKey,
+           }
+        };
+      }, false);
 
       // 清除 preview
       if (previousPreviewRef.current) {
@@ -692,7 +650,10 @@ const UserPage = () => {
       await insertUsername(tempUsername);
       // 同时更新 user 对象中的 username
       if (user) {
-        setUser({ ...user, username: tempUsername });
+         await mutate((data: { user: User | null } | undefined) => {
+            if (!data?.user) return data;
+            return { ...data, user: { ...data.user, username: tempUsername } };
+         }, false);
       }
     } catch (error) {
       console.error("Error saving username:", error);
@@ -727,7 +688,10 @@ const UserPage = () => {
         throw new Error(r.errorMessage || "Failed to remove avatar");
       }
       //* Update user state
-      setUser((prev) => (prev ? { ...prev, avatar_url: undefined } : prev));
+      await mutate((data: { user: User | null } | undefined) => {
+         if (!data?.user) return data;
+        return { ...data, user: { ...data.user, avatar_url: undefined } };
+      }, false);
     } catch (err) {
       console.error(err);
       toast.error(
@@ -764,7 +728,7 @@ const UserPage = () => {
       }
 
       console.log("Sign out successful");
-      setUser(null);
+      await mutate({ user: null }, false);
       setRedirecting(true);
       router.push("/");
     } catch (error) {
@@ -776,18 +740,29 @@ const UserPage = () => {
   };
 
   useEffect(() => {
+    if (loading) return;
+    
+    // Check if user is authenticated
+    if (!user) {
+      // Only redirect if not already redirecting to avoid loops
+      if (!redirecting) {
+        setRedirecting(true);
+        router.push("/signin");
+      }
+      return;
+    }
+
+    // User is present, fetch other data
     const init = async () => {
-      const success = await fetchUser();
-      if (success) {
         getBio();
         // getContactEmail();
         // getContactPhone();
         getUsername();
         fetchStats();
         fetchWeaves();
-      }
     };
     init();
+
     return () => {
       // cleanup any created object URLs on unmount
       if (previousPreviewRef.current) {
@@ -800,12 +775,15 @@ const UserPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user, loading, redirecting, router]);
 
   const sharePosts = posts.filter((post) => post.type === "share");
   const wishPosts = posts.filter((post) => post.type === "wish");
 
-  console.log("Fetched UserId: ", user?.userId);
+  useEffect(()=>{
+
+    console.log("Fetched UserId: ", user?.userId);
+  }, [user?.userId])
 
   if (loading || redirecting) {
     return (
@@ -905,9 +883,11 @@ const UserPage = () => {
 
                       {previewSrc ? (
                         // preview: 使用原生 img 以支援 object URL
-                        <img
+                        <Image
                           src={previewSrc}
                           alt="Avatar preview"
+                          width={220}
+                          height={222}
                           className="w-full h-full object-cover"
                         />
                       ) : user?.avatar_url ? (

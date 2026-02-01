@@ -17,6 +17,9 @@ import Footer from "./components/Footer";
 import PlausibleProvider from "next-plausible";
 dotenv.config();
 // const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
+import { UserProvider } from "./contexts/UserContext";
+import { SWRConfig } from "swr";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -140,57 +143,61 @@ export default function RootLayout({
             },
           }}
         />
-        <NavbarProvider>
-          <NotificationProvider>
-          <Navbar />
-
-          {/* Facebook SDK */}
-          <Script id="facebook-sdk" strategy="afterInteractive">
-            {`
-            window.fbAsyncInit = function() {
-              FB.init({
-                appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
-                cookie     : true,
-                xfbml      : true,
-                version    : 'v18.0'
-              });
-              
-              FB.AppEvents.logPageView();   
-            };
-
-            (function(d, s, id){
-               var js, fjs = d.getElementsByTagName(s)[0];
-               if (d.getElementById(id)) {return;}
-               js = d.createElement(s); js.id = id;
-               js.src = "https://connect.facebook.net/en_US/sdk.js";
-               fjs.parentNode.insertBefore(js, fjs);
-             }(document, 'script', 'facebook-jssdk'));
-          `}
-          </Script>
-          <Script
-            id="google-maps"
-            strategy="afterInteractive"
-            src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`}
-          />
-          <GoogleOAuthProvider
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-          >
-            <TeamProvider>
-              <PostProvider>
-                <PlausibleProvider
-                  domain="megaweave.net"
-                  trackLocalhost={true}
-                  enabled={true}
-                  taggedEvents={true}
-                >
-                  {children}
-                </PlausibleProvider>
-              </PostProvider>
-            </TeamProvider>
-          </GoogleOAuthProvider>
-          <Footer />
-          </NotificationProvider>
-        </NavbarProvider>
+        <SWRConfig value={{}}>
+        <UserProvider>
+          <NavbarProvider>
+            <NotificationProvider>
+            <Navbar />
+  
+            {/* Facebook SDK */}
+            <Script id="facebook-sdk" strategy="afterInteractive">
+              {`
+              window.fbAsyncInit = function() {
+                FB.init({
+                  appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
+                  cookie     : true,
+                  xfbml      : true,
+                  version    : 'v18.0'
+                });
+                
+                FB.AppEvents.logPageView();   
+              };
+  
+              (function(d, s, id){
+                 var js, fjs = d.getElementsByTagName(s)[0];
+                 if (d.getElementById(id)) {return;}
+                 js = d.createElement(s); js.id = id;
+                 js.src = "https://connect.facebook.net/en_US/sdk.js";
+                 fjs.parentNode.insertBefore(js, fjs);
+               }(document, 'script', 'facebook-jssdk'));
+            `}
+            </Script>
+            <Script
+              id="google-maps"
+              strategy="afterInteractive"
+              src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&loading=async`}
+            />
+            <GoogleOAuthProvider
+              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+            >
+              <TeamProvider>
+                <PostProvider>
+                  <PlausibleProvider
+                    domain="megaweave.net"
+                    trackLocalhost={true}
+                    enabled={true}
+                    taggedEvents={true}
+                  >
+                    {children}
+                  </PlausibleProvider>
+                </PostProvider>
+              </TeamProvider>
+            </GoogleOAuthProvider>
+            <Footer />
+            </NotificationProvider>
+          </NavbarProvider>
+        </UserProvider>
+        </SWRConfig>
       </body>
     </html>
   );

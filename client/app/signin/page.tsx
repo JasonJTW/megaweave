@@ -14,6 +14,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { useCallback } from "react";
+import { useUser } from "../contexts/UserContext";
 
 function SigninForm() {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -23,19 +25,20 @@ function SigninForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { user, loading: userLoading, mutate } = useUser();
   const [mode, setMode] = useState<"login" | "register">("login");
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
 
   //* After successful sign in, redirect to the page
-  const handleSigninSignupSuccess = () => {
+  const handleSigninSignupSuccess = useCallback(() => {
     if (returnTo) {
       router.push(decodeURIComponent(returnTo));
     } else {
       router.push("/user");
     }
-  };
+  }, [returnTo, router]);
 
   //* Google Sign in
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
@@ -66,6 +69,7 @@ function SigninForm() {
       }
 
       console.log("Google sign in response data:", data);
+      await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
@@ -79,36 +83,12 @@ function SigninForm() {
     }
   };
 
-  const fetchUser = async () => {
-    //* Check if user is already logged in
-    try {
-      const response = await fetch(`${hostName}/api/currentUser`, {
-        cache: "no-store",
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const errorMessage = await response.json();
-        console.log("Error fetching user data:", errorMessage.errorMessage);
-        if (response.status === 401) {
-          /// User is not authenticated, keep signin
-          return;
-        }
-        throw new Error(` ${errorMessage.errorMessage}`);
-      }
-      //* User has valid session in cookie, redirect to user page
-      setLoading(true);
+  //* No longer need local fetchUser as we use useUser() hook
+  useEffect(() => {
+    if (user && !userLoading) {
       handleSigninSignupSuccess();
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
-      );
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [user, userLoading, handleSigninSignupSuccess]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,6 +118,7 @@ function SigninForm() {
       }
       /// Sign in success
       console.log("response data:", data);
+      await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       toast.error(
@@ -148,10 +129,7 @@ function SigninForm() {
     }
   };
 
-  useEffect(() => {
-    fetchUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handleSubmit]);
+  // Removed local fetchUser effect
 
   //* Facebook Sign in
   const [isFBReady, setIsFBReady] = useState(false);
@@ -222,6 +200,7 @@ function SigninForm() {
       }
 
       console.log("Facebook backend response:", data);
+      await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
@@ -282,6 +261,7 @@ function SigninForm() {
       /// Add a 5-second delay to inspect the button text
       // await new Promise((resolve) => setTimeout(resolve, 300));
       toast.success(`Welcome to MegaWeave🥳🎉! ${username}`);
+      await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.log(error);

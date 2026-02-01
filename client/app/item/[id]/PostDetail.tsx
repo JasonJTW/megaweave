@@ -12,7 +12,6 @@ import {
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
 import CommentSection from "../../components/Comment/CommentSection";
 import { Post, Condition } from "../../types/schema";
-import User from "../../types/user";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import EyesIcon from "../../components/icons/EyesIcon";
@@ -23,6 +22,7 @@ import ClockIcon from "@/app/components/icons/ClockIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";
 import { MessageButton } from "@/app/components/Chat/MessageButton";
 import toast from "react-hot-toast";
+import { useUser } from "../../contexts/UserContext";
 
 type PostDetailProps = {
   postId: string;
@@ -36,7 +36,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
   const [post, setPost] = useState<Post | null>(null);
   const [conditions, setConditions] = useState<Condition[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
 
   // 互動狀態
@@ -48,20 +48,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const [lastScrollY, setLastScrollY] = useState(0);
   const condition = conditions.find((c) => c.level === post?.condition_level);
   // 獲取當前用戶
-  const fetchUser = useCallback(async () => {
-    try {
-      const response = await fetch(`${hostName}/api/currentUser`, {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData.user);
-        console.log(userData.user);
-      }
-    } catch (error) {
-      console.error("Error fetching user:", error);
-    }
-  }, [hostName]);
+  // No longer need local fetchUser as we use useUser() hook
 
   // 獲取貼文詳情
   const fetchPost = useCallback(async () => {
@@ -212,9 +199,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // };
 
   useEffect(() => {
-    fetchUser();
     fetchConditions();
-  }, [fetchUser, fetchConditions]);
+  }, [fetchConditions]);
 
   useEffect(() => {
     if (postId) {

@@ -1,46 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import NotificationList from "@/app/components/Notification";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import User from "../types/user";
+import { useUser } from "../contexts/UserContext";
 
 export default function NotificationsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useUser();
   const router = useRouter();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch(`${hostName}/api/currentUser`, {
-          cache: "no-store",
-          method: "GET",
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            router.push("/signin");
-            return;
-          }
-          throw new Error("Failed to fetch user");
-        }
-
-        const userData = await response.json();
-        setUser(userData.user);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-        toast.error("Failed to load user data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [hostName, router]);
 
   // Redirect to signin if user is not authenticated after loading
   useEffect(() => {

@@ -29,7 +29,10 @@ interface PostCardProps {
   currentUserId?: number;
   onWeaveStatusChange?: () => void; // ✅ 新增：狀態改變後的回調
   onCategoryClick?: (categoryId: number) => void;
-  onLocationClick?: (type: "province" | "city" | "route", value: string) => void;
+  onLocationClick?: (
+    type: "province" | "city" | "route",
+    value: string,
+  ) => void;
 }
 
 function PostCardInner({
@@ -53,10 +56,10 @@ function PostCardInner({
 
   // ✅ 新增：追蹤雙方的確認狀態
   const [localGiverConfirmed, setLocalGiverConfirmed] = useState(
-    !!weave?.giver_confirmed
+    !!weave?.giver_confirmed,
   );
   const [localReceiverConfirmed, setLocalReceiverConfirmed] = useState(
-    !!weave?.receiver_confirmed
+    !!weave?.receiver_confirmed,
   );
 
   // 判斷當前使用者角色與是否已確認
@@ -70,8 +73,8 @@ function PostCardInner({
   const imageUrls = Array.isArray(post.image_urls)
     ? post.image_urls
     : typeof post.image_urls === "string"
-    ? post.image_urls.split(",")
-    : [];
+      ? post.image_urls.split(",")
+      : [];
 
   const imageSrc = imageUrls[0];
 
@@ -116,7 +119,7 @@ function PostCardInner({
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ status: "completed" }),
-        }
+        },
       );
 
       const data = await response.json();
@@ -133,7 +136,9 @@ function PostCardInner({
         // 僅單方面確認成功
         if (isGiver) setLocalGiverConfirmed(true);
         if (isReceiver) setLocalReceiverConfirmed(true);
-        toast.success("Your confirmation received. Waiting for the other party.");
+        toast.success(
+          "Your confirmation received. Waiting for the other party.",
+        );
       }
 
       if (onWeaveStatusChange) onWeaveStatusChange();
@@ -165,7 +170,7 @@ function PostCardInner({
     }
 
     const confirmed = window.confirm(
-      "Are you sure you want to cancel this weave?"
+      "Are you sure you want to cancel this weave?",
     );
     if (!confirmed) return;
 
@@ -181,7 +186,7 @@ function PostCardInner({
           },
           credentials: "include",
           body: JSON.stringify({ status: "cancelled" }),
-        }
+        },
       );
 
       const data = await response.json();
@@ -200,7 +205,9 @@ function PostCardInner({
       }
     } catch (error) {
       console.error("Error cancelling weave:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to cancel weave");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel weave",
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -235,17 +242,17 @@ function PostCardInner({
               currentStatus === "completed"
                 ? "bg-green-500"
                 : currentStatus === "cancelled"
-                ? "bg-red-500"
-                : "bg-yellow-500"
+                  ? "bg-red-500"
+                  : "bg-yellow-500"
             } text-white font-bold `}
           >
             {currentStatus === "completed"
               ? "Completed"
               : currentStatus === "cancelled"
-              ? "Cancelled"
-              : hasIConfirmed
-              ? "Waiting for other"
-              : "Pending"}
+                ? "Cancelled"
+                : hasIConfirmed
+                  ? "Waiting for other"
+                  : "Pending"}
           </Badge>
         </div>
       )}
@@ -303,7 +310,7 @@ function PostCardInner({
 
           {(category || post.category_name_en) && (
             <div
-              className="flex items-center mx-4 mt-[8px] leading-[34px] cursor-pointer"
+              className="inline-flex mx-4 mt-[8px] leading-[34px] cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 if (onCategoryClick) {
@@ -396,9 +403,7 @@ function PostCardInner({
                     {!post.province &&
                       !post.city &&
                       !post.route &&
-                      post.full_address && (
-                        <span>{post.full_address}</span>
-                      )}
+                      post.full_address && <span>{post.full_address}</span>}
                   </span>
                 </div>
               )}

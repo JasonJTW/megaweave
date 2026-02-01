@@ -2,6 +2,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { useEffect } from "react";
 import { useSocket } from "./useSocket";
 import { Conversation, Message } from "@/app/types/schema";
+import { useUser } from "@/app/contexts/UserContext";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 // Fetcher function
@@ -17,8 +18,8 @@ const fetcher = async (url: string) => {
 
 
 export const useConversations = () => {
-  const { data: userData } = useSWR(`${hostName}/api/currentUser`, fetcher);
-  const userId = userData?.user?.userId;
+  const { user } = useUser();
+  const userId = user?.userId;
   
   const { data, error, isLoading, mutate } = useSWR<{ conversations: Conversation[] }>(
     userId ? `${hostName}/api/messages/conversations` : null,
@@ -50,9 +51,9 @@ export const useMessages = (conversationId: string | number | null) => {
 };
 
 export const useChatSocket = (conversationId: string | number | null) => {
-    const { data: userData } = useSWR(`${hostName}/api/currentUser`, fetcher);
-    const userId = userData?.user?.userId;
-    const { socket } = useSocket(userId);
+    const { user } = useUser();
+    const userId = user?.userId;
+    const { socket } = useSocket(userId ? userId.toString() : null);
     const { mutate: mutateMessages } = useSWRConfig();
     const { mutate: mutateConversations } = useSWRConfig(); // Global mutate to update conversation list
 

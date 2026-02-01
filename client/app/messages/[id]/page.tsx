@@ -5,9 +5,7 @@ import { useParams } from "next/navigation";
 import { ConversationList } from "@/app/components/Chat/ConversationList";
 import { ChatWindow } from "@/app/components/Chat/ChatWindow";
 import { useConversations } from "@/hooks/useChat";
-import useSWR from "swr";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { useUser } from "../../contexts/UserContext";
 
 export default function ConversationPage() {
   const params = useParams();
@@ -18,13 +16,7 @@ export default function ConversationPage() {
   const currentConversation = conversations.find(c => c.id === conversationId);
 
   // We also need currentUser for the chat window (to know which side to align)
-  // Reusing the fetcher from useChat or similar
-  const { data: userData } = useSWR(`${hostName}/api/currentUser`, async (url) => {
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-  });
-  const currentUser = userData?.user;
+  const { user: currentUser } = useUser();
 
   // If conversation not found in list, it might be loading or user manual entry. 
   // ChatWindow handles loading its own messages.

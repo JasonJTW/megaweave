@@ -4,8 +4,9 @@ import { useMessages, useChatSocket } from "@/hooks/useChat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
-import { SendIcon, ArrowLeft } from "lucide-react";
+import { format, isToday, isYesterday } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { SendIcon, ArrowLeft, Check, CheckCheck } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -151,30 +152,66 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {isLoading ? (
             <div className="text-center text-gray-400 mt-10">Loading messages...</div>
         ) : (
-            messages.map((msg) => { 
+            messages.map((msg, index) => { 
                const myId = currentUser?.id || currentUser?.userId || 0;
                const isMe = Number(msg.sender_id) === Number(myId);
                
-               return (
-                   <div key={msg.id} className={cn("flex w-full", isMe ? "justify-end" : "justify-start")}>
-                        {!isMe && (
-                             <Avatar className="w-8 h-8 mr-2 mt-1">
-                                <AvatarImage src={otherUser?.avatar_url} />
-                                <AvatarFallback>{otherUser?.username?.substring(0, 1).toUpperCase()}</AvatarFallback>
-                             </Avatar>
-                        )}
-                        <div className={cn(
-                            "max-w-[70%] px-4 py-2 rounded-2xl break-words shadow-sm",
-                            isMe 
-                              ? "bg-blue-500 text-white rounded-br-none" 
-                              : "bg-white text-gray-800 border rounded-bl-none"
-                        )}>
-                            <p>{msg.content}</p>
-                            <span className={cn("text-[10px] block text-right mt-1", isMe ? "text-blue-100" : "text-gray-400")}>
-                                {format(new Date(msg.created_at), "HH:mm")}
-                            </span>
-                        </div>
+               // Date separator logic
+               const currentDate = new Date(msg.created_at);
+               const nextMsg = messages[index + 1];
+               const isLastMessageOfDay = !nextMsg || 
+                   format(new Date(nextMsg.created_at), 'yyyy-MM-dd') !== format(currentDate, 'yyyy-MM-dd');
+
+               const dateHeader = isLastMessageOfDay ? (
+                   <div key={`date-${msg.created_at}`} className="flex justify-center my-4">
+                       <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full uppercase">
+                           {isToday(currentDate) ? "Today" : 
+                            isYesterday(currentDate) ? "Yesterday" : 
+                            format(currentDate, "yyyy-MM-dd", { locale: zhTW })}
+                       </span>
                    </div>
+               ) : null;
+
+               return (
+                   <React.Fragment key={msg.id}>
+                       <div className={cn("flex w-full mb-4", isMe ? "justify-end" : "justify-start")}>
+                            {!isMe && (
+                                 <Avatar className="w-8 h-8 mr-2 mt-1">
+                                    <AvatarImage src={otherUser?.avatar_url} />
+                                    <AvatarFallback>{otherUser?.username?.substring(0, 1).toUpperCase()}</AvatarFallback>
+                                 </Avatar>
+                            )}
+                            <div className="flex flex-col max-w-[70%]">
+                                <div className={cn(
+                                    "px-4 py-2 rounded-2xl break-words shadow-sm",
+                                    isMe 
+                                      ? "bg-blue-500 text-white rounded-br-none" 
+                                      : "bg-white text-gray-800 border rounded-bl-none"
+                                )}>
+                                    <p>{msg.content}</p>
+                                </div>
+                                <div className={cn(
+                                    "flex items-center mt-1 text-[10px]",
+                                    isMe ? "justify-end text-blue-400" : "justify-start text-gray-400"
+                                )}>
+                                    <span>{format(new Date(msg.created_at), "HH:mm")}</span>
+                                    {isMe && (
+                                        <span className="ml-1 flex items-center">
+                                            {msg.is_read ? (
+                                                <>
+                                                    <span className="mr-0.5">read</span>
+                                                    <CheckCheck className="w-3 h-3" />
+                                                </>
+                                            ) : (
+                                                <Check className="w-3 h-3" />
+                                            )}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                       </div>
+                       {dateHeader}
+                   </React.Fragment>
                );
             })
         )}

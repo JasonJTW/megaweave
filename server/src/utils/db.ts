@@ -31,6 +31,7 @@ const dbPool = mysql
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
     connectTimeout: 30000,
+    timezone: "+00:00", // Force driver to treat DB dates as UTC
   })
   .promise();
 

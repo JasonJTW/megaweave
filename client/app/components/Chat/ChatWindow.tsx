@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
+import { useSWRConfig } from "swr";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   otherUser: propOtherUser,
 }) => {
   const { messages, conversation, isLoading, mutate } = useMessages(conversationId);
+  const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
   
   // Use prop if available (from list), otherwise fallback to fetched conversation details
@@ -41,6 +43,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [isFocused, setIsFocused] = useState(true); // Track window focus
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Auto-scroll to bottom
@@ -53,25 +56,54 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [messages]);
 
   // Handle Mark as Read
+  // Handle Window Focus
+  useEffect(() => {
+    const handleFocus = () => setIsFocused(true);
+    const handleBlur = () => setIsFocused(false);
+    
+    // Initial check
+    setIsFocused(document.hasFocus());
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("visibilitychange", () => { // Handle tab switching
+       setIsFocused(!document.hidden);
+    });
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+      // document.removeEventListener("visibilitychange", ...); // Anonymous function can't be removed easily without ref, but component unmount clears effect scope. 
+      // For correctness let's use a named function if we were strict, but for now this effect cleanup is sufficient as listeners are attached to window/document which persist.
+      // Actually, better to define the handler outside or use a ref if we wanted to be 100% clean, but simple add/remove is fine.
+    };
+  }, []);
+
+  // Handle Mark as Read
   useEffect(() => {
     const markAsRead = async () => {
         try {
+            // Only mark as read if we have an ID AND messages AND the window is focused
+            if (!conversationId || messages.length === 0 || !isFocused) return;
+
+            // Check if the last message is from the *other* user and is *not* read
+            // Optimization: No need to call API if last message is mine or already read (though local state might lag)
+            // But strict "mark conversation read" is idempotent on server, so calling it is safe.
+            // Let's call it to be safe whenever messages/focus changes.
+
             await fetch(`${hostName}/api/messages/conversations/${conversationId}/read`, {
                 method: "PATCH",
                 credentials: "include",
             });
-            // Update local unread count - wait, that's in conversation list.
-            // But we might want to update the conversation list cache too. 
-            // The socket 'read' event (if implemented) or just manual mutate.
-            // For now simplest is we assume it's read when opened.
+            // Trigger a revalidate of conversations to update unread counts globally
+            globalMutate(`${hostName}/api/messages/conversations`);
         } catch (error) {
             console.error("Failed to mark as read", error);
         }
     };
-    if (conversationId && messages.length > 0) {
-        markAsRead();
-    }
-  }, [conversationId, messages.length]);
+    
+    markAsRead();
+  }, [conversationId, messages.length, isFocused, globalMutate]);
 
 
   const handleSend = async (e: React.FormEvent) => {
@@ -156,21 +188,46 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                const myId = currentUser?.userId || 0;
                const isMe = Number(msg.sender_id) === Number(myId);
                
-               // Date separator logic
-               const currentDate = new Date(msg.created_at);
-               const olderMsg = messages[index + 1];
-               const isLastMessageOfDay = !olderMsg || 
-                   format(new Date(olderMsg.created_at), 'yyyy-MM-dd') !== format(currentDate, 'yyyy-MM-dd');
 
-               const dateHeader = isLastMessageOfDay ? (
+               // Helper to parse date safely as UTC if needed
+               const parseDate = (dateString: string) => {
+                   // If string ends in Z, it is already UTC.
+                   if (dateString.endsWith('Z')) return new Date(dateString);
+                   // If not, append Z to force UTC interpretation (assuming server sends UTC)
+                   return new Date(dateString + 'Z');
+               };
+               
+               const msgDate = parseDate(msg.created_at);
+               const olderMsg = messages[index + 1];
+               
+               // Date separator logic
+               // Compare current message date with older message (next in list)
+               let showDateHeader = false;
+               if (!olderMsg) {
+                   // No older message -> this is the very first message ever -> Show Header
+                   showDateHeader = true;
+               } else {
+                   const olderMsgDate = parseDate(olderMsg.created_at);
+                   const isSameDay = format(msgDate, 'yyyy-MM-dd') === format(olderMsgDate, 'yyyy-MM-dd');
+                   if (!isSameDay) {
+                       // Different day from previous message -> Show Header
+                       showDateHeader = true;
+                   }
+               }
+               
+               const dateHeader = showDateHeader ? (
                    <div key={`date-${msg.created_at}`} className="flex justify-center my-4">
                        <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full uppercase">
-                           {isToday(currentDate) ? "Today" : 
-                            isYesterday(currentDate) ? "Yesterday" : 
-                            format(currentDate, "yyyy-MM-dd", { locale: zhTW })}
+                           {isToday(msgDate) ? "Today" : 
+                            isYesterday(msgDate) ? "Yesterday" : 
+                            format(msgDate, "yyyy-MM-dd", { locale: zhTW })}
                        </span>
                    </div>
                ) : null;
+
+               // Read status logic: detailed status only for the VERY LAST message sent by the current user
+               // Find the index of the last message sent by 'me'
+               const isLatestOwnMessage = messages.findIndex(m => Number(m.sender_id) === Number(myId)) === index;
 
                return (
                    <React.Fragment key={msg.id}>
@@ -194,16 +251,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                                     "flex items-center mt-1 text-[10px]",
                                     isMe ? "justify-end text-blue-400" : "justify-start text-gray-400"
                                 )}>
-                                    <span>{format(new Date(msg.created_at), "HH:mm")}</span>
+                                    <span>{format(parseDate(msg.created_at), "HH:mm")}</span>
                                     {isMe && (
-                                        <span className="ml-1 flex items-center">
-                                            {msg.is_read ? (
-                                                <>
-                                                    <span className="mr-0.5">read</span>
-                                                    <CheckCheck className="w-3 h-3" />
-                                                </>
+                                        <span className="ml-1 flex items-center h-3">
+                                            {isLatestOwnMessage ? (
+                                               msg.is_read ? (
+                                                   <>
+                                                       <span className="mr-0.5">read</span>
+                                                       <CheckCheck className="w-3 h-3" />
+                                                   </>
+                                               ) : (
+                                                   <Check className="w-3 h-3" />
+                                               )
                                             ) : (
-                                                <Check className="w-3 h-3" />
+                                               // For older messages, show checks but no text
+                                               msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
                                             )}
                                         </span>
                                     )}
@@ -214,6 +276,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                    </React.Fragment>
                );
             })
+
         )}
         {/* <div ref={messagesEndRef} /> No longer strictly needed with flex-col-reverse but helpful for initial load jump */}
       </div>

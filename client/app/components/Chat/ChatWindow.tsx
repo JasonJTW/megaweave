@@ -87,7 +87,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const optimisticMessage: Message = {
         id: tempId, // temp ID
         conversation_id: conversationId,
-        sender_id: currentUser?.id || currentUser?.userId || 0, // Handle different user object structures
+        sender_id: currentUser?.userId || 0, // Handle different user object structures
         content: content,
         is_read: false,
         created_at: new Date().toISOString(),
@@ -153,14 +153,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <div className="text-center text-gray-400 mt-10">Loading messages...</div>
         ) : (
             messages.map((msg, index) => { 
-               const myId = currentUser?.id || currentUser?.userId || 0;
+               const myId = currentUser?.userId || 0;
                const isMe = Number(msg.sender_id) === Number(myId);
                
                // Date separator logic
                const currentDate = new Date(msg.created_at);
-               const nextMsg = messages[index + 1];
-               const isLastMessageOfDay = !nextMsg || 
-                   format(new Date(nextMsg.created_at), 'yyyy-MM-dd') !== format(currentDate, 'yyyy-MM-dd');
+               const olderMsg = messages[index + 1];
+               const isLastMessageOfDay = !olderMsg || 
+                   format(new Date(olderMsg.created_at), 'yyyy-MM-dd') !== format(currentDate, 'yyyy-MM-dd');
 
                const dateHeader = isLastMessageOfDay ? (
                    <div key={`date-${msg.created_at}`} className="flex justify-center my-4">

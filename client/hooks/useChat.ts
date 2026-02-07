@@ -34,11 +34,13 @@ export const useConversations = () => {
   };
 };
 
-export const useMessages = (conversationId: string | number | null) => {
+export const useMessages = (conversationId: number | null) => {
   const { data, error, isLoading, mutate } = useSWR<{ messages: Message[], hasMore: boolean, conversation?: Conversation }>(
     conversationId ? `${hostName}/api/messages/conversations/${conversationId}` : null,
     fetcher
   );
+
+  console.log("messages: ", data?.messages)
 
   return {
     messages: data?.messages || [],
@@ -50,7 +52,7 @@ export const useMessages = (conversationId: string | number | null) => {
   };
 };
 
-export const useChatSocket = (conversationId: string | number | null) => {
+export const useChatSocket = (conversationId: number | null) => {
     const { user } = useUser();
     const userId = user?.userId;
     const { socket } = useSocket(userId ? userId.toString() : null);

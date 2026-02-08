@@ -40,7 +40,6 @@ export const useMessages = (conversationId: number | null) => {
     fetcher
   );
 
-  console.log("messages: ", data?.messages)
 
   return {
     messages: data?.messages || [],
@@ -55,72 +54,225 @@ export const useMessages = (conversationId: number | null) => {
 export const useChatSocket = (conversationId: number | null) => {
     const { user } = useUser();
     const userId = user?.userId;
-    const { socket } = useSocket(userId ? userId.toString() : null);
+    const { socket } = useSocket();
     const { mutate: mutateMessages } = useSWRConfig();
     const { mutate: mutateConversations } = useSWRConfig(); // Global mutate to update conversation list
 
     useEffect(() => {
-        if (!socket) return;
+        if (!socket) {
+            return;
+        }
 
         const handleNewMessage = (newMessage: Message) => {
-            console.log("📨 New Message Recieved:", newMessage);
 
-            // 1. Update Messages list if we are in that conversation
-            if (conversationId && Number(conversationId) === newMessage.conversation_id) {
+            const isCurrentConversationInHook = conversationId && Number(conversationId) === newMessage.conversation_id;
+
+            // 1. Update Messages list (Local Update)
+            // ONLY execute this if this hook instance is for the current conversation
+            if (isCurrentConversationInHook) {
                 mutateMessages(
                     `${hostName}/api/messages/conversations/${conversationId}`,
                     (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
                         if (!currentData) return { messages: [newMessage], hasMore: false };
+                        
+                        // 1. Check for duplicates by ID
+                        const isDuplicate = currentData.messages.some(m => m.id === newMessage.id);
+                        if (isDuplicate) {
+                            return currentData;
+                        }
+
+                        // 2. Check for optimistic message to replace (ID starts with 'temp-')
+                        const tempIndex = currentData.messages.findIndex(m => 
+                            String(m.id).startsWith("temp-") && 
+                            m.content === newMessage.content && 
+                            Number(m.sender_id) === Number(newMessage.sender_id)
+                        );
+
+                        if (tempIndex !== -1) {
+                            const newMessages = [...currentData.messages];
+                            newMessages[tempIndex] = newMessage;
+                            return { ...currentData, messages: newMessages };
+                        }
+
+                        // 3. Otherwise, append
                         return {
                             ...currentData,
-                            messages: [newMessage, ...currentData.messages] // Assume newest first
+                            messages: [newMessage, ...currentData.messages]
                         };
                     },
-                    false // Do not revalidate immediately
+                    false
                 );
-                
-                // Mark read immediately if window is open?
-                // Probably better to let the UI trigger markRead
             }
 
-            // 2. Update Conversation List (last message & unread count)
-            mutateConversations(
-                `${hostName}/api/messages/conversations`,
-                (currentData: { conversations: Conversation[] } | undefined) => {
-                   if (!currentData) return undefined; // Let revalidate handle it
-                   const conversations = currentData.conversations as Conversation[];
-                   
-                   const existingIndex = conversations.findIndex(c => c.id === newMessage.conversation_id);
-                   
-                   if (existingIndex !== -1) {
-                        // Move to top and update
-                        const updatedConv = {
-                            ...conversations[existingIndex],
-                            last_message_content: newMessage.content,
-                            last_message_at: newMessage.created_at,
-                            unread_count: (conversations[existingIndex].unread_count || 0) + (newMessage.sender_id !== Number(userId) ? 1 : 0)
+            // 2. Update Conversation List (Global Update)
+            // ONLY execute this in the Global Listener (where conversationId is null)
+            // This prevents double updates (+2) when multiple hooks are mounted.
+            if (conversationId === null) {
+                mutateConversations(
+                    `${hostName}/api/messages/conversations`,
+                    (currentData: { conversations: Conversation[] } | undefined) => {
+                        if (!currentData) {
+                            return undefined; 
+                        }
+                        
+                        const conversations = currentData.conversations;
+                        const existingIndex = conversations.findIndex(c => Number(c.id) === Number(newMessage.conversation_id));
+                        
+                        if (existingIndex !== -1) {
+                            const path = window.location.pathname;
+                            const pathParts = path.split('/');
+                            const activeConversationId = (pathParts[1] === 'messages' && pathParts[2]) ? Number(pathParts[2]) : null;
+                            
+                            const isBeingViewed = activeConversationId === Number(newMessage.conversation_id);
+                            const isFocused = document.hasFocus();
+                            
+                           
+
+                            let shouldIncrement = false;
+                            const isMyOwnMessage = Number(newMessage.sender_id) === Number(userId);
+
+                            if (!isMyOwnMessage) {
+                                if (isBeingViewed && isFocused) {
+                                    shouldIncrement = false;
+                                    fetch(`${hostName}/api/messages/conversations/${newMessage.conversation_id}/read`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        credentials: "include",
+                                    }).catch(err => console.error("Failed to mark read on global update", err));
+                                } else {
+                                    shouldIncrement = true;
+                                }
+                            }
+
+                            const updatedConv = {
+                                ...conversations[existingIndex],
+                                last_message_content: newMessage.content,
+                                last_message_at: newMessage.created_at,
+                                unread_count: (conversations[existingIndex].unread_count || 0) + (shouldIncrement ? 1 : 0)
+                            };
+                            
+                            const newConversations = [
+                                updatedConv,
+                                ...conversations.filter(c => Number(c.id) !== Number(newMessage.conversation_id))
+                            ];
+                            
+                            return { conversations: newConversations };
+                        } else {
+                            return undefined; 
+                        }
+                    },
+                    false
+                );
+            }
+        };
+        const handleMessagesRead = (data: { conversation_id: number, reader_id: number }) => {
+            
+            // 1. Update Messages list if we are in that conversation
+            if (conversationId && Number(conversationId) === data.conversation_id) {
+                mutateMessages(
+                    `${hostName}/api/messages/conversations/${conversationId}`,
+                    (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
+                        if (!currentData) return currentData;
+                        return {
+                            ...currentData,
+                            messages: currentData.messages.map(m => {
+                                // If I am the sender of a message, and someone else (data.reader_id) read it
+                                // then I should mark MY message as read in my UI.
+                                if (Number(m.sender_id) === Number(userId) && Number(data.reader_id) !== Number(userId)) {
+                                    return { ...m, is_read: true };
+                                }
+                                // Also handle receiving my own read status from other device
+                                if (Number(m.sender_id) !== Number(userId) && Number(data.reader_id) === Number(userId)) {
+                                    return { ...m, is_read: true };
+                                }
+                                return m;
+                            })
                         };
-                        
-                        const newConversations = [
-                            updatedConv,
-                            ...conversations.filter((_, i) => i !== existingIndex)
-                        ];
-                        
-                        return { conversations: newConversations };
-                   } else {
-                       // New conversation? We might need to revalidate to get full details (user info etc)
-                       // Return undefined to trigger revalidation
-                       return undefined;
-                   }
-                },
-                true // Revalidate to ensure consistency or if new conversation
-            );
+                    },
+                    false
+                );
+            }
+
+            if (conversationId === null) {
+                // Determine if WE are the ones who read it (either on this device or another)
+                const iReadIt = Number(data.reader_id) === Number(userId);
+
+                if (iReadIt) {
+                    mutateConversations(
+                        `${hostName}/api/messages/conversations`,
+                        (currentData: { conversations: Conversation[] } | undefined) => {
+                            if (!currentData) return currentData;
+                            const conversations = currentData.conversations;
+                            const existingIndex = conversations.findIndex(c => Number(c.id) === Number(data.conversation_id));
+                            if (existingIndex !== -1) {
+                                const newConversations = [...conversations];
+                                newConversations[existingIndex] = {
+                                    ...newConversations[existingIndex],
+                                    unread_count: 0
+                                };
+                                return { conversations: newConversations };
+                            }
+                            return currentData;
+                        },
+                        false
+                    );
+                }
+            }
         };
 
         socket.on("new_message", handleNewMessage);
+        socket.on("messages_read", handleMessagesRead);
 
         return () => {
             socket.off("new_message", handleNewMessage);
+            socket.off("messages_read", handleMessagesRead);
         };
     }, [socket, conversationId, mutateMessages, mutateConversations, userId]);
+
+    // 2. Focus/Visibility listener: Clear unread count IMMEDIATELY when recipient focuses back to chat
+    useEffect(() => {
+        if (!conversationId) return;
+
+        const clearRead = () => {
+            if (!document.hasFocus()) return;
+
+            // 1. Mark as read on server (this will emit messages_read to the sender)
+            fetch(`${hostName}/api/messages/conversations/${conversationId}/read`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            }).catch(err => console.error("Failed to mark read on focus", err));
+
+            // 2. Clear locally for THIS conversation in the global list
+            mutateConversations(
+                `${hostName}/api/messages/conversations`,
+                (currentData: { conversations: Conversation[] } | undefined) => {
+                    if (!currentData) return undefined;
+                    const conversations = currentData.conversations;
+                    const existingIndex = conversations.findIndex(c => c.id === Number(conversationId));
+                    if (existingIndex !== -1 && (conversations[existingIndex].unread_count || 0) > 0) {
+                        const newConversations = [...conversations];
+                        newConversations[existingIndex] = {
+                            ...newConversations[existingIndex],
+                            unread_count: 0
+                        };
+                        return { conversations: newConversations };
+                    }
+                    return currentData;
+                },
+                false
+            );
+        };
+
+        // Run if already focused when mounting
+        if (document.hasFocus()) clearRead();
+
+        window.addEventListener("focus", clearRead);
+        window.addEventListener("visibilitychange", clearRead);
+
+        return () => {
+            window.removeEventListener("focus", clearRead);
+            window.removeEventListener("visibilitychange", clearRead);
+        };
+    }, [conversationId, mutateConversations]);
 };

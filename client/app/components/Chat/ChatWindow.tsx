@@ -115,11 +115,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setInputValue(""); // Clear input immediately
 
     // Optimistic Update
-    const tempId = Date.now();
+    const tempId = `temp-${Date.now()}`;
     const optimisticMessage: Message = {
-        id: tempId, // temp ID
+        id: tempId, 
         conversation_id: conversationId,
-        sender_id: currentUser?.userId || 0, // Handle different user object structures
+        sender_id: currentUser?.userId || 0,
         content: content,
         is_read: false,
         created_at: new Date().toISOString(),
@@ -225,9 +225,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                    </div>
                ) : null;
 
-               // Read status logic: detailed status only for the VERY LAST message sent by the current user
-               // Find the index of the last message sent by 'me'
-               const isLatestOwnMessage = messages.findIndex(m => Number(m.sender_id) === Number(myId)) === index;
+               // 找出「我發送的且已被讀取」的最後一則訊息索引
+               const lastReadIndex = messages.findIndex(m => Number(m.sender_id) === Number(myId) && m.is_read);
+               const isLastReadMessage = lastReadIndex === index;
 
                return (
                    <React.Fragment key={msg.id}>
@@ -254,18 +254,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                                     <span>{format(parseDate(msg.created_at), "HH:mm")}</span>
                                     {isMe && (
                                         <span className="ml-1 flex items-center h-3">
-                                            {isLatestOwnMessage ? (
-                                               msg.is_read ? (
-                                                   <>
-                                                       <span className="mr-0.5">read</span>
-                                                       <CheckCheck className="w-3 h-3" />
-                                                   </>
-                                               ) : (
-                                                   <Check className="w-3 h-3" />
-                                               )
+                                            {isLastReadMessage ? (
+                                                <>
+                                                    <span className="mr-0.5">read</span>
+                                                    <CheckCheck className="w-3 h-3" />
+                                                </>
                                             ) : (
-                                               // For older messages, show checks but no text
-                                               msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
+                                                // 如果不是最後一則已讀，則根據 is_read 顯示雙勾或單勾
+                                                msg.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
                                             )}
                                         </span>
                                     )}

@@ -128,7 +128,7 @@ export interface Conversation {
 }
 
 export interface Message {
-  id: number;
+  id: number | string;
   conversation_id: number;
   sender_id: number;
   content: string;

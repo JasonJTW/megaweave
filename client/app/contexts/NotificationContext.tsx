@@ -54,7 +54,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const isUserFetching = isUserLoading;
 
     // 2. Setup Socket
-    const { socket } = useSocket(userId ? userId.toString() : "");
+    const { socket } = useSocket();
 
     // 3. Use SWR for Notifications
     const { data, isLoading, mutate: mutateNotifications } = useSWR(

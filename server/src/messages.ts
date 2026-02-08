@@ -64,8 +64,10 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     const message = await messageService.createMessage(conversationId, senderId, content);
 
     // 3. Socket Push
-    const io: Server = req.app.get("io");
+    const io: Server = res.locals.io;
+    console.log(`[POST /messages] res.locals.io instance:`, io ? "EXISTS" : "UNDEFINED");
     if (io) {
+        console.log(`[POST /messages] Emitting new_message to user_${recipientId} and user_${senderId}`);
         // Push to recipient's personal room
         io.to(`user_${recipientId}`).emit("new_message", {
             ...message,
@@ -77,6 +79,9 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
             ...message,
             conversation_id: conversationId
         });
+        console.log(`[POST /messages] Emission complete.`);
+    } else {
+        console.warn(`[POST /messages] WARNING: io is undefined, socket events not sent!`);
     }
 
     res.status(201).json({ message, conversationId });
@@ -118,6 +123,29 @@ router.patch("/conversations/:id/read", requireAuth, async (req: Request, res: R
         }
 
         await messageService.markConversationRead(conversationId, userId);
+
+        // Notify both participants that messages have been read
+        const io: Server = res.locals.io;
+        if (io) {
+            const conversation = await messageService.getConversationById(conversationId, userId);
+            if (conversation) {
+                const otherUserId = conversation.other_user_id;
+                console.log(`[PATCH /read] Notifying user_${otherUserId} and user_${userId} that messages are read in conv_${conversationId}`);
+                
+                // Notify the other user (the sender)
+                io.to(`user_${otherUserId}`).emit("messages_read", {
+                    conversation_id: conversationId,
+                    reader_id: userId
+                });
+
+                // Notify the current user's other devices
+                io.to(`user_${userId}`).emit("messages_read", {
+                    conversation_id: conversationId,
+                    reader_id: userId
+                });
+            }
+        }
+
         res.json({ success: true });
     } catch (error) {
         console.error("Mark read error:", error);

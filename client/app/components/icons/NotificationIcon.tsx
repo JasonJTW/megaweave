@@ -1,0 +1,22 @@
+// components/NotificationIcon.tsx
+export default function NotificationIcon({
+  className,
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      width="16"
+      height="18"
+      viewBox="0 0 16 18"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M10 16C10 17.1046 9.10457 18 8 18C6.89543 18 6 17.1046 6 16H10ZM8 0C9.10457 4.82823e-08 10 0.895431 10 2V2.3418C12.3303 3.1655 14 5.38761 14 8V12H14.5C15.3284 12 16 12.6716 16 13.5C16 14.3284 15.3284 15 14.5 15H1.5C0.671573 15 1.48488e-07 14.3284 0 13.5C3.62117e-08 12.6716 0.671573 12 1.5 12H2V8C2 5.38761 3.66968 3.1655 6 2.3418V2C6 0.895431 6.89543 1.61443e-08 8 0Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

@@ -2,21 +2,22 @@
 
 import React, { useState } from "react";
 import { useNavbar } from "../contexts/NavBarContext";
-import { useConversations } from "@/hooks/useChat";
+import { useConversations, useChatSocket } from "@/hooks/useChat";
 import Link from "next/link";
 import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
+import PrivateMessageIcon from "./icons/PrivateMessageIcon";
 import { usePathname } from "next/navigation";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { useUser } from "../contexts/UserContext";
+import NotificationIcon from "./icons/NotificationIcon";
 import {
   Menu,
   // Info,
   // Mail,
   GalleryHorizontalEnd,
   SquarePlus,
-  Bell,
-  MessageSquare,
 
   // FileText,
 } from "lucide-react";
@@ -61,16 +62,25 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { unreadCount } = useNotification(); // Notifications
-  const { conversations } = useConversations(); // Chat messages
-  const messageUnreadCount = conversations.reduce((acc, c) => acc + c.unread_count, 0);
   
+  // Listen for new messages globally
+  useChatSocket(null);
+
+  const { conversations } = useConversations(); // Chat messages
+  const { user } = useUser(); // Check if user is logged in
+  const messageUnreadCount = conversations.reduce(
+    (acc, c) => acc + c.unread_count,
+    0,
+  );
+
   // Clean up unused state and effects
   // Removed: userId, isMobileMenuOpen (kept), unreadCount (local), fetchUserAndNotifications, useSocket, window listener
-
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
     { href: "/user", label: "Profile", icon: UserIcon },
+    { href: "/messages", label: "Messages", icon: PrivateMessageIcon },
+    { href: "/notifications", label: "Notifications", icon: NotificationIcon },
   ];
 
   // 下拉菜單項目
@@ -89,19 +99,13 @@ const Navbar = () => {
     },
   ];
 
-  // 移動端菜單項目（統一格式）
+  //* mobile hamburger menu
   const mobileNavItems: NavigationItem[] = [
     {
       href: "/user",
       title: "Profile",
       description: "User Profile",
       icon: UserIcon,
-    },
-    {
-      href: "/notifications",
-      title: "Notifications",
-      description: "Notifications",
-      icon: Bell,
     },
     {
       href: "/about",
@@ -158,24 +162,7 @@ const Navbar = () => {
             </Link>
 
             {/* desktop nav item */}
-            <div className="hidden md:flex items-center space-x-6 mr-6">
-                <Link href="/messages" className="relative group p-2 text-gray-700 hover:bg-primary-30 rounded-full transition-all">
-                    <MessageSquare className="w-[20px] h-[20px]" />
-                    {messageUnreadCount > 0 && (
-                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                          {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
-                        </span>
-                    )}
-                </Link>
-                <Link href="/notifications" className="relative group p-2 text-gray-700 hover:bg-primary-30 rounded-full transition-all">
-                    <Bell className="w-[20px] h-[20px]" />
-                    {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                    )}
-                </Link>
-            </div>
+
             <div className="font-ddin">
               <NavigationMenu>
                 <NavigationMenuList>
@@ -203,53 +190,79 @@ const Navbar = () => {
                   </NavigationMenuItem>
 
                   {/* main nav item */}
-                  {mainNavItems.map((item, index) => (
-                    <NavigationMenuItem key={index} className="hidden md:block">
-                      <NavigationMenuLink
-                        asChild
-                        className={cn(
-                          navigationMenuTriggerStyle(),
-                          "transition-all duration-200 bg-transparent hover:bg-primary-30"
-                        )}
-                      >
-                        <Link
-                          href={item.href}
-                          className="font-semibold text-[18px]"
+                  {mainNavItems.map((item, index) => {
+                    const isMessage = item.href === "/messages";
+                    const isNotification = item.href === "/notifications";
+                    const showBadge =
+                      (isMessage && messageUnreadCount > 0) ||
+                      (isNotification && unreadCount > 0);
+                    const count = isMessage ? messageUnreadCount : unreadCount;
+                    const badgeColor = isMessage ? "bg-blue-500" : "bg-red-500";
+
+                    return (
+                      <NavigationMenuItem key={index} className="hidden md:block">
+                        <NavigationMenuLink
+                          asChild
+                          className={cn(
+                            navigationMenuTriggerStyle(),
+                            "transition-all duration-200 bg-transparent hover:bg-primary-30"
+                          )}
                         >
-                          <item.icon className="w-[18px] h-[16px] mr-[8px] " />
-                          <span className="hidden md:inline">{item.label}</span>
-                        </Link>
-                      </NavigationMenuLink>
-                    </NavigationMenuItem>
-                  ))}
+                          <Link
+                            href={item.href}
+                            className="font-semibold group text-[18px] flex items-center"
+                          >
+                            <div className="relative mr-2 flex items-center">
+                              <item.icon className="w-[18px] h-[16px] text-megaweave-forest-dark" />
+                              {showBadge && (
+                                <span
+                                  className={`absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ${badgeColor} text-[9px] font-bold text-white shadow-sm animate-in zoom-in duration-200 pointer-events-none`}
+                                >
+                                  {count > 99 ? "99+" : count}
+                                </span>
+                              )}
+                            </div>
+                            <span className="hidden md:inline text-megaweave-forest-dark">
+                              {item.label}
+                            </span>
+                          </Link>
+                        </NavigationMenuLink>
+                      </NavigationMenuItem>
+                    );
+                  })}
                 </NavigationMenuList>
               </NavigationMenu>
             </div>
 
-            {/* mobile nav bar item */}
+            {/* //* mobile nav bar top item */}
             <div className="md:hidden flex items-center space-x-2">
               {/* Profile 按鈕（手機顯示） */}
-              <Link href="/user" className="">
-                <UserIcon className="h-[16px] w-[18px]" />
-                <span className="sr-only">Profile</span>
-              </Link>
-              <Link href="/messages" className="relative group mr-2">
-                <MessageSquare className="h-[16px] w-[18px] text-black transition-transform group-hover:scale-110" />
-                <span className="sr-only">Messages</span>
-                 {messageUnreadCount > 0 && (
+              {!user && (
+                <Link href="/user" className="">
+                  <UserIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
+                  <span className="sr-only">Profile</span>
+                </Link>
+              )}
+
+              {user?.userId && (
+                <Link href="/messages" className="relative group mr-2">
+                  <PrivateMessageIcon className=" text-megaweave-forest-dark" />
+                  <span className="sr-only">Messages</span>
+                  {messageUnreadCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                      {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+                      {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
                     </span>
                   )}
-              </Link>
+                </Link>
+              )}
               <Link href="/notifications" className="relative group">
-                <Bell className="h-[16px] w-[18px] text-black transition-transform group-hover:scale-110" fill="black" />
+                <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
                 <span className="sr-only">Notifications</span>
-                 {unreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                  )}
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
@@ -260,7 +273,7 @@ const Navbar = () => {
                       "p-2 transition-all duration-200",
                       isAtTop
                         ? "text-megaweave-forest-dark "
-                        : "text-gray-900 "
+                        : "text-gray-900 ",
                     )}
                   >
                     <Menu className="h-6 w-6" />
@@ -287,11 +300,11 @@ const Navbar = () => {
                             "flex items-start space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-[16px] transition-all duration-200 group",
                             isActivePath(item.href)
                               ? "text-gray-900 bg-primary-30 "
-                              : "text-white "
+                              : "text-white ",
                           )}
                         >
                           <div className="flex-shrink-0 mt-3">
-                            <Icon className="w-5 h-5 transition-transform group-hover:scale-110" />
+                            <Icon className="w-5 h-5 " />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-medium">{item.title}</div>
@@ -305,7 +318,6 @@ const Navbar = () => {
                   </div>
                 </SheetContent>
               </Sheet>
-              
             </div>
           </div>
         </div>
@@ -333,7 +345,7 @@ const ListItem = React.forwardRef<
           href={href}
           className={cn(
             "block select-none space-y-1 rounded-lg p-4 leading-none no-underline outline-none transition-all duration-200 hover:bg-gray-50 hover:text-gray-900 focus:bg-gray-50 focus:text-gray-900 group",
-            className
+            className,
           )}
           {...props}
         >

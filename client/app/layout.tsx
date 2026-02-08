@@ -9,6 +9,7 @@ import { TeamProvider } from "./contexts/TeamContext";
 import { PostProvider } from "./contexts/PostContext";
 import { NavbarProvider } from "./contexts/NavBarContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { SocketProvider } from "./contexts/SocketContext";
 import Navbar from "./components/Navbar";
 import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
@@ -145,6 +146,7 @@ export default function RootLayout({
         />
         <SWRConfig value={{}}>
         <UserProvider>
+          <SocketProvider>
           <NavbarProvider>
             <NotificationProvider>
             <Navbar />
@@ -196,6 +198,7 @@ export default function RootLayout({
             <Footer />
             </NotificationProvider>
           </NavbarProvider>
+          </SocketProvider>
         </UserProvider>
         </SWRConfig>
       </body>

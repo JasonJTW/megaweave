@@ -695,7 +695,7 @@ const TeamInfoPage = () => {
                 <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-[26px] pb-30 pt-[50px] font-bold font-ddin relative">
                   織友 Weaver
                 </h3>
-                <div className="flex items-center justify-center h-full mb-[100px]">
+                <div id="our-team" className="flex items-center justify-center h-full mb-[100px]">
                   <img src="/assets/Weaver.svg" />
                 </div>
               </div>

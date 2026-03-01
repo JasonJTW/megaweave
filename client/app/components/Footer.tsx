@@ -39,13 +39,12 @@ const Footer: FC = () => {
                   </li>
                   <li>
                     <Link
-                      href="#"
+                      href="/about#our-team"
                       className="inline-block  hover:underline transition-all duration-200"
                     >
                       megaweaving Team
                     </Link>
                   </li>
-                  <li></li>
                 </ul>
               </div>
 

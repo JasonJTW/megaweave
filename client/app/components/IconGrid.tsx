@@ -5,10 +5,10 @@ import { motion } from "framer-motion";
 // import ReuseIcon from "./icons/ReuseIcon";
 // import ElfIcon from "./icons/ElfIcon";
 // import CommonShareIcon from "./icons/CommonShareIcon";
-import ChristmasStarIcon from "./icons/ChristmasStarIcon";
-import ChristmasSock from "./icons/ChristmasSockIcon";
-import ChristmasTreeIcon from "./icons/ChristmasTreeIcon";
-import ChristmasSnowmanIcon from "./icons/ChristmasSnowmanIcon";
+import ChristmasStarIcon from "./icons/ChineseNewYearIcon2";
+import ChristmasSock from "./icons/ChineseNewYearIcon1";
+import ChristmasTreeIcon from "./icons/ChineseNewYearIcon3";
+import ChristmasSnowmanIcon from "./icons/ChineseNewYearIcon4";
 export default function IconGrid() {
   const icons = [
     { id: "reuse", Icon: ChristmasStarIcon },

@@ -81,7 +81,6 @@ export const useMessages = (conversationId: number | null) => {
 
 export const useChatSocket = (conversationId: number | null) => {
     const { user } = useUser();
-    const userId = user?.userId;
     const { socket } = useSocket();
     const { mutate: mutateMessages } = useSWRConfig();
     const { mutate: mutateConversations } = useSWRConfig(); // Global mutate to update conversation list
@@ -255,7 +254,7 @@ export const useChatSocket = (conversationId: number | null) => {
             socket.off("new_message", handleNewMessage);
             socket.off("messages_read", handleMessagesRead);
         };
-    }, [socket, conversationId, mutateMessages, mutateConversations, userId]);
+    }, [socket, conversationId, mutateMessages, mutateConversations, user?.public_id]);
 
     // 2. Focus/Visibility listener: Clear unread count IMMEDIATELY when recipient focuses back to chat
     useEffect(() => {

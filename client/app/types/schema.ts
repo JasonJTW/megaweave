@@ -115,12 +115,10 @@ export interface UserStats {
 
 export interface Conversation {
   id: number;
-  user1_id: number;
-  user2_id: number;
   last_message_at: string;
   created_at: string;
   updated_at: string;
-  other_user_id: number;
+  other_public_id: string;
   other_username: string;
   other_avatar_url?: string;
   last_message_content?: string;
@@ -130,7 +128,7 @@ export interface Conversation {
 export interface Message {
   id: number | string;
   conversation_id: number;
-  sender_id: number;
+  sender_public_id: string;
   content: string;
   is_read: boolean;
   created_at: string;

@@ -5,11 +5,13 @@ export interface Conversation {
   id: number;
   user1_id: number;
   user2_id: number;
+  last_message_id?: number | null;
   last_message_at: Date;
   created_at: Date;
   updated_at: Date;
   // Joined fields
-  other_user_id?: number;
+  other_user_id?: number; // Keep for internal use, but we might want to hide it from JSON
+  other_public_id?: string;
   other_username?: string;
   other_avatar_url?: string;
   last_message_content?: string;
@@ -21,6 +23,7 @@ export interface Message {
   id: number;
   conversation_id: number;
   sender_id: number;
+  sender_public_id?: string;
   content: string;
   is_read: boolean;
   created_at: Date;
@@ -28,15 +31,18 @@ export interface Message {
   sender_avatar?: string;
 }
 
+export type ConversationDTO = Omit<Conversation, 'user1_id' | 'user2_id' | 'other_user_id'>;
+
+export type MessageDTO = Omit<Message, 'sender_id'>;
+
 export const messageService = {
   // 1. Get or Create Conversation
   getConversationId: async (userA: number, userB: number): Promise<number> => {
-    // Ensure order
+    // Try to find existing
     const user1 = Math.min(userA, userB);
     const user2 = Math.max(userA, userB);
 
-    // Try to find existing
-    const [rows] = await dbPool.query<RowDataPacket[]>(
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
       "SELECT id FROM conversations WHERE user1_id = ? AND user2_id = ?",
       [user1, user2]
     );
@@ -46,11 +52,30 @@ export const messageService = {
     }
 
     // Create new
-    const [result] = await dbPool.query<ResultSetHeader>(
-      "INSERT INTO conversations (user1_id, user2_id) VALUES (?, ?)",
-      [user1, user2]
-    );
-    return result.insertId;
+    const connection = await dbPool.getConnection();
+    try {
+        await connection.beginTransaction();
+        
+        const [result] = await connection.execute<ResultSetHeader>(
+            "INSERT INTO conversations (user1_id, user2_id) VALUES (?, ?)",
+            [user1, user2]
+        );
+        const conversationId = result.insertId;
+
+        // Insert into conversation_users
+        await connection.execute(
+            "INSERT INTO conversation_users (conversation_id, user_id) VALUES (?, ?), (?, ?)",
+            [conversationId, userA, conversationId, userB]
+        );
+
+        await connection.commit();
+        return conversationId;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
   },
 
   // 2. Create Message
@@ -59,26 +84,45 @@ export const messageService = {
     senderId: number,
     content: string
   ): Promise<Message> => {
-    // Insert message
-    const [result] = await dbPool.query<ResultSetHeader>(
-      "INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)",
-      [conversationId, senderId, content]
-    );
+    const connection = await dbPool.getConnection();
+    try {
+        await connection.beginTransaction();
 
-    // Update conversation timestamp
-    await dbPool.query(
-      "UPDATE conversations SET last_message_at = NOW() WHERE id = ?",
-      [conversationId]
-    );
+        // 1. Insert message
+        const [result] = await connection.execute<ResultSetHeader>(
+            "INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)",
+            [conversationId, senderId, content]
+        );
+        const messageId = result.insertId;
 
-    return {
-      id: result.insertId,
-      conversation_id: conversationId,
-      sender_id: senderId,
-      content,
-      is_read: false,
-      created_at: new Date(),
-    };
+        // 2. Update conversation timestamp and last_message_id
+        await connection.execute(
+            "UPDATE conversations SET last_message_at = NOW(), last_message_id = ? WHERE id = ?",
+            [messageId, conversationId]
+        );
+        
+        // 3. Update sender's last_read_message_id in conversation_users
+        await connection.execute(
+            "UPDATE conversation_users SET last_read_message_id = ? WHERE conversation_id = ? AND user_id = ?",
+            [messageId, conversationId, senderId]
+        );
+
+        await connection.commit();
+
+        return {
+            id: messageId,
+            conversation_id: conversationId,
+            sender_id: senderId,
+            content,
+            is_read: false,
+            created_at: new Date(),
+        };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
   },
 
   // 3. Get User's Conversations (with other user info and last message)
@@ -86,88 +130,78 @@ export const messageService = {
     const query = `
       SELECT 
         c.*,
-        u.id as other_user_id,
+        u.public_id as other_public_id,
         u.username as other_username,
         u.avatar_url as other_avatar_url,
+        u.id as other_user_id,
         m.content as last_message_content,
         m.is_read as last_message_is_read,
         m.sender_id as last_message_sender_id,
-        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = 0 AND sender_id != ?) as unread_count
-      FROM conversations c
-      JOIN users u ON u.id = CASE 
-        WHEN c.user1_id = ? THEN c.user2_id 
-        ELSE c.user1_id 
-      END
-      LEFT JOIN messages m ON m.conversation_id = c.id AND m.created_at = c.last_message_at
-      WHERE c.user1_id = ? OR c.user2_id = ?
+        (
+          SELECT COUNT(*) 
+          FROM messages msg
+          WHERE msg.conversation_id = c.id 
+            AND msg.sender_id != cu1.user_id
+            AND (cu1.last_read_message_id IS NULL OR msg.id > cu1.last_read_message_id)
+        ) as unread_count
+      FROM conversation_users cu1
+      JOIN conversations c ON cu1.conversation_id = c.id
+      JOIN conversation_users cu2 ON c.id = cu2.conversation_id AND cu2.user_id != cu1.user_id
+      JOIN users u ON cu2.user_id = u.id
+      LEFT JOIN messages m ON m.id = c.last_message_id
+      WHERE cu1.user_id = ?
       ORDER BY c.last_message_at DESC
     `;
 
-    // Note: The JOIN for last message based on exact timestamp is slightly risky if multiple messages same second.
-    // Ideally we would store last_message_id in conversations table, but for now this works or we can subquery.
-    // A more robust way to get last message content:
-    const betterQuery = `
-      SELECT 
-        c.*,
-        CASE WHEN c.user1_id = ? THEN u2.username ELSE u1.username END as other_username,
-        CASE WHEN c.user1_id = ? THEN u2.avatar_url ELSE u1.avatar_url END as other_avatar_url,
-        CASE WHEN c.user1_id = ? THEN u2.id ELSE u1.id END as other_user_id,
-        m.content as last_message_content,
-        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = 0 AND sender_id != ?) as unread_count
-      FROM conversations c
-      JOIN users u1 ON c.user1_id = u1.id
-      JOIN users u2 ON c.user2_id = u2.id
-      LEFT JOIN messages m ON m.conversation_id = c.id 
-        AND m.id = (SELECT id FROM messages WHERE conversation_id = c.id ORDER BY id DESC LIMIT 1)
-      WHERE c.user1_id = ? OR c.user2_id = ?
-      ORDER BY c.last_message_at DESC
-    `;
-
-    const [rows] = await dbPool.query<RowDataPacket[]>(betterQuery, [
-      userId, userId, userId, // for CASE SELECT
-      userId, // for unread_count
-      userId, userId // for WHERE
-    ]);
+    const [rows] = await dbPool.execute<RowDataPacket[]>(query, [userId]);
 
     return rows as Conversation[];
   },
 
-  // 4. Get Messages in Conversation
+  // 4. Get Messages in Conversation (Keyset Pagination)
   getMessages: async (
     conversationId: number, 
     limit: number = 20, 
-    offset: number = 0
+    beforeId?: number
   ): Promise<Message[]> => {
-    const [rows] = await dbPool.query<RowDataPacket[]>(
-      `SELECT m.*, u.username as sender_name, u.avatar_url as sender_avatar
-       FROM messages m
-       JOIN users u ON m.sender_id = u.id
-       WHERE m.conversation_id = ?
-       ORDER BY m.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [conversationId, limit, offset]
-    );
+    let query = `
+      SELECT m.*, u.username as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.conversation_id = ?
+    `;
+    const params: any[] = [conversationId];
 
-    // Return reversed (oldest first) or keep newest first depending on frontend pref.
-    // Usually API returns newest first (desc), and frontend reverses for display (scroll up).
+    if (beforeId) {
+      query += ` AND m.id < ?`;
+      params.push(beforeId);
+    }
+
+    query += ` ORDER BY m.id DESC LIMIT ?`;
+    params.push(limit);
+
+    const [rows] = await dbPool.query<RowDataPacket[]>(query, params);
+
     return rows as Message[];
   },
 
   // 5. Check if user belongs to conversation
   isUserInConversation: async (conversationId: number, userId: number): Promise<boolean> => {
-    const [rows] = await dbPool.query<RowDataPacket[]>(
-      "SELECT 1 FROM conversations WHERE id = ? AND (user1_id = ? OR user2_id = ?)",
-      [conversationId, userId, userId]
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT 1 FROM conversation_users WHERE conversation_id = ? AND user_id = ?",
+      [conversationId, userId]
     );
     return rows.length > 0;
   },
   
   // 6. Mark Conversation Read
   markConversationRead: async (conversationId: number, userId: number) => {
-      // Set all messages in this conversation NOT sent by me to read
-      await dbPool.query(
-          "UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_id != ?",
-          [conversationId, userId]
+      // Update last_read_message_id to the most recent message in the conversation
+      await dbPool.execute(
+          `UPDATE conversation_users 
+           SET last_read_message_id = (SELECT last_message_id FROM conversations WHERE id = ?) 
+           WHERE conversation_id = ? AND user_id = ?`,
+          [conversationId, conversationId, userId]
       );
   },
 
@@ -176,20 +210,50 @@ export const messageService = {
     const query = `
       SELECT 
         c.*,
-        CASE WHEN c.user1_id = ? THEN u2.username ELSE u1.username END as other_username,
-        CASE WHEN c.user1_id = ? THEN u2.avatar_url ELSE u1.avatar_url END as other_avatar_url,
-        CASE WHEN c.user1_id = ? THEN u2.id ELSE u1.id END as other_user_id
-      FROM conversations c
-      JOIN users u1 ON c.user1_id = u1.id
-      JOIN users u2 ON c.user2_id = u2.id
-      WHERE c.id = ? AND (c.user1_id = ? OR c.user2_id = ?)
+        u.public_id as other_public_id,
+        u.username as other_username,
+        u.avatar_url as other_avatar_url,
+        u.id as other_user_id
+      FROM conversation_users cu1
+      JOIN conversations c ON cu1.conversation_id = c.id
+      JOIN conversation_users cu2 ON c.id = cu2.conversation_id AND cu2.user_id != cu1.user_id
+      JOIN users u ON cu2.user_id = u.id
+      WHERE c.id = ? AND cu1.user_id = ?
     `;
     
-    const [rows] = await dbPool.query<RowDataPacket[]>(query, [
-        userId, userId, userId,
-        conversationId, userId, userId
-    ]);
+    const [rows] = await dbPool.execute<RowDataPacket[]>(query, [conversationId, userId]);
 
     return rows.length > 0 ? (rows[0] as Conversation) : null;
+  },
+
+  // 8. Get User ID by Public ID
+  getUserIdByPublicId: async (publicId: string): Promise<number | null> => {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT id FROM users WHERE public_id = ?",
+      [publicId]
+    );
+    return rows.length > 0 ? (rows[0].id as number) : null;
+  },
+
+  getPublicIdByUserId: async (userId: number): Promise<string | null> => {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT public_id FROM users WHERE id = ?",
+      [userId]
+    );
+    return rows.length > 0 ? (rows[0].public_id as string) : null;
+  },
+
+  // 10. DTO Mappers
+  toConversationDTO: (conv: Conversation): ConversationDTO => {
+    const { user1_id, user2_id, other_user_id, ...dto } = conv;
+    return dto as ConversationDTO;
+  },
+
+  toMessageDTO: (msg: Message, fallbackSenderPublicId?: string): MessageDTO => {
+    const { sender_id, ...dto } = msg;
+    if (!dto.sender_public_id && fallbackSenderPublicId) {
+        dto.sender_public_id = fallbackSenderPublicId;
+    }
+    return dto as MessageDTO;
   }
 };

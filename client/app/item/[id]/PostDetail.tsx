@@ -455,7 +455,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 </Button>
                 {post.user_id && user?.userId !== post.user_id && (
                     <MessageButton
-                        recipientId={post.user_id}
+                        recipientPublicId={post.author_public_id}
                         recipientName={post.username || "User"}
                         className="ml-2 border-0 hover:bg-transparent text-gray-500 hover:text-primary p-0 h-auto"
                     />

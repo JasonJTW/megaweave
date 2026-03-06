@@ -40,6 +40,33 @@ export const useMessages = (conversationId: number | null) => {
     fetcher
   );
 
+  const fetchMore = async () => {
+    if (!data?.hasMore || data.messages.length === 0 || !conversationId) return;
+
+    // The messages are sorted newest first. The last message is the oldest one.
+    const lastMessageId = data.messages[data.messages.length - 1].id;
+    
+    try {
+      const res = await fetch(`${hostName}/api/messages/conversations/${conversationId}?before_id=${lastMessageId}`, {
+          credentials: "include"
+      });
+      if (!res.ok) throw new Error("Failed to fetch more messages");
+      
+      const newData = await res.json();
+      
+      // Update the SWR cache by appending new messages to the end
+      mutate((current) => {
+          if (!current) return current;
+          return {
+              ...current,
+              messages: [...current.messages, ...newData.messages],
+              hasMore: newData.hasMore
+          };
+      }, false);
+    } catch (err) {
+      console.error("fetchMore error:", err);
+    }
+  };
 
   return {
     messages: data?.messages || [],
@@ -48,6 +75,7 @@ export const useMessages = (conversationId: number | null) => {
     isLoading,
     isError: error,
     mutate,
+    fetchMore,
   };
 };
 
@@ -85,7 +113,7 @@ export const useChatSocket = (conversationId: number | null) => {
                         const tempIndex = currentData.messages.findIndex(m => 
                             String(m.id).startsWith("temp-") && 
                             m.content === newMessage.content && 
-                            Number(m.sender_id) === Number(newMessage.sender_id)
+                            m.sender_public_id === newMessage.sender_public_id
                         );
 
                         if (tempIndex !== -1) {
@@ -129,7 +157,7 @@ export const useChatSocket = (conversationId: number | null) => {
                            
 
                             let shouldIncrement = false;
-                            const isMyOwnMessage = Number(newMessage.sender_id) === Number(userId);
+                            const isMyOwnMessage = newMessage.sender_public_id === user?.public_id;
 
                             if (!isMyOwnMessage) {
                                 if (isBeingViewed && isFocused) {
@@ -165,7 +193,7 @@ export const useChatSocket = (conversationId: number | null) => {
                 );
             }
         };
-        const handleMessagesRead = (data: { conversation_id: number, reader_id: number }) => {
+        const handleMessagesRead = (data: { conversation_id: number, reader_public_id: string }) => {
             
             // 1. Update Messages list if we are in that conversation
             if (conversationId && Number(conversationId) === data.conversation_id) {
@@ -178,11 +206,11 @@ export const useChatSocket = (conversationId: number | null) => {
                             messages: currentData.messages.map(m => {
                                 // If I am the sender of a message, and someone else (data.reader_id) read it
                                 // then I should mark MY message as read in my UI.
-                                if (Number(m.sender_id) === Number(userId) && Number(data.reader_id) !== Number(userId)) {
+                                if (m.sender_public_id === user?.public_id && data.reader_public_id !== user?.public_id) {
                                     return { ...m, is_read: true };
                                 }
                                 // Also handle receiving my own read status from other device
-                                if (Number(m.sender_id) !== Number(userId) && Number(data.reader_id) === Number(userId)) {
+                                if (m.sender_public_id !== user?.public_id && data.reader_public_id === user?.public_id) {
                                     return { ...m, is_read: true };
                                 }
                                 return m;
@@ -195,7 +223,7 @@ export const useChatSocket = (conversationId: number | null) => {
 
             if (conversationId === null) {
                 // Determine if WE are the ones who read it (either on this device or another)
-                const iReadIt = Number(data.reader_id) === Number(userId);
+                const iReadIt = data.reader_public_id === user?.public_id;
 
                 if (iReadIt) {
                     mutateConversations(
@@ -274,5 +302,5 @@ export const useChatSocket = (conversationId: number | null) => {
             window.removeEventListener("focus", clearRead);
             window.removeEventListener("visibilitychange", clearRead);
         };
-    }, [conversationId, mutateConversations]);
+    }, [conversationId, mutateConversations, user?.public_id]);
 };

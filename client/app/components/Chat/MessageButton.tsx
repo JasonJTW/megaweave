@@ -7,7 +7,7 @@ import { MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 
 interface MessageButtonProps {
-  recipientId: number;
+  recipientPublicId: string;
   recipientName: string;
   className?: string; // Allow custom styling
 }
@@ -15,7 +15,7 @@ interface MessageButtonProps {
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 export const MessageButton: React.FC<MessageButtonProps> = ({
-  recipientId,
+  recipientPublicId,
   recipientName,
   className,
 }) => {
@@ -29,7 +29,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ recipientId }),
+        body: JSON.stringify({ recipient_public_id: recipientPublicId }),
       });
 
       if (!res.ok) {

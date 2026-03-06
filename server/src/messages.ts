@@ -11,11 +11,12 @@ router.get("/conversations", requireAuth, async (req: Request, res: Response) =>
   console.log(`[GET /conversations] Fetching for userId: ${userId}`);
   try {
     const conversations = await messageService.getUserConversations(userId);
+    const dtos = conversations.map(c => messageService.toConversationDTO(c));
     console.log(`[GET /conversations] Found ${conversations.length} conversations`);
-    res.json({ conversations });
+    return res.json({ conversations: dtos });
   } catch (error) {
     console.error("Get conversations error:", error);
-    res.status(500).json({ errorMessage: "Internal server error" });
+    return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
 
@@ -23,60 +24,72 @@ router.get("/conversations", requireAuth, async (req: Request, res: Response) =>
 router.get("/conversations/:id", requireAuth, async (req: Request, res: Response) => {
   const userId = req.user!.userId;
   const conversationId = parseInt(req.params.id);
-  const page = parseInt(req.query.page as string) || 1;
+  const beforeId = req.query.before_id ? parseInt(req.query.before_id as string) : undefined;
   const limit = 20;
-  const offset = (page - 1) * limit;
 
   try {
     // Security check
     const isMember = await messageService.isUserInConversation(conversationId, userId);
     if (!isMember) {
-       res.status(403).json({ errorMessage: "Not authorized to view this conversation" });
-       return;
+       return res.status(403).json({ errorMessage: "Not authorized to view this conversation" });
     }
 
-    const messages = await messageService.getMessages(conversationId, limit, offset);
-    // Also fetch conversation details to ensure we have participant info (even if not in list yet)
+    const messages = await messageService.getMessages(conversationId, limit, beforeId);
     const conversation = await messageService.getConversationById(conversationId, userId);
     
-    res.json({ messages, conversation, hasMore: messages.length === limit });
+    return res.json({ 
+        messages: messages.map(m => messageService.toMessageDTO(m)), 
+        conversation: conversation ? messageService.toConversationDTO(conversation) : null,
+        hasMore: messages.length === limit 
+    });
   } catch (error) {
     console.error("Get message history error:", error);
-    res.status(500).json({ errorMessage: "Internal server error" });
+    return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
 
 // POST /api/messages - Send message
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   const senderId = req.user!.userId;
-  const { recipientId, content } = req.body;
+  const senderPublicId = req.user!.public_id;
+  const { recipient_public_id, content } = req.body;
 
-  if (!recipientId || !content) {
-     res.status(400).json({ errorMessage: "Recipient and content are required" });
-     return;
+  if (!recipient_public_id || !content) {
+     return res.status(400).json({ errorMessage: "Recipient and content are required" });
   }
 
   try {
+    // SECURITY: Map public_id to internal ID
+    const recipientId = await messageService.getUserIdByPublicId(recipient_public_id);
+    if (!recipientId) {
+      return res.status(404).json({ errorMessage: "Recipient not found" });
+    }
+
     // 1. Get or Create Conversation
     const conversationId = await messageService.getConversationId(senderId, recipientId);
 
     // 2. Create Message
     const message = await messageService.createMessage(conversationId, senderId, content);
+    
+    // Get sender public_id from session (already cached in req.user)
+    const senderPublicId = req.user!.public_id;
 
     // 3. Socket Push
     const io: Server = res.locals.io;
+    const messageDTO = messageService.toMessageDTO(message, senderPublicId);
+
     console.log(`[POST /messages] res.locals.io instance:`, io ? "EXISTS" : "UNDEFINED");
     if (io) {
         console.log(`[POST /messages] Emitting new_message to user_${recipientId} and user_${senderId}`);
         // Push to recipient's personal room
         io.to(`user_${recipientId}`).emit("new_message", {
-            ...message,
+            ...messageDTO,
             conversation_id: conversationId
         });
         
         // Push to sender (for multi-device sync)
         io.to(`user_${senderId}`).emit("new_message", {
-            ...message,
+            ...messageDTO,
             conversation_id: conversationId
         });
         console.log(`[POST /messages] Emission complete.`);
@@ -84,31 +97,34 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         console.warn(`[POST /messages] WARNING: io is undefined, socket events not sent!`);
     }
 
-    res.status(201).json({ message, conversationId });
+    res.status(201).json({ message: messageDTO, conversationId });
   } catch (error) {
     console.error("Send message error:", error);
-    res.status(500).json({ errorMessage: "Internal server error" });
+    return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
 
 // POST /api/messages/start - Start conversation (get or create)
 router.post("/start", requireAuth, async (req: Request, res: Response) => {
     const senderId = req.user!.userId;
-    const { recipientId } = req.body;
+    const { recipient_public_id } = req.body;
 
-    if (!recipientId) {
-         res.status(400).json({ errorMessage: "Recipient ID required" });
-         return;
+    if (!recipient_public_id) {
+         return res.status(400).json({ errorMessage: "Recipient Public ID required" });
     }
 
     try {
+        const recipientId = await messageService.getUserIdByPublicId(recipient_public_id);
+        if (!recipientId) {
+            return res.status(404).json({ errorMessage: "Recipient not found" });
+        }
         const conversationId = await messageService.getConversationId(senderId, recipientId);
-        res.json({ conversationId });
+        return res.json({ conversationId });
     } catch (error) {
         console.error("Start conversation error:", error);
-        res.status(500).json({ errorMessage: "Internal server error" });
+        return res.status(500).json({ errorMessage: "Internal server error" });
     }
-});
+}); 
 
 // PATCH /api/messages/conversations/:id/read - Mark as read
 router.patch("/conversations/:id/read", requireAuth, async (req: Request, res: Response) => {
@@ -118,8 +134,7 @@ router.patch("/conversations/:id/read", requireAuth, async (req: Request, res: R
     try {
         const isMember = await messageService.isUserInConversation(conversationId, userId);
         if (!isMember) {
-             res.status(403).json({ errorMessage: "Not authorized" });
-             return;
+             return res.status(403).json({ errorMessage: "Not authorized" });
         }
 
         await messageService.markConversationRead(conversationId, userId);
@@ -135,13 +150,13 @@ router.patch("/conversations/:id/read", requireAuth, async (req: Request, res: R
                 // Notify the other user (the sender)
                 io.to(`user_${otherUserId}`).emit("messages_read", {
                     conversation_id: conversationId,
-                    reader_id: userId
+                    reader_public_id: req.user!.public_id
                 });
 
                 // Notify the current user's other devices
                 io.to(`user_${userId}`).emit("messages_read", {
                     conversation_id: conversationId,
-                    reader_id: userId
+                    reader_public_id: req.user!.public_id
                 });
             }
         }

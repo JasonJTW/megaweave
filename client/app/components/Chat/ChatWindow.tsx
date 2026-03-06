@@ -71,14 +71,33 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [isFocused, setIsFocused] = useState(true); // Track window focus
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  const [prevFirstMessageId, setPrevFirstMessageId] = useState<number | string | null>(null);
+
   // Auto-scroll to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (behavior: "smooth" | "auto" = "smooth") => {
+    // With flex-col-reverse, the 'bottom' is actually the start of scroll container (0)
+    // But using a ref at the beginning is more robust across browsers.
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const currentFirstMessageId = messages[0]?.id || null;
+    
+    // 1. Initial Load: No previous messages, now we have some.
+    const isInitialLoad = prevFirstMessageId === null && currentFirstMessageId !== null;
+    
+    // 2. New Message: The latest message ID has changed.
+    // We only care if the START of the messages array changed (newest messages)
+    const isNewMessageAdded = prevFirstMessageId !== null && currentFirstMessageId !== prevFirstMessageId;
+
+    if (isInitialLoad || isNewMessageAdded) {
+      // Use auto for initial load, smooth for new messages
+      scrollToBottom(isInitialLoad ? "auto" : "smooth");
+    }
+    
+    // Update the tracker
+    setPrevFirstMessageId(currentFirstMessageId);
+  }, [messages, prevFirstMessageId]);
 
   // Handle Mark as Read
   // Handle Window Focus
@@ -231,6 +250,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 gap-4 bg-slate-50 flex flex-col-reverse">
+        {/* Anchor point for scrolling to bottom */}
+        <div ref={messagesEndRef} />
+        
         {isLoading ? (
             <div className="text-center text-gray-400 mt-10">Loading messages...</div>
         ) : (
@@ -249,18 +271,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                
                const msgDate = parseDate(msg.created_at);
                const olderMsg = messages[index + 1];
-               
-               // Date separator logic
+                              // Date separator logic
                // Compare current message date with older message (next in list)
                let showDateHeader = false;
-               if (!olderMsg) {
-                   // No older message -> this is the very first message ever -> Show Header
-                   showDateHeader = true;
-               } else {
+               if (olderMsg) {
                    const olderMsgDate = parseDate(olderMsg.created_at);
                    const isSameDay = format(msgDate, 'yyyy-MM-dd') === format(olderMsgDate, 'yyyy-MM-dd');
                    if (!isSameDay) {
                        // Different day from previous message -> Show Header
+                       showDateHeader = true;
+                   }
+               } else {
+                   // No older message in memory.
+                   // Only show header if we are absolutely sure there are no more messages in the DB.
+                   if (!hasMore) {
                        showDateHeader = true;
                    }
                }

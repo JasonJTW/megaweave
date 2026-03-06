@@ -10,6 +10,7 @@ import { zhTW } from "date-fns/locale";
 import { SendIcon, ArrowLeft, Check, CheckCheck } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import toast from "react-hot-toast";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -19,7 +20,7 @@ interface ChatWindowProps {
   conversationId: number;
   currentUser: User | null; 
   otherUser?: {
-    id: number;
+    public_id: string;
     username: string;
     avatar_url?: string;
   };
@@ -30,13 +31,37 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUser,
   otherUser: propOtherUser,
 }) => {
-  const { messages, conversation, isLoading, mutate } = useMessages(conversationId);
+  const { messages, conversation, isLoading, mutate, fetchMore, hasMore } = useMessages(conversationId);
   const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
   
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!hasMore || isLoading || isFetchingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsFetchingMore(true);
+          fetchMore().finally(() => setIsFetchingMore(false));
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, isFetchingMore, fetchMore]);
+  
   // Use prop if available (from list), otherwise fallback to fetched conversation details
   const otherUser = propOtherUser || (conversation ? {
-      id: conversation.other_user_id,
+      public_id: conversation.other_public_id,
       username: conversation.other_username,
       avatar_url: conversation.other_avatar_url
   } : undefined);
@@ -119,7 +144,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const optimisticMessage: Message = {
         id: tempId, 
         conversation_id: conversationId,
-        sender_id: currentUser?.userId || 0,
+        sender_public_id: currentUser?.public_id || "",
         content: content,
         is_read: false,
         created_at: new Date().toISOString(),
@@ -143,23 +168,48 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-           recipientId: otherUser.id,
+           recipient_public_id: otherUser.public_id,
            content: content
         }),
       });
-      
-      if (!res.ok) throw new Error("Failed to send");
-      
-      // Revalidate to ensure data consistency (replace temp ID with real ID)
-      mutate(); 
-      
+
+      if (!res.ok) {
+          // If the server responded with an error, revert optimistic update
+          mutate(
+              (currentData) => {
+                  if (!currentData) return currentData;
+                  return {
+                      ...currentData,
+                      messages: currentData.messages.filter(msg => msg.id !== tempId)
+                  };
+              },
+              false
+          );
+          const errorData = await res.json();
+          throw new Error(errorData.message || "Failed to send message");
+      }
+
+      // If successful, revalidate to get the actual message with real ID and status
+      // This will replace the optimistic message
+      mutate(); // Revalidate all messages for this conversation
+
     } catch (error) {
-       console.error("Send error", error);
-       setInputValue(content); 
-       // Rollback is tricky without undoing other changes, but revalidating will fix it
-       mutate();
+      console.error("Error sending message:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to send message.");
+      // If an error occurred, and the optimistic update was not reverted by !res.ok,
+      // ensure it's removed here. This handles network errors or other exceptions.
+      mutate(
+          (currentData) => {
+              if (!currentData) return currentData;
+              return {
+                  ...currentData,
+                  messages: currentData.messages.filter(msg => msg.id !== tempId)
+              };
+          },
+          false
+      );
     } finally {
-       setIsSending(false);
+      setIsSending(false);
     }
   };
 
@@ -185,8 +235,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <div className="text-center text-gray-400 mt-10">Loading messages...</div>
         ) : (
             messages.map((msg, index) => { 
-               const myId = currentUser?.userId || 0;
-               const isMe = Number(msg.sender_id) === Number(myId);
+               const myPublicId = currentUser?.public_id || "";
+               const isMe = msg.sender_public_id === myPublicId;
                
 
                // Helper to parse date safely as UTC if needed
@@ -226,7 +276,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                ) : null;
 
                // 找出「我發送的且已被讀取」的最後一則訊息索引
-               const lastReadIndex = messages.findIndex(m => Number(m.sender_id) === Number(myId) && m.is_read);
+               const lastReadIndex = messages.findIndex(m => m.sender_public_id === myPublicId && m.is_read);
                const isLastReadMessage = lastReadIndex === index;
 
                return (
@@ -272,9 +322,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                    </React.Fragment>
                );
             })
-
         )}
-        {/* <div ref={messagesEndRef} /> No longer strictly needed with flex-col-reverse but helpful for initial load jump */}
+        {hasMore && (
+            <div ref={loadMoreRef} className="h-10 flex items-center justify-center py-4">
+                {isFetchingMore && <span className="text-xs text-gray-400">Loading older messages...</span>}
+            </div>
+        )}
       </div>
 
       {/* Input */}

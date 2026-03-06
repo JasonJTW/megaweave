@@ -38,7 +38,7 @@ export default function ConversationPage() {
                       conversationId={conversationId} 
                       currentUser={currentUser}
                       otherUser={currentConversation ? {
-                          id: currentConversation.other_user_id,
+                          public_id: currentConversation.other_public_id,
                           username: currentConversation.other_username,
                           avatar_url: currentConversation.other_avatar_url
                       } : undefined}

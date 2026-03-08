@@ -19,6 +19,7 @@ import {
   CreatePostFormData,
 } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
+import { compressImage } from "@/utils/imageProcessor";
 
 import { useRouter } from "next/navigation";
 import { useUser } from "./contexts/UserContext";
@@ -368,10 +369,15 @@ const PostsApp = () => {
       formData.append("type", postType);
 
       //TODO: Add Share Commons option
-      // 添加圖片文件
-      selectedImages.forEach((image) => {
-        formData.append("images", image);
-      });
+      // 添加圖片文件 (先壓縮)
+      for (const image of selectedImages) {
+        const compressedBlob = await compressImage(image, 1200, 1200, 0.85);
+        if (compressedBlob) {
+          formData.append("images", compressedBlob, "image.webp");
+        } else {
+          formData.append("images", image);
+        }
+      }
 
       if (!itemsInvalid) {
         formData.append("items", JSON.stringify(createFormData.items));

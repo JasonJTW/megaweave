@@ -32,6 +32,7 @@ import EditIcon from "../components/icons/EditIcon";
 import { usePost } from "../contexts/PostContext";
 import type { Weave } from "@/services/weaveService";
 import DrawerWrapper from "@/components/DrawerWrapper";
+import { compressImage } from "@/utils/imageProcessor";
 // 定義表單資料型別（無需 zod）
 // type ContactSettingsValues = {
 //   email?: string; // 可選填的電子郵件
@@ -44,6 +45,8 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 const processHostName = process.env.NEXT_PUBLIC_PROCESS_HOSTNAME;
 const userNameMaxLength =
   Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
+
+  
 
 // const defaultContactValues: ContactSettingsValues = {
 //   email: "",
@@ -347,36 +350,37 @@ const UserPage = () => {
     setUploadingAvatar(true);
 
     try {
-      // Optional: compress before upload (uncomment if desired)
-      // const compressedBlob = await compressImage(selectedAvatarFile, 1200, 1200, 0.8);
-      // const fileToUpload = compressedBlob ? new File([compressedBlob], selectedAvatarFile.name, { type: "image/jpeg" }) : selectedAvatarFile;
-      const formData = new FormData();
-      formData.append("image", selectedAvatarFile);
+      // 1. Compress before processing to save bandwidth to the effect service
+      const startTime = performance.now();
+      const compressedBlob = await compressImage(selectedAvatarFile, 800, 800, 0.85);
+      const endTime = performance.now();
+      console.log(`[FE] Compression took ${(endTime - startTime).toFixed(2)}ms. File size: ${(selectedAvatarFile.size / 1024).toFixed(2)}KB -> ${(compressedBlob ? compressedBlob.size / 1024 : selectedAvatarFile.size / 1024).toFixed(2)}KB`);
+      const blobToProcess = compressedBlob || selectedAvatarFile;
+
+      // 2. Add effects/filters via the processing host
+      const effectFormData = new FormData();
+      effectFormData.append("image", blobToProcess, "avatar.webp");
 
       const processedResponse = await fetch(`${processHostName}`, {
         method: "POST",
         credentials: "include",
-        body: formData,
+        body: effectFormData,
       });
 
       if (!processedResponse.ok) {
-        throw new Error(`Processing failed: ${processedResponse.status}`);
+        throw new Error(`Avatar effect processing failed: ${processedResponse.status}`);
       }
 
       const processedBlob: Blob = await processedResponse.blob();
 
-      const processedFormData = new FormData();
-      processedFormData.append(
-        "avatar",
-        processedBlob,
-        selectedAvatarFile.name || "avatar.png"
-      );
+      // 3. Final upload to our backend
+      const uploadFormData = new FormData();
+      uploadFormData.append("avatar", processedBlob, "avatar.webp");
 
-      //* Upload to db
       const response = await fetch(`${hostName}/api/avatar`, {
         method: "POST",
         credentials: "include",
-        body: processedFormData,
+        body: uploadFormData,
       });
 
       if (!response.ok) {

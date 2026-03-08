@@ -1,9 +1,11 @@
 import {
   s3Client,
-  uploadAvatarImage,
+  memoryUpload,
   updateAvatar,
   deleteS3Files,
+  uploadToS3,
 } from "./upload";
+import { imageProcessor } from "./utils/imageProcessor";
 import { Request, Response, Router } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { v4 as uuidv4 } from "uuid";
@@ -12,17 +14,18 @@ import dbPool from "./utils/db";
 import { updateUserSession } from "./session";
 dotenv.config();
 
+const S3_BUCKET_AVATAR_FOLDER = process.env.S3_BUCKET_AVATAR_FOLDER || "avatars";
+  
 const router = Router();
 router.post(
   "/",
   requireAuth,
-  uploadAvatarImage,
+  memoryUpload.single("avatar"),
   async (req: AuthenticatedRequest, res: Response) => {
     let connection;
     try {
       // * start transaction
-      const file = req.file as Express.MulterS3.File;
-      if (!file) {
+      if (!req.file) {
         return res
           .status(400)
           .json({ errorMessage: "Please upload an image file." });
@@ -30,15 +33,26 @@ router.post(
 
       const userId = req.user!.userId;
       const userRole = req.user!.role;
+      
+      // Process image
+      const processedBuffer = await imageProcessor.processAvatar(req.file.buffer);
+      
+      // Upload to S3
+      const { key: avatarKey, url: avatarUrl } = await uploadToS3(
+        processedBuffer,
+        S3_BUCKET_AVATAR_FOLDER,
+        `${Date.now()}-${uuidv4()}.webp`
+      );
+
       connection = await dbPool.getConnection();
       await connection.beginTransaction();
-      // TODO: update user avatar url in database
-      const result = await updateAvatar(connection, userId, userRole, file);
+      
+      const result = await updateAvatar(connection, userId, userRole, avatarUrl, avatarKey);
       await connection.commit();
 
       //! async delete old avatar (file-and-forget)
       const oldAvatarKey = result.oldAvatarKey;
-      const newAvatarKey = file.key as string;
+      const newAvatarKey = avatarKey;
       if (oldAvatarKey && oldAvatarKey !== newAvatarKey) {
         void deleteS3Files([oldAvatarKey])
           .then(() => console.log(`Delete old Avatar ${oldAvatarKey}`))

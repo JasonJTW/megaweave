@@ -1,11 +1,10 @@
 //* upload.ts
 import multer from "multer";
-import multerS3 from "multer-s3";
 import { S3Client } from "@aws-sdk/client-s3";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
 import { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 dotenv.config();
 
@@ -37,59 +36,64 @@ async function cleanupFailedAvatarUpload(fileKey: string) {
   }
 }
 
-//* Multer to S3 configuration
-export const uploadConfig = (S3folder: string) => {
-  return multer({
-    storage: multerS3({
-      s3: s3Client,
-      bucket: BUCKET_NAME!,
-      key: function (req, file, cb) {
-        const fileExtension = file.originalname.split(".").pop();
-        const fileName = `${S3folder}/${Date.now()}-${uuidv4()}.${fileExtension}`;
-        cb(null, fileName);
-      },
-      contentType: multerS3.AUTO_CONTENT_TYPE,
-    }),
-    limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB limit
-    },
-    fileFilter: (req, file, cb) => {
-      // 只允許圖片文件
-      if (file.mimetype.startsWith("image/")) {
-        cb(null, true);
-      } else {
-        cb(new Error("Only image files are allowed!"));
-      }
-    },
+
+//* Memory storage for images that need processing
+export const memoryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"));
+    }
+  },
+});
+
+/**
+ * Upload a buffer to S3 directly
+ */
+export async function uploadToS3(
+  buffer: Buffer,
+  folder: string,
+  fileName: string,
+  contentType: string = "image/webp"
+): Promise<{ key: string; url: string }> {
+  const key = `${folder}/${fileName}`;
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME!,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
   });
-};
 
-export const postsUploadConfig = uploadConfig(S3_BUCKET_IMAGE_FOLDER);
-export const avatarUploadConfig = uploadConfig(S3_BUCKET_AVATAR_FOLDER);
+  await s3Client.send(command);
+  return {
+    key,
+    url: `${CLOUDFRONT_URL}/${key}`,
+  };
+}
 
-//* Upload post images middleware
-export const uploadImages = postsUploadConfig.array(
-  "images",
-  parseInt(UPLOAD_IMAGE_LIMIT)
-);
 
 //* Insert images url into db
 export async function insertImages(
   connection: PoolConnection,
   postId: number,
-  files: Express.MulterS3.File[]
+  images: Array<{ url: string; thumbnailUrl: string }>
 ): Promise<void> {
-  if (!files || files.length === 0) return;
+  if (!images || images.length === 0) return;
 
   const imageInsertQuery = `
     INSERT INTO images (post_id, image_url, thumbnail_url, alt_text, created_at) 
     VALUES ?
   `;
 
-  const imageValues = files.map((file) => [
+  const imageValues = images.map((img) => [
     postId,
-    `${CLOUDFRONT_URL}/${file.key}`, // 暫時使用原圖作為縮圖
-    `${CLOUDFRONT_URL}/${file.key}`,
+    img.url,
+    img.thumbnailUrl,
     `Image for post ${postId}`,
     new Date(),
   ]);
@@ -122,23 +126,15 @@ export async function deleteS3Files(fileKeys: string[]): Promise<void> {
   await Promise.all(deletePromises);
 }
 
-//* upload user avatar config
-export const uploadAvatarImage = avatarUploadConfig.single("avatar");
 
 //* upload user avatar to db and delete old avatar in S3
 export async function updateAvatar(
   connection: PoolConnection,
   userId: number,
   userRole: string,
-  file: Express.MulterS3.File
+  avatarUrl: string,
+  avatarKey: string
 ): Promise<{ avatarUrl: string; oldAvatarKey?: string; avatarKey: string }> {
-  const s3Key = file.key as string | undefined;
-  if (!s3Key) {
-    throw new Error("Uploaded file does not have a valid S3 key.");
-  }
-
-  const avatarUrl = `${CLOUDFRONT_URL}/${s3Key}`;
-  const avatarKey = s3Key;
   try {
     //* Get old avatar url from database
     //* FOR UPDATE <- prevents race when multiple concurrent uploads for same user
@@ -173,7 +169,7 @@ export async function updateAvatar(
 
     //* If error occurs, try delete the uploaded file from S3
     try {
-      await cleanupFailedAvatarUpload(s3Key);
+      await cleanupFailedAvatarUpload(avatarKey);
     } catch (cleanupError) {
       console.error(
         "Failed to clean up uploaded avatar after DB error:",

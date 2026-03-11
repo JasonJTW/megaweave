@@ -122,7 +122,16 @@ export interface Conversation {
   other_username: string;
   other_avatar_url?: string;
   last_message_content?: string;
+  last_message_attachment_count?: number;
   unread_count: number;
+}
+
+export interface Attachment {
+  id: number;
+  message_id: number;
+  file_url: string;
+  file_type: 'image' | 'video' | 'file';
+  created_at: string;
 }
 
 export interface Message {
@@ -134,6 +143,7 @@ export interface Message {
   created_at: string;
   sender_name?: string;
   sender_avatar?: string;
+  attachments?: Attachment[];
 }
 
 export interface User {

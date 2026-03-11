@@ -2,6 +2,9 @@ import Router, { Request, Response } from "express";
 import { requireAuth } from "./middleware/auth";
 import { messageService } from "./utils/messageService";
 import { Server } from "socket.io";
+import { memoryUpload, uploadToS3 } from "./upload";
+import { imageProcessor } from "./utils/imageProcessor";
+import { v4 as uuidv4 } from "uuid";
 
 const router = Router();
 
@@ -48,14 +51,14 @@ router.get("/conversations/:id", requireAuth, async (req: Request, res: Response
   }
 });
 
-// POST /api/messages - Send message
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+// POST /api/messages - Send message (Supports optional image attachments)
+router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Request, res: Response) => {
   const senderId = req.user!.userId;
   const senderPublicId = req.user!.public_id;
   const { recipient_public_id, content } = req.body;
 
-  if (!recipient_public_id || !content) {
-     return res.status(400).json({ errorMessage: "Recipient and content are required" });
+  if (!recipient_public_id || (!content && (!req.files || (req.files as Express.Multer.File[]).length === 0))) {
+     return res.status(400).json({ errorMessage: "Recipient and content or image are required" });
   }
 
   try {
@@ -65,15 +68,28 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ errorMessage: "Recipient not found" });
     }
 
+    // 0. Process Attachments if any
+    const attachments: Array<{ url: string; type: 'image' | 'video' | 'file' }> = [];
+    if (req.files && Array.isArray(req.files)) {
+        const files = req.files as Express.Multer.File[];
+        for (const file of files) {
+            // Re-use processPostImage for chat images (max 1200px)
+            const processedBuffer = await imageProcessor.processPostImage(file.buffer);
+            const { url } = await uploadToS3(
+                processedBuffer,
+                "messages",
+                `${Date.now()}-${uuidv4()}.webp`
+            );
+            attachments.push({ url, type: 'image' });
+        }
+    }
+
     // 1. Get or Create Conversation
     const conversationId = await messageService.getConversationId(senderId, recipientId);
 
-    // 2. Create Message
-    const message = await messageService.createMessage(conversationId, senderId, content);
+    // 2. Create Message with attachments
+    const message = await messageService.createMessage(conversationId, senderId, content || "", attachments);
     
-    // Get sender public_id from session (already cached in req.user)
-    const senderPublicId = req.user!.public_id;
-
     // 3. Socket Push
     const io: Server = res.locals.io;
     const messageDTO = messageService.toMessageDTO(message, senderPublicId);
@@ -81,17 +97,15 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     console.log(`[POST /messages] res.locals.io instance:`, io ? "EXISTS" : "UNDEFINED");
     if (io) {
         console.log(`[POST /messages] Emitting new_message to user_${recipientId} and user_${senderId}`);
-        // Push to recipient's personal room
-        io.to(`user_${recipientId}`).emit("new_message", {
+        const payload = {
             ...messageDTO,
             conversation_id: conversationId
-        });
+        };
+        // Push to recipient's personal room
+        io.to(`user_${recipientId}`).emit("new_message", payload);
         
         // Push to sender (for multi-device sync)
-        io.to(`user_${senderId}`).emit("new_message", {
-            ...messageDTO,
-            conversation_id: conversationId
-        });
+        io.to(`user_${senderId}`).emit("new_message", payload);
         console.log(`[POST /messages] Emission complete.`);
     } else {
         console.warn(`[POST /messages] WARNING: io is undefined, socket events not sent!`);

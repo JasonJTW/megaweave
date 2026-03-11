@@ -64,7 +64,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                     "text-sm truncate pr-2",
                     conversation.unread_count > 0 ? "font-bold text-black" : "text-gray-500"
                 )}>
-                  {conversation.last_message_content || "Start a conversation"}
+                  {conversation.last_message_content || (conversation.last_message_attachment_count && conversation.last_message_attachment_count > 0 ? "[Image]" : "Start a conversation")}
                 </p>
                 {conversation.unread_count > 0 && (
                   <span className="flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-500 rounded-full shrink-0">

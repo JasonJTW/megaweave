@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format, isToday, isYesterday } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { SendIcon, ArrowLeft, Check, CheckCheck, ImageIcon, X, Loader2 } from "lucide-react";
+import { SendIcon, ArrowLeft, Check, CheckCheck, ImageIcon, X, Loader2, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -76,6 +76,153 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Lightbox states
+  const [lightboxUrls, setLightboxUrls] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const lightboxOpen = lightboxUrls.length > 0;
+  
+  // Swipe & Pinch-to-zoom refs
+  const touchStartX = useRef(0);
+  const touchStartDist = useRef(0);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [animOffset, setAnimOffset] = useState(0); // -1 = sliding next, +1 = sliding prev
+  const isAnimating = useRef(false);
+
+  // Collect all image URLs from messages (oldest first)
+  const allImageUrls = React.useMemo(() => {
+    const urls: string[] = [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.attachments) {
+        for (const att of msg.attachments) {
+          if (att.file_type === 'image') urls.push(att.file_url);
+        }
+      }
+    }
+    return urls;
+  }, [messages]);
+
+  const openLightbox = (url: string) => {
+    const idx = allImageUrls.indexOf(url);
+    setLightboxUrls(allImageUrls);
+    setLightboxIndex(idx >= 0 ? idx : 0);
+    setZoomScale(1);
+    setAnimOffset(0);
+  };
+
+  const closeLightbox = () => {
+    setLightboxUrls([]);
+    setLightboxIndex(0);
+    setZoomScale(1);
+    setAnimOffset(0);
+  };
+
+  const navigateLightbox = (direction: 'prev' | 'next') => {
+    const canGo = direction === 'prev' ? lightboxIndex > 0 : lightboxIndex < lightboxUrls.length - 1;
+    if (!canGo || isAnimating.current) return;
+    isAnimating.current = true;
+    setZoomScale(1);
+    // Start animation: slide the strip
+    setAnimOffset(direction === 'next' ? -1 : 1);
+    // After animation: update index and reset strip position instantly
+    setTimeout(() => {
+      if (direction === 'prev') setLightboxIndex(i => i - 1);
+      else setLightboxIndex(i => i + 1);
+      setAnimOffset(0);
+      isAnimating.current = false;
+    }, 300);
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') navigateLightbox('prev');
+      else if (e.key === 'ArrowRight') navigateLightbox('next');
+      else if (e.key === 'Escape') { setLightboxUrls([]); setLightboxIndex(0); setZoomScale(1); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxOpen, lightboxUrls.length, lightboxIndex]);
+
+  // Helper: get distance between two touch points
+  const getTouchDistance = (touches: React.TouchList) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Pinch start
+      touchStartDist.current = getTouchDistance(e.touches);
+    } else if (e.touches.length === 1) {
+      touchStartX.current = e.touches[0].clientX;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStartDist.current > 0) {
+      // Pinch zoom
+      const currentDist = getTouchDistance(e.touches);
+      const ratio = currentDist / touchStartDist.current;
+      setZoomScale(prev => Math.max(1, Math.min(5, prev * ratio)));
+      touchStartDist.current = currentDist;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Only swipe if not zoomed in and was a single-finger gesture
+    if (zoomScale <= 1 && e.changedTouches.length === 1 && touchStartDist.current === 0) {
+      const diff = e.changedTouches[0].clientX - touchStartX.current;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0 && lightboxIndex > 0) navigateLightbox('prev');
+        else if (diff < 0 && lightboxIndex < lightboxUrls.length - 1) navigateLightbox('next');
+        e.stopPropagation();
+      }
+    }
+    // Reset pinch tracking
+    touchStartDist.current = 0;
+    // Snap back if zoomed out below 1
+    if (zoomScale < 1.1) setZoomScale(1);
+  };
+
+  // Single-tap to close / Double-tap to toggle zoom
+  const lastTapTime = useRef(0);
+  const closePendingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLightboxTap = () => {
+    const now = Date.now();
+    if (now - lastTapTime.current < 300) {
+      // Double-tap: toggle zoom, cancel pending close
+      if (closePendingTimer.current) {
+        clearTimeout(closePendingTimer.current);
+        closePendingTimer.current = null;
+      }
+      setZoomScale(prev => prev > 1 ? 1 : 2.5);
+    } else {
+      // Single-tap: close after a short delay (if not zoomed)
+      if (zoomScale <= 1) {
+        closePendingTimer.current = setTimeout(() => {
+          closeLightbox();
+          closePendingTimer.current = null;
+        }, 300);
+      } else {
+        // If zoomed, single tap resets zoom
+        setZoomScale(1);
+      }
+    }
+    lastTapTime.current = now;
+  };
+
+  const handleDownload = () => {
+    if (!lightboxUrls[lightboxIndex]) return;
+    window.open(lightboxUrls[lightboxIndex], "_blank");
+  };
+
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -395,7 +542,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                                     <div className="mb-1">
                                         {msg.attachments.length === 1 ? (
                                             /* Single image - large, standalone */
-                                            <div className="relative w-[280px] h-[210px] sm:w-[340px] sm:h-[255px] rounded-xl overflow-hidden bg-gray-100 shadow-sm">
+                                            <div 
+                                                className="relative w-[280px] h-[210px] sm:w-[340px] sm:h-[255px] rounded-xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer active:opacity-80 transition-opacity"
+                                                onClick={() => openLightbox(msg.attachments![0].file_url)}
+                                            >
                                                 <Image 
                                                     src={msg.attachments[0].file_url} 
                                                     alt="Attachment" 
@@ -417,9 +567,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                                                     <div 
                                                         key={att.id} 
                                                         className={cn(
-                                                            "relative rounded-xl overflow-hidden bg-gray-100 shadow-sm aspect-square",
+                                                            "relative rounded-xl overflow-hidden bg-gray-100 shadow-sm aspect-square cursor-pointer active:opacity-80 transition-opacity",
                                                             msg.attachments!.length === 3 && attIdx === 0 && "col-span-2 aspect-[2/1]"
                                                         )}
+                                                        onClick={() => openLightbox(att.file_url)}
                                                     >
                                                         <Image 
                                                             src={att.file_url} 
@@ -530,6 +681,118 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             </Button>
         </form>
       </div>
+
+      {/* Lightbox Modal */}
+      {lightboxOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center overflow-hidden"
+          onClick={handleLightboxTap}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Top bar */}
+          <div 
+            className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={closeLightbox} className="text-white/80 hover:text-white p-2">
+              <X className="w-6 h-6" />
+            </button>
+            <span className="text-white/60 text-sm">
+              {lightboxIndex + 1} / {lightboxUrls.length}
+            </span>
+            <button 
+              onClick={handleDownload}
+              className="text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+            >
+              <Download className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Left arrow */}
+          {lightboxIndex > 0 && (
+            <button
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors hidden sm:block"
+              onClick={(e) => { e.stopPropagation(); navigateLightbox('prev'); }}
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+          )}
+
+          {/* Right arrow */}
+          {lightboxIndex < lightboxUrls.length - 1 && (
+            <button
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors hidden sm:block"
+              onClick={(e) => { e.stopPropagation(); navigateLightbox('next'); }}
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          )}
+
+          {/* 3-image carousel strip */}
+          <div className="relative w-full h-full max-h-[80vh] overflow-hidden" style={{ maxWidth: '90vw' }}>
+            <div
+              className="flex h-full"
+              style={{
+                width: '300%',
+                transform: `translateX(${(-33.33 + animOffset * 33.33)}%)`,
+                transition: animOffset !== 0 ? 'transform 0.3s ease-out' : 'none',
+              }}
+            >
+              {/* Prev image slot */}
+              <div className="relative h-full" style={{ width: '33.33%' }}>
+                {lightboxIndex > 0 && (
+                  <Image
+                    src={lightboxUrls[lightboxIndex - 1]}
+                    alt="Previous"
+                    fill
+                    className="object-contain pointer-events-none select-none"
+                    sizes="90vw"
+                    unoptimized={lightboxUrls[lightboxIndex - 1].startsWith('blob:')}
+                    draggable={false}
+                  />
+                )}
+              </div>
+              {/* Current image slot (with zoom) */}
+              <div 
+                className="relative h-full" 
+                style={{ 
+                  width: '33.33%',
+                  transform: `scale(${zoomScale})`,
+                  transition: 'transform 0.2s ease-out',
+                  touchAction: 'none',
+                }}
+              >
+                <Image
+                  src={lightboxUrls[lightboxIndex]}
+                  alt="Full size"
+                  fill
+                  className="object-contain pointer-events-none select-none"
+                  sizes="90vw"
+                  unoptimized={lightboxUrls[lightboxIndex].startsWith('blob:')}
+                  priority
+                  draggable={false}
+                />
+              </div>
+              {/* Next image slot */}
+              <div className="relative h-full" style={{ width: '33.33%' }}>
+                {lightboxIndex < lightboxUrls.length - 1 && (
+                  <Image
+                    src={lightboxUrls[lightboxIndex + 1]}
+                    alt="Next"
+                    fill
+                    className="object-contain pointer-events-none select-none"
+                    sizes="90vw"
+                    unoptimized={lightboxUrls[lightboxIndex + 1].startsWith('blob:')}
+                    draggable={false}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

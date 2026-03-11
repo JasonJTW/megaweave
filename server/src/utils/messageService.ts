@@ -19,6 +19,14 @@ export interface Conversation {
   unread_count?: number; 
 }
 
+export interface Attachment {
+  id: number;
+  message_id: number;
+  file_url: string;
+  file_type: 'image' | 'video' | 'file';
+  created_at: Date;
+}
+
 export interface Message {
   id: number;
   conversation_id: number;
@@ -29,6 +37,7 @@ export interface Message {
   created_at: Date;
   sender_name?: string;
   sender_avatar?: string;
+  attachments?: Attachment[];
 }
 
 export type ConversationDTO = Omit<Conversation, 'user1_id' | 'user2_id' | 'other_user_id'>;
@@ -78,11 +87,11 @@ export const messageService = {
     }
   },
 
-  // 2. Create Message
   createMessage: async (
     conversationId: number,
     senderId: number,
-    content: string
+    content: string,
+    attachments?: Array<{ url: string; type: 'image' | 'video' | 'file' }>
   ): Promise<Message> => {
     const connection = await dbPool.getConnection();
     try {
@@ -95,13 +104,31 @@ export const messageService = {
         );
         const messageId = result.insertId;
 
-        // 2. Update conversation timestamp and last_message_id
+        // 2. Insert attachments if any
+        const insertedAttachments: Attachment[] = [];
+        if (attachments && attachments.length > 0) {
+            for (const att of attachments) {
+                const [attResult] = await connection.execute<ResultSetHeader>(
+                    "INSERT INTO message_attachments (message_id, file_url, file_type) VALUES (?, ?, ?)",
+                    [messageId, att.url, att.type]
+                );
+                insertedAttachments.push({
+                    id: attResult.insertId,
+                    message_id: messageId,
+                    file_url: att.url,
+                    file_type: att.type,
+                    created_at: new Date()
+                });
+            }
+        }
+
+        // 3. Update conversation timestamp and last_message_id
         await connection.execute(
             "UPDATE conversations SET last_message_at = NOW(), last_message_id = ? WHERE id = ?",
             [messageId, conversationId]
         );
         
-        // 3. Update sender's last_read_message_id in conversation_users
+        // 4. Update sender's last_read_message_id in conversation_users
         await connection.execute(
             "UPDATE conversation_users SET last_read_message_id = ? WHERE conversation_id = ? AND user_id = ?",
             [messageId, conversationId, senderId]
@@ -116,6 +143,7 @@ export const messageService = {
             content,
             is_read: false,
             created_at: new Date(),
+            attachments: insertedAttachments
         };
     } catch (error) {
         await connection.rollback();
@@ -143,7 +171,12 @@ export const messageService = {
           WHERE msg.conversation_id = c.id 
             AND msg.sender_id != cu1.user_id
             AND (cu1.last_read_message_id IS NULL OR msg.id > cu1.last_read_message_id)
-        ) as unread_count
+        ) as unread_count,
+        (
+          SELECT COUNT(*)
+          FROM message_attachments
+          WHERE message_id = c.last_message_id
+        ) as last_message_attachment_count
       FROM conversation_users cu1
       JOIN conversations c ON cu1.conversation_id = c.id
       JOIN conversation_users cu2 ON c.id = cu2.conversation_id AND cu2.user_id != cu1.user_id
@@ -158,7 +191,6 @@ export const messageService = {
     return rows as Conversation[];
   },
 
-  // 4. Get Messages in Conversation (Keyset Pagination)
   getMessages: async (
     conversationId: number, 
     limit: number = 20, 
@@ -181,8 +213,22 @@ export const messageService = {
     params.push(limit);
 
     const [rows] = await dbPool.query<RowDataPacket[]>(query, params);
+    const messages = rows as Message[];
 
-    return rows as Message[];
+    if (messages.length > 0) {
+        const messageIds = messages.map(m => m.id);
+        const [attachmentRows] = await dbPool.query<RowDataPacket[]>(
+            "SELECT * FROM message_attachments WHERE message_id IN (?)",
+            [messageIds]
+        );
+        const attachments = attachmentRows as Attachment[];
+        
+        messages.forEach(m => {
+            m.attachments = attachments.filter(a => a.message_id === m.id);
+        });
+    }
+
+    return messages;
   },
 
   // 5. Check if user belongs to conversation

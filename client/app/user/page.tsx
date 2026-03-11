@@ -351,10 +351,7 @@ const UserPage = () => {
 
     try {
       // 1. Compress before processing to save bandwidth to the effect service
-      const startTime = performance.now();
       const compressedBlob = await compressImage(selectedAvatarFile, 800, 800, 0.85);
-      const endTime = performance.now();
-      console.log(`[FE] Compression took ${(endTime - startTime).toFixed(2)}ms. File size: ${(selectedAvatarFile.size / 1024).toFixed(2)}KB -> ${(compressedBlob ? compressedBlob.size / 1024 : selectedAvatarFile.size / 1024).toFixed(2)}KB`);
       const blobToProcess = compressedBlob || selectedAvatarFile;
 
       // 2. Add effects/filters via the processing host

@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format, isToday, isYesterday } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import { SendIcon, ArrowLeft, Check, CheckCheck } from "lucide-react";
+import { SendIcon, ArrowLeft, Check, CheckCheck, ImageIcon, X, Loader2 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { compressImage } from "@/utils/imageProcessor";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -69,6 +71,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isFocused, setIsFocused] = useState(true); // Track window focus
+  
+  // Image selective states
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const [prevFirstMessageId, setPrevFirstMessageId] = useState<number | string | null>(null);
@@ -150,13 +158,63 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [conversationId, messages.length, isFocused, globalMutate]);
 
 
+  // Handle Image Selection
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Limit to 10 images
+    if (selectedFiles.length + files.length > 10) {
+      toast.error("Maximum 10 images allowed");
+      return;
+    }
+
+    const newPreviews: string[] = [];
+    const newFiles: File[] = [];
+
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} is too large (>10MB)`);
+        continue;
+      }
+      
+      const objectUrl = URL.createObjectURL(file);
+      newPreviews.push(objectUrl);
+      newFiles.push(file);
+    }
+
+    setPreviews(prev => [...prev, ...newPreviews]);
+    setSelectedFiles(prev => [...prev, ...newFiles]);
+    
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeSelectedImage = (index: number) => {
+    URL.revokeObjectURL(previews[index]);
+    setPreviews(prev => prev.filter((_, i) => i !== index));
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Cleanup object URLs
+  useEffect(() => {
+    return () => {
+      previews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previews]);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !otherUser) return;
+    if ((!inputValue.trim() && selectedFiles.length === 0) || !otherUser) return;
     
     setIsSending(true);
     const content = inputValue;
+    const filesToSend = [...selectedFiles];
+    const previewUrls = [...previews];
+    
     setInputValue(""); // Clear input immediately
+    setSelectedFiles([]);
+    setPreviews([]);
 
     // Optimistic Update
     const tempId = `temp-${Date.now()}`;
@@ -167,6 +225,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         content: content,
         is_read: false,
         created_at: new Date().toISOString(),
+        attachments: filesToSend.map((file, i) => ({
+            id: Math.random(), // Temporary ID for rendering
+            message_id: 0,
+            file_url: previewUrls[i], // Use object URL for immediate display
+            file_type: 'image',
+            created_at: new Date().toISOString()
+        }))
     };
 
     // Update local cache immediately
@@ -182,14 +247,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     );
 
     try {
+      const formData = new FormData();
+      formData.append("recipient_public_id", otherUser.public_id);
+      formData.append("content", content);
+      
+      // Compress and append images
+      for (const file of filesToSend) {
+          const compressed = await compressImage(file, 1200, 1200, 0.85);
+          if (compressed) {
+              formData.append("images", compressed, "image.webp");
+          } else {
+              formData.append("images", file);
+          }
+      }
+
       const res = await fetch(`${hostName}/api/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-           recipient_public_id: otherUser.public_id,
-           content: content
-        }),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -312,15 +387,66 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                                     <AvatarFallback>{otherUser?.username?.substring(0, 1).toUpperCase()}</AvatarFallback>
                                  </Avatar>
                             )}
-                            <div className="flex flex-col max-w-[70%]">
-                                <div className={cn(
-                                    "px-4 py-2 rounded-2xl break-words shadow-sm",
-                                    isMe 
-                                      ? "bg-blue-500 text-white rounded-br-none" 
-                                      : "bg-white text-gray-800 border rounded-bl-none"
-                                )}>
-                                    <p>{msg.content}</p>
-                                </div>
+                             <div className={cn(
+                                 "flex flex-col",
+                                 isMe ? "items-end" : "items-start"
+                             )}>
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                    <div className="mb-1">
+                                        {msg.attachments.length === 1 ? (
+                                            /* Single image - large, standalone */
+                                            <div className="relative w-[280px] h-[210px] sm:w-[340px] sm:h-[255px] rounded-xl overflow-hidden bg-gray-100 shadow-sm">
+                                                <Image 
+                                                    src={msg.attachments[0].file_url} 
+                                                    alt="Attachment" 
+                                                    fill 
+                                                    className="object-cover"
+                                                    sizes="340px"
+                                                    unoptimized={msg.attachments[0].file_url.startsWith('blob:')}
+                                                />
+                                            </div>
+                                        ) : (
+                                            /* Multiple images - grid */
+                                            <div className={cn(
+                                                "grid gap-1.5",
+                                                msg.attachments.length === 2 ? "grid-cols-2 w-[280px] sm:w-[340px]" :
+                                                msg.attachments.length === 3 ? "grid-cols-2 w-[280px] sm:w-[340px]" :
+                                                "grid-cols-2 w-[280px] sm:w-[340px]"
+                                            )}>
+                                                {msg.attachments.map((att, attIdx) => (
+                                                    <div 
+                                                        key={att.id} 
+                                                        className={cn(
+                                                            "relative rounded-xl overflow-hidden bg-gray-100 shadow-sm aspect-square",
+                                                            msg.attachments!.length === 3 && attIdx === 0 && "col-span-2 aspect-[2/1]"
+                                                        )}
+                                                    >
+                                                        <Image 
+                                                            src={att.file_url} 
+                                                            alt="Attachment" 
+                                                            fill 
+                                                            className="object-cover"
+                                                            sizes="170px"
+                                                            unoptimized={att.file_url.startsWith('blob:')}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {msg.content && (
+                                    <div className={cn(
+                                        "px-4 py-2 rounded-2xl break-words shadow-sm max-w-[280px] sm:max-w-[340px]",
+                                        isMe 
+                                          ? "bg-blue-500 text-white rounded-br-none" 
+                                          : "bg-white text-gray-800 border rounded-bl-none"
+                                    )}>
+                                        <p className="text-[14px] sm:text-base leading-relaxed">{msg.content}</p>
+                                    </div>
+                                )}
+
                                 <div className={cn(
                                     "flex items-center mt-1 text-[10px]",
                                     isMe ? "justify-end text-blue-400" : "justify-start text-gray-400"
@@ -355,18 +481,55 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSend} className="p-4 border-t bg-white flex items-center gap-2">
-         <Input 
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1"
-            disabled={isSending}
-         />
-         <Button type="submit" size="icon" disabled={isSending || !inputValue.trim()}>
-            <SendIcon className="w-4 h-4" />
-         </Button>
-      </form>
+      <div className="border-t bg-white">
+        {/* Previews */}
+        {previews.length > 0 && (
+            <div className="flex gap-2 p-2 overflow-x-auto bg-gray-50 border-b">
+                {previews.map((url, i) => (
+                    <div key={url} className="relative w-20 h-20 flex-shrink-0 group">
+                        <Image src={url} alt="Preview" fill className="object-cover rounded-md border" />
+                        <button 
+                            onClick={() => removeSelectedImage(i)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        )}
+        
+        <form onSubmit={handleSend} className="p-4 flex items-center gap-2">
+            <input 
+                type="file" 
+                ref={fileInputRef}
+                className="hidden" 
+                accept="image/*" 
+                multiple 
+                onChange={handleImageSelect}
+            />
+            <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending}
+                className="text-gray-400 hover:text-blue-500"
+            >
+                <ImageIcon className="w-6 h-6" />
+            </Button>
+            <Input 
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1"
+                disabled={isSending}
+            />
+            <Button type="submit" size="icon" disabled={isSending || (!inputValue.trim() && selectedFiles.length === 0)}>
+                {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <SendIcon className="w-4 h-4" />}
+            </Button>
+        </form>
+      </div>
     </div>
   );
 };

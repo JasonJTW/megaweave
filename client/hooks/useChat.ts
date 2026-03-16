@@ -37,7 +37,10 @@ export const useConversations = () => {
 export const useMessages = (conversationId: number | null) => {
   const { data, error, isLoading, mutate } = useSWR<{ messages: Message[], hasMore: boolean, conversation?: Conversation }>(
     conversationId ? `${hostName}/api/messages/conversations/${conversationId}` : null,
-    fetcher
+    fetcher,
+    {
+      revalidateOnFocus: false, // Socket handles real-time updates; auto-revalidation causes race conditions with markAsRead
+    }
   );
 
   const fetchMore = async () => {
@@ -56,7 +59,7 @@ export const useMessages = (conversationId: number | null) => {
       
       // Update the SWR cache by appending new messages to the end
       mutate((current) => {
-          if (!current) return current;
+          if (!current) return { messages: newData.messages, hasMore: newData.hasMore };
           return {
               ...current,
               messages: [...current.messages, ...newData.messages],
@@ -100,7 +103,7 @@ export const useChatSocket = (conversationId: number | null) => {
                 mutateMessages(
                     `${hostName}/api/messages/conversations/${conversationId}`,
                     (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
-                        if (!currentData) return { messages: [newMessage], hasMore: false };
+                        if (!currentData) return currentData; // No-op: SWR fetch still in flight, don't corrupt cache
                         
                         // 1. Check for duplicates by ID
                         const isDuplicate = currentData.messages.some(m => m.id === newMessage.id);
@@ -138,9 +141,7 @@ export const useChatSocket = (conversationId: number | null) => {
                 mutateConversations(
                     `${hostName}/api/messages/conversations`,
                     (currentData: { conversations: Conversation[] } | undefined) => {
-                        if (!currentData) {
-                            return undefined; 
-                        }
+                        if (!currentData) return currentData;
                         
                         const conversations = currentData.conversations;
                         const existingIndex = conversations.findIndex(c => Number(c.id) === Number(newMessage.conversation_id));
@@ -185,7 +186,7 @@ export const useChatSocket = (conversationId: number | null) => {
                             
                             return { conversations: newConversations };
                         } else {
-                            return undefined; 
+                            return currentData; 
                         }
                     },
                     false
@@ -274,7 +275,7 @@ export const useChatSocket = (conversationId: number | null) => {
             mutateConversations(
                 `${hostName}/api/messages/conversations`,
                 (currentData: { conversations: Conversation[] } | undefined) => {
-                    if (!currentData) return undefined;
+                    if (!currentData) return currentData;
                     const conversations = currentData.conversations;
                     const existingIndex = conversations.findIndex(c => c.id === Number(conversationId));
                     if (existingIndex !== -1 && (conversations[existingIndex].unread_count || 0) > 0) {
@@ -291,9 +292,8 @@ export const useChatSocket = (conversationId: number | null) => {
             );
         };
 
-        // Run if already focused when mounting
-        if (document.hasFocus()) clearRead();
-
+        // Only listen for focus events, do NOT fire on mount
+        // Initial markAsRead is handled by ChatWindow's own effect which waits for messages to load
         window.addEventListener("focus", clearRead);
         window.addEventListener("visibilitychange", clearRead);
 

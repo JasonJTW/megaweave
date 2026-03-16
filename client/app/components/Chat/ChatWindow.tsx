@@ -265,16 +265,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     window.addEventListener("focus", handleFocus);
     window.addEventListener("blur", handleBlur);
-    document.addEventListener("visibilitychange", () => { // Handle tab switching
-       setIsFocused(!document.hidden);
-    });
+    const handleVisibilityChange = () => setIsFocused(!document.hidden);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
-      // document.removeEventListener("visibilitychange", ...); // Anonymous function can't be removed easily without ref, but component unmount clears effect scope. 
-      // For correctness let's use a named function if we were strict, but for now this effect cleanup is sufficient as listeners are attached to window/document which persist.
-      // Actually, better to define the handler outside or use a ref if we wanted to be 100% clean, but simple add/remove is fine.
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -283,7 +280,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const markAsRead = async () => {
         try {
             // Only mark as read if we have an ID AND messages AND the window is focused
-            if (!conversationId || messages.length === 0 || !isFocused) return;
+            if (!conversationId || messages?.length === 0 || !isFocused) return;
 
             // Check if the last message is from the *other* user and is *not* read
             // Optimization: No need to call API if last message is mine or already read (though local state might lag)
@@ -302,7 +299,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     };
     
     markAsRead();
-  }, [conversationId, messages.length, isFocused, globalMutate]);
+  }, [conversationId, messages?.length, isFocused, globalMutate]);
 
 
   // Handle Image Selection
@@ -474,9 +471,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       <div className="flex-1 overflow-y-auto p-4 gap-4 bg-slate-50 flex flex-col-reverse">
         {/* Anchor point for scrolling to bottom */}
         <div ref={messagesEndRef} />
-        
         {isLoading ? (
             <div className="text-center text-gray-400 mt-10">Loading messages...</div>
+        ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 mb-10">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-2">
+                    <Avatar className="w-12 h-12">
+                        <AvatarImage src={otherUser?.avatar_url} />
+                        <AvatarFallback>{otherUser?.username?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                </div>
+                <p className="font-semibold text-gray-700">No messages yet</p>
+                <p className="text-sm">Send a message to start the conversation with {otherUser?.username}</p>
+            </div>
         ) : (
             messages.map((msg, index) => { 
                const myPublicId = currentUser?.public_id || "";

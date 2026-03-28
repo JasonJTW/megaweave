@@ -47,11 +47,12 @@ export default function OverlayTour({
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const isSwiping = useRef(false);
+  const isTransitioning = useRef(false);
 
   const step = steps[currentStepIndex];
 
   const updatePosition = useCallback(() => {
-    if (!isOpen || !step) return;
+    if (!isOpen || !step || isTransitioning.current) return;
 
     if (step.targetId) {
       const el = document.getElementById(step.targetId);
@@ -65,6 +66,11 @@ export default function OverlayTour({
           step.layoutType === "message";
 
         if (!isInViewport) {
+          isTransitioning.current = true;
+
+          // Temporarily unlock body overflow so scrollIntoView actually works
+          document.body.style.overflow = "";
+
           if (
             step.layoutType === "welcome" ||
             step.layoutType === "wish" ||
@@ -74,13 +80,18 @@ export default function OverlayTour({
           } else {
             el.scrollIntoView({ behavior: "smooth", block: "center" });
           }
+
           setTimeout(() => {
+            // Re-lock body overflow after scroll completes
+            document.body.style.overflow = "hidden";
+            isTransitioning.current = false;
+
             if (isSpotlightStep) {
               setTargetRect(el.getBoundingClientRect());
             } else {
               setTargetRect(null);
             }
-          }, 300);
+          }, 500);
         } else {
           if (isSpotlightStep) {
             setTargetRect(rect);
@@ -99,10 +110,8 @@ export default function OverlayTour({
   useEffect(() => {
     updatePosition();
     window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition);
     return () => {
       window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition);
     };
   }, [updatePosition]);
 

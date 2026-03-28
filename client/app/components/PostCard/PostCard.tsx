@@ -257,7 +257,8 @@ function PostCardInner({
         </div>
       )}
 
-      <div className="relative pt-4">
+      {/*//* pt-3 for title margin */}
+      <div className="relative pt-3">
         {post.type === "share" && (
           <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
         )}
@@ -275,7 +276,8 @@ function PostCardInner({
           style={{ pointerEvents: isExpanded ? "auto" : "none" }}
         >
           {imageSrc && (
-            <div className="relative justify-center mb-0 mx-4">
+            //* mx-3 for image margin
+            <div className="relative justify-center mb-0 mx-3">
               <div className="relative w-full h-64 md:h-80 rounded-[20px] overflow-hidden">
                 <Image
                   src={imageSrc}
@@ -287,7 +289,7 @@ function PostCardInner({
                 />
               </div>
 
-              <div className="absolute w-full flex flex-row bottom-0 justify-between px-5 py-5">
+              <div className="absolute w-full flex flex-row bottom-0 justify-between px-3 py-3">
                 {post.view_count > 0 && (
                   <div className="flex items-center">
                     <Badge className="bg-[#7c7c7c] text-white font-ddin font-normal text-[14px] px-2">
@@ -304,13 +306,13 @@ function PostCardInner({
               </div>
             </div>
           )}
-          <h2 className="font-semibold mx-4 font-ddin text-[36px] text-gray-800 truncate flex-1">
+          <h2 className="font-semibold mx-3 font-ddin text-[36px] text-gray-800 truncate flex-1">
             {post.title}
           </h2>
 
           {(category || post.category_name_en) && (
             <div
-              className="inline-flex mx-4 mt-[8px] leading-[34px] cursor-pointer"
+              className="inline-flex mx-3 mt-[8px] leading-[34px] cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 if (onCategoryClick) {
@@ -324,7 +326,7 @@ function PostCardInner({
             </div>
           )}
 
-          <div className="bg-white flex flex-col p-4 mx-4 rounded-[20px]">
+          <div className="bg-white flex flex-col p-3 mx-0 rounded-[20px]">
             <p className="text-black text-[18px] truncate">{post.content}</p>
 
             {/* ✅ 顯示 Weave 備註 */}

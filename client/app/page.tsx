@@ -12,6 +12,7 @@ import { usePost } from "./contexts/PostContext";
 import { LucideLoader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
+import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
 import {
   Post,
   PostsResponse,
@@ -20,6 +21,7 @@ import {
 } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImage } from "@/utils/imageProcessor";
+import OverlayTour, { TourStep } from "./components/OverlayTour";
 
 import { useRouter } from "next/navigation";
 import { useUser } from "./contexts/UserContext";
@@ -52,6 +54,70 @@ const PostsApp = () => {
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
+  const [isTourOpen, setIsTourOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // const hasSeenTour = localStorage.getItem("megaweave_tour_seen");
+      const hasSeenTour = false;
+      if (!hasSeenTour) {
+        setTimeout(() => setIsTourOpen(true), 300);
+      }
+    }
+  }, []);
+
+  const TOUR_STEPS: TourStep[] = [
+    {
+      targetId: undefined,
+      content:
+        'megaweaving is a platform for resources sharing and circulation.\n\nThe concept of "weaving" allows users to exchange resources for free, creating a cycle that maximizes resource efficiency through collective sharing.\n\nBy "weave" user with those who "share" or "wish", we foster sustainability and strengthen community bonds.',
+      layoutType: "welcome",
+    },
+    {
+      targetId: "tour-wish",
+      content: "Post a request for specific resources\nyou are looking for.",
+      layoutType: "wish",
+    },
+    {
+      targetId: "tour-share",
+      content: "List resources you want to\ngive away to the community.",
+      layoutType: "share",
+    },
+    {
+      targetId: "tour-feed",
+      content: "Scroll vertical to browse.",
+      layoutType: "scroll",
+    },
+    {
+      targetId: undefined,
+      content: (
+        <span>
+          Free resources only.
+          <br />
+          <strong className="text-megaweave-red-dark">
+            No monetary transactions
+          </strong>
+          <br />
+          or trades involved.
+        </span>
+      ),
+      layoutType: "rules",
+    },
+    {
+      targetId: "tour-message",
+      content: (
+        <span>
+          Click
+          <div className="inline-block px-2 py-1 mx-2 align-top bg-white rounded-full">
+            <PrivateMessageIcon />
+          </div>
+          button to send a private message and request weaving with the owner of
+          the post.
+        </span>
+      ),
+      layoutType: "message",
+    },
+  ];
 
   // 分類和狀況數據
 
@@ -532,6 +598,15 @@ const PostsApp = () => {
 
   return (
     <>
+      <OverlayTour
+        steps={TOUR_STEPS}
+        isOpen={isTourOpen}
+        onClose={() => {
+          setIsTourOpen(false);
+          localStorage.setItem("megaweave_tour_seen", "true");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+      />
       <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
       <div className="min-h-screen ">
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
@@ -565,6 +640,7 @@ const PostsApp = () => {
         >
           <div className="flex justify-between items-center w-full">
             <Button
+              id="tour-wish"
               className="bg-megaweave-red-dark  border-megaweave-red-light border-[2px] text-[#efd0c4] py-[32px] mr-[10px] shadow-none duration-150"
               onClick={() => {
                 handleCreatePostButtonClick("wish");
@@ -574,6 +650,7 @@ const PostsApp = () => {
               <ElfIcon className="text-[#efd0c4] !w-[18px] !h-[18px]" />
             </Button>
             <Button
+              id="tour-share"
               className="bg-megaweave-gold border-megaweave-gold-light border-[2px] text-[#fbe7c6] py-[32px] shadow-none duration-150"
               onClick={() => {
                 handleCreatePostButtonClick("share");
@@ -867,40 +944,42 @@ const PostsApp = () => {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
           ) : (
-            <Feed
-              posts={posts}
-              conditions={conditions}
-              onPostClick={(post) => {
-                if (categoryInteractionLockRef.current) return;
-                router.push(`/item/${post.id}`);
-              }}
-              weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
-              currentUserId={user?.userId}
-              onWeaveStatusChange={() => {
-                fetchPosts(); // 重新抓取資料
-              }}
-              onCategoryClick={(categoryId) => {
-                setSelectedCategory(categoryId.toString());
-                window.scrollTo({ top: 300, behavior: "smooth" });
-              }}
-              onLocationClick={(type, value) => {
-                // Handle clickable location parts
-                console.log("Location clicked:", type, value);
-                if (type === "province") {
-                  setSearchProvince(value);
-                  setSearchCity("");
-                  setSelectedLocation("");
-                  setLocationInput(value);
-                } else if (type === "city") {
-                  setSearchCity(value);
-                  setSelectedLocation("");
-                  setLocationInput(value);
-                } else if (type === "route") {
-                  setSelectedLocation(value);
-                  setLocationInput(value);
-                }
-              }}
-            />
+            <div id="tour-feed" className="w-full">
+              <Feed
+                posts={posts}
+                conditions={conditions}
+                onPostClick={(post) => {
+                  if (categoryInteractionLockRef.current) return;
+                  router.push(`/item/${post.id}`);
+                }}
+                weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
+                currentUserId={user?.userId}
+                onWeaveStatusChange={() => {
+                  fetchPosts(); // 重新抓取資料
+                }}
+                onCategoryClick={(categoryId) => {
+                  setSelectedCategory(categoryId.toString());
+                  window.scrollTo({ top: 300, behavior: "smooth" });
+                }}
+                onLocationClick={(type, value) => {
+                  // Handle clickable location parts
+                  console.log("Location clicked:", type, value);
+                  if (type === "province") {
+                    setSearchProvince(value);
+                    setSearchCity("");
+                    setSelectedLocation("");
+                    setLocationInput(value);
+                  } else if (type === "city") {
+                    setSearchCity(value);
+                    setSelectedLocation("");
+                    setLocationInput(value);
+                  } else if (type === "route") {
+                    setSelectedLocation(value);
+                    setLocationInput(value);
+                  }
+                }}
+              />
+            </div>
           )}
 
           {/* 分頁 */}
@@ -988,6 +1067,7 @@ const PostsApp = () => {
                       {selectedImages.map((image, index) => (
                         <div key={index} className="relative group">
                           <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={URL.createObjectURL(image)}
                               alt={`預覽 ${index + 1}`}

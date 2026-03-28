@@ -152,7 +152,7 @@ export default {
   plugins: [
     tailwindcssAnimate,
     // *** 新增客製化文字樣式插件 ***
-    plugin(function ({ addUtilities }) {
+    plugin(function ({ addComponents }) {
       const typeStyles = {
         // --- Heading Styles ---
         ".type-h1": {
@@ -211,9 +211,9 @@ export default {
         },
         ".type-button-b1": {
           fontSize: "18px", // 18pt
-          lineHeight: "1",
+          lineHeight: "1.5rem",
           fontWeight: "600",
-          letterSpacing: "0.05em", // 5% 字距
+          letterSpacing: "0.02em",
         },
         ".type-button-b2": {
           fontSize: "16px", // 18pt
@@ -223,7 +223,7 @@ export default {
         },
       };
 
-      addUtilities(typeStyles);
+      addComponents(typeStyles);
     }),
   ],
 } satisfies Config;

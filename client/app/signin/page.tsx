@@ -76,7 +76,7 @@ function SigninForm() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "An unexpected error occurred during Google sign in"
+          : "An unexpected error occurred during Google sign in",
       );
     } finally {
       setLoading(false);
@@ -122,7 +122,7 @@ function SigninForm() {
       handleSigninSignupSuccess();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
+        error instanceof Error ? error.message : "An unexpected error occurred",
       );
     } finally {
       setLoading(false);
@@ -176,7 +176,7 @@ function SigninForm() {
           setLoading(false);
         }
       },
-      { scope: "email,public_profile" }
+      { scope: "email,public_profile" },
     );
   };
 
@@ -207,7 +207,7 @@ function SigninForm() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "An unexpected error occurred during Facebook sign in"
+          : "An unexpected error occurred during Facebook sign in",
       );
     } finally {
       setLoading(false);
@@ -266,7 +266,7 @@ function SigninForm() {
     } catch (error) {
       console.log(error);
       toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
+        error instanceof Error ? error.message : "An unexpected error occurred",
       );
     } finally {
       setLoading(false);
@@ -275,62 +275,89 @@ function SigninForm() {
 
   return (
     <>
-      <div className="fixed inset-0 bg-secondary  -z-10"></div>
-      <div className="min-h-screen flex bg-secondary items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-secondary md:bg-[#000000]/80 overflow-x-hidden font-ddin relative">
         <motion.div
           initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: easeInOut }}
-          className="w-full max-w-md"
+          className="w-full max-w-md md:max-w-[640px] z-10"
         >
-          <div className="bg-secondary rounded-2xl  p-8 space-y-6">
-
-            {/* icon */}
+          <div className="bg-secondary md:bg-white rounded-2xl md:rounded-[60px] p-8 md:px-16 md:py-12 space-y-6 md:space-y-8 flex flex-col items-center shadow-none md:shadow-2xl">
             <div className="flex w-full justify-center">
-              <Image
-                src="/icons/weaving.svg"
-                alt="megaweaving icon"
-                width={150}
-                height={150}
-                className="object-cover"
-                priority
-              />
+              <div className="relative">
+                <Image
+                  src="/icons/weaving.svg"
+                  alt="megaweaving icon"
+                  width={150}
+                  height={150}
+                  className="object-cover md:w-[130px] md:h-[130px]"
+                  priority
+                />
+                {/* The '+' overlay seen in Figma */}
+                <div className="hidden md:flex absolute inset-0 items-center justify-center text-white text-4xl font-bold">
+                  +
+                </div>
+              </div>
             </div>
+
             {/* title */}
-            <div className="flex w-full text-[48px] font-ddin font-semibold text-center justify-center">
-              {mode == "register" ? "Register" : "Log in"}
+            <div className="flex flex-col items-center w-full text-center">
+              <div className="hidden md:block text-[48px] md:text-[36px] font-bold text-megaweave-forest-dark leading-tight">
+                Welcome to megaweaving!
+              </div>
+              <div className="md:hidden text-[48px] font-bold text-megaweave-forest-dark leading-tight">
+                {mode === "register" ? "Register" : "Log in"}
+              </div>
+              <div className="hidden md:block text-[#888888] type-body-t3 mt-2">
+                {mode === "register"
+                  ? "Register before start weaving."
+                  : "Log in to continue weaving."}
+              </div>
             </div>
-            <div className="flex flex-col-2 max-w-full ">
-              <Button
-                className={
-                  mode === "login"
-                    ? "pointer-events-none"
-                    : "bg-transparent shadow-none text-megaweave-forest-dark"
-                }
+
+            <div className="relative flex items-center bg-secondary md:bg-gray-100 rounded-full p-1 w-full h-[50px] md:h-[60px] overflow-hidden">
+              {/* Single Sliding Pill - Explicit horizontal motion only */}
+              <motion.div
+                className="absolute top-1 bottom-1 left-1 bg-megaweave-forest rounded-full z-0"
+                initial={false}
+                animate={{
+                  x: mode === "login" ? "0%" : "100%",
+                  y: 0,
+                  opacity: 1,
+                  width: "calc(50% - 4px)",
+                }}
+                transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
+              />
+              <button
+                className={`relative flex-1 h-full flex items-center justify-center transition-colors duration-300 z-10 type-button-b2 md:type-button-b1 ${
+                  mode === "login" ? "text-white" : "text-megaweave-forest-dark"
+                }`}
                 onClick={handleLoginClick}
               >
                 Log in
-              </Button>
-              <Button
-                className={
+              </button>
+              <button
+                className={`relative flex-1 h-full flex items-center justify-center transition-colors duration-300 z-10 type-button-b2 md:type-button-b1 ${
                   mode === "register"
-                    ? "pointer-events-none"
-                    : "bg-transparent shadow-none text-megaweave-forest-dark"
-                }
+                    ? "text-white"
+                    : "text-megaweave-forest-dark"
+                }`}
                 onClick={handleRegisterClick}
               >
                 Register
-              </Button>
+              </button>
             </div>
 
-            <div className="grid grid-rows-2 gap-4">
+            <div className="w-full h-[1px] bg-megaweave-stone/20 mb-2" />
+
+            <div className="flex flex-col gap-4 w-full px-4">
               <Button
                 variant={"outline"}
-                className="w-full hover:bg-primary-30 transition-all duration-200 plausible-event-name=SigninWithGoogle"
+                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 plaqueable-event-name=SigninWithGoogle text-megaweave-forest-dark type-button-b1"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
-                    "hidden-google-signin"
+                    "hidden-google-signin",
                   );
                   const googleButton =
                     container?.querySelector('[role="button"]');
@@ -347,7 +374,6 @@ function SigninForm() {
                   viewBox="0 0 24 24"
                   className="w-5 h-5 mr-2"
                   fill="currentColor"
-                  style={{ display: "inline-block", verticalAlign: "middle" }}
                 >
                   <path d={siGoogle.path} />
                 </svg>
@@ -366,7 +392,7 @@ function SigninForm() {
               </div>
               <Button
                 variant={"outline"}
-                className="w-full hover:bg-primary-30 transition-all duration-200 plausible-event-name=SigninWithFacebook"
+                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 plausible-event-name=SigninWithFacebook text-megaweave-forest-dark type-button-b1"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >
@@ -375,7 +401,6 @@ function SigninForm() {
                   viewBox="0 0 24 24"
                   className="w-5 h-5 mr-2"
                   fill="currentColor"
-                  style={{ display: "inline-block", verticalAlign: "middle" }}
                 >
                   <path d={siFacebook.path} />
                 </svg>
@@ -384,15 +409,18 @@ function SigninForm() {
             </div>
             <div className="relative">
               <div className="relative flex justify-center text-megaweave-forest-dark font-ddin font-semibold">
-                <span className="bg-secondary px-2 select-none">or</span>
+                <span className="bg-transparent px-2 select-none">or</span>
               </div>
             </div>
 
             {mode === "login" && (
-              <form onSubmit={handleSubmit} className="">
+              <form onSubmit={handleSubmit} className="w-full px-4 space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-primary">
+                    <Label
+                      htmlFor="email"
+                      className="text-secondary-foreground md:hidden px-1"
+                    >
                       Email
                     </Label>
                     <Input
@@ -402,11 +430,14 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary text-primary "
+                      className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-primary-400">
+                    <Label
+                      htmlFor="password"
+                      className="text-secondary-foreground md:hidden px-1"
+                    >
                       Password
                     </Label>
                     <div className="relative">
@@ -417,15 +448,14 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary text-primary "
+                        className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
                       />
                       <button
                         type="button"
                         onClick={() => {
                           setShowPassword(!showPassword);
-                          console.log(showPassword);
                         }}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
+                        className="absolute right-9 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-emerald-700 transition duration-300"
                       >
                         {showPassword ? (
                           <EyeClosed size={20} />
@@ -435,27 +465,28 @@ function SigninForm() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between px-1">
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="remember"
-                        className="border-emerald-300"
-                        onClick={() => {
-                          setRememberMe(!rememberMe);
-                          console.log(rememberMe);
-                        }}
+                        className="border-emerald-300 md:border-gray-300"
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(!!checked)}
                       />
-                      <Label htmlFor="remember" className="text-primary-400">
+                      <Label
+                        htmlFor="remember"
+                        className="text-primary-400 md:text-gray-500"
+                      >
                         Remember me
                       </Label>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center mt-4">
+                <div className="flex items-center">
                   <Button
                     type="submit"
-                    className="w-full bg-primary-75  hover:shadow-primary-15 shadow-2xl transition-all duration-200 z-10"
+                    className="w-full bg-primary-75 md:h-12 transition-all duration-200 z-10"
                     disabled={!email || !password || loading}
                   >
                     {loading ? "Logging in..." : "Log in"}
@@ -465,25 +496,34 @@ function SigninForm() {
             )}
 
             {mode === "register" && (
-              <form onSubmit={handleSignupSubmit} className="">
+              <form
+                onSubmit={handleSignupSubmit}
+                className="w-full px-4 space-y-6"
+              >
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="username" className="text-primary-75">
+                    <Label
+                      htmlFor="username"
+                      className="text-secondary-foreground md:hidden px-1"
+                    >
                       UserName
                     </Label>
                     <Input
-                      type="username"
+                      type="text"
                       id="username"
                       value={username}
                       onChange={(e) => setUserName(e.target.value)}
                       required
                       placeholder="Enter your username"
-                      className="bg-secondary text-primary "
+                      className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-primary">
+                    <Label
+                      htmlFor="email"
+                      className="text-secondary-foreground md:hidden px-1"
+                    >
                       Email
                     </Label>
                     <Input
@@ -493,11 +533,14 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary text-primary "
+                      className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-primary">
+                    <Label
+                      htmlFor="password"
+                      className="text-secondary-foreground md:hidden px-1"
+                    >
                       Password
                     </Label>
                     <div className="relative">
@@ -508,15 +551,14 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary text-primary "
+                        className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
                       />
                       <button
                         type="button"
                         onClick={() => {
                           setShowPassword(!showPassword);
-                          console.log(showPassword);
                         }}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
+                        className="absolute right-9 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-emerald-700 transition duration-300"
                       >
                         {showPassword ? (
                           <EyeClosed size={20} />
@@ -526,48 +568,41 @@ function SigninForm() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between px-1">
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="remember"
-                        className="border-emerald-300"
-                        onClick={() => {
-                          setRememberMe(!rememberMe);
-                          console.log(rememberMe);
-                        }}
+                        className="border-emerald-300 md:border-gray-300"
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(!!checked)}
                       />
-                      <Label htmlFor="remember" className="text-primary">
+                      <Label
+                        htmlFor="remember"
+                        className="text-primary md:text-gray-500"
+                      >
                         Remember me
                       </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <a
-                        href=""
-                        className="text-primary underline hover:text-emerald-700"
-                      >
-                        Forgot Password?
-                      </a>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center mt-4">
+                <div className="flex items-center">
                   <Button
                     type="submit"
-                    className="w-full bg-primary-75 hover:shadow-primary-15 shadow-2xl transition-all duration-200 z-10 "
+                    className="w-full bg-primary-75 md:h-12 transition-all duration-200 z-10"
                     disabled={!username || !email || !password || loading}
                   >
-                    {loading ? "Registering..." : "Register"}
+                    {loading ? "Registering..." : "Sign up"}
                   </Button>
                 </div>
               </form>
             )}
-            <div className="flex justify-center text-[12px] mt-5">
+            <div className="flex justify-center text-[12px] md:text-sm mt-5">
               <a
                 href=""
-                className="text-primary items-center hover:text-emerald-700"
+                className="text-primary md:text-megaweave-forest-dark items-center hover:text-emerald-700 font-bold"
               >
-                Forgot Password?
+                Forget password?
               </a>
             </div>
           </div>

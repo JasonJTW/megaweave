@@ -195,7 +195,7 @@ export default {
         ".type-body-t3": {
           fontSize: "1.125rem", // 18pt
           lineHeight: "1.5",
-          fontWeight: "400", // Regular (R)
+          fontWeight: "500", // Regular (R)
         },
         ".type-body-t4": {
           fontSize: "16px", // 16pt

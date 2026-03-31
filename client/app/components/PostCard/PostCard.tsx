@@ -278,13 +278,15 @@ function PostCardInner({
           {imageSrc && (
             //* mx-3 for image margin
             <div className="relative justify-center mb-0 mx-3">
-              <div className="relative w-full h-64 md:h-80 rounded-[20px] overflow-hidden">
+              <div className="relative w-full rounded-[20px] overflow-hidden">
                 <Image
                   src={imageSrc}
                   alt={post.title}
-                  fill
+                  width={0}
+                  height={0}
+                  sizes="100vw"
+                  style={{ width: "100%", height: "auto" }}
                   className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 50vw"
                   priority={false}
                 />
               </div>

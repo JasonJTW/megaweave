@@ -70,7 +70,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         if (user) {
           const likeResponse = await fetch(
             `${hostName}/api/posts/${postId}/like`,
-            { credentials: "include", method: "GET" }
+            { credentials: "include", method: "GET" },
           );
           if (likeResponse.ok) {
             const likeData = await likeResponse.json();
@@ -106,7 +106,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     if (!user) {
       toast.error("Please log in to like");
       router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
       return;
     }
@@ -454,11 +454,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   <MessageIcon className="w-5 h-5 text-dark" />
                 </Button>
                 {post.user_id && user?.userId !== post.user_id && (
-                    <MessageButton
-                        recipientPublicId={post.author_public_id}
-                        recipientName={post.username || "User"}
-                        className="ml-2 border-0 hover:bg-transparent text-gray-500 hover:text-primary p-0 h-auto"
-                    />
+                  <MessageButton
+                    recipientPublicId={post.author_public_id}
+                    recipientName={post.username || "User"}
+                    className="ml-2 border-0 hover:bg-transparent text-gray-500 hover:text-primary p-0 h-auto"
+                  />
                 )}
               </div>
 

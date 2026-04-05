@@ -219,7 +219,7 @@ function PostCardInner({
   return (
     <div
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px] bg-white  transition-all duration-300 py-0 pb-4 mt-4 relevant ${
+      className={`font-ddin cursor-pointer rounded-[30px] bg-white  transition-all duration-300 py-0 pb-4 mt-4 relative ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -270,7 +270,7 @@ function PostCardInner({
           className="overflow-hidden"
           initial={false}
           animate={
-            isExpanded ? { y: 0, maxHeight: 2000 } : { y: 0, maxHeight: 0 }
+            isExpanded ? { y: 0, maxHeight: 5000 } : { y: 0, maxHeight: 0 }
           }
           transition={{ duration: 0.6, ease: "easeIn" }}
           style={{ pointerEvents: isExpanded ? "auto" : "none" }}

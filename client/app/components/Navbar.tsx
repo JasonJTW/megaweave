@@ -4,19 +4,18 @@ import React, { useState } from "react";
 import { useNavbar } from "../contexts/NavBarContext";
 import { useConversations, useChatSocket } from "@/hooks/useChat";
 import Link from "next/link";
-import Image from "next/image";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
+import MenuIcon from "./icons/MenuIcon";
 import PrivateMessageIcon from "./icons/PrivateMessageIcon";
 import { usePathname } from "next/navigation";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "../contexts/UserContext";
 import NotificationIcon from "./icons/NotificationIcon";
 import {
-  Menu,
   // Info,
   // Mail,
-  GalleryHorizontalEnd,
+  // GalleryHorizontalEnd,
   SquarePlus,
 
   // FileText,
@@ -31,11 +30,11 @@ import {
 } from "@/components/ui/sheet";
 import {
   NavigationMenu,
-  NavigationMenuContent,
+  // NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  NavigationMenuTrigger,
+  // NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
@@ -55,6 +54,7 @@ type NavigationItem = {
 };
 
 import { useNotification } from "../contexts/NotificationContext";
+import WeavingIcon from "./icons/WeavingIcon";
 
 // cleaned up
 const Navbar = () => {
@@ -62,7 +62,7 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { unreadCount } = useNotification(); // Notifications
-  
+
   // Listen for new messages globally
   useChatSocket(null);
 
@@ -78,26 +78,26 @@ const Navbar = () => {
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
-    { href: "/user", label: "Profile", icon: UserIcon },
     { href: "/messages", label: "Messages", icon: PrivateMessageIcon },
     { href: "/notifications", label: "Notifications", icon: NotificationIcon },
+    { href: "/user", label: "Profile", icon: UserIcon },
   ];
 
   // 下拉菜單項目
-  const teamMenuItems: NavigationItem[] = [
-    {
-      href: "/about",
-      title: "Team Overview",
-      description: "Meet our amazing team members",
-      icon: TeamIcon,
-    },
-    {
-      href: "/about",
-      title: "Timeline",
-      description: "Our timeline and milestones",
-      icon: GalleryHorizontalEnd,
-    },
-  ];
+  // const teamMenuItems: NavigationItem[] = [
+  //   {
+  //     href: "/about",
+  //     title: "Team Overview",
+  //     description: "Meet our amazing team members",
+  //     icon: TeamIcon,
+  //   },
+  //   {
+  //     href: "/about",
+  //     title: "Timeline",
+  //     description: "Our timeline and milestones",
+  //     icon: GalleryHorizontalEnd,
+  //   },
+  // ];
 
   //* mobile hamburger menu
   const mobileNavItems: NavigationItem[] = [
@@ -139,35 +139,79 @@ const Navbar = () => {
     <>
       {/* 導航欄 */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-100 ease-in-out ${
-          isNavbarVisible ? "translate-y-0" : "-translate-y-full"
-        } ${isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg "}`}
+        className={cn(
+          "fixed top-0 left-0 right-0 transition-all duration-100 ease-in-out",
+          isMobileMenuOpen ? "z-[60]" : "z-50",
+          isNavbarVisible ? "translate-y-0" : "-translate-y-full",
+          isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg",
+        )}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-[50px]">
           <div className="flex justify-between items-center h-20">
             {/* Logo */}
             <Link href="/" className="flex-shrink-0">
-              <div className="flex items-center space-x-3 ">
-                <Image
-                  src="/icons/weaving.svg"
-                  alt="megaweaving icon"
-                  width={32}
-                  height={32}
-                  className="hidden md:block align-middle"
+              <div className="flex items-center space-x-3 sm:space-x-5 ">
+                <WeavingIcon
+                  className={cn(
+                    "w-8 h-8 hidden sm:block align-middle transition-colors duration-200",
+                    isMobileMenuOpen ? "text-white" : "text-primary",
+                  )}
                 />
-                <div className="text-2xl sm:text-2xl font-bold text-primary font-ddin leading-[32px] justify-self-center text-center">
+                <div
+                  className={cn(
+                    "text-2xl sm:text-4xl font-bold font-ddin justify-self-center text-center transition-colors duration-200",
+                    isMobileMenuOpen ? "text-white" : "text-primary",
+                  )}
+                >
                   megaweaving
                 </div>
               </div>
             </Link>
 
-            {/* desktop nav item */}
+            {/* //* Right Side Actions (Mobile icons, Desktop Nav, Hamburger) */}
+            <div
+              className={cn(
+                "flex items-center space-x-2 sm:space-x-4 font-ddin transition-all duration-300",
+                isMobileMenuOpen
+                  ? "opacity-20 brightness-50 pointer-events-none"
+                  : "opacity-100",
+              )}
+            >
+              {/* //* mobile nav bar top item (Visible only on mobile) */}
+              <div className="sm:hidden flex items-center space-x-2">
+                {!user && (
+                  <Link href="/user" className="">
+                    <UserIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
+                    <span className="sr-only">Profile</span>
+                  </Link>
+                )}
 
-            <div className="font-ddin">
-              <NavigationMenu>
+                {user?.userId && (
+                  <Link href="/messages" className="relative group mr-2">
+                    <PrivateMessageIcon className=" text-megaweave-forest-dark" />
+                    <span className="sr-only">Messages</span>
+                    {messageUnreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                        {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
+                <Link href="/notifications" className="relative group">
+                  <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
+                  <span className="sr-only">Notifications</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              </div>
+
+              <NavigationMenu className="mt-0">
                 <NavigationMenuList>
                   {/* Team 下拉菜單 */}
-                  <NavigationMenuItem className="hidden md:block hover:cursor-pointer">
+                  {/* <NavigationMenuItem className="hidden md:block hover:cursor-pointer">
                     <NavigationMenuTrigger className="bg-transparent hover:bg-primary-30">
                       <TeamIcon className="w-[18px] h-[16px] mr-[8px] " />
                       About
@@ -187,7 +231,7 @@ const Navbar = () => {
                         ))}
                       </ul>
                     </NavigationMenuContent>
-                  </NavigationMenuItem>
+                  </NavigationMenuItem> */}
 
                   {/* main nav item */}
                   {mainNavItems.map((item, index) => {
@@ -200,19 +244,22 @@ const Navbar = () => {
                     const badgeColor = isMessage ? "bg-blue-500" : "bg-red-500";
 
                     return (
-                      <NavigationMenuItem key={index} className="hidden md:block">
+                      <NavigationMenuItem
+                        key={index}
+                        className="hidden sm:block"
+                      >
                         <NavigationMenuLink
                           asChild
                           className={cn(
                             navigationMenuTriggerStyle(),
-                            "transition-all duration-200 bg-transparent hover:bg-primary-30"
+                            "transition-all duration-200 bg-transparent hover:bg-primary-30 px-3",
                           )}
                         >
                           <Link
                             href={item.href}
                             className="font-semibold group text-[18px] flex items-center"
                           >
-                            <div className="relative mr-2 flex items-center">
+                            <div className="relative flex items-center">
                               <item.icon className="w-[18px] h-[16px] text-megaweave-forest-dark" />
                               {showBadge && (
                                 <span
@@ -222,9 +269,9 @@ const Navbar = () => {
                                 </span>
                               )}
                             </div>
-                            <span className="hidden md:inline text-megaweave-forest-dark">
+                            {/* <span className="hidden md:inline text-megaweave-forest-dark">
                               {item.label}
-                            </span>
+                            </span> */}
                           </Link>
                         </NavigationMenuLink>
                       </NavigationMenuItem>
@@ -232,51 +279,20 @@ const Navbar = () => {
                   })}
                 </NavigationMenuList>
               </NavigationMenu>
-            </div>
-
-            {/* //* mobile nav bar top item */}
-            <div className="md:hidden flex items-center space-x-2">
-              {/* Profile 按鈕（手機顯示） */}
-              {!user && (
-                <Link href="/user" className="">
-                  <UserIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
-                  <span className="sr-only">Profile</span>
-                </Link>
-              )}
-
-              {user?.userId && (
-                <Link href="/messages" className="relative group mr-2">
-                  <PrivateMessageIcon className=" text-megaweave-forest-dark" />
-                  <span className="sr-only">Messages</span>
-                  {messageUnreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                      {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
-                    </span>
-                  )}
-                </Link>
-              )}
-              <Link href="/notifications" className="relative group">
-                <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
-                <span className="sr-only">Notifications</span>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </Link>
+              {/* //* nav bar hamburger menu */}
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
                     className={cn(
-                      "p-2 transition-all duration-200",
+                      "p-2 transition-all duration-200 w-6",
                       isAtTop
                         ? "text-megaweave-forest-dark "
                         : "text-gray-900 ",
                     )}
                   >
-                    <Menu className="h-6 w-6" />
+                    <MenuIcon className="h-6 w-6" />
                     <span className="sr-only">Open menu</span>
                   </Button>
                 </SheetTrigger>
@@ -287,34 +303,36 @@ const Navbar = () => {
                       Browse through the navigation options
                     </SheetDescription>
                   </VisuallyHidden>
-                  <div className="space-y-2">
-                    {mobileNavItems.map((item, index) => {
-                      const Icon = item.icon;
+                  <div className="space-y-2 flex flex-col justify-center sm:items-center h-full">
+                    <div className="items-start">
+                      {mobileNavItems.map((item, index) => {
+                        const Icon = item.icon;
 
-                      return (
-                        <Link
-                          key={index}
-                          href={item.href}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className={cn(
-                            "flex items-start space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-[16px] transition-all duration-200 group",
-                            isActivePath(item.href)
-                              ? "text-gray-900 bg-primary-30 "
-                              : "text-white ",
-                          )}
-                        >
-                          <div className="flex-shrink-0 mt-3">
-                            <Icon className="w-5 h-5 " />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium">{item.title}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {item.description}
+                        return (
+                          <Link
+                            key={index}
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                              "flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-[16px] transition-all duration-200 group",
+                              isActivePath(item.href)
+                                ? "text-gray-900 bg-primary-30 "
+                                : "text-white ",
+                            )}
+                          >
+                            <div className="flex-shrink-0">
+                              <Icon className="w-5 h-5 " />
                             </div>
-                          </div>
-                        </Link>
-                      );
-                    })}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium">{item.title}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {item.description}
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>

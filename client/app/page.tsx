@@ -37,6 +37,12 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+
+import {
+  RefractiveDiv,
+  RefractiveButton,
+} from "./components/Refractive.client";
+
 import TagIcon from "./components/icons/TagIcon";
 import LocationIcon from "./components/icons/LocationIcon";
 import DeleteIcon from "./components/icons/DeleteIcon";
@@ -632,11 +638,16 @@ const PostsApp = () => {
           </div>
         </div>
 
-        <div
-          className={` max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 bg-primary-5 transition-all duration-150 ${
+        <RefractiveDiv
+          className={` max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 transition-all duration-150 ${
             isNavbarVisible ? "top-[80px]" : "top-[0px]"
           }
          `}
+          refraction={{
+            radius: 40,
+            blur: 4,
+            bezelWidth: 20,
+          }}
         >
           <div className="flex justify-between items-center w-full">
             <Button
@@ -719,7 +730,7 @@ const PostsApp = () => {
                 The handleLocationClick below will set 'selectedLocation' for 'route' click.
              */}
           </div>
-        </div>
+        </RefractiveDiv>
 
         <>
           {/* 選單面板 */}
@@ -909,17 +920,22 @@ const PostsApp = () => {
               </>
             )}
           </AnimatePresence>
-          <Button
+          <RefractiveButton
             ref={searchButtonRef}
             onClick={() => {
               setIsMenuOpen((pref) => !pref);
             }}
             className={
-              " fixed bottom-6 right-8 z-50 w-[70px] h-[60px] rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/80 backdrop-blur-sm  hover:bg-megaweave-forest-dark/80 active:bg-megaweave-forest-dark/80 "
+              " fixed bottom-6 right-8 z-50 w-[70px] h-[60px] rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/30"
             }
+            refraction={{
+              radius: 20,
+              blur: 2,
+              bezelWidth: 20,
+            }}
           >
             <SearchIcon className=" text-white" />
-          </Button>
+          </RefractiveButton>
         </>
 
         {/* Error message and posts*/}

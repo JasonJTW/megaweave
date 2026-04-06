@@ -277,16 +277,17 @@ function PostCardInner({
         >
           {imageSrc && (
             //* mx-3 for image margin
-            <div className="relative justify-center mb-0 mx-3">
-              <div className="relative w-full rounded-[20px] overflow-hidden">
+            <div className="relative mb-0 mx-3">
+              {/* Mobile: w-full + auto height; Desktop: fill column width (max 280px) + fixed 240px height */}
+              <div className="relative w-full sm:max-w-[280px] sm:h-[240px] sm:mx-auto rounded-[20px] overflow-hidden">
+                {/* Mobile: responsive width/height */}
                 <Image
                   src={imageSrc}
                   alt={post.title}
                   width={0}
                   height={0}
-                  sizes="100vw"
-                  style={{ width: "100%", height: "auto" }}
-                  className="object-cover"
+                  sizes="(min-width: 768px) 280px, 100vw"
+                  className="w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover"
                   priority={false}
                 />
               </div>
@@ -329,7 +330,9 @@ function PostCardInner({
           )}
 
           <div className="bg-white flex flex-col p-3 mx-0 rounded-[20px]">
-            <p className="text-black text-[18px] truncate">{post.content}</p>
+            <p className="text-black text-[18px] truncate sm:hidden">
+              {post.content}
+            </p>
 
             {/* ✅ 顯示 Weave 備註 */}
             {weave?.notes && (

@@ -49,6 +49,9 @@ import DeleteIcon from "./components/icons/DeleteIcon";
 import SearchIcon from "./components/icons/SearchIcon";
 import ElfIcon from "./components/icons/ElfIcon";
 import ReuseIcon from "./components/icons/ReuseIcon";
+import WeavingIcon from "./components/icons/WeavingIcon";
+import WazowskiIcon from "./components/icons/WazowskiIcon";
+import ShareIcon from "./components/icons/ShareIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -65,7 +68,7 @@ const PostsApp = () => {
   useEffect(() => {
     if (typeof window !== "undefined") {
       // const hasSeenTour = localStorage.getItem("megaweave_tour_seen");
-      const hasSeenTour = false;
+      const hasSeenTour = true;
       if (!hasSeenTour) {
         setTimeout(() => setIsTourOpen(true), 300);
       }
@@ -617,7 +620,104 @@ const PostsApp = () => {
       <div className="min-h-screen ">
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
+        {/* === Desktop Head Area === */}
+        <div className="hidden md:flex flex-col w-full max-w-7xl mx-auto px-8 pt-8 pb-4 relative z-20">
+          <div className="flex justify-between items-stretch gap-12 max-h-[640px]">
+            {/* Left Column: IconGrid */}
+            <div className="flex-1 w-[50%] max-w-[640px] flex items-center">
+              <div className="w-full aspect-square">
+                {!showCreateForm && <IconGrid />}
+              </div>
+            </div>
+
+            {/* Right Column: Stacked Action Buttons */}
+            <div className="flex flex-col py-8 gap-8 w-[35%] max-h-[640px]">
+              <Button
+                className="bg-primary-15 border-[2px] border-primary-30 hover:border-white relative flex-1 flex justify-start items-center pl-8 pr-0 py-0 overflow-hidden rounded-full shadow-none w-full max-h-[160px]"
+                onClick={() => handleCreatePostButtonClick("wish")}
+              >
+                <span className="text-3xl font-bold ml-2 tracking-wide text-megaweave-forest-dark relative z-10">
+                  + Wish
+                </span>
+                <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 h-full aspect-square pointer-events-none flex items-center justify-center">
+                  <ElfIcon className="!w-full !h-full text-[#CB5E32]" />
+                </div>
+              </Button>
+
+              <Button
+                className="bg-primary-15 border-[2px] border-primary-30 hover:border-white relative flex-1 flex justify-start items-center pl-8 pr-0 py-0 overflow-hidden rounded-full shadow-none w-full max-h-[160px]"
+                onClick={() => handleCreatePostButtonClick("share")}
+              >
+                <span className="text-3xl font-bold ml-2 tracking-wide text-megaweave-forest-dark relative z-10">
+                  + Share
+                </span>
+                <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 h-full aspect-square pointer-events-none flex items-center justify-center">
+                  <WazowskiIcon className="!w-full !h-full" />
+                </div>
+              </Button>
+
+              <Button
+                disabled
+                className="bg-[#3B6232] border-[2px] border-transparent text-white relative flex-1 flex justify-start items-center pl-8 pr-0 py-0 overflow-hidden rounded-full shadow-none w-full opacity-80 cursor-not-allowed max-h-[160px]"
+              >
+                <div className="flex flex-col text-left ml-2 relative z-10">
+                  <span className="text-[20px] font-bold leading-tight text-white opacity-90">
+                    + Common
+                  </span>
+                  <span className="text-[20px] font-bold leading-tight text-white opacity-90">
+                    Share
+                  </span>
+                  <span className="text-xs font-bold mt-1 tracking-wider text-white opacity-80">
+                    Coming soon
+                  </span>
+                </div>
+                <div className="absolute right-[-20px] top-1/2 -translate-y-1/2 h-full aspect-square pointer-events-none flex items-center justify-center">
+                  <WeavingIcon className="!w-full !h-full text-[#2c4b25] opacity-50" />
+                </div>
+              </Button>
+            </div>
+          </div>
+
+          {/* View only visual layout for search & filter tools for Desktop */}
+          <div className="w-full mt-10 mb-4 bg-white rounded-full flex flex-row items-center px-6 py-4 shadow-sm font-semibold border-[2px] border-transparent">
+            <span className="text-lg text-[#333]">Search</span>
+            <div className="flex-1"></div>
+            <X className="w-5 h-5 text-[#333]" />
+          </div>
+
+          <div className="w-full flex justify-between gap-4 flex-wrap border-gray-200/50">
+            <div className="bg-white rounded-full flex-1 flex py-3 px-6 items-center justify-between text-[#333] font-semibold opacity-70">
+              <span>Category</span>
+              <span className="text-xs">▼</span>
+            </div>
+            <div className="bg-white rounded-full flex-1 flex py-3 px-6 items-center justify-between text-[#333] font-semibold opacity-70">
+              <span>Location</span>
+              <span className="text-xs">▼</span>
+            </div>
+            <div className="bg-transparent border border-gray-300 rounded-full px-6 py-3 flex items-center justify-center gap-2 text-sm text-[#333] font-semibold">
+              Wish Only <ElfIcon className="w-4 h-4 text-megaweave-red-dark" />
+            </div>
+            <div className="bg-transparent border border-gray-300 rounded-full px-6 py-3 flex items-center justify-center gap-2 text-sm text-[#333] font-semibold">
+              Share Only <ReuseIcon className="w-4 h-4 text-megaweave-gold" />
+            </div>
+            <div className="bg-transparent border border-gray-300 rounded-full px-6 py-3 flex items-center justify-center text-sm text-[#333] font-semibold">
+              Hide Overdue
+            </div>
+          </div>
+
+          <div className="flex gap-4 mt-[48px] mb-[16px] items-center">
+            <h1 className="text-[56px] font-black text-[#262626] tracking-tight mr-4 leading-none font-sans">
+              Let&apos;s start weaving !
+            </h1>
+            <div className="bg-white w-16 h-[64px] rounded-[32px]"></div>
+            <div className="bg-white w-16 h-[64px] rounded-[32px]"></div>
+            <div className="bg-white w-16 h-[64px] rounded-[32px]"></div>
+            <div className="bg-white w-16 h-[64px] rounded-[32px_15px_15px_32px]"></div>
+          </div>
+        </div>
+        {/* === Desktop Head Area End === */}
+
+        <div className="md:hidden max-w-7xl mx-auto px-4 pt-4 sm:px-6 lg:px-8 ">
           {!showCreateForm && <IconGrid />}
         </div>
 
@@ -639,7 +739,7 @@ const PostsApp = () => {
         </div>
 
         <RefractiveDiv
-          className={` max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 transition-all duration-150 ${
+          className={` md:hidden max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 transition-all duration-150 ${
             isNavbarVisible ? "top-[80px]" : "top-[0px]"
           }
          `}

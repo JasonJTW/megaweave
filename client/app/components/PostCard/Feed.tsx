@@ -4,6 +4,9 @@ import PostCard from "./PostCard";
 import { usePost } from "../../contexts/PostContext";
 import { Weave } from "@/services/weaveService";
 import type { Post, Condition } from "../../types/schema";
+import ElfIcon from "../icons/ElfIcon";
+import WazowskiIcon from "../icons/WazowskiIcon";
+import WeavingIcon from "../icons/WeavingIcon";
 
 interface FeedProps {
   posts: Post[];
@@ -14,7 +17,10 @@ interface FeedProps {
   onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
   onCategoryClick?: (categoryId: number) => void;
-  onLocationClick?: (type: "province" | "city" | "route", value: string) => void;
+  onLocationClick?: (
+    type: "province" | "city" | "route",
+    value: string,
+  ) => void;
 }
 
 export default function Feed({
@@ -161,7 +167,7 @@ export default function Feed({
 
     const observer = new IntersectionObserver(
       observerCallback,
-      observerOptions
+      observerOptions,
     );
     cardRefs.current.forEach((ref) => ref && observer.observe(ref));
 
@@ -219,11 +225,11 @@ export default function Feed({
   // memoized click to avoid re-renders
   const handlePostClick = useCallback(
     (p: Post) => onPostClick(p),
-    [onPostClick]
+    [onPostClick],
   );
 
   return (
-    <div className="feed-snap snap-y snap-mandatory">
+    <div className="feed-snap snap-y snap-mandatory sm:snap-none sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6 sm:gap-y-[30px] sm:auto-rows-max px-4 sm:px-0">
       {posts.map((p, i) => {
         // ✅ 取得對應的 weave 資料
         // ✅ 修正邏輯：
@@ -239,27 +245,45 @@ export default function Feed({
         const uniqueKey = weave ? `weave-${weave.id}` : `post-${p.id}`;
 
         return (
-          <div
-            key={uniqueKey}
-            data-index={i}
-            ref={(el) => {
-              cardRefs.current[i] = el;
-            }}
-            className="snap-child snap-center px-4"
-          >
-            <PostCard
-              post={p}
-              conditions={conditions}
-              categories={categories}
-              onPostClick={handlePostClick}
-              isExpanded={true}
-              weave={weave} // ✅ 傳遞 weave 資料
-              currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
-              onWeaveStatusChange={onWeaveStatusChange}
-              onCategoryClick={onCategoryClick}
-              onLocationClick={onLocationClick}
-            />
-          </div>
+          <React.Fragment key={uniqueKey}>
+            <div
+              data-index={i}
+              ref={(el) => {
+                cardRefs.current[i] = el;
+              }}
+              className="snap-child snap-center md:snap-align-none pb-4 md:pb-0"
+            >
+              <PostCard
+                post={p}
+                conditions={conditions}
+                categories={categories}
+                onPostClick={handlePostClick}
+                isExpanded={true}
+                weave={weave} // ✅ 傳遞 weave 資料
+                currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
+                onWeaveStatusChange={onWeaveStatusChange}
+                onCategoryClick={onCategoryClick}
+                onLocationClick={onLocationClick}
+              />
+            </div>
+
+            {/* Desktop-only Sprite Injection */}
+            {i === 1 && (
+              <div className="hidden sm:flex w-full relative items-end justify-end self-end">
+                <ElfIcon className="w-full h-full text-[#CB5E32]" />
+              </div>
+            )}
+            {i === 3 && (
+              <div className="hidden sm:flex w-full relative items-end justify-end self-end">
+                <WazowskiIcon className="w-full h-full" />
+              </div>
+            )}
+            {i === 8 && (
+              <div className="hidden sm:flex w-full relative items-end justify-end self-end">
+                <WeavingIcon className="w-full h-full text-[#3B6232]  mt-10" />
+              </div>
+            )}
+          </React.Fragment>
         );
       })}
     </div>

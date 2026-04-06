@@ -38,13 +38,13 @@ export default function IconGrid() {
   return (
     <div className="bg-megaweave-secondary">
       <div
-        className="overflow-hidden flex items-center justify-center"
+        className="overflow-hidden flex items-center justify-center p-2"
         style={{ contain: "layout paint" }}
       >
         <motion.div
           layout
           layoutScroll={false}
-          className="grid grid-cols-2 grid-rows-2 gap-0 px-5 pt-6 md:p-12 w-full"
+          className="grid grid-cols-2 grid-rows-2 gap-0 w-full"
         >
           {positions.map((iconIndex) => {
             const { id, Icon } = icons[iconIndex];

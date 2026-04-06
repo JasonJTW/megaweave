@@ -64,7 +64,7 @@ export default {
 
           // Accent colors
           red: {
-            dark: "#C8551E",
+            dark: "#C05421",
             light: "#FAA06C",
           },
           blue: {
@@ -94,7 +94,7 @@ export default {
           75: "#6c8965", // 75%
           50: "#9eb098", // 50%
           30: "#c4d0c2", // 30%
-          15: "#E4E8DB", // 15%
+          15: "#e2e7e0", // 15%
           5: "#f4f5f3", // 5%
         },
         // secondary sand

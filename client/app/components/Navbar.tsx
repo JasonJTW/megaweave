@@ -38,7 +38,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
-
+import { RefractiveNav } from "./Refractive.client";
 // 型別定義
 type MainNavigationItem = {
   href: string;
@@ -138,7 +138,12 @@ const Navbar = () => {
   return (
     <>
       {/* 導航欄 */}
-      <nav
+      <RefractiveNav
+        refraction={{
+          radius: 40,
+          blur: 4,
+          bezelWidth: 20,
+        }}
         className={cn(
           "fixed top-0 left-0 right-0 transition-all duration-100 ease-in-out",
           isMobileMenuOpen ? "z-[60]" : "z-50",
@@ -339,7 +344,7 @@ const Navbar = () => {
             </div>
           </div>
         </div>
-      </nav>
+      </RefractiveNav>
 
       {/* 佔位符 */}
       <div className="h-16" />

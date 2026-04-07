@@ -51,7 +51,6 @@ import ElfIcon from "./components/icons/ElfIcon";
 import ReuseIcon from "./components/icons/ReuseIcon";
 import WeavingIcon from "./components/icons/WeavingIcon";
 import WazowskiIcon from "./components/icons/WazowskiIcon";
-import ShareIcon from "./components/icons/ShareIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -165,10 +164,14 @@ const PostsApp = () => {
 
   const locationInputRef = useRef<HTMLInputElement | null>(null);
   const searchLocationInputRef = useRef<HTMLInputElement | null>(null); // Add ref for search input
+  const desktopSearchLocationInputRef = useRef<HTMLInputElement | null>(null); // Add ref for desktop search input
+
   const autocompleteInstanceRef =
     useRef<google.maps.places.Autocomplete | null>(null);
   const autocompleteSearchInstanceRef =
     useRef<google.maps.places.Autocomplete | null>(null); // Add ref for search autocomplete
+  const desktopAutocompleteSearchInstanceRef =
+    useRef<google.maps.places.Autocomplete | null>(null); // Desktop search autocomplete
 
   const extractAddress = (place: google.maps.places.PlaceResult) => {
     const components = place.address_components || [];
@@ -259,7 +262,90 @@ const PostsApp = () => {
     };
   }, [showCreateForm]);
 
+  // Add useEffect for Search Autocomplete (Desktop)
+  useEffect(() => {
+    if (
+      !desktopSearchLocationInputRef.current ||
+      desktopAutocompleteSearchInstanceRef.current
+    ) {
+      return;
+    }
+
+    let checkGoogleInterval: NodeJS.Timeout;
+
+    const initAutocomplete = () => {
+      if (
+        typeof window === "undefined" ||
+        !window.google ||
+        !window.google.maps ||
+        !window.google.maps.places ||
+        !desktopSearchLocationInputRef.current
+      ) {
+        return;
+      }
+
+      const autocomplete = new google.maps.places.Autocomplete(
+        desktopSearchLocationInputRef.current,
+        {
+          types: ["geocode"],
+          componentRestrictions: { country: "tw" },
+          fields: [
+            "address_components",
+            "formatted_address",
+            "geometry",
+            "place_id",
+          ],
+        },
+      );
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place && place.address_components) {
+          const { province, city } = extractAddress(place);
+          const address = place.name || place.formatted_address || "";
+          setLocationInput(address);
+          setSelectedLocation(address);
+          setSearchCity(city);
+          setSearchProvince(province);
+        }
+      });
+
+      desktopAutocompleteSearchInstanceRef.current = autocomplete;
+      if (checkGoogleInterval) {
+        clearInterval(checkGoogleInterval);
+      }
+    };
+
+    if (typeof window !== "undefined" && window.google) {
+      initAutocomplete();
+    } else if (typeof window !== "undefined") {
+      checkGoogleInterval = setInterval(() => {
+        if (window.google) {
+          initAutocomplete();
+        }
+      }, 300);
+    }
+
+    return () => {
+      if (checkGoogleInterval) {
+        clearInterval(checkGoogleInterval);
+      }
+      if (
+        desktopAutocompleteSearchInstanceRef.current &&
+        typeof window !== "undefined" &&
+        window.google
+      ) {
+        // eslint-disable-next-line
+        google.maps.event.clearInstanceListeners(
+          desktopAutocompleteSearchInstanceRef.current,
+        );
+        desktopAutocompleteSearchInstanceRef.current = null;
+      }
+    };
+  }, []);
+
   // Add useEffect for Search Autocomplete
+
   useEffect(() => {
     if (
       !isMenuOpen ||
@@ -621,7 +707,7 @@ const PostsApp = () => {
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
 
         {/* === Desktop Head Area === */}
-        <div className="hidden md:flex flex-col w-full max-w-7xl mx-auto px-8 pt-8 pb-4 relative z-20">
+        <div className="hidden font-ddin md:flex flex-col w-full max-w-7xl mx-auto px-8 pt-8 pb-4 relative z-20">
           <div className="flex justify-between items-stretch gap-12 max-h-[640px]">
             {/* Left Column: IconGrid */}
             <div className="flex-1 w-[50%] max-w-[640px] flex items-center">
@@ -679,29 +765,95 @@ const PostsApp = () => {
           </div>
 
           {/* View only visual layout for search & filter tools for Desktop */}
-          <div className="w-full mt-10 mb-4 bg-white rounded-full flex flex-row items-center px-6 py-4 shadow-sm font-semibold border-[2px] border-transparent">
-            <span className="text-lg text-[#333]">Search</span>
-            <div className="flex-1"></div>
-            <X className="w-5 h-5 text-[#333]" />
+          <div className="w-full mt-10 mb-4 bg-white shadow-none rounded-full flex flex-row items-center px-6 py-4 border-[2px] border-transparent">
+            <input
+              type="text"
+              placeholder="Search"
+              className="bg-transparent border-0 outline-none focus:outline-none focus:ring-0 p-0 w-full h-auto type-h3 placeholder:text-primary-50"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm ? (
+              <button onClick={() => setSearchTerm("")}>
+                <X className="w-5 h-5 text-[#333] shrink-0 ml-2" />
+              </button>
+            ) : (
+              <div className="w-5 h-5 ml-2 shrink-0 border-none bg-transparent" />
+            )}
           </div>
 
-          <div className="w-full flex justify-between gap-4 flex-wrap border-gray-200/50">
-            <div className="bg-white rounded-full flex-1 flex py-3 px-6 items-center justify-between text-[#333] font-semibold opacity-70">
-              <span>Category</span>
-              <span className="text-xs">▼</span>
+          <div className="w-full flex justify-between gap-2 lg:gap-4 flex-wrap xl:flex-nowrap border-gray-200/50 items-center type-button-b1">
+            <div className="bg-white rounded-full flex-1 min-w-[130px] flex items-center justify-between text-[#333]">
+              <Select
+                value={selectedCategory || "ALL"}
+                onValueChange={(value) =>
+                  setSelectedCategory(value === "ALL" ? "" : value)
+                }
+              >
+                <SelectTrigger className="bg-transparent border-0 shadow-none focus:ring-0 px-4 lg:px-6 py-6 w-full flex items-center justify-between truncate">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Categories</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name_en}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="bg-white rounded-full flex-1 flex py-3 px-6 items-center justify-between text-[#333] font-semibold opacity-70">
-              <span>Location</span>
-              <span className="text-xs">▼</span>
+            <div className="bg-white rounded-full flex-1 min-w-[130px] flex py-3 px-4 lg:px-6 items-center justify-between text-[#333] font-semibold opacity-70">
+              <input
+                ref={desktopSearchLocationInputRef}
+                className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none p-0 text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0"
+                type="text"
+                placeholder="Location"
+                value={locationInput}
+                onChange={(e) => {
+                  setLocationInput(e.target.value);
+                  if (!e.target.value) {
+                    setSelectedLocation("");
+                    setSearchCity("");
+                    setSearchProvince("");
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setSelectedLocation(locationInput);
+                  }
+                }}
+              />
             </div>
-            <div className="bg-transparent border border-gray-300 rounded-full px-6 py-3 flex items-center justify-center gap-2 text-sm text-[#333] font-semibold">
-              Wish Only <ElfIcon className="w-4 h-4 text-megaweave-red-dark" />
-            </div>
-            <div className="bg-transparent border border-gray-300 rounded-full px-6 py-3 flex items-center justify-center gap-2 text-sm text-[#333] font-semibold">
-              Share Only <ReuseIcon className="w-4 h-4 text-megaweave-gold" />
-            </div>
-            <div className="bg-transparent border border-gray-300 rounded-full px-6 py-3 flex items-center justify-center text-sm text-[#333] font-semibold">
-              Hide Overdue
+
+            <div className="flex flex-nowrap items-center gap-2 lg:gap-4 overflow-x-auto overflow-y-hidden hide-scrollbar">
+              <button
+                className={`bg-transparent border rounded-full px-4 lg:px-6 py-2 flex items-center justify-center gap-2 type-button-b1 font-semibold transition-colors whitespace-nowrap ${
+                  postFilterType === "wish"
+                    ? "bg-[#fbe9e7] border-[#fbe9e7] text-megaweave-forest-dark"
+                    : "border-gray-300 text-[#333]"
+                }`}
+                onClick={() =>
+                  setPostFilterType((prev) => (prev === "wish" ? "" : "wish"))
+                }
+              >
+                Wish Only <ElfIcon className="w-4 h-4 text-[#CB5E32]" />
+              </button>
+              <button
+                className={`bg-transparent border rounded-full px-4 lg:px-6 py-2 flex items-center justify-center gap-2 type-button-b1 font-semibold transition-colors whitespace-nowrap ${
+                  postFilterType === "share"
+                    ? "bg-[#fff3e0] border-[#fff3e0] text-megaweave-forest-dark"
+                    : "border-gray-300 text-[#333]"
+                }`}
+                onClick={() =>
+                  setPostFilterType((prev) => (prev === "share" ? "" : "share"))
+                }
+              >
+                Share Only <ReuseIcon className="w-4 h-4 text-[#F0AF1E]" />
+              </button>
+              <button className="bg-transparent border border-gray-300 rounded-full px-4 lg:px-6 py-2 flex items-center justify-center type-button-b1 font-semibold transition-colors whitespace-nowrap">
+                Hide Overdue
+              </button>
             </div>
           </div>
 

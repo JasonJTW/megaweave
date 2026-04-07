@@ -166,7 +166,7 @@ export default {
           fontWeight: "600", // Semibold (SB)
         },
         ".type-h3": {
-          fontSize: "36px", // 36pt
+          fontSize: "28px", // 36pt
           lineHeight: "1",
           fontWeight: "700", // Bold (B)
         },

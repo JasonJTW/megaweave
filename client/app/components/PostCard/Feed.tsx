@@ -21,6 +21,8 @@ interface FeedProps {
     type: "province" | "city" | "route",
     value: string,
   ) => void;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 export default function Feed({
@@ -33,6 +35,8 @@ export default function Feed({
   highlightWeaveId,
   onCategoryClick,
   onLocationClick,
+  onLoadMore,
+  hasMore,
 }: FeedProps) {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const pendingIndexRef = useRef<number | null>(null);
@@ -43,6 +47,33 @@ export default function Feed({
   // state + ref pair to avoid stale closures
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
   const activeIndexRef = useRef<number | null>(activeIndex);
+  
+  // Intersection Observer for Infinite Scroll
+  const loadingRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!hasMore || !onLoadMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadingRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) observer.unobserve(currentRef);
+      observer.disconnect();
+    };
+  }, [hasMore, onLoadMore]);
+
   useEffect(() => {
     activeIndexRef.current = activeIndex;
   }, [activeIndex]);
@@ -287,6 +318,11 @@ export default function Feed({
           </React.Fragment>
         );
       })}
+      {hasMore && (
+        <div ref={loadingRef} className="w-full flex justify-center py-8 sm:col-span-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
     </div>
   );
 }

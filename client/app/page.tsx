@@ -426,8 +426,9 @@ const PostsApp = () => {
       }
 
       try {
+        const pageToFetch = isPullRefresh ? 1 : currentPage;
         const params = new URLSearchParams({
-          page: currentPage.toString(),
+          page: pageToFetch.toString(),
           limit: "12",
         });
         const delay = isPullRefresh ? 800 : 1;
@@ -446,8 +447,19 @@ const PostsApp = () => {
         const data: PostsResponse = await response.json();
 
         if (response.ok) {
-          setPosts(data.posts);
+          if (pageToFetch === 1) {
+            setPosts(data.posts);
+          } else {
+            setPosts((prev) => {
+              const prevIds = new Set(prev.map((p) => p.id));
+              const newUniquePosts = data.posts.filter((p: Post) => !prevIds.has(p.id));
+              return [...prev, ...newUniquePosts];
+            });
+          }
           setPagination(data.pagination);
+          if (isPullRefresh && currentPage !== 1) {
+            setCurrentPage(1);
+          }
         } else {
           toast.error("Fetch posts failed");
         }
@@ -637,6 +649,11 @@ const PostsApp = () => {
       }));
     }
   }, [categories, createFormData.categoryId]);
+
+  // 當篩選條件改變時，重設分頁
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, searchCity, searchProvince, selectedLocation, postFilterType]);
 
   // 獲取貼文
   useEffect(() => {
@@ -1260,50 +1277,13 @@ const PostsApp = () => {
                     setLocationInput(value);
                   }
                 }}
+                hasMore={pagination ? currentPage < pagination.totalPages : false}
+                onLoadMore={() => {
+                  if (!loading && pagination && currentPage < pagination.totalPages) {
+                    setCurrentPage((prev) => prev + 1);
+                  }
+                }}
               />
-            </div>
-          )}
-
-          {/* 分頁 */}
-          {pagination && pagination.totalPages > 1 && (
-            <div className="flex justify-center mt-8">
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  previous page
-                </button>
-
-                {Array.from(
-                  { length: pagination.totalPages },
-                  (_, i) => i + 1,
-                ).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => {
-                      setCurrentPage(page);
-                      window.scrollTo({ top: 300, behavior: "smooth" });
-                    }}
-                    className={`px-4 py-2 border rounded-lg ${
-                      currentPage === page
-                        ? "bg-primary text-white border-primary"
-                        : "border-gray-300 "
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-
-                <button
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === pagination.totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                >
-                  next page
-                </button>
-              </div>
             </div>
           )}
         </div>

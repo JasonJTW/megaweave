@@ -219,9 +219,13 @@ function PostCardInner({
   const currentStatus = localWeaveStatus || weave?.status;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true, margin: "100px" }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px] bg-white  transition-all duration-300 py-0 pb-4 mt-4 relative ${
+      className={`font-ddin cursor-pointer rounded-[30px] bg-white transition-all duration-300 py-0 pb-4 mt-4 relative ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -557,7 +561,7 @@ function PostCardInner({
           )}
         </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

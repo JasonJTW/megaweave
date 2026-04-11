@@ -1,6 +1,13 @@
 //* forms/page.tsx
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import useSWRInfinite from "swr/infinite";
 import {
   usePullToRefresh,
   DEFAULT_MAXIMUM_PULL_LENGTH,
@@ -13,12 +20,7 @@ import { LucideLoader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
 import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
-import {
-  Post,
-  PostsResponse,
-  Pagination,
-  CreatePostFormData,
-} from "./types/schema";
+import { Post, PostsResponse, CreatePostFormData } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImage } from "@/utils/imageProcessor";
 import OverlayTour, { TourStep } from "./components/OverlayTour";
@@ -56,10 +58,6 @@ const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const { user } = useUser();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
@@ -131,8 +129,6 @@ const PostsApp = () => {
   // 分類和狀況數據
 
   // 搜索和篩選狀態
-  const [currentPage, setCurrentPage] = useState(1);
-
   const [searchTerm, setSearchTerm] = useState("");
 
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -142,6 +138,68 @@ const PostsApp = () => {
   const [searchProvince, setSearchProvince] = useState(""); // Add province state
   const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
   const categoryInteractionLockRef = useRef(false);
+
+  const getKey = useCallback(
+    (pageIndex: number, previousPageData: PostsResponse | null) => {
+      // reached the end
+      if (previousPageData && !previousPageData.posts.length) return null;
+
+      const params = new URLSearchParams({
+        page: (pageIndex + 1).toString(),
+        limit: "12",
+      });
+
+      if (searchTerm) params.append("search", searchTerm);
+      if (selectedCategory) params.append("category_id", selectedCategory);
+      if (selectedLocation) params.append("location", selectedLocation);
+      if (searchCity) params.append("city", searchCity);
+      if (searchProvince) params.append("province", searchProvince);
+      if (postFilterType) params.append("type", postFilterType);
+
+      return `${hostName}/api/posts?${params.toString()}`;
+    },
+    [
+      hostName,
+      searchTerm,
+      selectedCategory,
+      selectedLocation,
+      searchCity,
+      searchProvince,
+      postFilterType,
+    ],
+  );
+
+  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+  const { data, size, setSize, isValidating, mutate } =
+    useSWRInfinite<PostsResponse>(getKey, fetcher, {
+      revalidateFirstPage: false,
+    });
+
+  const posts = useMemo(() => {
+    if (!data) return [];
+    const allPosts: Post[] = [];
+    const seenIds = new Set<number>();
+
+    for (const page of data) {
+      if (!page?.posts) continue;
+      for (const p of page.posts) {
+        if (!seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          allPosts.push(p);
+        }
+      }
+    }
+    return allPosts;
+  }, [data]);
+
+  const loading = isValidating && (!data || data.length === 0);
+  const refreshing = isValidating && data?.length === size;
+
+  const pagination = data ? data[data.length - 1]?.pagination : null;
+  const hasMore = pagination
+    ? pagination.currentPage < pagination.totalPages
+    : false;
 
   // 創建貼文狀態
   const [postType, setPostType] = useState<Post["type"]>("share");
@@ -348,7 +406,6 @@ const PostsApp = () => {
         typeof window !== "undefined" &&
         window.google
       ) {
-        // eslint-disable-next-line
         google.maps.event.clearInstanceListeners(
           desktopAutocompleteSearchInstanceRef.current,
         );
@@ -415,77 +472,9 @@ const PostsApp = () => {
 
   // No longer need local fetchUser as we use useUser() hook
 
-  // 使用 useCallback 來記憶化 fetchPosts 函數
-  const fetchPosts = useCallback(
-    async (isPullRefresh = false) => {
-      console.log(isPullRefresh ? "Pull refreshing..." : "Loading posts...");
-      if (isPullRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      try {
-        const pageToFetch = isPullRefresh ? 1 : currentPage;
-        const params = new URLSearchParams({
-          page: pageToFetch.toString(),
-          limit: "12",
-        });
-        const delay = isPullRefresh ? 800 : 1;
-
-        if (searchTerm) params.append("search", searchTerm);
-        if (selectedCategory) params.append("category_id", selectedCategory);
-        // Optimize search params
-        if (selectedLocation) params.append("location", selectedLocation);
-        if (searchCity) params.append("city", searchCity);
-        if (searchProvince) params.append("province", searchProvince);
-        if (postFilterType) params.append("type", postFilterType);
-        const [response] = await Promise.all([
-          fetch(`${hostName}/api/posts?${params}`),
-          new Promise((resolve) => setTimeout(resolve, delay)),
-        ]);
-        const data: PostsResponse = await response.json();
-
-        if (response.ok) {
-          if (pageToFetch === 1) {
-            setPosts(data.posts);
-          } else {
-            setPosts((prev) => {
-              const prevIds = new Set(prev.map((p) => p.id));
-              const newUniquePosts = data.posts.filter((p: Post) => !prevIds.has(p.id));
-              return [...prev, ...newUniquePosts];
-            });
-          }
-          setPagination(data.pagination);
-          if (isPullRefresh && currentPage !== 1) {
-            setCurrentPage(1);
-          }
-        } else {
-          toast.error("Fetch posts failed");
-        }
-      } catch (error) {
-        console.error("Internal server error:", error);
-        toast.error("Internal server error, please try again later.");
-      } finally {
-        setRefreshing(false);
-        setLoading(false);
-      }
-    },
-    [
-      currentPage,
-      searchTerm,
-      selectedCategory,
-      selectedLocation,
-      searchCity, // Add to dependency array
-      searchProvince, // Add to dependency array
-      hostName,
-      postFilterType,
-    ],
-  );
-
-  // mobile 下拉刷新功能，fetchPosts宣告後才啟動
+  // mobile 下拉刷新功能
   const { isRefreshing, pullPosition } = usePullToRefresh({
-    onRefresh: () => fetchPosts(true),
+    onRefresh: async () => { await mutate(); },
     maximumPullLength: DEFAULT_MAXIMUM_PULL_LENGTH,
     refreshThreshold: DEFAULT_REFRESH_THRESHOLD,
     // isDisabled:
@@ -596,7 +585,7 @@ const PostsApp = () => {
           type: postType,
           items: [{ title: "", quantity: 1 }],
         });
-        fetchPosts(); // 重新獲取貼文列表
+        mutate(); // 重新獲取貼文列表
       } else {
         const errorData = await response.json();
         toast.error(errorData.errorMessage || "Failed to create post");
@@ -650,16 +639,7 @@ const PostsApp = () => {
     }
   }, [categories, createFormData.categoryId]);
 
-  // 當篩選條件改變時，重設分頁
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedCategory, searchCity, searchProvince, selectedLocation, postFilterType]);
-
-  // 獲取貼文
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
-
+  // (SWR automatically handles refetching when getKey dependencies change)
   useEffect(() => {
     if (showCreateForm) {
       document.body.style.overflow = "hidden";
@@ -1254,7 +1234,7 @@ const PostsApp = () => {
                 weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
                 currentUserId={user?.userId}
                 onWeaveStatusChange={() => {
-                  fetchPosts(); // 重新抓取資料
+                  mutate(); // 重新抓取資料
                 }}
                 onCategoryClick={(categoryId) => {
                   setSelectedCategory(categoryId.toString());
@@ -1277,10 +1257,10 @@ const PostsApp = () => {
                     setLocationInput(value);
                   }
                 }}
-                hasMore={pagination ? currentPage < pagination.totalPages : false}
+                hasMore={hasMore}
                 onLoadMore={() => {
-                  if (!loading && pagination && currentPage < pagination.totalPages) {
-                    setCurrentPage((prev) => prev + 1);
+                  if (!isValidating && hasMore) {
+                    setSize(size + 1);
                   }
                 }}
               />

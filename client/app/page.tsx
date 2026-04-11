@@ -210,11 +210,13 @@ const PostsApp = () => {
     if (
       !showCreateForm ||
       !locationInputRef.current ||
-      autocompleteInstanceRef.current
+      autocompleteInstanceRef.current ||
+      !window.google?.maps?.places
     ) {
       return;
     }
 
+    try {
     // Initialize the traditional Autocomplete
     const autocomplete = new google.maps.places.Autocomplete(
       locationInputRef.current,
@@ -251,6 +253,9 @@ const PostsApp = () => {
     });
 
     autocompleteInstanceRef.current = autocomplete;
+    } catch (error) {
+      console.warn("Failed to initialize create form autocomplete:", error);
+    }
 
     return () => {
       if (autocompleteInstanceRef.current) {
@@ -284,6 +289,7 @@ const PostsApp = () => {
         return;
       }
 
+      try {
       const autocomplete = new google.maps.places.Autocomplete(
         desktopSearchLocationInputRef.current,
         {
@@ -313,6 +319,9 @@ const PostsApp = () => {
       desktopAutocompleteSearchInstanceRef.current = autocomplete;
       if (checkGoogleInterval) {
         clearInterval(checkGoogleInterval);
+      }
+      } catch (error) {
+        console.warn("Failed to initialize desktop search autocomplete:", error);
       }
     };
 
@@ -350,11 +359,13 @@ const PostsApp = () => {
     if (
       !isMenuOpen ||
       !searchLocationInputRef.current ||
-      autocompleteSearchInstanceRef.current
+      autocompleteSearchInstanceRef.current ||
+      !window.google?.maps?.places
     ) {
       return;
     }
 
+    try {
     const autocomplete = new google.maps.places.Autocomplete(
       searchLocationInputRef.current,
       {
@@ -384,6 +395,9 @@ const PostsApp = () => {
     });
 
     autocompleteSearchInstanceRef.current = autocomplete;
+    } catch (error) {
+      console.warn("Failed to initialize mobile search autocomplete:", error);
+    }
 
     return () => {
       if (autocompleteSearchInstanceRef.current) {

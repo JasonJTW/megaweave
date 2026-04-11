@@ -51,6 +51,7 @@ import ElfIcon from "./components/icons/ElfIcon";
 import ReuseIcon from "./components/icons/ReuseIcon";
 import WeavingIcon from "./components/icons/WeavingIcon";
 import WazowskiIcon from "./components/icons/WazowskiIcon";
+import LetsStartWeavingBanner from "./components/ui/LetsStartWeavingBanner";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -217,42 +218,42 @@ const PostsApp = () => {
     }
 
     try {
-    // Initialize the traditional Autocomplete
-    const autocomplete = new google.maps.places.Autocomplete(
-      locationInputRef.current,
-      {
-        types: ["geocode"], // Street-level precision
-        componentRestrictions: { country: "tw" }, // Restrict to Taiwan
-        fields: [
-          "address_components",
-          "formatted_address",
-          "geometry",
-          "place_id",
-        ],
-      },
-    );
+      // Initialize the traditional Autocomplete
+      const autocomplete = new google.maps.places.Autocomplete(
+        locationInputRef.current,
+        {
+          types: ["geocode"], // Street-level precision
+          componentRestrictions: { country: "tw" }, // Restrict to Taiwan
+          fields: [
+            "address_components",
+            "formatted_address",
+            "geometry",
+            "place_id",
+          ],
+        },
+      );
 
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (place && place.geometry && place.geometry.location) {
-        const { province, city, route, zip } = extractAddress(place);
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place && place.geometry && place.geometry.location) {
+          const { province, city, route, zip } = extractAddress(place);
 
-        console.log("Place selected:", place);
-        setCreateFormData((prev) => ({
-          ...prev,
-          location: place.formatted_address || place.name || "",
-          place_id: place.place_id,
-          province,
-          city,
-          route,
-          zip,
-          lat: place.geometry!.location!.lat(),
-          lng: place.geometry!.location!.lng(),
-        }));
-      }
-    });
+          console.log("Place selected:", place);
+          setCreateFormData((prev) => ({
+            ...prev,
+            location: place.formatted_address || place.name || "",
+            place_id: place.place_id,
+            province,
+            city,
+            route,
+            zip,
+            lat: place.geometry!.location!.lat(),
+            lng: place.geometry!.location!.lng(),
+          }));
+        }
+      });
 
-    autocompleteInstanceRef.current = autocomplete;
+      autocompleteInstanceRef.current = autocomplete;
     } catch (error) {
       console.warn("Failed to initialize create form autocomplete:", error);
     }
@@ -290,38 +291,41 @@ const PostsApp = () => {
       }
 
       try {
-      const autocomplete = new google.maps.places.Autocomplete(
-        desktopSearchLocationInputRef.current,
-        {
-          types: ["geocode"],
-          componentRestrictions: { country: "tw" },
-          fields: [
-            "address_components",
-            "formatted_address",
-            "geometry",
-            "place_id",
-          ],
-        },
-      );
+        const autocomplete = new google.maps.places.Autocomplete(
+          desktopSearchLocationInputRef.current,
+          {
+            types: ["geocode"],
+            componentRestrictions: { country: "tw" },
+            fields: [
+              "address_components",
+              "formatted_address",
+              "geometry",
+              "place_id",
+            ],
+          },
+        );
 
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place && place.address_components) {
-          const { province, city } = extractAddress(place);
-          const address = place.name || place.formatted_address || "";
-          setLocationInput(address);
-          setSelectedLocation(address);
-          setSearchCity(city);
-          setSearchProvince(province);
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (place && place.address_components) {
+            const { province, city } = extractAddress(place);
+            const address = place.name || place.formatted_address || "";
+            setLocationInput(address);
+            setSelectedLocation(address);
+            setSearchCity(city);
+            setSearchProvince(province);
+          }
+        });
+
+        desktopAutocompleteSearchInstanceRef.current = autocomplete;
+        if (checkGoogleInterval) {
+          clearInterval(checkGoogleInterval);
         }
-      });
-
-      desktopAutocompleteSearchInstanceRef.current = autocomplete;
-      if (checkGoogleInterval) {
-        clearInterval(checkGoogleInterval);
-      }
       } catch (error) {
-        console.warn("Failed to initialize desktop search autocomplete:", error);
+        console.warn(
+          "Failed to initialize desktop search autocomplete:",
+          error,
+        );
       }
     };
 
@@ -366,35 +370,35 @@ const PostsApp = () => {
     }
 
     try {
-    const autocomplete = new google.maps.places.Autocomplete(
-      searchLocationInputRef.current,
-      {
-        types: ["geocode"], // Restrict to regions (cities/provinces)
-        componentRestrictions: { country: "tw" },
-        fields: [
-          "address_components",
-          "formatted_address",
-          "geometry",
-          "place_id",
-        ],
-      },
-    );
+      const autocomplete = new google.maps.places.Autocomplete(
+        searchLocationInputRef.current,
+        {
+          types: ["geocode"], // Restrict to regions (cities/provinces)
+          componentRestrictions: { country: "tw" },
+          fields: [
+            "address_components",
+            "formatted_address",
+            "geometry",
+            "place_id",
+          ],
+        },
+      );
 
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-      if (place && place.address_components) {
-        const { province, city } = extractAddress(place);
-        console.log("Search Place:", { province, city });
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (place && place.address_components) {
+          const { province, city } = extractAddress(place);
+          console.log("Search Place:", { province, city });
 
-        const address = place.name || place.formatted_address || "";
-        setLocationInput(address);
-        setSelectedLocation(address);
-        setSearchCity(city);
-        setSearchProvince(province);
-      }
-    });
+          const address = place.name || place.formatted_address || "";
+          setLocationInput(address);
+          setSelectedLocation(address);
+          setSearchCity(city);
+          setSearchProvince(province);
+        }
+      });
 
-    autocompleteSearchInstanceRef.current = autocomplete;
+      autocompleteSearchInstanceRef.current = autocomplete;
     } catch (error) {
       console.warn("Failed to initialize mobile search autocomplete:", error);
     }
@@ -817,7 +821,7 @@ const PostsApp = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="bg-white rounded-full flex-1 min-w-[130px] flex py-3 px-4 lg:px-6 items-center justify-between text-[#333] font-semibold opacity-70">
+            <div className="bg-white rounded-full flex-1 min-w-[130px] flex py-3 px-4 lg:px-6 items-center justify-between text-[#333] font-semibold">
               <input
                 ref={desktopSearchLocationInputRef}
                 className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none p-0 text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0"
@@ -871,14 +875,10 @@ const PostsApp = () => {
             </div>
           </div>
 
-          <div className="flex gap-4 mt-[48px] mb-[16px] items-center">
-            <h1 className="text-[56px] font-black text-[#262626] tracking-tight mr-4 leading-none font-sans">
-              Let&apos;s start weaving !
-            </h1>
-            <div className="bg-white w-16 h-[64px] rounded-[32px]"></div>
-            <div className="bg-white w-16 h-[64px] rounded-[32px]"></div>
-            <div className="bg-white w-16 h-[64px] rounded-[32px]"></div>
-            <div className="bg-white w-16 h-[64px] rounded-[32px_15px_15px_32px]"></div>
+          <div className="mt-12 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6">
+            <div className="lg:[grid-column:1/-2]">
+              <LetsStartWeavingBanner className="w-full h-auto" />
+            </div>
           </div>
         </div>
         {/* === Desktop Head Area End === */}

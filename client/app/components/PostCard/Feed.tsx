@@ -251,7 +251,7 @@ export default function Feed({
               ref={(el) => {
                 cardRefs.current[i] = el;
               }}
-              className="snap-child snap-center md:snap-align-none pb-4 md:pb-0"
+              className="snap-child snap-center sm:snap-align-none pb-4 sm:pb-0"
             >
               <PostCard
                 post={p}

@@ -221,8 +221,7 @@ function PostCardInner({
   return (
     <motion.div
       initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true, margin: "100px" }}
+      animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
       className={`font-ddin cursor-pointer rounded-[30px] bg-white transition-all duration-300 py-0 pb-4 mt-4 relative ${

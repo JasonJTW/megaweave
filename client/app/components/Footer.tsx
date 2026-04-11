@@ -4,7 +4,7 @@ import WeavingIcon from "./icons/WeavingIcon";
 
 const Footer: FC = () => {
   return (
-    <footer className=" overflow-hidden  bg-[#f4f5f3] text-[#14321f] font-ddin max-w-full">
+    <footer className=" overflow-hidden sm:sticky sm:z-40 sm:bottom-0 bg-[#f4f5f3] text-[#14321f] font-ddin max-w-full">
       {/* 頂端細線（幾乎不可見） */}
 
       {/* 主要內容區（置於 logo 之上） */}

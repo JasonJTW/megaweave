@@ -368,9 +368,9 @@ function PostCardInner({
                 post.city ||
                 post.route ||
                 post.full_address) && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <LocationIcon className="text-primary flex-shrink-0" />
-                  <span className="text-[16px] text-gray-700">
+                <div className="flex items-start sm:items-center gap-2 w-full">
+                  <LocationIcon className="text-primary flex-shrink-0 mt-[2px] sm:mt-0" />
+                  <div className="text-[16px] text-gray-700 truncate min-w-0 flex-1 w-full">
                     {post.province && (
                       <span
                         className="cursor-pointer hover:underline hover:text-primary transition-colors"
@@ -413,7 +413,7 @@ function PostCardInner({
                       !post.city &&
                       !post.route &&
                       post.full_address && <span>{post.full_address}</span>}
-                  </span>
+                  </div>
                 </div>
               )}
               {post.created_at && (

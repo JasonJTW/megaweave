@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useInView } from "react-intersection-observer";
 import PostCard from "./PostCard";
 import { usePost } from "../../contexts/PostContext";
 import { Weave } from "@/services/weaveService";
@@ -48,31 +49,16 @@ export default function Feed({
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
   const activeIndexRef = useRef<number | null>(activeIndex);
   
-  // Intersection Observer for Infinite Scroll
-  const loadingRef = useRef<HTMLDivElement | null>(null);
+  // Intersection Observer for Infinite Scroll using react-intersection-observer
+  const { ref: loadingRef, inView } = useInView({
+    rootMargin: "800px 0px", // Trigger fetch when the bottom is still 800px away
+  });
 
   useEffect(() => {
-    if (!hasMore || !onLoadMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          onLoadMore();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    const currentRef = loadingRef.current;
-    if (currentRef) {
-      observer.observe(currentRef);
+    if (inView && hasMore && onLoadMore) {
+      onLoadMore();
     }
-
-    return () => {
-      if (currentRef) observer.unobserve(currentRef);
-      observer.disconnect();
-    };
-  }, [hasMore, onLoadMore]);
+  }, [inView, hasMore, onLoadMore]);
 
   useEffect(() => {
     activeIndexRef.current = activeIndex;

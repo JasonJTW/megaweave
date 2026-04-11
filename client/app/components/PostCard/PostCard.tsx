@@ -28,6 +28,7 @@ interface PostCardProps {
   weave?: Weave;
   currentUserId?: number;
   onWeaveStatusChange?: () => void; // ✅ 新增：狀態改變後的回調
+  isFirstVisible?: boolean;
   onCategoryClick?: (categoryId: number) => void;
   onLocationClick?: (
     type: "province" | "city" | "route",
@@ -44,6 +45,7 @@ function PostCardInner({
   weave,
   currentUserId,
   onWeaveStatusChange,
+  isFirstVisible,
   onCategoryClick,
   onLocationClick,
 }: PostCardProps) {
@@ -288,7 +290,7 @@ function PostCardInner({
                   height={0}
                   sizes="(min-width: 768px) 280px, 100vw"
                   className="w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover"
-                  priority={false}
+                  priority={!!isFirstVisible}
                 />
               </div>
 
@@ -565,6 +567,7 @@ export default React.memo(PostCardInner, (prev, next) => {
     prev.post.id === next.post.id &&
     prev.weave?.status === next.weave?.status &&
     prev.weave?.giver_confirmed === next.weave?.giver_confirmed &&
-    prev.weave?.receiver_confirmed === next.weave?.receiver_confirmed
+    prev.weave?.receiver_confirmed === next.weave?.receiver_confirmed &&
+    prev.isFirstVisible === next.isFirstVisible
   );
 });

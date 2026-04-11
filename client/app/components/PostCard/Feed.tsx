@@ -259,6 +259,7 @@ export default function Feed({
                 categories={categories}
                 onPostClick={handlePostClick}
                 isExpanded={true}
+                isFirstVisible={i === 0}
                 weave={weave} // ✅ 傳遞 weave 資料
                 currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
                 onWeaveStatusChange={onWeaveStatusChange}

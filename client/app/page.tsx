@@ -988,14 +988,23 @@ const PostsApp = () => {
           </div>
         </div>
         <div
-          className={`hidden sm:block sticky transition-[top] duration-150 ease-in-out ${
+          className={`hidden md:block sticky transition-[top] duration-150 ease-in-out ${
             isNavbarVisible ? "top-[152px]" : "top-[72px]"
-          } mt-8 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6 z-10 bg-[#f4f5f3]`}
+          } mt-8 mb-4 z-10 bg-[#f4f5f3]`}
         >
-          <div className="lg:[grid-column:1/-2]">
-            <LetsStartWeavingBanner className="w-full h-auto" />
+          {/* Mirror the Feed wrapper padding so the grid columns align exactly */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Same grid definition as Feed: sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center */}
+            <div className="sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6">
+              {/* 2 cols (<936px): full | 3+ cols (>=936px): all-except-last
+                  936px = viewport where 3×280px + 2×24px gap fits with sm:px-6 (48px) padding */}
+              <div className="sm:[grid-column:1/-1] min-[936px]:[grid-column:1/-2]">
+                <LetsStartWeavingBanner className="w-full h-auto" />
+              </div>
+            </div>
           </div>
         </div>
+
         <div className="md:hidden max-w-7xl mx-auto px-4 pt-4 sm:px-6 lg:px-8 ">
           {!showCreateForm && <IconGrid />}
         </div>

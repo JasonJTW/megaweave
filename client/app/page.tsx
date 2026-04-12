@@ -995,12 +995,74 @@ const PostsApp = () => {
           {/* Mirror the Feed wrapper padding so the grid columns align exactly */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Same grid definition as Feed: sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center */}
-            <div className="sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6">
+            <div className="sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6 relative">
               {/* 2 cols (<936px): full | 3+ cols (>=936px): all-except-last
                   936px = viewport where 3×280px + 2×24px gap fits with sm:px-6 (48px) padding */}
               <div className="sm:[grid-column:1/-1] min-[936px]:[grid-column:1/-2]">
                 <LetsStartWeavingBanner className="w-full h-auto" />
               </div>
+
+              {/* Collapsible Weaving button — only in the last column when 3+ cols */}
+              {isStuck && (
+                <div className="hidden min-[936px]:flex min-[936px]:[grid-column:-2/-1] items-center justify-center overflow-visible">
+                  <div className="group relative flex items-center justify-center w-full h-full font-ddin overflow-visible">
+                    {/* Main "+ Weaving" pill button */}
+                    <button
+                      className="
+                        relative z-10 w-full h-full rounded-full
+                        bg-megaweave-forest-dark text-white font-extrabold text-3xl tracking-wide
+                        flex items-center justify-center
+                        transition-all duration-300 ease-in-out
+                        group-hover:opacity-0 group-hover:scale-95 group-hover:pointer-events-none
+                      "
+                    >
+                      + Weaving
+                    </button>
+
+                    {/* Expanded sub-buttons — anchored to right, expand left to cover banner */}
+                    <div
+                      className="
+                        absolute right-0 top-0 bg-white p-2 rounded-full shadow-md
+                        flex flex-row items-center gap-3 font-extrabold text-3xl
+                        opacity-0 scale-x-90 origin-right pointer-events-none
+                        group-hover:opacity-100 group-hover:scale-x-100 group-hover:pointer-events-auto
+                        transition-all duration-300 ease-in-out
+                        z-20 h-full
+                      "
+                    >
+                      {/* + Wish */}
+                      <button
+                        onClick={() => handleCreatePostButtonClick("wish")}
+                        className="
+                          flex-1 h-full rounded-full
+                          bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
+                          flex items-center justify-between pl-6 pr-1 overflow-hidden transition-colors duration-150
+                        "
+                      >
+                        <span className="whitespace-nowrap">+ Wish</span>
+                        <div className="relative h-full aspect-square flex items-center justify-center shrink-0">
+                          <ElfIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-red-dark" />
+                        </div>
+                      </button>
+
+                      {/* + Share */}
+                      <button
+                        onClick={() => handleCreatePostButtonClick("share")}
+                        className="
+                          flex-1 h-full rounded-full
+                          bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
+                          flex items-center justify-between pl-6 pr-1 overflow-hidden transition-colors duration-150
+                        "
+                      >
+                        <span className="whitespace-nowrap">+ Share</span>
+                        <div className="relative h-full aspect-square flex items-center justify-center shrink-0">
+                          <ReuseIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-gold" />
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

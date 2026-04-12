@@ -25,21 +25,25 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     const controlNavbar = () => {
       const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollY;
 
       setIsAtTop(currentScrollY < 10);
 
       if (currentScrollY < 100) {
         setIsNavbarVisible(true);
-      } else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      } else if (delta > 8 && currentScrollY > 100) {
+        // Only hide when scrolling DOWN by more than 8px 
+        // (filters out mobile viewport height changes from browser chrome)
         setIsNavbarVisible(false);
-      } else if (currentScrollY < lastScrollY) {
+      } else if (delta < -8) {
+        // Only show when scrolling UP by more than 8px
         setIsNavbarVisible(true);
       }
 
       setLastScrollY(currentScrollY);
     };
 
-    window.addEventListener("scroll", controlNavbar);
+    window.addEventListener("scroll", controlNavbar, { passive: true });
     return () => window.removeEventListener("scroll", controlNavbar);
   }, [lastScrollY]);
 

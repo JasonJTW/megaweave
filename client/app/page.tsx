@@ -71,6 +71,8 @@ const PostsApp = () => {
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
   const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isWeavingExpanded, setIsWeavingExpanded] = useState(false);
+  const weavingButtonRef = useRef<HTMLDivElement>(null);
 
   // Measure the bar's natural height (only meaningful while it's in normal document flow)
   useEffect(() => {
@@ -705,33 +707,33 @@ const PostsApp = () => {
     const handleMouseDown = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
 
-      // 1. 檢查點擊是否發生在主選單 (motion.div) 內部
-      const isInsideMenu = menuRef.current && menuRef.current.contains(target);
+      // 1. Mobile Menu Outside Click
+      if (isMenuOpen) {
+        const isInsideMenu = menuRef.current && menuRef.current.contains(target);
+        const isInsideSearchButton =
+          searchButtonRef.current && searchButtonRef.current.contains(target);
+        const isInsideRadixPortal =
+          target.closest("[data-radix-popper-content]") ||
+          target.closest(".radix-select-content");
+        const isInsideFeed = target.closest(".feed-snap");
 
-      const isInsideSearchButton =
-        searchButtonRef.current && searchButtonRef.current.contains(target);
+        if (
+          !isInsideMenu &&
+          !isInsideRadixPortal &&
+          !isInsideSearchButton &&
+          !isInsideFeed
+        ) {
+          setIsMenuOpen(false);
+        }
+      }
 
-      // 2. 檢查點擊是否發生在任何 Radix UI Portal 內容內部 (如 SelectContent)
-      // Radix UI 的 Portal 內容通常會有一個 data 屬性，例如 data-radix-popper-content 或 data-state="open"
-      // 最常見的方式是檢查 Select 的內容是否是點擊目標的祖先元素。
-      const isInsideRadixPortal =
-        target.closest("[data-radix-popper-content]") ||
-        target.closest(".radix-select-content");
-
-      const isInsideFeed = target.closest(".feed-snap");
-
-      // 邏輯：
-      // 如果點擊不在主選單內，AND 點擊也不在任何彈出的 Radix Portal 內
-      // 說明這是真正的「外部點擊」，應該關閉主選單。
-      if (
-        !isInsideMenu &&
-        !isInsideRadixPortal &&
-        !isInsideSearchButton &&
-        !isInsideFeed
-      ) {
-        // 這裡使用 event.preventDefault() 可以防止點擊事件繼續傳播到更下方的頁面物件
-        event.preventDefault();
-        setIsMenuOpen(false);
+      // 2. Weaving Button Outside Click (Tablet)
+      if (isWeavingExpanded) {
+        const isInsideWeaving =
+          weavingButtonRef.current && weavingButtonRef.current.contains(target);
+        if (!isInsideWeaving) {
+          setIsWeavingExpanded(false);
+        }
       }
     };
 
@@ -741,7 +743,7 @@ const PostsApp = () => {
     return () => {
       document.removeEventListener("mousedown", handleMouseDown);
     };
-  }, [isMenuOpen]); // isMenuOpen 狀態改變時重新運行
+  }, [isMenuOpen, isWeavingExpanded]); // isMenuOpen 或 isWeavingExpanded 狀態改變時重新運行
 
   return (
     <>
@@ -1005,34 +1007,54 @@ const PostsApp = () => {
               {/* Collapsible Weaving button — only in the last column when 3+ cols */}
               {isStuck && (
                 <div className="hidden min-[936px]:flex min-[936px]:[grid-column:-2/-1] items-center justify-center overflow-visible">
-                  <div className="group relative flex items-center justify-center w-full h-full font-ddin overflow-visible">
+                  <div
+                    ref={weavingButtonRef}
+                    onMouseEnter={() => setIsWeavingExpanded(true)}
+                    onMouseLeave={() => setIsWeavingExpanded(false)}
+                    className="relative flex items-center justify-center w-full h-full font-ddin overflow-visible"
+                  >
                     {/* Main "+ Weaving" pill button */}
                     <button
-                      className="
-                        relative z-10 w-full h-full rounded-full
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsWeavingExpanded(!isWeavingExpanded);
+                      }}
+                      className={`
+                        w-full h-full rounded-full
                         bg-megaweave-forest-dark text-white font-extrabold text-3xl tracking-wide
                         flex items-center justify-center
                         transition-all duration-300 ease-in-out
-                        group-hover:opacity-0 group-hover:scale-95 group-hover:pointer-events-none
-                      "
+                        ${
+                          isWeavingExpanded
+                            ? "opacity-0 scale-95 pointer-events-none z-10"
+                            : "opacity-100 scale-100 z-30"
+                        }
+                      `}
                     >
                       + Weaving
                     </button>
 
                     {/* Expanded sub-buttons — anchored to right, expand left to cover banner */}
                     <div
-                      className="
+                      className={`
                         absolute right-0 top-0 bg-white p-2 rounded-full shadow-md
                         flex flex-row items-center gap-3 font-extrabold text-3xl
-                        opacity-0 scale-x-90 origin-right pointer-events-none
-                        group-hover:opacity-100 group-hover:scale-x-100 group-hover:pointer-events-auto
                         transition-all duration-300 ease-in-out
-                        z-20 h-full
-                      "
+                        h-full
+                        ${
+                          isWeavingExpanded
+                            ? "opacity-100 scale-x-100 pointer-events-auto z-20"
+                            : "opacity-0 scale-x-90 origin-right pointer-events-none z-0"
+                        }
+                      `}
                     >
                       {/* + Wish */}
                       <button
-                        onClick={() => handleCreatePostButtonClick("wish")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCreatePostButtonClick("wish");
+                          setIsWeavingExpanded(false);
+                        }}
                         className="
                           flex-1 h-full rounded-full
                           bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
@@ -1047,7 +1069,11 @@ const PostsApp = () => {
 
                       {/* + Share */}
                       <button
-                        onClick={() => handleCreatePostButtonClick("share")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCreatePostButtonClick("share");
+                          setIsWeavingExpanded(false);
+                        }}
                         className="
                           flex-1 h-full rounded-full
                           bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide

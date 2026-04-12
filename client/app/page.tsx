@@ -988,7 +988,7 @@ const PostsApp = () => {
           </div>
         </div>
         <div
-          className={`sticky transition-[top] duration-150 ease-in-out ${
+          className={`hidden sm:block sticky transition-[top] duration-150 ease-in-out ${
             isNavbarVisible ? "top-[152px]" : "top-[72px]"
           } mt-8 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6 z-10 bg-[#f4f5f3]`}
         >

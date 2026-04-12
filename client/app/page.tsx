@@ -474,7 +474,9 @@ const PostsApp = () => {
 
   // mobile 下拉刷新功能
   const { isRefreshing, pullPosition } = usePullToRefresh({
-    onRefresh: async () => { await mutate(); },
+    onRefresh: async () => {
+      await mutate();
+    },
     maximumPullLength: DEFAULT_MAXIMUM_PULL_LENGTH,
     refreshThreshold: DEFAULT_REFRESH_THRESHOLD,
     // isDisabled:
@@ -778,9 +780,13 @@ const PostsApp = () => {
               </Button>
             </div>
           </div>
+        </div>
 
-          {/* View only visual layout for search & filter tools for Desktop */}
-          <div className="w-full mt-10 mb-4 bg-white shadow-none rounded-full flex flex-row items-center px-6 py-4 border-[2px] border-transparent">
+        {/* === Desktop Head Area End === */}
+
+        {/* View only visual layout for search & filter tools for Desktop */}
+        <div className="hidden md:block sticky top-0 z-20 bg-[#f4f5f3] w-full px-8 pt-4 pb-2 max-w-7xl mx-auto">
+          <div className="w-full mb-4 bg-white shadow-none rounded-full flex flex-row items-center px-6 py-4 border-[2px] border-transparent">
             <input
               type="text"
               placeholder="Search"
@@ -872,13 +878,12 @@ const PostsApp = () => {
             </div>
           </div>
 
-          <div className="mt-12 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6">
+          <div className="mt-8 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6">
             <div className="lg:[grid-column:1/-2]">
               <LetsStartWeavingBanner className="w-full h-auto" />
             </div>
           </div>
         </div>
-        {/* === Desktop Head Area End === */}
 
         <div className="md:hidden max-w-7xl mx-auto px-4 pt-4 sm:px-6 lg:px-8 ">
           {!showCreateForm && <IconGrid />}

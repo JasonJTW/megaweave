@@ -58,10 +58,45 @@ const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const { user } = useUser();
+  const [isStuck, setIsStuck] = useState(false);
+  // Ref on the desktop header — we watch its bottom edge to decide when to stick
+  const desktopHeaderRef = useRef<HTMLDivElement>(null);
+  // Ref on the search/filter bar — needed to measure its natural height for the spacer
+  const barRef = useRef<HTMLDivElement>(null);
+  // Natural height of the bar while it's in document flow (not fixed)
+  const [barHeight, setBarHeight] = useState(0);
+  // Track stuck state in a ref so the scroll handler can read it without stale-closure issues
+  const isStuckRef = useRef(false);
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
   const [isTourOpen, setIsTourOpen] = useState(false);
+
+  // Measure the bar's natural height (only meaningful while it's in normal document flow)
+  useEffect(() => {
+    if (!isStuck && barRef.current) {
+      setBarHeight(barRef.current.offsetHeight);
+    }
+  }, [isStuck]);
+
+  useEffect(() => {
+    const checkSticky = () => {
+      if (!desktopHeaderRef.current) return;
+      const bottom = desktopHeaderRef.current.getBoundingClientRect().bottom;
+      // Hysteresis: require 20px past threshold to engage, 20px before to disengage.
+      // This prevents rapid toggling when the user scrolls slowly near the boundary.
+      if (!isStuckRef.current && bottom < -20) {
+        isStuckRef.current = true;
+        setIsStuck(true);
+      } else if (isStuckRef.current && bottom > 20) {
+        isStuckRef.current = false;
+        setIsStuck(false);
+      }
+    };
+    window.addEventListener("scroll", checkSticky, { passive: true });
+    checkSticky();
+    return () => window.removeEventListener("scroll", checkSticky);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -722,9 +757,11 @@ const PostsApp = () => {
       <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
       <div className="min-h-screen ">
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
-
         {/* === Desktop Head Area === */}
-        <div className="hidden font-ddin md:flex flex-col w-full max-w-7xl mx-auto px-8 pt-8 pb-4 relative z-20">
+        <div
+          ref={desktopHeaderRef}
+          className="hidden font-ddin md:flex flex-col w-full max-w-7xl mx-auto px-8 pt-8 pb-4 relative z-20"
+        >
           <div className="flex justify-between items-stretch gap-12 max-h-[640px]">
             {/* Left Column: IconGrid */}
             <div className="flex-1 w-[50%] max-w-[640px] flex items-center">
@@ -781,114 +818,187 @@ const PostsApp = () => {
             </div>
           </div>
         </div>
-
-        {/* === Desktop Head Area End === */}
-
-        {/* View only visual layout for search & filter tools for Desktop */}
-        <div className="hidden md:block sticky top-0 z-20 bg-[#f4f5f3] w-full px-8 pt-4 pb-2 max-w-7xl mx-auto">
-          <div className="w-full mb-4 bg-white shadow-none rounded-full flex flex-row items-center px-6 py-4 border-[2px] border-transparent">
-            <input
-              type="text"
-              placeholder="Search"
-              className="bg-transparent border-0 outline-none focus:outline-none focus:ring-0 p-0 w-full h-auto type-h3 placeholder:text-primary-50"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm ? (
-              <button onClick={() => setSearchTerm("")}>
-                <X className="w-5 h-5 text-[#333] shrink-0 ml-2" />
-              </button>
-            ) : (
-              <div className="w-5 h-5 ml-2 shrink-0 border-none bg-transparent" />
-            )}
-          </div>
-
-          <div className="w-full flex justify-between gap-2 lg:gap-4 flex-wrap xl:flex-nowrap border-gray-200/50 items-center type-button-b1">
-            <div className="bg-white rounded-full flex-1 min-w-[130px] flex items-center justify-between text-[#333]">
-              <Select
-                value={selectedCategory || "ALL"}
-                onValueChange={(value) =>
-                  setSelectedCategory(value === "ALL" ? "" : value)
+        {/*
+          SPACER: When the bar is fixed (out of document flow), this div holds its original space
+          so the document height doesn't shrink — which would trigger browser scroll-anchoring
+          and cause the Navbar to spuriously reappear.
+        */}
+        {isStuck && (
+          <div className="hidden md:block" style={{ height: barHeight }} />
+        )}
+        {/* Desktop search & filter bar — fixed when stuck, static when not */}
+        <div
+          ref={barRef}
+          className="hidden md:block bg-[#f4f5f3] z-20"
+          style={
+            isStuck
+              ? {
+                  position: "fixed",
+                  top: isNavbarVisible ? 80 : 0,
+                  left: 0,
+                  right: 0,
+                  // Smoothly animate top when Navbar shows/hides
+                  transition: "top 150ms ease-in-out",
                 }
-              >
-                <SelectTrigger className="bg-transparent border-0 shadow-none focus:ring-0 px-4 lg:px-6 py-6 w-full flex items-center justify-between truncate">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Categories</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>
-                      {cat.name_en}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="bg-white rounded-full flex-1 min-w-[130px] flex py-3 px-4 lg:px-6 items-center justify-between text-[#333] font-semibold">
-              <input
-                ref={desktopSearchLocationInputRef}
-                className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none p-0 text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0"
-                type="text"
-                placeholder="Location"
-                value={locationInput}
-                onChange={(e) => {
-                  setLocationInput(e.target.value);
-                  if (!e.target.value) {
-                    setSelectedLocation("");
-                    setSearchCity("");
-                    setSearchProvince("");
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setSelectedLocation(locationInput);
-                  }
-                }}
-              />
-            </div>
-
-            <div className="flex flex-nowrap items-center gap-2 lg:gap-4 overflow-x-auto overflow-y-hidden hide-scrollbar">
-              <button
-                className={`bg-transparent border rounded-full px-4 lg:px-6 py-2 flex items-center justify-center gap-2 type-button-b1 font-semibold transition-colors whitespace-nowrap ${
-                  postFilterType === "wish"
-                    ? "bg-[#fbe9e7] border-[#fbe9e7] text-megaweave-forest-dark"
-                    : "border-gray-300 text-[#333]"
+              : {}
+          }
+        >
+          {/* Inner wrapper mirrors the original max-w / padding */}
+          <div className="max-w-7xl mx-auto px-8 pt-4 pb-2">
+            <div
+              className={`w-full flex ${
+                isStuck ? "flex-row items-center gap-1 lg:gap-2" : "flex-col"
+              }`}
+            >
+              {/* Search Bar */}
+              <div
+                className={`bg-white shadow-none rounded-full flex flex-row items-center border-[2px] border-transparent transition-all duration-300 ${
+                  isStuck ? "flex-1 py-1 px-4 h-12" : "w-full mb-4 py-4 px-6"
                 }`}
-                onClick={() =>
-                  setPostFilterType((prev) => (prev === "wish" ? "" : "wish"))
-                }
               >
-                Wish Only <ElfIcon className="w-4 h-4 text-[#CB5E32]" />
-              </button>
-              <button
-                className={`bg-transparent border rounded-full px-4 lg:px-6 py-2 flex items-center justify-center gap-2 type-button-b1 font-semibold transition-colors whitespace-nowrap ${
-                  postFilterType === "share"
-                    ? "bg-[#fff3e0] border-[#fff3e0] text-megaweave-forest-dark"
-                    : "border-gray-300 text-[#333]"
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className={`bg-transparent border-0 outline-none focus:outline-none focus:ring-0 p-0 w-full h-auto placeholder:text-primary-50 transition-all duration-300 ${
+                    isStuck ? "type-body-t2" : "type-h3"
+                  }`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm ? (
+                  <button onClick={() => setSearchTerm("")}>
+                    <X className="w-5 h-5 text-[#333] shrink-0 ml-2" />
+                  </button>
+                ) : (
+                  <div className="w-5 h-5 ml-2 shrink-0 border-none bg-transparent" />
+                )}
+              </div>
+              <div
+                className={`flex justify-between gap-1 lg:gap-2 items-center type-button-b1 transition-all duration-300 ${
+                  isStuck
+                    ? "flex-[2.5] min-w-0"
+                    : "w-full flex-wrap xl:flex-nowrap"
                 }`}
-                onClick={() =>
-                  setPostFilterType((prev) => (prev === "share" ? "" : "share"))
-                }
               >
-                Share Only <ReuseIcon className="w-4 h-4 text-[#F0AF1E]" />
-              </button>
-              <button className="bg-transparent border border-gray-300 rounded-full px-4 lg:px-6 py-2 flex items-center justify-center type-button-b1 font-semibold transition-colors whitespace-nowrap">
-                Hide Overdue
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-8 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6">
-            <div className="lg:[grid-column:1/-2]">
-              <LetsStartWeavingBanner className="w-full h-auto" />
+                <div
+                  className={`bg-white rounded-full flex items-center justify-between text-[#333] transition-all duration-300 ${
+                    isStuck
+                      ? "flex-initial min-w-[80px] max-w-[140px]"
+                      : "flex-1 min-w-[130px]"
+                  }`}
+                >
+                  <Select
+                    value={selectedCategory || "ALL"}
+                    onValueChange={(value) =>
+                      setSelectedCategory(value === "ALL" ? "" : value)
+                    }
+                  >
+                    <SelectTrigger
+                      className={`bg-transparent border-0 shadow-none focus:ring-0 w-full flex items-center justify-between truncate transition-all duration-300 ${
+                        isStuck ? "px-4 py-2 h-10" : "px-4 lg:px-6 py-6"
+                      }`}
+                    >
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Categories</SelectItem>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                          {cat.name_en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div
+                  className={`bg-white rounded-full flex items-center justify-between text-[#333] font-semibold transition-all duration-300 ${
+                    isStuck
+                      ? "flex-initial min-w-[80px] max-w-[140px] py-1 px-3 h-10"
+                      : "flex-1 min-w-[130px] py-3 px-4 lg:px-6"
+                  }`}
+                >
+                  <input
+                    ref={desktopSearchLocationInputRef}
+                    className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none p-0 text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0"
+                    type="text"
+                    placeholder="Location"
+                    value={locationInput}
+                    onChange={(e) => {
+                      setLocationInput(e.target.value);
+                      if (!e.target.value) {
+                        setSelectedLocation("");
+                        setSearchCity("");
+                        setSearchProvince("");
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setSelectedLocation(locationInput);
+                      }
+                    }}
+                  />
+                </div>
+                <div
+                  className={`flex flex-nowrap items-center transition-all duration-300 ${isStuck ? "gap-1 lg:gap-2" : "gap-2 lg:gap-4 overflow-x-auto overflow-y-hidden hide-scrollbar"}`}
+                >
+                  <button
+                    className={`bg-transparent border rounded-full flex items-center justify-center gap-1 lg:gap-2 type-button-b1 font-semibold transition-all whitespace-nowrap ${
+                      isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    } ${
+                      postFilterType === "wish"
+                        ? "bg-[#fbe9e7] border-[#fbe9e7] text-megaweave-forest-dark"
+                        : "border-gray-300 text-[#333]"
+                    }`}
+                    onClick={() =>
+                      setPostFilterType((prev) =>
+                        prev === "wish" ? "" : "wish",
+                      )
+                    }
+                  >
+                    Wish Only{" "}
+                    <ElfIcon className="w-4 h-4 text-[#CB5E32] shrink-0" />
+                  </button>
+                  <button
+                    className={`bg-transparent border rounded-full flex items-center justify-center gap-1 lg:gap-2 type-button-b1 font-semibold transition-all whitespace-nowrap ${
+                      isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    } ${
+                      postFilterType === "share"
+                        ? "bg-[#fff3e0] border-[#fff3e0] text-megaweave-forest-dark"
+                        : "border-gray-300 text-[#333]"
+                    }`}
+                    onClick={() =>
+                      setPostFilterType((prev) =>
+                        prev === "share" ? "" : "share",
+                      )
+                    }
+                  >
+                    Share Only{" "}
+                    <ReuseIcon className="w-4 h-4 text-[#F0AF1E] shrink-0" />
+                  </button>
+                  <button
+                    className={`bg-transparent border border-gray-300 rounded-full flex items-center justify-center type-button-b1 font-semibold transition-all whitespace-nowrap ${
+                      isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    }`}
+                  >
+                    Hide Overdue
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
+        <div
+          className={`sticky transition-[top] duration-150 ease-in-out ${
+            isNavbarVisible ? "top-[152px]" : "top-[72px]"
+          } mt-8 mb-4 lg:grid lg:grid-cols-[repeat(auto-fill,280px)] lg:justify-center lg:gap-x-6 z-10 bg-[#f4f5f3]`}
+        >
+          <div className="lg:[grid-column:1/-2]">
+            <LetsStartWeavingBanner className="w-full h-auto" />
+          </div>
+        </div>
         <div className="md:hidden max-w-7xl mx-auto px-4 pt-4 sm:px-6 lg:px-8 ">
           {!showCreateForm && <IconGrid />}
         </div>
-
         <div
           style={{
             top: (isRefreshing ? DEFAULT_REFRESH_THRESHOLD : pullPosition) / 3,
@@ -905,7 +1015,6 @@ const PostsApp = () => {
             <LucideLoader2 className="h-full w-full" />
           </div>
         </div>
-
         <RefractiveDiv
           className={` md:hidden max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 transition-all duration-150 ${
             isNavbarVisible ? "top-[80px]" : "top-[0px]"
@@ -999,7 +1108,6 @@ const PostsApp = () => {
              */}
           </div>
         </RefractiveDiv>
-
         <>
           {/* 選單面板 */}
           <AnimatePresence>
@@ -1205,7 +1313,6 @@ const PostsApp = () => {
             <SearchIcon className=" text-white" />
           </RefractiveButton>
         </>
-
         {/* Error message and posts*/}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
           {/* 錯誤提示 */}
@@ -1272,7 +1379,6 @@ const PostsApp = () => {
             </div>
           )}
         </div>
-
         {/* Create Post */}
         {showCreateForm && (
           <div className="fixed inset-0 flex z-50 bg-secondary overflow-y-auto font-ddin">

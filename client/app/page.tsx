@@ -701,50 +701,6 @@ const PostsApp = () => {
     };
   }, [selectedImages]);
 
-  useEffect(() => {
-    if (!isMenuOpen) return; // 只在選單打開時監聽
-
-    const handleMouseDown = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-
-      // 1. Mobile Menu Outside Click
-      if (isMenuOpen) {
-        const isInsideMenu = menuRef.current && menuRef.current.contains(target);
-        const isInsideSearchButton =
-          searchButtonRef.current && searchButtonRef.current.contains(target);
-        const isInsideRadixPortal =
-          target.closest("[data-radix-popper-content]") ||
-          target.closest(".radix-select-content");
-        const isInsideFeed = target.closest(".feed-snap");
-
-        if (
-          !isInsideMenu &&
-          !isInsideRadixPortal &&
-          !isInsideSearchButton &&
-          !isInsideFeed
-        ) {
-          setIsMenuOpen(false);
-        }
-      }
-
-      // 2. Weaving Button Outside Click (Tablet)
-      if (isWeavingExpanded) {
-        const isInsideWeaving =
-          weavingButtonRef.current && weavingButtonRef.current.contains(target);
-        if (!isInsideWeaving) {
-          setIsWeavingExpanded(false);
-        }
-      }
-    };
-
-    // 監聽 mousedown 事件
-    document.addEventListener("mousedown", handleMouseDown);
-
-    return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-    };
-  }, [isMenuOpen, isWeavingExpanded]); // isMenuOpen 或 isWeavingExpanded 狀態改變時重新運行
-
   return (
     <>
       <OverlayTour
@@ -990,10 +946,21 @@ const PostsApp = () => {
           </div>
         </div>
         <div
-          className={`hidden md:block sticky transition-[top] duration-150 ease-in-out ${
+          className={`hidden md:block sticky transition-all duration-150 ease-in-out ${
             isNavbarVisible ? "top-[152px]" : "top-[72px]"
-          } mt-8 mb-4 z-10 bg-[#f4f5f3]`}
+          } mt-8 mb-4 bg-[#f4f5f3] ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
         >
+          {/* 全局透明遮罩：當 Weaving 展開時，攔截所有外部點擊並防止事件穿透 */}
+          {isWeavingExpanded && (
+            <div
+              className="fixed inset-0 z-[-1] bg-transparent cursor-default"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsWeavingExpanded(false);
+              }}
+            />
+          )}
+
           {/* Mirror the Feed wrapper padding so the grid columns align exactly */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Same grid definition as Feed: sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center */}
@@ -1223,7 +1190,7 @@ const PostsApp = () => {
                 {/* 背景遮罩 */}
                 <div
                   className="fixed inset-0 z-[45] bg-transparent"
-                  // onClick={() => setIsMenuOpen(false)}
+                  onClick={() => setIsMenuOpen(false)}
                 />
                 <motion.div
                   ref={menuRef}
@@ -1264,6 +1231,7 @@ const PostsApp = () => {
                     },
                   }}
                   className="fixed bottom-24 right-8 left-8 sm:left-auto z-[60] bg-megaweave-forest-dark/80 backdrop-blur-[3px] rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right flex-col"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {/* Search Input */}
                   <div className="relative mb-4">

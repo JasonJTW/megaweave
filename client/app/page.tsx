@@ -973,12 +973,12 @@ const PostsApp = () => {
 
               {/* Collapsible Weaving button — only in the last column when 3+ cols */}
               {isStuck && (
-                <div className="hidden min-[936px]:flex min-[936px]:[grid-column:-2/-1] items-center justify-center overflow-visible">
+                <div className="hidden min-[936px]:flex min-[936px]:[grid-column:-2/-1] items-stretch justify-center overflow-visible">
                   <div
                     ref={weavingButtonRef}
                     onMouseEnter={() => setIsWeavingExpanded(true)}
                     onMouseLeave={() => setIsWeavingExpanded(false)}
-                    className="relative flex items-center justify-center w-full h-full font-ddin overflow-visible"
+                    className="relative flex items-stretch justify-center w-full h-full font-ddin overflow-visible"
                   >
                     {/* Main "+ Weaving" pill button */}
                     <button
@@ -1023,13 +1023,13 @@ const PostsApp = () => {
                           setIsWeavingExpanded(false);
                         }}
                         className="
-                          flex-1 h-full rounded-full
+                          flex-1 h-full rounded-full relative
                           bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
-                          flex items-center justify-between pl-6 pr-1 overflow-hidden transition-colors duration-150
+                          flex items-center justify-start pl-6 pr-16 overflow-hidden transition-colors duration-150
                         "
                       >
-                        <span className="whitespace-nowrap">+ Wish</span>
-                        <div className="relative h-full aspect-square flex items-center justify-center shrink-0">
+                        <span className="whitespace-nowrap relative z-10">+ Wish</span>
+                        <div className="absolute right-0 top-0 bottom-0 aspect-square flex items-center justify-center shrink-0 pointer-events-none">
                           <ElfIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-red-dark" />
                         </div>
                       </button>
@@ -1042,13 +1042,13 @@ const PostsApp = () => {
                           setIsWeavingExpanded(false);
                         }}
                         className="
-                          flex-1 h-full rounded-full
+                          flex-1 h-full rounded-full relative
                           bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
-                          flex items-center justify-between pl-6 pr-1 overflow-hidden transition-colors duration-150
+                          flex items-center justify-start pl-6 pr-16 overflow-hidden transition-colors duration-150
                         "
                       >
-                        <span className="whitespace-nowrap">+ Share</span>
-                        <div className="relative h-full aspect-square flex items-center justify-center shrink-0">
+                        <span className="whitespace-nowrap relative z-10">+ Share</span>
+                        <div className="absolute right-0 top-0 bottom-0 aspect-square flex items-center justify-center shrink-0 pointer-events-none">
                           <ReuseIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-gold" />
                         </div>
                       </button>

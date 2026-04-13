@@ -811,7 +811,9 @@ const PostsApp = () => {
               {/* Search Bar */}
               <div
                 className={`bg-white shadow-none rounded-full flex flex-row items-center border-[2px] border-transparent transition-all duration-300 ${
-                  isStuck ? "flex-1 py-1 px-4 h-12" : "w-full mb-4 py-4 px-6"
+                  isStuck
+                    ? "flex-1 min-w-[100px] py-1 px-4 h-12"
+                    : "w-full mb-4 py-4 px-6"
                 }`}
               >
                 <input
@@ -832,16 +834,16 @@ const PostsApp = () => {
                 )}
               </div>
               <div
-                className={`flex justify-between gap-1 lg:gap-2 items-center type-button-b1 transition-all duration-300 ${
+                className={`flex gap-1 lg:gap-2 items-center type-button-b1 transition-all duration-300 ${
                   isStuck
-                    ? "flex-[2.5] min-w-0"
-                    : "w-full flex-wrap xl:flex-nowrap"
+                    ? "flex-none"
+                    : "w-full flex-wrap xl:flex-nowrap justify-between"
                 }`}
               >
                 <div
                   className={`bg-white rounded-full flex items-center justify-between text-[#333] transition-all duration-300 ${
                     isStuck
-                      ? "flex-initial min-w-[80px] max-w-[140px]"
+                      ? "flex-none w-[130px] lg:w-[150px]"
                       : "flex-1 min-w-[130px]"
                   }`}
                 >
@@ -853,7 +855,7 @@ const PostsApp = () => {
                   >
                     <SelectTrigger
                       className={`bg-transparent border-0 shadow-none focus:ring-0 w-full flex items-center justify-between truncate transition-all duration-300 ${
-                        isStuck ? "px-4 py-2 h-10" : "px-4 lg:px-6 py-6"
+                        isStuck ? "px-3 lg:px-4 py-2 h-10" : "px-4 lg:px-6 py-6"
                       }`}
                     >
                       <SelectValue placeholder="Category" />
@@ -871,13 +873,13 @@ const PostsApp = () => {
                 <div
                   className={`bg-white rounded-full flex items-center justify-between text-[#333] font-semibold transition-all duration-300 ${
                     isStuck
-                      ? "flex-initial min-w-[80px] max-w-[140px] py-1 px-3 h-10"
-                      : "flex-1 min-w-[130px] py-3 px-4 lg:px-6"
+                      ? "flex-none w-[140px] lg:w-[160px] pl-2 pr-1 lg:px-4 h-10"
+                      : "flex-1 min-w-[130px] py-1 px-4 lg:px-6"
                   }`}
                 >
-                  <input
+                  <Input
                     ref={desktopSearchLocationInputRef}
-                    className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none p-0 text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0"
+                    className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none pl-1 pr-4 h-auto text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0 placeholder:type-body-t2 !type-body-t2"
                     type="text"
                     placeholder="Location"
                     value={locationInput}
@@ -1028,7 +1030,9 @@ const PostsApp = () => {
                           flex items-center justify-start pl-6 pr-16 overflow-hidden transition-colors duration-150
                         "
                       >
-                        <span className="whitespace-nowrap relative z-10">+ Wish</span>
+                        <span className="whitespace-nowrap relative z-10">
+                          + Wish
+                        </span>
                         <div className="absolute right-0 top-0 bottom-0 aspect-square flex items-center justify-center shrink-0 pointer-events-none">
                           <ElfIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-red-dark" />
                         </div>
@@ -1047,7 +1051,9 @@ const PostsApp = () => {
                           flex items-center justify-start pl-6 pr-16 overflow-hidden transition-colors duration-150
                         "
                       >
-                        <span className="whitespace-nowrap relative z-10">+ Share</span>
+                        <span className="whitespace-nowrap relative z-10">
+                          + Share
+                        </span>
                         <div className="absolute right-0 top-0 bottom-0 aspect-square flex items-center justify-center shrink-0 pointer-events-none">
                           <ReuseIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-gold" />
                         </div>

@@ -46,8 +46,6 @@ const processHostName = process.env.NEXT_PUBLIC_PROCESS_HOSTNAME;
 const userNameMaxLength =
   Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
 
-  
-
 // const defaultContactValues: ContactSettingsValues = {
 //   email: "",
 //   phone: "",
@@ -89,7 +87,7 @@ const UserPage = () => {
   // Avatar preview / upload states
   const [previewSrc, setPreviewSrc] = useState<string | null>(null); // object URL for preview
   const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(
-    null
+    null,
   );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -107,7 +105,7 @@ const UserPage = () => {
   const fetchWithTimeout = async (
     url: string,
     options: RequestInit,
-    timeout = 10000
+    timeout = 10000,
   ) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -181,13 +179,13 @@ const UserPage = () => {
           method: "GET",
           credentials: "include",
         },
-        10000 //? 10 seconds timeout
+        10000, //? 10 seconds timeout
       );
 
       if (!response.ok) {
         const errorMessage = await response.json();
         throw new Error(
-          errorMessage.errorMessage || "Failed to fetch user stats"
+          errorMessage.errorMessage || "Failed to fetch user stats",
         );
       }
       const statsData = await response.json();
@@ -215,7 +213,7 @@ const UserPage = () => {
           method: "GET",
           credentials: "include",
         },
-        10000
+        10000,
       );
 
       if (!response.ok) {
@@ -338,7 +336,11 @@ const UserPage = () => {
       const result = await response.json();
       const updatedUser = result.updatedUser;
       // alert(`User session updated: ${JSON.stringify(updatedUser)}`);
-      await mutate((data: { user: User | null } | undefined) => (data ? { ...data, user: updatedUser } : { user: updatedUser }), false);
+      await mutate(
+        (data: { user: User | null } | undefined) =>
+          data ? { ...data, user: updatedUser } : { user: updatedUser },
+        false,
+      );
     } catch (error) {
       console.error("Error updating user session:", error);
     }
@@ -351,7 +353,12 @@ const UserPage = () => {
 
     try {
       // 1. Compress before processing to save bandwidth to the effect service
-      const compressedBlob = await compressImage(selectedAvatarFile, 800, 800, 0.85);
+      const compressedBlob = await compressImage(
+        selectedAvatarFile,
+        800,
+        800,
+        0.85,
+      );
       const blobToProcess = compressedBlob || selectedAvatarFile;
 
       // 2. Add effects/filters via the processing host
@@ -365,7 +372,9 @@ const UserPage = () => {
       });
 
       if (!processedResponse.ok) {
-        throw new Error(`Avatar effect processing failed: ${processedResponse.status}`);
+        throw new Error(
+          `Avatar effect processing failed: ${processedResponse.status}`,
+        );
       }
 
       const processedBlob: Blob = await processedResponse.blob();
@@ -392,12 +401,12 @@ const UserPage = () => {
       await mutate((data: { user: User | null } | undefined) => {
         if (!data?.user) return data;
         return {
-           ...data,
-           user: {
-             ...data.user,
-             avatar_url: result.avatarUrl,
-             avatar_key: result.avatarKey,
-           }
+          ...data,
+          user: {
+            ...data.user,
+            avatar_url: result.avatarUrl,
+            avatar_key: result.avatarKey,
+          },
         };
       }, false);
 
@@ -455,7 +464,7 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error update username: ", error);
       toast.error(
-        error instanceof Error ? error.message : "Error update username"
+        error instanceof Error ? error.message : "Error update username",
       );
       throw error;
     }
@@ -483,7 +492,7 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error update profile: ", error);
       toast.error(
-        error instanceof Error ? error.message : "Error update profile"
+        error instanceof Error ? error.message : "Error update profile",
       );
       throw error;
     }
@@ -651,10 +660,10 @@ const UserPage = () => {
       await insertUsername(tempUsername);
       // 同时更新 user 对象中的 username
       if (user) {
-         await mutate((data: { user: User | null } | undefined) => {
-            if (!data?.user) return data;
-            return { ...data, user: { ...data.user, username: tempUsername } };
-         }, false);
+        await mutate((data: { user: User | null } | undefined) => {
+          if (!data?.user) return data;
+          return { ...data, user: { ...data.user, username: tempUsername } };
+        }, false);
       }
     } catch (error) {
       console.error("Error saving username:", error);
@@ -662,7 +671,7 @@ const UserPage = () => {
       setUsername(username || "");
       setTempUsername(username || "");
       toast.error(
-        error instanceof Error ? error.message : "Error saving username"
+        error instanceof Error ? error.message : "Error saving username",
       );
     }
   };
@@ -690,13 +699,13 @@ const UserPage = () => {
       }
       //* Update user state
       await mutate((data: { user: User | null } | undefined) => {
-         if (!data?.user) return data;
+        if (!data?.user) return data;
         return { ...data, user: { ...data.user, avatar_url: undefined } };
       }, false);
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to remove avatar"
+        err instanceof Error ? err.message : "Failed to remove avatar",
       );
     }
   };
@@ -735,14 +744,14 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
+        error instanceof Error ? error.message : "An unexpected error occurred",
       );
     }
   };
 
   useEffect(() => {
     if (loading) return;
-    
+
     // Check if user is authenticated
     if (!user) {
       // Only redirect if not already redirecting to avoid loops
@@ -755,12 +764,12 @@ const UserPage = () => {
 
     // User is present, fetch other data
     const init = async () => {
-        getBio();
-        // getContactEmail();
-        // getContactPhone();
-        getUsername();
-        fetchStats();
-        fetchWeaves();
+      getBio();
+      // getContactEmail();
+      // getContactPhone();
+      getUsername();
+      fetchStats();
+      fetchWeaves();
     };
     init();
 
@@ -781,10 +790,9 @@ const UserPage = () => {
   const sharePosts = posts.filter((post) => post.type === "share");
   const wishPosts = posts.filter((post) => post.type === "wish");
 
-  useEffect(()=>{
-
+  useEffect(() => {
     console.log("Fetched UserId: ", user?.userId);
-  }, [user?.userId])
+  }, [user?.userId]);
 
   if (loading || redirecting) {
     return (

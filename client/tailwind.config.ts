@@ -167,7 +167,7 @@ export default {
         },
         ".type-h3": {
           fontSize: "28px", // 36pt
-          lineHeight: "1",
+          lineHeight: "1.5",
           fontWeight: "700", // Bold (B)
         },
         ".type-h4": {

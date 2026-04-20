@@ -135,6 +135,8 @@ const Navbar = () => {
     return pathname.startsWith(path);
   };
 
+  if (pathname === "/earthday") return null;
+
   return (
     <>
       {/* 導航欄 */}

@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   :root {
     --background: 0 0% 100%;
 
@@ -116,12 +119,16 @@
 
 @keyframes neon-pulse {
   0% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5),
-      0 0 40px rgba(147, 51, 234, 0.3), 0 0 60px rgba(236, 72, 153, 0.2);
+    box-shadow:
+      0 0 20px rgba(59, 130, 246, 0.5),
+      0 0 40px rgba(147, 51, 234, 0.3),
+      0 0 60px rgba(236, 72, 153, 0.2);
   }
   100% {
-    box-shadow: 0 0 30px rgba(59, 130, 246, 0.8),
-      0 0 60px rgba(147, 51, 234, 0.6), 0 0 90px rgba(236, 72, 153, 0.4);
+    box-shadow:
+      0 0 30px rgba(59, 130, 246, 0.8),
+      0 0 60px rgba(147, 51, 234, 0.6),
+      0 0 90px rgba(236, 72, 153, 0.4);
   }
 }
 
@@ -192,23 +199,28 @@
 
 @keyframes border-rotate {
   0% {
-    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
       linear-gradient(0deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
   }
   25% {
-    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
       linear-gradient(90deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
   }
   50% {
-    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
       linear-gradient(180deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
   }
   75% {
-    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
       linear-gradient(270deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
   }
   100% {
-    background-image: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0)),
       linear-gradient(360deg, #ff006e, #fb5607, #ffbe0b, #8338ec, #3a86ff);
   }
 }
@@ -226,7 +238,9 @@
 
 /* 輕量動畫，使用 transform/opacity 以減少 layout reflow */
 .postcard-compact {
-  transition: transform 220ms ease, opacity 220ms ease;
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
 }
 .postcard-expanded {
   transform: scale(1); /* or slight scale */
@@ -274,10 +288,6 @@
   border-top: none;
 }
 
-
-
-
-
 /* 主要文字（地點名稱） */
 .pac-item-query {
   font-size: 16px;
@@ -298,5 +308,5 @@
 
 /* Google logo（可以選擇隱藏，但注意這可能違反 Google 服務條款） */
 .pac-logo:after {
-display: none !important;
+  display: none !important;
 }

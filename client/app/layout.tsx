@@ -99,6 +99,13 @@ export default function RootLayout({
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544"
           crossOrigin="anonymous"
         ></script>
+        {process.env.NODE_ENV === "production" && (
+          <script
+            defer
+            src="https://stats.megaweave.net/script.js"
+            data-website-id="..."
+          />
+        )}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
@@ -145,15 +152,15 @@ export default function RootLayout({
           }}
         />
         <SWRConfig value={{}}>
-        <UserProvider>
-          <SocketProvider>
-          <NavbarProvider>
-            <NotificationProvider>
-            <Navbar />
-  
-            {/* Facebook SDK */}
-            <Script id="facebook-sdk" strategy="afterInteractive">
-              {`
+          <UserProvider>
+            <SocketProvider>
+              <NavbarProvider>
+                <NotificationProvider>
+                  <Navbar />
+
+                  {/* Facebook SDK */}
+                  <Script id="facebook-sdk" strategy="afterInteractive">
+                    {`
               window.fbAsyncInit = function() {
                 FB.init({
                   appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
@@ -173,33 +180,33 @@ export default function RootLayout({
                  fjs.parentNode.insertBefore(js, fjs);
                }(document, 'script', 'facebook-jssdk'));
             `}
-            </Script>
-            <Script
-              id="google-maps"
-              strategy="afterInteractive"
-              src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
-            />
-            <GoogleOAuthProvider
-              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-            >
-              <TeamProvider>
-                <PostProvider>
-                  <PlausibleProvider
-                    domain="megaweave.net"
-                    trackLocalhost={true}
-                    enabled={true}
-                    taggedEvents={true}
+                  </Script>
+                  <Script
+                    id="google-maps"
+                    strategy="afterInteractive"
+                    src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
+                  />
+                  <GoogleOAuthProvider
+                    clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
                   >
-                    {children}
-                  </PlausibleProvider>
-                </PostProvider>
-              </TeamProvider>
-            </GoogleOAuthProvider>
-            <Footer />
-            </NotificationProvider>
-          </NavbarProvider>
-          </SocketProvider>
-        </UserProvider>
+                    <TeamProvider>
+                      <PostProvider>
+                        <PlausibleProvider
+                          domain="megaweave.net"
+                          trackLocalhost={true}
+                          enabled={true}
+                          taggedEvents={true}
+                        >
+                          {children}
+                        </PlausibleProvider>
+                      </PostProvider>
+                    </TeamProvider>
+                  </GoogleOAuthProvider>
+                  <Footer />
+                </NotificationProvider>
+              </NavbarProvider>
+            </SocketProvider>
+          </UserProvider>
         </SWRConfig>
       </body>
     </html>

@@ -865,9 +865,11 @@ export default function EarthDayPage() {
                   className="flex w-full max-w-[400px] md:max-w-none gap-3 cursor-pointer"
                 >
                   <input
+                    readOnly
                     type="text"
                     placeholder="Email / Line ID / Instagram"
                     className="flex-1 min-w-0 border border-[#e5e5e5] bg-transparent rounded-full px-5 py-3 text-[10px] md:text-[14px] outline-none text-[#555] placeholder:text-[#9ca693] cursor-pointer"
+                    onFocus={(e) => e.target.blur()}
                   />
                   <button className="bg-[#9ca693] hover:bg-[#838e78] transition-colors text-white font-ddin font-bold rounded-full px-6 py-3 text-[13px] md:text-[15px] shrink-0 cursor-pointer">
                     Enter

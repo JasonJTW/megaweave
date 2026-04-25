@@ -93,23 +93,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544"
-          crossOrigin="anonymous"
-        ></script>
-        {process.env.NODE_ENV === "production" && (
-          <script
-            defer
-            src="https://stats.megaweave.net/script.js"
-            data-website-id="405ee142-6613-4505-ae33-4b1167ca4a8"
-          />
-        )}
-      </head>
+      <head />
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${ddinPro.variable} antialiased`}
       >
+        <Script
+          id="adsense-loader"
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3940256099942544"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+
+        {/* Umami */}
+        <Script
+          id="umami-analytics"
+          defer
+          src="https://stats.megaweave.net/script.js"
+          data-website-id="405ee142-6613-4505-ae33-4b1167ca4a87"
+          strategy="afterInteractive"
+        />
         <Toaster
           position="top-center"
           containerStyle={{ top: "100px" }}

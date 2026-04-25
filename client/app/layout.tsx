@@ -106,13 +106,15 @@ export default function RootLayout({
         />
 
         {/* Umami */}
-        <Script
-          id="umami-analytics"
-          defer
-          src="https://stats.megaweave.net/script.js"
-          data-website-id="405ee142-6613-4505-ae33-4b1167ca4a87"
-          strategy="afterInteractive"
-        />
+        {process.env.NODE_ENV === "production" && (
+          <Script
+            id="umami-analytics"
+            defer
+            src="https://stats.megaweave.net/script.js"
+            data-website-id="405ee142-6613-4505-ae33-4b1167ca4a87"
+            strategy="afterInteractive"
+          />
+        )}
         <Toaster
           position="top-center"
           containerStyle={{ top: "100px" }}

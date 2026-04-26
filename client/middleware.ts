@@ -3,7 +3,9 @@ import { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
+  if (request.method !== "GET") {
+    return NextResponse.next();
+  }
   const sessionId = request.cookies.get("session-id")?.value;
   if (pathname === "/signin" || pathname.startsWith("/earthday")) {
     return NextResponse.next();

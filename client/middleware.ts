@@ -1,30 +1,57 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  
-  // 如果使用者訪問的路徑不是 /earthday 開頭，就將他們導向 /earthday
-  if (!pathname.startsWith('/earthday')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/earthday'
-    return NextResponse.redirect(url)
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  const sessionId = request.cookies.get("session-id")?.value;
+  if (pathname === "/signin" || pathname.startsWith("/earthday")) {
+    return NextResponse.next();
   }
 
-  // 如果原本就是訪問 /earthday，則放行
-  return NextResponse.next()
+  if (!sessionId) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/signin";
+    url.searchParams.set("returnTo", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  let isAdminOrContributor = false;
+  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+  try {
+    const response = await fetch(`${hostName}/api/currentUser`, {
+      headers: {
+        Cookie: `session-id=${sessionId}`,
+      },
+    });
+
+    if (response.status === 200) {
+      const data = await response.json();
+      console.log("Middleware auth check user data:", data);
+      if (data?.user?.role === "admin" || data?.user?.role === "contributor") {
+        isAdminOrContributor = true;
+      }
+    }
+  } catch (error) {
+    console.error("Middleware auth check failed:", error);
+  }
+
+  if (isAdminOrContributor) {
+    return NextResponse.next();
+  } else {
+    return NextResponse.redirect(new URL("/earthday", request.url));
+  }
 }
 
 // 設定只有哪些路徑會被 middleware 攔截
 export const config = {
   matcher: [
     /*
-     * 攔截所有路徑，但是避開以下內容（確保網站素材能正常載入）：
-     * - api (API 路由)
-     * - _next/static (Next.js 編譯的靜態資源)
-     * - _next/image (Next.js 圖片最佳化服務)
-     * - 各種副檔名的靜態圖片素材與 favicon 等
+     * 調整後的 Matcher：
+     * 1. 排除 api
+     * 2. 排除 _next 內部檔案
+     * 3. 排除所有常見靜態檔案副檔名 (加上了 .json, .ico, .txt 等)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2)$).*)',
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|json|txt)$).*)",
   ],
-}
+};

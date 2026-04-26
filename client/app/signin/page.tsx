@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -27,18 +27,19 @@ function SigninForm() {
   const [loading, setLoading] = useState(false);
   const { user, loading: userLoading, mutate } = useUser();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
 
   //* After successful sign in, redirect to the page
   const handleSigninSignupSuccess = useCallback(() => {
     if (returnTo) {
-      router.push(decodeURIComponent(returnTo));
+      // 使用 window.location.href 強制完整頁面跳轉
+      // 確保瀏覽器在新請求時帶上已設置的 session Cookie
+      window.location.href = decodeURIComponent(returnTo);
     } else {
-      router.push("/user");
+      window.location.href = "/";
     }
-  }, [returnTo, router]);
+  }, [returnTo]);
 
   //* Google Sign in
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {

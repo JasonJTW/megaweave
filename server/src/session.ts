@@ -45,6 +45,7 @@ export class UpdateSessionError extends SessionError {
 }
 
 function setCookie(res: Response, name: string, value: string) {
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookie(name, value, {
     maxAge: SESSION_EXPIRATION_SECONDS * 1000,
     expires: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
@@ -52,6 +53,7 @@ function setCookie(res: Response, name: string, value: string) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    domain: isProduction ? ".megaweave.net" : undefined,
   });
 }
 

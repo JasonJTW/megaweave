@@ -57,6 +57,21 @@ function setCookie(res: Response, name: string, value: string) {
   });
 }
 
+// 供 Middleware 讀取的 role cookie (httpOnly: false 以便伺服器端 Edge Runtime 讀取)
+// 不含敏感資料，真正的身份驗證仍由 Redis session 處理
+function setRoleCookie(res: Response, role: string) {
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookie("user-role", role, {
+    maxAge: SESSION_EXPIRATION_SECONDS * 1000,
+    expires: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
+    secure: true,
+    httpOnly: false, // Middleware (Edge Runtime) 需要能讀取這個 Cookie
+    sameSite: "lax",
+    path: "/",
+    domain: isProduction ? ".megaweave.net" : undefined,
+  });
+}
+
 // ✅ Redis 連線檢查輔助函數
 async function ensureRedisConnection(): Promise<void> {
   try {
@@ -93,6 +108,8 @@ export async function createUserSession(
 
     //* Store session ID in cookie
     setCookie(res, COOKIE_SESSION_KEY, sessionId);
+    //* Store role in a separate cookie for Middleware to read without API call
+    setRoleCookie(res, user.role);
     return sessionId;
   } catch (error) {
     console.error("Error creating user session:", error);

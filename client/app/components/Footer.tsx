@@ -5,10 +5,12 @@ import { FC } from "react";
 import WeavingIcon from "./icons/WeavingIcon";
 import { useNavbar } from "../contexts/NavBarContext";
 import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
 const Footer: FC = () => {
   const { isNavbarVisible } = useNavbar();
-
+  const pathname = usePathname();
+  if (pathname.startsWith("/messages")) return null;
   return (
     <footer
       className={cn(

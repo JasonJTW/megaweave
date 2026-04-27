@@ -10,6 +10,7 @@ import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
 import ShareBadgeIcon from "../icons/ShareBadgeIcon";
+import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
 import type { Weave } from "@/services/weaveService";
 import AcceptIcon from "../icons/AcceptIcon";
 import CancelIcon from "../icons/CancelIcon";
@@ -79,6 +80,10 @@ function PostCardInner({
       : [];
 
   const imageSrc = imageUrls[0];
+
+  const isExpired = post.expires_at
+    ? new Date(post.expires_at) < new Date()
+    : false;
 
   const displayUser =
     weave && currentUserId
@@ -224,7 +229,7 @@ function PostCardInner({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px] bg-white transition-all duration-300 py-0 pb-4 mt-4 relative ${
+      className={`font-ddin cursor-pointer rounded-[30px] ${isExpired ? "bg-secondary" : "bg-white"} transition-all duration-300 py-0 pb-4 mt-4 relative ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -264,9 +269,12 @@ function PostCardInner({
 
       {/*//* pt-3 for title margin */}
       <div className="relative pt-3">
-        {post.type === "share" && (
-          <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
-        )}
+        {post.type === "share" &&
+          (isExpired ? (
+            <ShareBadgeExpiredIcon className="absolute -top-1 right-5 z-20" />
+          ) : (
+            <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
+          ))}
         {post.type === "wish" && (
           <SeekBadgeIcon className="absolute -top-1 right-5 z-20" />
         )}
@@ -292,7 +300,7 @@ function PostCardInner({
                   width={0}
                   height={0}
                   sizes="(min-width: 768px) 280px, 100vw"
-                  className="w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover"
+                  className={`w-full h-auto ${isExpired ? "grayscale" : ""} sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover`}
                   priority={!!isFirstVisible}
                 />
               </div>
@@ -334,7 +342,7 @@ function PostCardInner({
             </div>
           )}
 
-          <div className="bg-white flex flex-col p-3 mx-0 rounded-[20px]">
+          <div className="bg-transparent flex flex-col p-3 mx-0 rounded-[20px]">
             <p className="text-black text-[18px] truncate sm:hidden">
               {post.content}
             </p>

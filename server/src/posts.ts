@@ -120,7 +120,7 @@ async function findOrCreateLocation(
     zip?: string;
     lat: number;
     lng: number;
-  }
+  },
 ): Promise<number> {
   // 1. 檢查地點是否存在
   const checkQuery = "SELECT id FROM locations WHERE place_id = ?";
@@ -174,12 +174,16 @@ router.post(
         ...req.body,
         categoryId: parseInt(req.body.categoryId),
         conditionLevel: parseInt(req.body.conditionLevel),
+        expiresAt: req.body.expires_at, // Map frontend expires_at to Zod schema expiresAt
         lat: req.body.lat ? parseFloat(req.body.lat) : undefined,
         lng: req.body.lng ? parseFloat(req.body.lng) : undefined,
         items: items ? JSON.parse(items) : undefined,
       };
 
+      console.log("Mapped postData expiresAt:", postData.expiresAt);
+
       validationResult = CreatePostSchema.parse(postData);
+      console.log("Validation Result expiresAt:", validationResult.expiresAt);
     } catch (error) {
       console.error("Create post validation error: ", error);
       return handleError(error, res);
@@ -193,7 +197,7 @@ router.post(
     try {
       // 2. 驗證分類是否存在
       const categoryExists = await validateCategory(
-        validationResult.categoryId
+        validationResult.categoryId,
       );
       if (!categoryExists) {
         return res.status(400).json({ errorMessage: "Invalid category" });
@@ -250,7 +254,7 @@ router.post(
 
       const [postResult] = await connection.execute<ResultSetHeader>(
         postInsertQuery,
-        postValues
+        postValues,
       );
       const postId = postResult.insertId;
 
@@ -272,32 +276,42 @@ router.post(
       }
 
       // 5. Process and upload images
-      const uploadedImages: Array<{ url: string; thumbnailUrl: string; key: string; thumbKey: string }> = [];
-      
+      const uploadedImages: Array<{
+        url: string;
+        thumbnailUrl: string;
+        key: string;
+        thumbKey: string;
+      }> = [];
+
       if (files && files.length > 0) {
         for (const file of files) {
           const fileId = uuidv4();
           const timestamp = Date.now();
-          
+
           // Process main image
           const mainBuffer = await imageProcessor.processPostImage(file.buffer);
           const { key: mainKey, url: mainUrl } = await uploadToS3(
             mainBuffer,
             "posts",
-            `${timestamp}-${fileId}.webp`
+            `${timestamp}-${fileId}.webp`,
           );
-          
+
           // Process thumbnail
           const thumbBuffer = await imageProcessor.createThumbnail(file.buffer);
           const { key: thumbKey, url: thumbUrl } = await uploadToS3(
             thumbBuffer,
             "posts",
-            `${timestamp}-${fileId}-thumb.webp`
+            `${timestamp}-${fileId}-thumb.webp`,
           );
-          
-          uploadedImages.push({ url: mainUrl, thumbnailUrl: thumbUrl, key: mainKey, thumbKey });
+
+          uploadedImages.push({
+            url: mainUrl,
+            thumbnailUrl: thumbUrl,
+            key: mainKey,
+            thumbKey,
+          });
         }
-        
+
         await insertImages(connection, postId, uploadedImages);
       }
 
@@ -334,10 +348,10 @@ router.post(
       if (connection) {
         await connection.rollback();
       }
-      
-      // Note: We don't have 'uploadedImages' in scope here easily if processing fails mid-loop, 
-      // but we should ideally cleanup what WAS uploaded. 
-      // For simplicity in this refactor, we rely on the DB rollback. 
+
+      // Note: We don't have 'uploadedImages' in scope here easily if processing fails mid-loop,
+      // but we should ideally cleanup what WAS uploaded.
+      // For simplicity in this refactor, we rely on the DB rollback.
       // In a production app, we'd track successfully uploaded keys for cleanup.
 
       console.error("⚠️Create post error:", error);
@@ -347,7 +361,7 @@ router.post(
         connection.release();
       }
     }
-  }
+  },
 );
 
 // 獲取貼文列表 (帶分頁和篩選)
@@ -376,27 +390,29 @@ router.get("/", async (req: Request, res: Response) => {
     // Optimize location search using indexes
     if (city || province) {
       if (city && province) {
-         // Best case: Use composite index (province, city)
-         whereConditions.push("l.province = ? AND l.city = ?");
-         queryParams.push(province, city);
+        // Best case: Use composite index (province, city)
+        whereConditions.push("l.province = ? AND l.city = ?");
+        queryParams.push(province, city);
       } else if (province) {
-         // Use index on province (first part of composite index)
-         whereConditions.push("l.province = ?");
-         queryParams.push(province);
+        // Use index on province (first part of composite index)
+        whereConditions.push("l.province = ?");
+        queryParams.push(province);
       } else if (city) {
-         // City only (might not fully use composite index but better than LIKE)
-         whereConditions.push("l.city = ?");
-         queryParams.push(city);
+        // City only (might not fully use composite index but better than LIKE)
+        whereConditions.push("l.city = ?");
+        queryParams.push(city);
       }
     } else if (location) {
       // Fallback to legacy search (inefficient but needed for manual input)
-      whereConditions.push("(l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)");
+      whereConditions.push(
+        "(l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
+      );
       queryParams.push(`%${location}%`, `%${location}%`, `%${location}%`);
     }
 
     if (search) {
       whereConditions.push(
-        "(p.title LIKE ? OR p.content LIKE ? OR p.tags LIKE ?)"
+        "(p.title LIKE ? OR p.content LIKE ? OR p.tags LIKE ?)",
       );
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
@@ -431,10 +447,10 @@ router.get("/", async (req: Request, res: Response) => {
 
     const [posts] = await dbPool.execute<RowDataPacket[]>(
       postsQuery,
-      queryParams
+      queryParams,
     );
 
-    console.log("posts: ", posts);
+    // console.log("posts: ", posts);
 
     // 獲取總數
     const countQuery = `
@@ -447,7 +463,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     const [countResult] = await dbPool.execute<RowDataPacket[]>(
       countQuery,
-      queryParams
+      queryParams,
     );
 
     const total = countResult[0].total;
@@ -524,14 +540,14 @@ router.get("/:id", async (req: Request, res: Response) => {
       if (!isAuthor) {
         const shouldCount = await shouldIncrementView(
           postId,
-          viewerIdentifier as string
+          viewerIdentifier as string,
         );
 
         if (shouldCount) {
           // 更新資料庫
           await dbPool.execute(
             "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
-            [postId]
+            [postId],
           );
 
           // 重要：手動更新記憶體中的 postData，讓回傳給前端的數據即時顯示 +1
@@ -554,7 +570,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     const imageUrls = images.map((img: any) => img.image_url).join(",");
     const [items] = await dbPool.execute(
       `SELECT * FROM items WHERE post_id = ?`,
-      [postId]
+      [postId],
     );
     const post = {
       ...rows[0],

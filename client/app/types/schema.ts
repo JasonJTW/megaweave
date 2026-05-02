@@ -50,6 +50,7 @@ export interface CreatePostFormData {
   zip?: string;
   lat?: number;
   lng?: number;
+  expires_at?: Date;
 }
 
 export interface Item {

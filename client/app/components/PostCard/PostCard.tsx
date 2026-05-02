@@ -427,10 +427,10 @@ function PostCardInner({
                   </div>
                 </div>
               )}
-              {post.created_at && (
+              {post.expires_at && (
                 <div className="flex items-center gap-2">
                   <ClockIcon className="text-primary" />
-                  {new Date(post.created_at).toLocaleDateString()}
+                  {new Date(post.expires_at).toLocaleDateString()}
                 </div>
               )}
 

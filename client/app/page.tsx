@@ -14,9 +14,16 @@ import {
   DEFAULT_REFRESH_THRESHOLD,
 } from "@/hooks/use-pull-to-refresh";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { LucideLoader2, X } from "lucide-react";
+import { LucideLoader2, X, CalendarIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
 import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
@@ -585,6 +592,9 @@ const PostsApp = () => {
         "conditionLevel",
         createFormData.conditionLevel.toString(),
       );
+      if (createFormData.expires_at) {
+        formData.append("expires_at", createFormData.expires_at.toISOString());
+      }
       formData.append("type", postType);
 
       //TODO: Add Share Commons option
@@ -623,6 +633,7 @@ const PostsApp = () => {
           conditionLevel: null,
           type: postType,
           items: [{ title: "", quantity: 1 }],
+          expires_at: undefined,
         });
         mutate(); // 重新獲取貼文列表
       } else {
@@ -1645,6 +1656,38 @@ const PostsApp = () => {
                       placeholder="Location (City)"
                       defaultValue={createFormData.location}
                     />
+                  </div>
+                  <div className="flex items-center gap-[5px]">
+                    <CalendarIcon className="w-[24px] h-[24px] text-primary" />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          data-empty={!createFormData.expires_at}
+                          className="w-[212px] justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
+                        >
+                          {createFormData.expires_at ? (
+                            format(createFormData.expires_at, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={createFormData.expires_at}
+                          onSelect={(date) =>
+                            setCreateFormData({
+                              ...createFormData,
+                              expires_at: date || undefined,
+                            })
+                          }
+                          defaultMonth={createFormData.expires_at}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div>

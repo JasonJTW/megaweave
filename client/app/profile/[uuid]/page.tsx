@@ -296,6 +296,7 @@ const PublicProfilePage = () => {
                           alt="contributor-badge"
                           width={20}
                           height={20}
+                          unoptimized
                         />
                         <p className="text-md text-megaweave-blue-light font-ddin font-bold tracking-widest">
                           Contributor

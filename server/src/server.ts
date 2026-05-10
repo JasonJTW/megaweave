@@ -32,14 +32,8 @@ app.use(
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
-  })
+  }),
 );
-
-// ✅ Fix Google Sign-in COOP policy error
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  next();
-});
 
 const limiter = rateLimit({
   windowMs: 1 * 5 * 1000, // 5 seconds
@@ -66,7 +60,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-
 async function startServer() {
   try {
     await connectRedis();
@@ -88,7 +81,7 @@ async function startServer() {
 
       if (!CERT_PATH || !KEY_PATH || !PASSPHRASE) {
         console.error(
-          "HTTPS configuration is incomplete. Please check your .env.development file."
+          "HTTPS configuration is incomplete. Please check your .env.development file.",
         );
         process.exit(1);
       }
@@ -99,7 +92,7 @@ async function startServer() {
           cert: fs.readFileSync(path.join(__dirname, CERT_PATH)),
           passphrase: PASSPHRASE, // 替換為你的密碼
         },
-        app
+        app,
       );
     } else {
       server = http.createServer(app);
@@ -140,13 +133,10 @@ async function startServer() {
 
     app.use("/api", apiRoutes);
 
-
-
-
     //* start server
     server.listen(PORT, () => {
       console.log(
-        `${ENABLE_HTTPS ? "Secure " : ""}Server listening on port ${PORT}`
+        `${ENABLE_HTTPS ? "Secure " : ""}Server listening on port ${PORT}`,
       );
     });
 
@@ -166,7 +156,7 @@ async function startServer() {
 
           //* Step 0: Disconnect subClient for Socket.IO adapter
           console.log(
-            "\n📍 Step 0/2: Disconnecting Socket.IO Redis subscriber..."
+            "\n📍 Step 0/2: Disconnecting Socket.IO Redis subscriber...",
           );
           await subClient.quit();
 

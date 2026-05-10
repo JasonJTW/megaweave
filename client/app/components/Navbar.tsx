@@ -7,7 +7,7 @@ import Link from "next/link";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
 import MenuIcon from "./icons/MenuIcon";
-import PrivateMessageIcon from "./icons/PrivateMessageIcon";
+import MessageIcon from "./icons/MessageIcon";
 import { usePathname } from "next/navigation";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "../contexts/UserContext";
@@ -73,12 +73,9 @@ const Navbar = () => {
     0,
   );
 
-  // Clean up unused state and effects
-  // Removed: userId, isMobileMenuOpen (kept), unreadCount (local), fetchUserAndNotifications, useSocket, window listener
-
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
-    { href: "/messages", label: "Messages", icon: PrivateMessageIcon },
+    { href: "/messages", label: "Messages", icon: MessageIcon },
     { href: "/notifications", label: "Notifications", icon: NotificationIcon },
     { href: "/user", label: "Profile", icon: UserIcon },
   ];
@@ -160,7 +157,7 @@ const Navbar = () => {
               <div className="flex items-center space-x-3 sm:space-x-5 ">
                 <WeavingIcon
                   className={cn(
-                    "w-8 h-8 hidden sm:block align-middle transition-colors duration-200",
+                    "w-8 h-8 hidden xl:block align-middle transition-colors duration-200",
                     isMobileMenuOpen ? "text-white" : "text-primary",
                   )}
                 />
@@ -195,7 +192,7 @@ const Navbar = () => {
 
                 {user?.userId && (
                   <Link href="/messages" className="relative group mr-2">
-                    <PrivateMessageIcon className=" text-megaweave-forest-dark" />
+                    <MessageIcon className=" text-megaweave-forest-dark" />
                     <span className="sr-only">Messages</span>
                     {messageUnreadCount > 0 && (
                       <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">

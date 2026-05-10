@@ -16,6 +16,7 @@ import AcceptIcon from "../icons/AcceptIcon";
 import CancelIcon from "../icons/CancelIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
 import toast from "react-hot-toast";
+import SeekBadgeExpiredIcon from "../icons/SeekBadgeExpiredIcon";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -275,9 +276,12 @@ function PostCardInner({
           ) : (
             <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
           ))}
-        {post.type === "wish" && (
-          <SeekBadgeIcon className="absolute -top-1 right-5 z-20" />
-        )}
+        {post.type === "wish" &&
+          (isExpired ? (
+            <SeekBadgeExpiredIcon className="absolute -top-1 right-5 z-20" />
+          ) : (
+            <SeekBadgeIcon className="absolute -top-1 right-5 z-20" />
+          ))}
 
         <motion.div
           className="overflow-hidden"
@@ -290,7 +294,7 @@ function PostCardInner({
         >
           {imageSrc && (
             //* mx-3 for image margin
-            <div className="relative mb-0 mx-3">
+            <div className=" relative mb-0 mx-4">
               {/* Mobile: w-full + auto height; Desktop: fill column width (max 280px) + fixed 240px height */}
               <div className="relative w-full sm:max-w-[280px] sm:h-[240px] sm:mx-auto rounded-[20px] overflow-hidden">
                 {/* Mobile: responsive width/height */}
@@ -322,13 +326,13 @@ function PostCardInner({
               </div>
             </div>
           )}
-          <h2 className="font-semibold mx-3 font-ddin text-[36px] text-gray-800 truncate flex-1">
+          <h2 className="font-semibold mx-4 font-ddin text-[36px] text-gray-800 truncate flex-1">
             {post.title}
           </h2>
 
           {(category || post.category_name_en) && (
             <div
-              className="inline-flex mx-3 mt-[8px] leading-[34px] cursor-pointer"
+              className="inline-flex mx-4 mt-[8px] leading-[34px] cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 if (onCategoryClick) {
@@ -342,7 +346,7 @@ function PostCardInner({
             </div>
           )}
 
-          <div className="bg-transparent flex flex-col p-3 mx-0 rounded-[20px]">
+          <div className="bg-transparent flex flex-col px-4 pb-3 mx-0 rounded-[20px]">
             <p className="text-black text-[18px] truncate sm:hidden">
               {post.content}
             </p>

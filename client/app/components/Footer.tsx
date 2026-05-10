@@ -27,14 +27,14 @@ const Footer: FC = () => {
           <div className="flex flex-row items-center">
             <WeavingIcon className="w-[50px] h-[50px] sm:w-[80px] sm:h-[80px] mr-12 sm:mr-7 text-megaweave-forest" />
             {/* Desktop Megaweaving logo*/}
-            <div className="hidden sm:text-center sm:mb-[8px] sm:block ">
+            {/* <div className="hidden sm:text-center sm:mb-[8px] sm:block ">
               <span
                 aria-hidden
                 className="pointer-events-none select-none block  text-[clamp(50px,15vw,400px)] sm:text-[clamp(20px,5vw,400px)] font-extrabold leading-none text-primary/30 tracking-normal"
               >
                 megaweaving
               </span>
-            </div>
+            </div> */}
           </div>
 
           {/* 導航：兩欄布局 */}
@@ -93,12 +93,12 @@ const Footer: FC = () => {
         <div className="mt-9">
           {/* Mobile Megaweaving logo*/}
           <div className="text-center mb-[8px] w-full sm:hidden">
-            <span
+            {/* <span
               aria-hidden
               className="pointer-events-none select-none block  text-[clamp(50px,15vw,400px)] font-extrabold leading-none text-primary/30 tracking-normal"
             >
               megaweaving
-            </span>
+            </span> */}
           </div>
 
           {/* 分隔線（在 logo 下方） */}

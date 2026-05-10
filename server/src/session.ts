@@ -138,9 +138,11 @@ export async function removeUserSession(req: Request, res: Response) {
   const sessionId = req.cookies[COOKIE_SESSION_KEY];
   const isProduction = process.env.NODE_ENV === "production";
   
-  const cookieOptions = {
+  const cookieOptions: CookieOptions = {
     path: "/",
     domain: isProduction ? ".megaweave.net" : undefined,
+    secure: true,
+    sameSite: "lax",
   };
 
   try {

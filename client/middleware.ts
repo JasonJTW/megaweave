@@ -14,29 +14,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. 讀取 session-id cookie（判斷是否有登入）
+  // 3. 讀取 Cookie 判斷身份
   const sessionId = request.cookies.get("session-id")?.value;
-
-  // 4. 如果沒有登入，導向登入頁面（帶上 returnTo 參數）
-  if (!sessionId) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/signin";
-    url.searchParams.set("returnTo", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  // 5. 直接從 Cookie 讀取 role，不需要打 API
-  // 這個 Cookie 由後端在登入時設置，與 session-id 同時存在
   const userRole = request.cookies.get("user-role")?.value;
   const isAdminOrContributor =
     userRole === "admin" || userRole === "contributor";
 
-  // 6. 根據角色決定去處
-  if (isAdminOrContributor) {
+  // 4. 授權驗證
+  // 只有同時具備 session-id 且身分是 admin 或 contributor 才能通行
+  if (sessionId && isAdminOrContributor) {
     return NextResponse.next();
-  } else {
-    return NextResponse.redirect(new URL("/earthday", request.url));
   }
+
+  // 5. 其他所有人（未登入、或權限不足）全部導向 /earthday
+  return NextResponse.redirect(new URL("/earthday", request.url));
 }
 
 // 設定只有哪些路徑會被 middleware 攔截

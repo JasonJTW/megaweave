@@ -354,7 +354,7 @@ function SigninForm() {
             <div className="flex flex-col gap-4 w-full px-4">
               <Button
                 variant={"outline"}
-                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 plaqueable-event-name=SigninWithGoogle text-megaweave-forest-dark type-button-b1"
+                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 text-megaweave-forest-dark type-button-b1"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
@@ -393,7 +393,7 @@ function SigninForm() {
               </div>
               <Button
                 variant={"outline"}
-                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 plausible-event-name=SigninWithFacebook text-megaweave-forest-dark type-button-b1"
+                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 text-megaweave-forest-dark type-button-b1"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >

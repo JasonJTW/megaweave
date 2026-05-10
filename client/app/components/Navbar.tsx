@@ -17,7 +17,7 @@ import {
   // Mail,
   // GalleryHorizontalEnd,
   SquarePlus,
-
+  NewspaperIcon,
   // FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -109,6 +109,12 @@ const Navbar = () => {
       title: "About Us",
       description: "About Megaweaving",
       icon: TeamIcon,
+    },
+    {
+      href: "/earthday",
+      title: "Jumbo",
+      description: "Earth Day",
+      icon: NewspaperIcon,
     },
     {
       href: "/install",

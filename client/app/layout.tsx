@@ -15,7 +15,7 @@ import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 import Footer from "./components/Footer";
-import PlausibleProvider from "next-plausible";
+
 dotenv.config();
 // const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
 import { UserProvider } from "./contexts/UserContext";
@@ -196,14 +196,7 @@ export default function RootLayout({
                   >
                     <TeamProvider>
                       <PostProvider>
-                        <PlausibleProvider
-                          domain="megaweave.net"
-                          trackLocalhost={true}
-                          enabled={true}
-                          taggedEvents={true}
-                        >
                           {children}
-                        </PlausibleProvider>
                       </PostProvider>
                     </TeamProvider>
                   </GoogleOAuthProvider>

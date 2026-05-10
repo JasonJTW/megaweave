@@ -11,12 +11,13 @@ dotenv.config();
 
 //* Seven days in seconds
 const SESSION_EXPIRATION_SECONDS = 60 * 60 * 24 * 7;
-const COOKIE_SESSION_KEY = process.env.COOKIE_SESSION_KEY!;
-const REDIS_SESSION_KEY = process.env.REDIS_SESSION_KEY!;
+const COOKIE_SESSION_KEY = process.env.COOKIE_SESSION_KEY || "session-id";
+const REDIS_SESSION_KEY = process.env.REDIS_SESSION_KEY || "session";
+const ROLE_SESSION_KEY = process.env.ROLE_SESSION_KEY || "user-role";
 
-if (!COOKIE_SESSION_KEY || !REDIS_SESSION_KEY) {
-  throw new Error(
-    "Missing required environment variables: COOKIE_SESSION_KEY or REDIS_SESSION_KEY"
+if (!process.env.COOKIE_SESSION_KEY || !process.env.REDIS_SESSION_KEY || !process.env.ROLE_SESSION_KEY) {
+  console.warn(
+    "⚠️ Warning: Some session-related environment variables are missing. Using default values.",
   );
 }
 
@@ -24,7 +25,10 @@ const redisClient = getRedisClient();
 
 // ✅ 自定義錯誤類別
 export class SessionError extends Error {
-  constructor(message: string, public code: string) {
+  constructor(
+    message: string,
+    public code: string,
+  ) {
     super(message);
     this.name = "SessionError";
   }
@@ -82,7 +86,7 @@ async function ensureRedisConnection(): Promise<void> {
   } catch (error) {
     console.error("Redis connection failed:", error);
     throw new RedisConnectionError(
-      error instanceof Error ? error.message : "Unknown Redis error"
+      error instanceof Error ? error.message : "Unknown Redis error",
     );
   }
 }
@@ -90,7 +94,7 @@ async function ensureRedisConnection(): Promise<void> {
 export async function createUserSession(
   user: UserSession,
   req: Request,
-  res: Response
+  res: Response,
 ) {
   try {
     // ✅ 檢查 Redis 連線
@@ -103,7 +107,7 @@ export async function createUserSession(
     await redisClient.setEx(
       `${REDIS_SESSION_KEY}:${sessionId}`,
       SESSION_EXPIRATION_SECONDS,
-      sessionData
+      sessionData,
     );
 
     //* Store session ID in cookie
@@ -125,44 +129,43 @@ export async function createUserSession(
 
     throw new SessionError(
       "Failed to create user session",
-      "CREATE_SESSION_ERROR"
+      "CREATE_SESSION_ERROR",
     );
   }
 }
 
 export async function removeUserSession(req: Request, res: Response) {
   const sessionId = req.cookies[COOKIE_SESSION_KEY];
-  if (!sessionId) {
-    throw new SessionError("No session ID found in cookies", "NO_SESSION_ID");
-  }
+  const isProduction = process.env.NODE_ENV === "production";
+  
+  const cookieOptions = {
+    path: "/",
+    domain: isProduction ? ".megaweave.net" : undefined,
+  };
 
   try {
-    // ✅ 檢查 Redis 連線
-    await ensureRedisConnection();
-
-    const result = await redisClient.del(`${REDIS_SESSION_KEY}:${sessionId}`);
-    console.log("Delete session from redis result:", result);
-
-    res.clearCookie(COOKIE_SESSION_KEY);
-    return res.status(200).json({ message: "Session removed successfully" });
-  } catch (error) {
-    console.error("Error removing user session:", error);
-
-    // ✅ 處理不同類型的錯誤
-    if (error instanceof RedisConnectionError) {
-      return res.status(503).json({
-        errorMessage: "Database temporarily unavailable",
-      });
+    if (sessionId) {
+      // ✅ 檢查 Redis 連線
+      await ensureRedisConnection();
+      const result = await redisClient.del(`${REDIS_SESSION_KEY}:${sessionId}`);
+      console.log("Delete session from redis result:", result);
     }
 
-    return res.status(500).json({
-      errorMessage: "Failed to remove session",
-    });
+    // ✅ 清除所有相關 Cookies
+    res.clearCookie(COOKIE_SESSION_KEY, cookieOptions);
+    res.clearCookie(ROLE_SESSION_KEY, cookieOptions);
+    
+  } catch (error) {
+    console.error("Error removing user session:", error);
+    // 即使 Redis 刪除失敗，也至少嘗試清除 Cookies
+    res.clearCookie(COOKIE_SESSION_KEY, cookieOptions);
+    res.clearCookie(ROLE_SESSION_KEY, cookieOptions);
+    throw error; // 丟出錯誤讓呼叫者處理 Response
   }
 }
 
 export async function getUserSessionFromRedis(
-  sessionId: string
+  sessionId: string,
 ): Promise<UserSession | null> {
   try {
     // ✅ 檢查 Redis 連線
@@ -198,7 +201,7 @@ export async function getUserSessionFromRedis(
 }
 
 export async function getUserFromCookie(
-  req: Request
+  req: Request,
 ): Promise<UserSession | null> {
   const sessionId = req.cookies[COOKIE_SESSION_KEY];
   if (!sessionId) {
@@ -215,7 +218,7 @@ export async function getUserFromCookie(
 
 export async function updateUserSession(
   req: Request,
-  updates: Partial<UserSession>
+  updates: Partial<UserSession>,
 ): Promise<UserSession | null> {
   try {
     const sessionId = req.cookies[COOKIE_SESSION_KEY];
@@ -237,7 +240,7 @@ export async function updateUserSession(
 
     //* Merge existing session data with updates
     const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
+      Object.entries(updates).filter(([_, v]) => v !== undefined),
     );
     const updated = { ...parsed, ...filteredUpdates };
 
@@ -251,7 +254,7 @@ export async function updateUserSession(
       await redisClient.setEx(
         key,
         SESSION_EXPIRATION_SECONDS,
-        JSON.stringify(validated)
+        JSON.stringify(validated),
       );
     }
 
@@ -275,7 +278,7 @@ export async function updateUserSession(
 
     console.error("UpdateUserSession failed:", error);
     throw new UpdateSessionError(
-      error instanceof Error ? error.message : "Unknown error"
+      error instanceof Error ? error.message : "Unknown error",
     );
   }
 }

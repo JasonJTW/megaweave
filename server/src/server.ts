@@ -35,6 +35,12 @@ app.use(
   })
 );
 
+// ✅ Fix Google Sign-in COOP policy error
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
+
 const limiter = rateLimit({
   windowMs: 1 * 5 * 1000, // 5 seconds
   limit: 20,

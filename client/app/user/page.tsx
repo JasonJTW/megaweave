@@ -740,7 +740,7 @@ const UserPage = () => {
       console.log("Sign out successful");
       await mutate({ user: null }, false);
       setRedirecting(true);
-      router.push("/");
+      window.location.href = "/";
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error(

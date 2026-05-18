@@ -1,14 +1,13 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import User from "../types/user";
-import { Post, UserStats } from "../types/schema";
 import { googleLogout } from "@react-oauth/google";
-import { Button } from "@/components/ui/button";
-import { User as UserIcon, LogOut, Save, X, ArrowLeft } from "lucide-react";
+import { motion } from "framer-motion";
+import { LogOut, Save, User as UserIcon, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { Post, UserStats } from "../types/schema";
+import User from "../types/user";
 // import { useForm } from "react-hook-form";
 // import {
 //   Form,
@@ -18,21 +17,17 @@ import toast from "react-hot-toast";
 //   FormLabel,
 // } from "@/components/ui/form";
 // import { Switch } from "@/components/ui/switch";
-import Image from "next/image";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
-import MemberForm from "../memberForm";
+import Image from "next/image";
 import { useTeam } from "../contexts/TeamContext";
 import { useUser } from "../contexts/UserContext";
-import ElfIcon from "../components/icons/ElfIcon";
-import ReuseIcon from "../components/icons/ReuseIcon";
-import CommonShareIcon from "../components/icons/CommonShareIcon";
-import WeavingIcon from "../components/icons/WeavingIcon";
+import MemberForm from "../memberForm";
 // import UserPageDecoLine from "../components/Deco/UserPageDecoLine";
+import DrawerWrapper from "@/components/DrawerWrapper";
+import type { Weave } from "@/services/weaveService";
+import { compressImage } from "@/utils/imageProcessor";
 import EditIcon from "../components/icons/EditIcon";
 import { usePost } from "../contexts/PostContext";
-import type { Weave } from "@/services/weaveService";
-import DrawerWrapper from "@/components/DrawerWrapper";
-import { compressImage } from "@/utils/imageProcessor";
 // 定義表單資料型別（無需 zod）
 // type ContactSettingsValues = {
 //   email?: string; // 可選填的電子郵件
@@ -828,37 +823,22 @@ const UserPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="  "
         >
-          <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center mt-10">
             <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                onClick={() => router.back()}
-                className="p-4"
-              >
-                <ArrowLeft className="w-8 h-8" />
-              </Button>
+              <span className="type-h1 font-bold text-megaweave-forest-dark">
+                User Profile
+              </span>
             </div>
 
             <button
               onClick={handleSignOut}
-              className="flex items-center space-x-2 px-4 py-2 rounded-full bg-primary/50 transition-all duration-200 border border-primary-30/30 hover:border-primary-30 hover:bg-primary-30/35"
+              className="flex items-center space-x-2 px-4 py-2 text-primary-75 rounded-full transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
             >
-              <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </motion.header>
-
-        {/*icons*/}
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center space-x-2 px-6">
-            <ReuseIcon className="h-[85px] w-auto text-megaweave-gold" />
-            <WeavingIcon className="h-[85px] w-auto text-megaweave-forest" />
-            <ElfIcon className="h-[85px] w-auto text-megaweave-red-dark" />
-            <CommonShareIcon className="h-[85px] w-auto text-megaweave-blue" />
-          </div>
-        </div>
-
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -880,14 +860,11 @@ const UserPage = () => {
                     className="hidden"
                   />
                   <div className="relative">
-                    <button
-                      className="absolute -top-4 right-0"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <EditIcon />
-                    </button>
                     {/* 固定尺寸容器：保持原本的大小/比例（max-w-72, h-80） */}
-                    <div className="w-full max-w-[220px] h-[222px] max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto  hover:cursor-pointer relative overflow-hidden">
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full max-w-[220px] h-[222px] max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto  hover:cursor-pointer relative overflow-hidden"
+                    >
                       {/* 如果有 preview，顯示 preview 圖片；否則若 user.avatarUrl 存在則顯示真實頭像，否則顯示字母色塊 */}
 
                       {previewSrc ? (
@@ -1140,11 +1117,11 @@ const UserPage = () => {
               className="lg:col-span-2 space-y-6"
             >
               {/* Bio Section */}
-              <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
-                <div className="flex items-center justify-between mb-6">
+              <div className="min-h-[240px] bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+                <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold flex items-center space-x-2">
                     <UserIcon className="w-5 h-5 text-megaweave-forest-dark" />
-                    <div className="type-button-b1 text-megaweave-forest-dark">
+                    <div className="type-h4 text-megaweave-forest-dark">
                       About Me
                     </div>
                   </h3>
@@ -1179,9 +1156,9 @@ const UserPage = () => {
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-primary leading-relaxed whitespace-pre-line break-all"
+                    className="min-h-[140px] text-body-t3 text-primary leading-relaxed whitespace-pre-line break-all"
                   >
-                    {renderTextWithUrls(bio)}
+                    {bio ? renderTextWithUrls(bio) : "description..."}
                   </motion.p>
                 ) : (
                   <motion.div
@@ -1196,6 +1173,15 @@ const UserPage = () => {
                     />
                   </motion.div>
                 )}
+                <div className="flex justify-between items-center mt-2">
+                  <div className="flex items-center space-x-3"></div>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center space-x-2 text-primary-75 type-button-b2"
+                  >
+                    <span>Joined in 2025.09</span>
+                  </button>
+                </div>
               </div>
 
               {/* Contact Settings */}
@@ -1367,7 +1353,6 @@ const UserPage = () => {
             </motion.div>
           </div>
         </div>
-
         {/* member form */}
         {isContributor && (
           <MemberForm
@@ -1375,16 +1360,17 @@ const UserPage = () => {
             memberUserId={user.userId}
           />
         )}
-
-        <DrawerWrapper
-          weaves={weaves}
-          sharePosts={sharePosts}
-          wishPosts={wishPosts}
-          conditions={conditions}
-          currentUserId={user.userId}
-          fetchWeaves={fetchWeaves}
-          fetchStats={fetchStats}
-        />
+        <div className="max-w-6xl mx-auto">
+          <DrawerWrapper
+            weaves={weaves}
+            sharePosts={sharePosts}
+            wishPosts={wishPosts}
+            conditions={conditions}
+            currentUserId={user.userId}
+            fetchWeaves={fetchWeaves}
+            fetchStats={fetchStats}
+          />
+        </div>
       </div>
     </>
   );

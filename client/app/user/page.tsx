@@ -1,6 +1,7 @@
 "use client";
 
 import DrawerWrapper from "@/components/DrawerWrapper";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -14,11 +15,11 @@ import { compressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
 import { motion } from "framer-motion";
-import { LogOut, Save, User as UserIcon, X } from "lucide-react";
+import { LogOut, Save, User as UserIcon, Users, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Control, type FieldPath } from "react-hook-form";
 import toast from "react-hot-toast";
 import CommonShareIcon from "../components/icons/CommonShareIcon";
 import ContactProfileIcon from "../components/icons/ContactProfileIcon";
@@ -29,7 +30,11 @@ import WeavingIcon from "../components/icons/WeavingIcon";
 import { usePost } from "../contexts/PostContext";
 import { useTeam } from "../contexts/TeamContext";
 import { useUser } from "../contexts/UserContext";
-import MemberForm from "../memberForm";
+import {
+  memberToFormValues,
+  normalizeTeamMember,
+  TeamMember,
+} from "../teamMembers";
 import { Post, UserStats } from "../types/schema";
 import User from "../types/user";
 // 定義表單資料型別（無需 zod）
@@ -57,6 +62,108 @@ const defaultStats: UserStats = {
   weaveCount: 0,
   points: 0,
 };
+
+type MemberFormValues = {
+  title?: string;
+  location?: string;
+  website?: string;
+  email?: string;
+  titleVisible: boolean;
+  locationVisible: boolean;
+  websiteVisible: boolean;
+  emailVisible: boolean;
+};
+
+const defaultMemberValues: MemberFormValues = {
+  title: "",
+  location: "",
+  website: "",
+  email: "",
+  titleVisible: true,
+  locationVisible: true,
+  websiteVisible: true,
+  emailVisible: false,
+};
+
+type InfoFieldRowValues = MemberFormValues | ContactSettingsValues;
+
+interface MemberInfoFieldRowProps<T extends InfoFieldRowValues> {
+  label: string;
+  name: FieldPath<T>;
+  visibleName: FieldPath<T>;
+  control: Control<T>;
+  isEditing: boolean;
+  placeholder: string;
+  emptyText: string;
+  inputType?: string;
+  linkify?: boolean;
+}
+
+const MemberInfoFieldRow = <T extends InfoFieldRowValues>({
+  label,
+  name,
+  visibleName,
+  control,
+  isEditing,
+  placeholder,
+  emptyText,
+  inputType = "text",
+  linkify = false,
+}: MemberInfoFieldRowProps<T>) => (
+  <div className="py-3">
+    <div className="flex items-center justify-between gap-4">
+      <FormLabel className="font-bold text-megaweave-forest-dark leading-tight">
+        {label}
+      </FormLabel>
+      <FormField
+        control={control}
+        name={visibleName}
+        render={({ field }) => (
+          <FormItem className="space-y-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-primary-75">Private</span>
+              <FormControl>
+                <Switch
+                  checked={Boolean(field.value)}
+                  onCheckedChange={field.onChange}
+                  disabled={!isEditing}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </FormControl>
+            </div>
+          </FormItem>
+        )}
+      />
+    </div>
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem className="mt-0.5 space-y-0">
+          <FormControl>
+            {isEditing ? (
+              <input
+                {...field}
+                value={String(field.value ?? "")}
+                type={inputType}
+                placeholder={placeholder}
+                className="w-full rounded-lg border border-primary-30 px-3 py-1.5 text-sm font-normal text-megaweave-forest-dark bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+              />
+            ) : linkify && field.value ? (
+              <div className="text-sm font-normal text-megaweave-forest-dark underline break-all">
+                {renderTextWithUrls(String(field.value))}
+              </div>
+            ) : (
+              <div className="text-sm font-normal text-megaweave-forest-dark">
+                {String(field.value || emptyText)}
+              </div>
+            )}
+          </FormControl>
+        </FormItem>
+      )}
+    />
+  </div>
+);
 
 const UserPage = () => {
   //* Get user data from cookie session
@@ -97,6 +204,14 @@ const UserPage = () => {
     defaultValues: defaultContactValues,
   });
 
+  const [isEditingMember, setIsEditingMember] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
+  const [memberError, setMemberError] = useState<string | null>(null);
+  const [member, setMember] = useState<TeamMember | null>(null);
+  const memberForm = useForm<MemberFormValues>({
+    defaultValues: defaultMemberValues,
+  });
+
   const onContactFormSubmit = (data: ContactSettingsValues) => {
     console.log("Contact settings updated:", data);
     // 這裡可以添加 API 調用來保存設定
@@ -134,6 +249,129 @@ const UserPage = () => {
       }
     }
   }, [user]);
+
+  const fetchMemberData = async (
+    memberUserId: number,
+    options?: { silent?: boolean },
+  ) => {
+    try {
+      if (!options?.silent) setMemberLoading(true);
+      const response = await fetch(
+        `${hostName}/api/member/all?userId=${memberUserId}`,
+        {
+          cache: "no-store",
+          method: "GET",
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.errorMessage || "Failed to fetch member data");
+      }
+
+      const result = await response.json();
+      if (!result[0]) {
+        throw new Error("Member profile not found");
+      }
+      const memberData = normalizeTeamMember(result[0]);
+      setMember(memberData);
+      memberForm.reset(memberToFormValues(memberData, memberForm.getValues()));
+      setMemberError(null);
+    } catch (err) {
+      console.error("Error fetching member data:", err);
+      setMemberError(
+        err instanceof Error ? err.message : "Failed to fetch member data",
+      );
+    } finally {
+      if (!options?.silent) setMemberLoading(false);
+    }
+  };
+
+  const saveMemberData = async (data: MemberFormValues) => {
+    const updates = {
+      title: data.title,
+      location: data.location,
+      email: data.email,
+      websites: data.website
+        ? JSON.stringify([{ url: data.website, type: "personal" }])
+        : JSON.stringify([]),
+    };
+
+    const response = await fetch(`${hostName}/api/member`, {
+      cache: "no-store",
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates }),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.errorMessage || "Failed to save member data");
+    }
+
+    setMemberError(null);
+  };
+
+  const handleEditMember = () => setIsEditingMember(true);
+
+  const handleSaveMember = async () => {
+    try {
+      const formData = memberForm.getValues();
+      await saveMemberData(formData);
+
+      const updatedMember: TeamMember = normalizeTeamMember({
+        ...(member ?? {
+          index: 0,
+          user_id: user!.userId,
+          member_name: username,
+          avatar_url: user?.avatar_url ?? "",
+          user_role: user?.role ?? "contributor",
+        }),
+        title: formData.title,
+        location: formData.location,
+        email: formData.email,
+        websites: formData.website
+          ? [{ url: formData.website, type: "personal" }]
+          : [],
+      });
+
+      setMember(updatedMember);
+      memberForm.reset(memberToFormValues(updatedMember, formData));
+      setIsEditingMember(false);
+      setMemberError(null);
+      toast.success("Team member info saved");
+
+      await refetchTeamMembers();
+      if (user?.userId) {
+        await fetchMemberData(user.userId, { silent: true });
+      }
+    } catch (err) {
+      console.error("Error saving member data:", err);
+      setMemberError(
+        err instanceof Error ? err.message : "Failed to save member data",
+      );
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save member data",
+      );
+    }
+  };
+
+  const handleCancelMember = () => {
+    if (member) {
+      memberForm.reset(memberToFormValues(member, memberForm.getValues()));
+    }
+    setIsEditingMember(false);
+    setMemberError(null);
+  };
+
+  useEffect(() => {
+    if (isContributor && user?.userId) {
+      fetchMemberData(user.userId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isContributor, user?.userId]);
 
   const getBio = async () => {
     const response = await fetch(`${hostName}/api/userprofile/bio`, {
@@ -764,12 +1002,14 @@ const UserPage = () => {
 
     // User is present, fetch other data
     const init = async () => {
-      getBio();
-      // getContactEmail();
-      // getContactPhone();
-      getUsername();
-      fetchStats();
-      fetchWeaves();
+      await Promise.all([
+        getBio(),
+        getContactEmail(),
+        getContactPhone(),
+        getUsername(),
+        fetchStats(),
+        fetchWeaves(),
+      ]);
     };
     init();
 
@@ -828,8 +1068,8 @@ const UserPage = () => {
           animate={{ opacity: 1, y: 0 }}
           className="  "
         >
-          <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center mt-10">
-            <div className="flex items-center space-x-3">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex justify-center md:justify-between items-center mt-10">
+            <div className="flex items-center justify-center md:justify-start space-x-3">
               {/*icons*/}
               <div className="flex items-center space-x-2 px-6">
                 <ReuseIcon className="h-[85px] w-auto text-megaweave-gold" />
@@ -853,15 +1093,15 @@ const UserPage = () => {
         </motion.header>
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:items-stretch">
             {/* Profile Card */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className="lg:col-span-1"
+              className="lg:col-span-1 h-full"
             >
-              <div className="bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300 h-full">
                 {/* Avatar */}
                 <div className="text-center mb-2 mt-4 ">
                   <input
@@ -1126,10 +1366,10 @@ const UserPage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="lg:col-span-2 space-y-6"
+              className="lg:col-span-2 space-y-6 lg:flex lg:flex-col lg:h-full"
             >
               {/* Bio Section */}
-              <div className="min-h-[240px] bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="min-h-[240px] flex-shrink-0 bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold flex items-center space-x-2">
                     <UserIcon className="w-5 h-5 text-megaweave-forest-dark" />
@@ -1197,14 +1437,15 @@ const UserPage = () => {
               </div>
 
               {/* Contact Settings */}
-              <div className="bg-white border border-primary-30 rounded-2xl p-6  transition-all duration-300">
-                <div className="flex items-center justify-between mb-8">
+              <div className="bg-white border border-primary-30 rounded-2xl p-6 transition-all duration-300 lg:flex-1 lg:flex lg:flex-col">
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="type-button-b1 text-megaweave-forest-dark flex items-center space-x-2">
                     <ContactProfileIcon className="w-5 h-5" />
                     <span>Contact Setting</span>
                   </h3>
                   {!isEditingContact ? (
                     <button
+                      type="button"
                       onClick={handleEditContact}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
@@ -1213,6 +1454,7 @@ const UserPage = () => {
                   ) : (
                     <div className="flex space-x-2">
                       <button
+                        type="button"
                         onClick={handleSaveContact}
                         className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
                       >
@@ -1220,6 +1462,7 @@ const UserPage = () => {
                         <span>Save</span>
                       </button>
                       <button
+                        type="button"
                         onClick={handleCancelContact}
                         className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
                       >
@@ -1233,139 +1476,141 @@ const UserPage = () => {
                 <Form {...contactForm}>
                   <form
                     onSubmit={contactForm.handleSubmit(onContactFormSubmit)}
-                    className="space-y-6"
+                    className="divide-y divide-primary-30 rounded-lg overflow-hidden lg:flex-1 lg:flex lg:flex-col"
                   >
-                    <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base font-medium text-megaweave-forest">
-                            Email
-                          </FormLabel>
-                        </div>
-
-                        <FormField
-                          control={contactForm.control}
-                          name="emailVisible"
-                          render={({ field }) => (
-                            <FormItem>
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`text-sm transition-colors duration-200 ${
-                                    field.value
-                                      ? "text-green-400"
-                                      : "text-gray-400"
-                                  }`}
-                                >
-                                  {field.value ? "Public" : "Private"}
-                                </span>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                    className="data-[state=checked]:bg-blue-500"
-                                  />
-                                </FormControl>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={contactForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              {isEditingContact ? (
-                                <input
-                                  {...field}
-                                  type="email"
-                                  className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                                />
-                              ) : (
-                                <div className="text-gray-300 rounded-lg">
-                                  {field.value || "No email provided"}
-                                </div>
-                              )}
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="p-4 bg-megaweave-blue/10 rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base font-medium text-megaweave-forest">
-                            Phone
-                          </FormLabel>
-                        </div>
-
-                        <FormField
-                          control={contactForm.control}
-                          name="phoneVisible"
-                          render={({ field }) => (
-                            <FormItem>
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`text-sm transition-colors duration-200 ${
-                                    field.value
-                                      ? "text-green-400"
-                                      : "text-gray-400"
-                                  }`}
-                                >
-                                  {field.value ? "Public" : "Private"}
-                                </span>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                    className="data-[state=checked]:bg-blue-500"
-                                  />
-                                </FormControl>
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <FormField
-                        control={contactForm.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              {isEditingContact ? (
-                                <input
-                                  {...field}
-                                  type="phone"
-                                  placeholder="Enter your contact phone number"
-                                  className="w-full rounded-lg px-4 py-2 text-gray-300 bg-gray-700/30 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
-                                />
-                              ) : (
-                                <div className=" text-gray-300 rounded-lg ">
-                                  {field.value || "No phone provided"}
-                                </div>
-                              )}
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                    <MemberInfoFieldRow
+                      label="Email"
+                      name="email"
+                      visibleName="emailVisible"
+                      control={contactForm.control}
+                      isEditing={isEditingContact}
+                      placeholder="Enter your email"
+                      emptyText="No email provided"
+                      inputType="email"
+                    />
+                    <MemberInfoFieldRow
+                      label="Phone"
+                      name="phone"
+                      visibleName="phoneVisible"
+                      control={contactForm.control}
+                      isEditing={isEditingContact}
+                      placeholder="Enter your contact phone number"
+                      emptyText="No phone provided"
+                      inputType="tel"
+                    />
                   </form>
                 </Form>
               </div>
             </motion.div>
           </div>
+
+          {isContributor && user && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mt-8"
+            >
+              <div className="bg-primary-15 border border-primary-30 rounded-2xl p-6 transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <h3 className="type-button-b1 text-megaweave-forest-dark flex items-center space-x-2">
+                    <Users className="w-5 h-5" />
+                    <span>Team Member Info.</span>
+                  </h3>
+                  {!isEditingMember ? (
+                    <button
+                      onClick={handleEditMember}
+                      className="flex items-center px-3 py-1.5 transition-all duration-200"
+                    >
+                      <EditIcon className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveMember}
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
+                      >
+                        <Save className="w-3 h-3" />
+                        <span>Save</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelMember}
+                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
+                      >
+                        <X className="w-3 h-3" />
+                        <span>Cancel</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="type-body-t5 text-megaweave-forest-dark mt-1 mb-4">
+                  *megaweaveing Team Only
+                </p>
+
+                {memberLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <>
+                    {memberError && (
+                      <Alert className="mb-4 bg-red-950/50 border-red-500/30">
+                        <AlertDescription className="text-red-300">
+                          {memberError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    <Form {...memberForm}>
+                      <form className="divide-y divide-primary-30 rounded-lg overflow-hidden">
+                        <MemberInfoFieldRow
+                          label="Title"
+                          name="title"
+                          visibleName="titleVisible"
+                          control={memberForm.control}
+                          isEditing={isEditingMember}
+                          placeholder="Enter your title"
+                          emptyText="No title provided"
+                        />
+                        <MemberInfoFieldRow
+                          label="Location"
+                          name="location"
+                          visibleName="locationVisible"
+                          control={memberForm.control}
+                          isEditing={isEditingMember}
+                          placeholder="Enter your location"
+                          emptyText="No location provided"
+                        />
+                        <MemberInfoFieldRow
+                          label="Website"
+                          name="website"
+                          visibleName="websiteVisible"
+                          control={memberForm.control}
+                          isEditing={isEditingMember}
+                          placeholder="https://your-website.com"
+                          emptyText="No website provided"
+                          inputType="url"
+                          linkify
+                        />
+                        <MemberInfoFieldRow
+                          label="Email"
+                          name="email"
+                          visibleName="emailVisible"
+                          control={memberForm.control}
+                          isEditing={isEditingMember}
+                          placeholder="Enter your email"
+                          emptyText="No email provided"
+                          inputType="email"
+                        />
+                      </form>
+                    </Form>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
         </div>
-        {/* member form */}
-        {isContributor && (
-          <MemberForm
-            isContributor={isContributor}
-            memberUserId={user.userId}
-          />
-        )}
         <div className="max-w-6xl mx-auto">
           <DrawerWrapper
             weaves={weaves}

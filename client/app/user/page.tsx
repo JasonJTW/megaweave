@@ -15,7 +15,7 @@ import { compressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
 import { motion } from "framer-motion";
-import { LogOut, Save, User as UserIcon, Users, X } from "lucide-react";
+import { LogOut, Save, Share, User as UserIcon, Users, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +27,7 @@ import EditIcon from "../components/icons/EditIcon";
 import ElfIcon from "../components/icons/ElfIcon";
 import ReuseIcon from "../components/icons/ReuseIcon";
 import WeavingIcon from "../components/icons/WeavingIcon";
+import ShareQrModal from "../components/ShareQrModal";
 import { usePost } from "../contexts/PostContext";
 import { useTeam } from "../contexts/TeamContext";
 import { useUser } from "../contexts/UserContext";
@@ -197,6 +198,8 @@ const UserPage = () => {
     null,
   );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [isShareQrOpen, setIsShareQrOpen] = useState(false);
+  const [shareProfileUrl, setShareProfileUrl] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const previousPreviewRef = useRef<string | null>(null); // store previous object URL so we can revoke it
 
@@ -246,6 +249,11 @@ const UserPage = () => {
       setUsername(user.username);
       if (user.role === "contributor" || user.role === "admin") {
         setIsContributor(true);
+      }
+      if (user.public_id && typeof window !== "undefined") {
+        setShareProfileUrl(
+          `${window.location.origin}/profile/${user.public_id}`,
+        );
       }
     }
   }, [user]);
@@ -1084,7 +1092,7 @@ const UserPage = () => {
 
             <button
               onClick={handleSignOut}
-              className="hidden md:flex font-ddin items-center space-x-2 px-4 py-2 text-megaweave-forest-dark rounded-full transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
+              className="hidden md:flex font-ddin font-bold items-center space-x-2 px-4 py-2 text-megaweave-forest-dark rounded-full transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
             >
               <span>Sign Out</span>
               <LogOut className="w-4 h-4" />
@@ -1093,17 +1101,25 @@ const UserPage = () => {
         </motion.header>
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-[330px_1fr] gap-8 lg:items-stretch">
             {/* Profile Card */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className="lg:col-span-1 h-full"
+              className="w-full lg:w-[330px] h-full relative"
             >
-              <div className="bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300 h-full">
+              <div className="relative bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300 h-full">
+                <button
+                  type="button"
+                  onClick={() => setIsShareQrOpen(true)}
+                  className="absolute top-6 right-6 z-10 rounded-full p-1.5 transition-colors hover:bg-primary-15"
+                  aria-label="Share profile QR code"
+                >
+                  <Share className="w-4 h-4 text-megaweave-forest-dark pointer-events-none" />
+                </button>
                 {/* Avatar */}
-                <div className="text-center mb-2 mt-4 ">
+                <div className="text-center">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -1330,7 +1346,6 @@ const UserPage = () => {
                     </motion.div>
                   )}
                 </div>
-
                 {/* Stats */}
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
                   <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
@@ -1366,7 +1381,7 @@ const UserPage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="lg:col-span-2 space-y-6 lg:flex lg:flex-col lg:h-full"
+              className="space-y-6 lg:flex lg:flex-col lg:h-full min-w-0"
             >
               {/* Bio Section */}
               <div className="min-h-[240px] flex-shrink-0 bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
@@ -1427,10 +1442,7 @@ const UserPage = () => {
                 )}
                 <div className="flex justify-between items-center mt-2">
                   <div className="flex items-center space-x-3"></div>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center space-x-2 text-primary-75 type-button-b2"
-                  >
+                  <button className="flex items-center space-x-2 text-primary-75 type-button-b2">
                     <span>Joined in 2025.09</span>
                   </button>
                 </div>
@@ -1623,6 +1635,14 @@ const UserPage = () => {
           />
         </div>
       </div>
+
+      <ShareQrModal
+        open={isShareQrOpen}
+        onOpenChange={setIsShareQrOpen}
+        username={username}
+        profileUrl={shareProfileUrl}
+        avatarUrl={user.avatar_url}
+      />
     </>
   );
 };

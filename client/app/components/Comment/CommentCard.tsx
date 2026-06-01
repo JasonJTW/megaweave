@@ -9,6 +9,7 @@ import WeavingIcon from "../icons/WeavingIcon";
 import ExpandedIcon from "../icons/ExpandedIcon";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import PrivateMessageIcon from "../icons/PrivateMessageIcon";
 interface CommentCardProps {
   title: string;
   count?: number;
@@ -16,6 +17,7 @@ interface CommentCardProps {
   isOpen?: boolean;
   onToggle?: () => void;
   onWeaving?: () => void;
+  onPrivateMessage?: () => void;
 }
 const CommentCard: React.FC<CommentCardProps> = ({
   title,
@@ -24,6 +26,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
   isOpen = false,
   onToggle,
   onWeaving,
+  onPrivateMessage,
 }) => {
   // ✅ 新增：控制數量選單的顯示狀態
 
@@ -40,6 +43,14 @@ const CommentCard: React.FC<CommentCardProps> = ({
     } else {
       // 預設行為（如果沒有傳遞 onWeaving prop）
       toast.success("Weaving action triggered (No callback provided).");
+    }
+  };
+
+  const handlePrivateMessageClick = () => {
+    if (onPrivateMessage) {
+      onPrivateMessage();
+    } else {
+      toast.success("Private Message action triggered.");
     }
   };
 
@@ -70,6 +81,13 @@ const CommentCard: React.FC<CommentCardProps> = ({
 
       <div className="flex gap-[10px] items-center flex-shrink-0">
         {/* 留言按鈕 + 數量 */}
+        <Button
+          variant="ghost"
+          className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
+          onClick={handlePrivateMessageClick}
+        >
+          <PrivateMessageIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
+        </Button>
         <Button
           variant="ghost"
           className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"

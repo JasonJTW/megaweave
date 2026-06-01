@@ -141,6 +141,8 @@ export interface Message {
   sender_public_id: string;
   content: string;
   is_read: boolean;
+  message_type?: string;
+  metadata?: Record<string, unknown> | string;
   created_at: string;
   sender_name?: string;
   sender_avatar?: string;

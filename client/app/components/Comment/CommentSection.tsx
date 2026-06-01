@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 // ✅ 引入 WeavingInput
 import WeavingInput from "./WeavingInput";
 import toast from "react-hot-toast";
+import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import {
   Comment,
   getComments,
@@ -32,8 +33,56 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const { openChat } = useChatPopup();
   // ✅ 新增：追蹤哪個 Tab 正在顯示 WeavingInput
   const [weavingInputItem, setWeavingInputItem] = useState<TabKey | null>(null);
+
+  const handlePrivateMessage = async (tab: { key: TabKey; title: string }) => {
+    if (!user) {
+      toast.error("Please log in to message.");
+      router.push("/signin");
+      return;
+    }
+
+    if (user.userId === post.author_user_id) {
+      toast.error("You cannot message yourself.");
+      return;
+    }
+
+    try {
+      const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+      
+      const requestBody: { recipient_public_id: string; item_id?: number | string; post_title?: string } = { recipient_public_id: post.author_public_id };
+      if (tab.key !== 'all') {
+          requestBody.item_id = tab.key;
+          requestBody.post_title = tab.title;
+      } else {
+          // If it's the main post, we can use the post ID or title
+          // Currently, let's just pass the post title for context
+          requestBody.post_title = post.title;
+      }
+
+      const res = await fetch(`${hostName}/api/messages/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!res.ok) throw new Error("Failed to start conversation");
+
+      const data = await res.json();
+      console.log("data: ", data);
+      openChat(data.conversationId, {
+        public_id: post.author_public_id,
+        username: post.username,
+        avatar_url: post.avatar_url,
+      });
+    } catch (error) {
+      console.error("Message error:", error);
+      toast.error(`Could not message ${post.username}`);
+    }
+  };
 
   // 取得留言數量（初始載入）
   const fetchCounts = useCallback(async () => {
@@ -62,7 +111,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         setIsLoading(false);
       }
     },
-    [post.id]
+    [post.id],
   );
 
   // 初始載入留言數量
@@ -91,38 +140,42 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
             const data = await res.json();
             const itemId = data.comment.item_id;
             const targetTab = itemId === null ? "all" : itemId;
-            
+
             setActiveTab(targetTab);
-            
+
             // Wait for comments to load and render, then scroll
             // We need to poll or use a ref mechanism, but a simple timeout works for now
             // better: relying on 'comments' dependency in another effect
           }
         } catch (e) {
-            console.error("Deep link failed", e);
+          console.error("Deep link failed", e);
         }
       }
     };
-    
+
     handleDeepLink();
   }, []);
 
   // Scroll to hash when comments are updated
   useEffect(() => {
     if (!isLoading && activeTab !== null) {
-        const hash = window.location.hash;
-        if (hash && hash.startsWith("#comment-")) {
-            const id = hash.substring(1);
-            // Check if element exists
-            setTimeout(() => {
-                const element = document.getElementById(id);
-                if (element) {
-                    element.scrollIntoView({ behavior: "smooth", block: "center" });
-                    element.classList.add("bg-yellow-50", "transition-colors", "duration-1000");
-                    setTimeout(() => element.classList.remove("bg-yellow-50"), 2000);
-                }
-            }, 300); // delay after render
-        }
+      const hash = window.location.hash;
+      if (hash && hash.startsWith("#comment-")) {
+        const id = hash.substring(1);
+        // Check if element exists
+        setTimeout(() => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            element.classList.add(
+              "bg-yellow-50",
+              "transition-colors",
+              "duration-1000",
+            );
+            setTimeout(() => element.classList.remove("bg-yellow-50"), 2000);
+          }
+        }, 300); // delay after render
+      }
     }
   }, [isLoading, comments, activeTab]);
 
@@ -162,7 +215,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   // ✅ 處理索取留言的提交邏輯
   const handleWeavingSubmit = async (
     tabKey: TabKey,
-    quantity: number | "all"
+    quantity: number | "all",
   ) => {
     //* check login
     if (!user) {
@@ -243,6 +296,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
             onToggle={() => handleTabClick(tab.key)}
             // ✅ All Tab 也允許發起 Weaving (索取所有)
             onWeaving={() => handleWeavingIconClick(tab.key)}
+            onPrivateMessage={() => handlePrivateMessage(tab)}
           />
           <AnimatePresence>
             {activeTab === tab.key && (

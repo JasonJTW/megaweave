@@ -196,26 +196,28 @@ const Navbar = () => {
                   </Link>
                 )}
 
-                {user?.userId && (
-                  <Link href="/messages" className="relative group mr-2">
-                    <MessageIcon className=" text-megaweave-forest-dark" />
-                    <span className="sr-only">Messages</span>
-                    {messageUnreadCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                        {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
-                      </span>
-                    )}
-                  </Link>
+                {user && (
+                  <>
+                    <Link href="/messages" className="relative group mr-2">
+                      <MessageIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
+                      <span className="sr-only">Messages</span>
+                      {messageUnreadCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                          {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
+                        </span>
+                      )}
+                    </Link>
+                    <Link href="/notifications" className="relative group">
+                      <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
+                      <span className="sr-only">Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
+                    </Link>
+                  </>
                 )}
-                <Link href="/notifications" className="relative group">
-                  <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
-                  <span className="sr-only">Notifications</span>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )}
-                </Link>
               </div>
 
               <NavigationMenu className="mt-0">

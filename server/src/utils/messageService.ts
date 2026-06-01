@@ -34,6 +34,8 @@ export interface Message {
   sender_public_id?: string;
   content: string;
   is_read: boolean;
+  message_type?: string;
+  metadata?: any;
   created_at: Date;
   sender_name?: string;
   sender_avatar?: string;
@@ -91,7 +93,9 @@ export const messageService = {
     conversationId: number,
     senderId: number,
     content: string,
-    attachments?: Array<{ url: string; type: 'image' | 'video' | 'file' }>
+    attachments?: Array<{ url: string; type: 'image' | 'video' | 'file' }>,
+    messageType: string = 'text',
+    metadata: any = null
   ): Promise<Message> => {
     const connection = await dbPool.getConnection();
     try {
@@ -99,8 +103,8 @@ export const messageService = {
 
         // 1. Insert message
         const [result] = await connection.execute<ResultSetHeader>(
-            "INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)",
-            [conversationId, senderId, content]
+            "INSERT INTO messages (conversation_id, sender_id, content, message_type, metadata) VALUES (?, ?, ?, ?, ?)",
+            [conversationId, senderId, content, messageType, metadata ? JSON.stringify(metadata) : null]
         );
         const messageId = result.insertId;
 
@@ -142,6 +146,8 @@ export const messageService = {
             sender_id: senderId,
             content,
             is_read: false,
+            message_type: messageType,
+            metadata,
             created_at: new Date(),
             attachments: insertedAttachments
         };
@@ -163,7 +169,6 @@ export const messageService = {
         u.avatar_url as other_avatar_url,
         u.id as other_user_id,
         m.content as last_message_content,
-        m.is_read as last_message_is_read,
         m.sender_id as last_message_sender_id,
         (
           SELECT COUNT(*) 
@@ -197,9 +202,15 @@ export const messageService = {
     beforeId?: number
   ): Promise<Message[]> => {
     let query = `
-      SELECT m.*, u.username as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
+      SELECT 
+        m.id, m.conversation_id, m.sender_id, m.content, m.message_type, m.metadata, m.created_at,
+        IF(m.id <= cu.last_read_message_id, 1, 0) as is_read,
+        u.username as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
       FROM messages m
       JOIN users u ON m.sender_id = u.id
+      LEFT JOIN conversation_users cu 
+        ON cu.conversation_id = m.conversation_id 
+        AND cu.user_id != m.sender_id
       WHERE m.conversation_id = ?
     `;
     const params: any[] = [conversationId];
@@ -214,6 +225,10 @@ export const messageService = {
 
     const [rows] = await dbPool.query<RowDataPacket[]>(query, params);
     const messages = rows as Message[];
+
+    messages.forEach(m => {
+        m.is_read = !!m.is_read;
+    });
 
     if (messages.length > 0) {
         const messageIds = messages.map(m => m.id);
@@ -249,6 +264,14 @@ export const messageService = {
            WHERE conversation_id = ? AND user_id = ?`,
           [conversationId, conversationId, userId]
       );
+  },
+
+  hasRecentSystemMessage: async (conversationId: number, messageType: string, itemId: number): Promise<boolean> => {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT id FROM messages WHERE conversation_id = ? AND message_type = ? AND JSON_EXTRACT(metadata, '$.item_id') = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+      [conversationId, messageType, itemId]
+    );
+    return rows.length > 0;
   },
 
   // 7. Get Conversation Details by ID

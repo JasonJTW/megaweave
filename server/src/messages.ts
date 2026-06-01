@@ -121,7 +121,7 @@ router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Requ
 // POST /api/messages/start - Start conversation (get or create)
 router.post("/start", requireAuth, async (req: Request, res: Response) => {
     const senderId = req.user!.userId;
-    const { recipient_public_id } = req.body;
+    const { recipient_public_id, item_id, post_title } = req.body;
 
     if (!recipient_public_id) {
          return res.status(400).json({ errorMessage: "Recipient Public ID required" });
@@ -133,6 +133,32 @@ router.post("/start", requireAuth, async (req: Request, res: Response) => {
             return res.status(404).json({ errorMessage: "Recipient not found" });
         }
         const conversationId = await messageService.getConversationId(senderId, recipientId);
+
+        // If it's a weaving consultation, check and insert system message
+        if (item_id) {
+            const hasSystemMsg = await messageService.hasRecentSystemMessage(conversationId, 'system_start_weaving', item_id);
+            
+            if (!hasSystemMsg) {
+                const sysMsg = await messageService.createMessage(
+                    conversationId, 
+                    senderId, 
+                    "Start Weaving", 
+                    undefined, 
+                    "system_start_weaving", 
+                    { item_id, post_title }
+                );
+                
+                // Emit via socket so the UI updates if already open
+                const io: Server = res.locals.io;
+                if (io) {
+                    const messageDTO = messageService.toMessageDTO(sysMsg, req.user!.public_id);
+                    const payload = { ...messageDTO, conversation_id: conversationId };
+                    io.to(`user_${recipientId}`).emit("new_message", payload);
+                    io.to(`user_${senderId}`).emit("new_message", payload);
+                }
+            }
+        }
+
         return res.json({ conversationId });
     } catch (error) {
         console.error("Start conversation error:", error);

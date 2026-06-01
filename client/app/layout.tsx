@@ -15,6 +15,8 @@ import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 import Footer from "./components/Footer";
+import { ChatPopupProvider } from "./contexts/ChatPopupContext";
+import { ChatPopup } from "./components/Chat/ChatPopup";
 
 dotenv.config();
 // const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
@@ -160,48 +162,51 @@ export default function RootLayout({
           <UserProvider>
             <SocketProvider>
               <NavbarProvider>
-                <NotificationProvider>
-                  <Navbar />
+                  <NotificationProvider>
+                    <ChatPopupProvider>
+                      <Navbar />
+                      <ChatPopup />
 
-                  {/* Facebook SDK */}
-                  <Script id="facebook-sdk" strategy="afterInteractive">
-                    {`
-              window.fbAsyncInit = function() {
-                FB.init({
-                  appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
-                  cookie     : true,
-                  xfbml      : true,
-                  version    : 'v18.0'
-                });
-                
-                FB.AppEvents.logPageView();   
-              };
-  
-              (function(d, s, id){
-                 var js, fjs = d.getElementsByTagName(s)[0];
-                 if (d.getElementById(id)) {return;}
-                 js = d.createElement(s); js.id = id;
-                 js.src = "https://connect.facebook.net/en_US/sdk.js";
-                 fjs.parentNode.insertBefore(js, fjs);
-               }(document, 'script', 'facebook-jssdk'));
-            `}
-                  </Script>
-                  <Script
-                    id="google-maps"
-                    strategy="afterInteractive"
-                    src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
-                  />
-                  <GoogleOAuthProvider
-                    clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-                  >
-                    <TeamProvider>
-                      <PostProvider>
-                          {children}
-                      </PostProvider>
-                    </TeamProvider>
-                  </GoogleOAuthProvider>
-                  <Footer />
-                </NotificationProvider>
+                      {/* Facebook SDK */}
+                      <Script id="facebook-sdk" strategy="afterInteractive">
+                        {`
+                  window.fbAsyncInit = function() {
+                    FB.init({
+                      appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
+                      cookie     : true,
+                      xfbml      : true,
+                      version    : 'v18.0'
+                    });
+                    
+                    FB.AppEvents.logPageView();   
+                  };
+      
+                  (function(d, s, id){
+                     var js, fjs = d.getElementsByTagName(s)[0];
+                     if (d.getElementById(id)) {return;}
+                     js = d.createElement(s); js.id = id;
+                     js.src = "https://connect.facebook.net/en_US/sdk.js";
+                     fjs.parentNode.insertBefore(js, fjs);
+                   }(document, 'script', 'facebook-jssdk'));
+                `}
+                      </Script>
+                      <Script
+                        id="google-maps"
+                        strategy="afterInteractive"
+                        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
+                      />
+                      <GoogleOAuthProvider
+                        clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+                      >
+                        <TeamProvider>
+                          <PostProvider>
+                              {children}
+                          </PostProvider>
+                        </TeamProvider>
+                      </GoogleOAuthProvider>
+                      <Footer />
+                    </ChatPopupProvider>
+                  </NotificationProvider>
               </NavbarProvider>
             </SocketProvider>
           </UserProvider>

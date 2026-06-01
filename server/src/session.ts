@@ -184,6 +184,8 @@ export async function getUserSessionFromRedis(
 
     if (!success) {
       console.error("Invalid session data format in Redis");
+      console.error("rawUser: ", rawUser)
+      console.error("parsedUser: ", parsedUser)
       return null;
     }
 

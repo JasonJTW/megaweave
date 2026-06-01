@@ -11,6 +11,7 @@ export const sessionSchema = z.object({
   avatar_url: z.url().optional().nullable(),
   avatar_key: z.string().optional().nullable(),
   public_id: z.string(),
+  joined_at: z.coerce.date(),
 });
 
 export type UserSession = z.infer<typeof sessionSchema>;

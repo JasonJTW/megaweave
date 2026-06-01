@@ -1443,7 +1443,7 @@ const UserPage = () => {
                 <div className="flex justify-between items-center mt-2">
                   <div className="flex items-center space-x-3"></div>
                   <button className="flex items-center space-x-2 text-primary-75 type-button-b2">
-                    <span>Joined in 2025.09</span>
+                    <span>Joined in {user?.joined_at ? new Date(user.joined_at).toISOString().slice(0, 7).replace('-', '.') : ''}</span>
                   </button>
                 </div>
               </div>

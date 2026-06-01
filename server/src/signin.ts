@@ -265,6 +265,7 @@ router.post("/", async (req: Request, res: Response) => {
       avatar_url: foundUser.avatar_url || null,
       avatar_key: foundUser.avatar_key || null,
       public_id: foundUser.public_id,
+      joined_at: foundUser.created_at,
     };
 
     await createUserSession(validUser, req, res);
@@ -327,6 +328,7 @@ router.post("/google", async (req: Request, res: Response) => {
       avatar_url: user.avatar_url ?? null,
       avatar_key: user.avatar_key ?? null,
       public_id: user.public_id,
+      joined_at: user.created_at,
     };
 
     await createUserSession(googleUserSession, req, res);
@@ -414,6 +416,7 @@ router.post("/facebook", async (req: Request, res: Response) => {
       avatar_url: user.avatar_url || null,
       avatar_key: user.avatar_key || null,
       public_id: user.public_id,
+      joined_at: user.created_at,
     };
 
     await createUserSession(facebookUserSession, req, res);

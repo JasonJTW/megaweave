@@ -5,4 +5,5 @@ export type User = {
   password: string;
   salt: string;
   public_id: string;
+  created_at?: Date;
 };

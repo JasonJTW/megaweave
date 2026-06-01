@@ -7,4 +7,5 @@ export default interface User {
   avatar_url?: string;
   avatar_key?: string;
   public_id: string;
+  joined_at: string;
 }

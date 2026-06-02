@@ -1,0 +1,210 @@
+import type { Weave } from "@/services/weaveService";
+import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import type { Condition, Post } from "../types/schema";
+import DrawerListItem from "./DrawerListItem";
+import ExpandedIcon from "./icons/ExpandedIcon";
+import ExpandIcon from "./icons/ExpandIcon";
+
+interface DrawerListProps {
+  title: string;
+  posts: Post[];
+  conditions: Condition[];
+  weaves?: Weave[];
+  currentUserId?: number;
+  onWeaveStatusChange?: () => void;
+  highlightWeaveId?: number;
+  fetchWeaves?: () => void | Promise<void>;
+}
+
+const DrawerList: React.FC<DrawerListProps> = ({
+  title,
+  posts,
+  weaves,
+  currentUserId,
+  highlightWeaveId,
+  fetchWeaves,
+}) => {
+  const router = useRouter();
+  const listRef = useRef<(HTMLDivElement | null)[]>([]);
+  const shouldAutoExpand =
+    weaves?.some((w) => w.id === highlightWeaveId) ?? false;
+  const [isExpanded, setIsExpanded] = useState(shouldAutoExpand);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (shouldAutoExpand) {
+      setIsExpanded(true);
+    }
+  }, [shouldAutoExpand]);
+
+  useEffect(() => {
+    if (!highlightWeaveId || !weaves?.length) return;
+
+    const targetIndex = weaves.findIndex((w) => w.id === highlightWeaveId);
+    if (targetIndex === -1) return;
+
+    const timer = setTimeout(() => {
+      listRef.current[targetIndex]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [highlightWeaveId, weaves]);
+
+  const handleRefresh = async () => {
+    if (!fetchWeaves) return;
+    setIsRefreshing(true);
+    const minSpinTime = 500;
+    const startTime = Date.now();
+
+    try {
+      await fetchWeaves();
+    } catch (error) {
+      console.error("Refresh failed", error);
+    } finally {
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime < minSpinTime) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, minSpinTime - elapsedTime),
+        );
+      }
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const isWeavingTab = title === "Weaving";
+  const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
+  const postsToRender = isWeavingTab ? postsForWeaving : posts;
+
+  const postIdToWeaveMap = new Map<number, Weave>();
+  weaves?.forEach((weave) => {
+    postIdToWeaveMap.set(weave.post.id, weave);
+  });
+
+  const emptyMessage = isWeavingTab
+    ? "You have no active weaving yet."
+    : `No posts in ${title} yet.`;
+
+  return (
+    <div className="mb-4">
+      <div className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-button-b1 text-megaweave-forest-dark">
+        <div>{title}</div>
+        <button
+          type="button"
+          onClick={handleExpand}
+          className="transition-transform duration-300"
+          aria-label={isExpanded ? "Collapse list" : "Expand list"}
+        >
+          <motion.div
+            animate={{ rotate: isExpanded ? 0 : 180 }}
+            transition={{
+              type: "spring",
+              stiffness: 200,
+              damping: 15,
+            }}
+          >
+            {isExpanded ? <ExpandedIcon /> : <ExpandIcon />}
+          </motion.div>
+        </button>
+      </div>
+
+      <motion.div
+        initial={false}
+        animate={{
+          height: isExpanded ? "auto" : 0,
+          opacity: isExpanded ? 1 : 0,
+          marginBottom: isExpanded ? 0 : -16,
+        }}
+        transition={{
+          height: isExpanded
+            ? { duration: 0.25, ease: [0.34, 1.3, 0.64, 1] }
+            : { duration: 0.25, ease: "easeInOut" },
+          opacity: { duration: 0.25, ease: "easeInOut" },
+          marginBottom: isExpanded
+            ? { duration: 0.25, ease: [0.34, 1.3, 0.64, 1] }
+            : { duration: 0.25, ease: "easeInOut" },
+        }}
+        style={{ overflow: "hidden" }}
+      >
+        <motion.div
+          initial={false}
+          animate={{
+            y: isExpanded ? 0 : -10,
+            scale: isExpanded ? 1 : 0.98,
+          }}
+          transition={{
+            duration: 0.25,
+            ease: [0.34, 1.3, 0.64, 1],
+          }}
+        >
+          {fetchWeaves && (
+            <div className="mb-2 text-right">
+              {/*  <button
+                type="button"
+                className="px-4"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                aria-label="Refresh list"
+              >
+                <motion.div
+                  animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
+                  transition={
+                    isRefreshing
+                      ? { duration: 1, ease: "linear", repeat: Infinity }
+                      : { duration: 0 }
+                  }
+                >
+                  <LucideRefreshCcw className="h-4 w-4" />
+                </motion.div>
+              </button> */}
+            </div>
+          )}
+
+          {postsToRender.length > 0 ? (
+            <div className="mx-4 flex flex-col gap-3 pb-2">
+              {postsToRender.map((post, index) => {
+                const directWeave =
+                  weaves && weaves[index]?.post.id === post.id
+                    ? weaves[index]
+                    : undefined;
+                const weave = directWeave ?? postIdToWeaveMap.get(post.id);
+                const uniqueKey = weave
+                  ? `weave-${weave.id}`
+                  : `post-${post.id}`;
+
+                return (
+                  <div
+                    key={uniqueKey}
+                    ref={(el) => {
+                      listRef.current[index] = el;
+                    }}
+                  >
+                    <DrawerListItem
+                      post={post}
+                      weave={weave}
+                      currentUserId={currentUserId}
+                      isHighlighted={weave?.id === highlightWeaveId}
+                      onClick={() => router.push(`/item/${post.id}`)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-500">{emptyMessage}</div>
+          )}
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default DrawerList;

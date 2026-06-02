@@ -3,7 +3,7 @@
 
 import { useSearchParams } from "next/navigation";
 import React from "react";
-import Drawer from "@/app/components/Drawer"; // 假設您的 Drawer 元件在這個路徑下
+import DrawerList from "@/app/components/DrawerList";
 import type { Weave } from "@/services/weaveService";
 import type { Condition, Post } from "@/app/types/schema";
 
@@ -36,23 +36,28 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
 
   return (
     <>
-      <Drawer
-        title="Weaving"
-        posts={[]}
-        weaves={weaves}
-        conditions={conditions}
-        currentUserId={currentUserId}
-        highlightWeaveId={parsedHighlightId}
-        fetchWeaves={fetchWeaves} // 傳遞給 Weaving Drawer
-      />
-      {/* 其他 Drawer 不處理 highlight 邏輯 */}
-      <Drawer
-        title="Share"
-        posts={sharePosts}
-        conditions={conditions}
-        fetchWeaves={fetchStats}
-      />
-      <Drawer
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+        <div className="min-w-0">
+          <DrawerList
+            title="Weaving"
+            posts={[]}
+            weaves={weaves}
+            conditions={conditions}
+            currentUserId={currentUserId}
+            highlightWeaveId={parsedHighlightId}
+            fetchWeaves={fetchWeaves}
+          />
+        </div>
+        <div className="min-w-0">
+          <DrawerList
+            title="Share"
+            posts={sharePosts}
+            conditions={conditions}
+            fetchWeaves={fetchStats}
+          />
+        </div>
+      </div>
+      <DrawerList
         title="Wish"
         posts={wishPosts}
         conditions={conditions}

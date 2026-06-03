@@ -112,7 +112,7 @@ export default function RootLayout({
           <Script
             id="umami-analytics"
             defer
-            src="https://stats.megaweave.net/script.js"
+            src="https://stats.megaweaving.net/script.js"
             data-website-id="405ee142-6613-4505-ae33-4b1167ca4a87"
             strategy="afterInteractive"
           />

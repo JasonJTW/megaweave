@@ -14,6 +14,7 @@ const SESSION_EXPIRATION_SECONDS = 60 * 60 * 24 * 7;
 const COOKIE_SESSION_KEY = process.env.COOKIE_SESSION_KEY || "session-id";
 const REDIS_SESSION_KEY = process.env.REDIS_SESSION_KEY || "session";
 const ROLE_SESSION_KEY = process.env.ROLE_SESSION_KEY || "user-role";
+const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN!;
 
 if (!process.env.COOKIE_SESSION_KEY || !process.env.REDIS_SESSION_KEY || !process.env.ROLE_SESSION_KEY) {
   console.warn(
@@ -57,7 +58,7 @@ function setCookie(res: Response, name: string, value: string) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    domain: isProduction ? ".megaweave.net" : undefined,
+    domain: COOKIE_DOMAIN
   });
 }
 
@@ -72,7 +73,7 @@ function setRoleCookie(res: Response, role: string) {
     httpOnly: false, // Middleware (Edge Runtime) 需要能讀取這個 Cookie
     sameSite: "lax",
     path: "/",
-    domain: isProduction ? ".megaweave.net" : undefined,
+    domain:  COOKIE_DOMAIN,
   });
 }
 
@@ -140,7 +141,7 @@ export async function removeUserSession(req: Request, res: Response) {
   
   const cookieOptions: CookieOptions = {
     path: "/",
-    domain: isProduction ? ".megaweave.net" : undefined,
+    domain: COOKIE_DOMAIN,
     secure: true,
     sameSite: "lax",
   };

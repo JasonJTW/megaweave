@@ -7,6 +7,10 @@ import DrawerListItem from "./DrawerListItem";
 import ExpandedIcon from "./icons/ExpandedIcon";
 import ExpandIcon from "./icons/ExpandIcon";
 
+const MAX_VISIBLE_POSTS = 5;
+const LIST_ITEM_ESTIMATED_HEIGHT_PX = 120;
+const LIST_ITEM_GAP_PX = 12;
+
 interface DrawerListProps {
   title: string;
   posts: Post[];
@@ -83,6 +87,10 @@ const DrawerList: React.FC<DrawerListProps> = ({
   const isWeavingTab = title === "Weaving";
   const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
   const postsToRender = isWeavingTab ? postsForWeaving : posts;
+  const shouldScrollList = postsToRender.length > MAX_VISIBLE_POSTS;
+  const scrollableListMaxHeight =
+    MAX_VISIBLE_POSTS * LIST_ITEM_ESTIMATED_HEIGHT_PX +
+    (MAX_VISIBLE_POSTS - 1) * LIST_ITEM_GAP_PX;
 
   const postIdToWeaveMap = new Map<number, Weave>();
   weaves?.forEach((weave) => {
@@ -169,7 +177,14 @@ const DrawerList: React.FC<DrawerListProps> = ({
           )}
 
           {postsToRender.length > 0 ? (
-            <div className="mx-4 flex flex-col gap-3 pb-2">
+            <div
+              className={`mx-4 flex flex-col gap-3 pb-2 ${shouldScrollList ? "overflow-y-auto" : ""}`}
+              style={
+                shouldScrollList
+                  ? { maxHeight: scrollableListMaxHeight }
+                  : undefined
+              }
+            >
               {postsToRender.map((post, index) => {
                 const directWeave =
                   weaves && weaves[index]?.post.id === post.id

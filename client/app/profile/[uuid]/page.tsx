@@ -1,17 +1,16 @@
 // app/profile/[uuid]/page.tsx
 "use client";
 
-import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
-import Image from "next/image";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { motion } from "framer-motion";
-import { User as UserIcon, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import Drawer from "@/app/components/Drawer";
 import type { Post, UserStats } from "@/app/types/schema";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import renderTextWithUrls from "@/utils/renderTextWithUrl";
+import { motion } from "framer-motion";
+import { ArrowLeft, User as UserIcon } from "lucide-react";
+import Image from "next/image";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 // import type { Weave } from "@/services/weaveService";
 import { usePost } from "@/app/contexts/PostContext";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -70,7 +69,7 @@ const PublicProfilePage = () => {
         {
           method: "GET",
           cache: "no-store",
-        }
+        },
       );
 
       if (!response.ok) {
@@ -90,7 +89,7 @@ const PublicProfilePage = () => {
     } catch (error) {
       console.error("Error fetching profile:", error);
       setError(
-        error instanceof Error ? error.message : "Failed to load profile"
+        error instanceof Error ? error.message : "Failed to load profile",
       );
     }
     // 注意：這裡不設定 setLoading(false)，交給 init 統一處理
@@ -105,7 +104,7 @@ const PublicProfilePage = () => {
         {
           method: "GET",
           cache: "no-store",
-        }
+        },
       );
 
       if (response.ok) {

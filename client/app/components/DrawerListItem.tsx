@@ -133,7 +133,11 @@ const DrawerListItem = ({
         {statusLabel && <div className="my-2 border-b border-primary-30" />}
 
         <p className="flex min-w-0 items-baseline type-body-t5 font-bold text-dark">
-          <span className="shrink-0">{post.title}</span>
+          <span
+            className={`min-w-0 truncate text-dark ${post.content ? "max-w-[50%]" : ""}`}
+          >
+            {post.title}
+          </span>
           {post.content ? (
             <>
               <span className="shrink-0">: </span>

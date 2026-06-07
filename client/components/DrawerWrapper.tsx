@@ -1,11 +1,11 @@
 // components/DrawerWrapper.tsx
 "use client";
 
+import DrawerList from "@/app/components/DrawerList";
+import type { Condition, Post } from "@/app/types/schema";
+import type { Weave } from "@/services/weaveService";
 import { useSearchParams } from "next/navigation";
 import React from "react";
-import DrawerList from "@/app/components/DrawerList";
-import type { Weave } from "@/services/weaveService";
-import type { Condition, Post } from "@/app/types/schema";
 
 interface DrawerWrapperProps {
   weaves?: Weave[];
@@ -57,12 +57,12 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
           />
         </div>
       </div>
-      <DrawerList
+      {/*    <DrawerList
         title="Wish"
         posts={wishPosts}
         conditions={conditions}
         fetchWeaves={fetchStats}
-      />
+      /> */}
     </>
   );
 };

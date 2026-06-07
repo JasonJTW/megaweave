@@ -182,7 +182,6 @@ const UserPage = () => {
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [tempBio, setTempBio] = useState("");
   const [tempUsername, setTempUsername] = useState("");
   const [stats, setStats] = useState<UserStats>(defaultStats);
@@ -768,9 +767,8 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      setError(
-        error instanceof Error ? error.message : "Error update contact email",
-      );
+      const errMsg = error instanceof Error ? error.message : "Error update contact email";
+      toast.error(errMsg);
       throw error;
     }
   };
@@ -799,9 +797,8 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      setError(
-        error instanceof Error ? error.message : "Error update contact phone",
-      );
+      const errMsg = error instanceof Error ? error.message : "Error update contact phone";
+      toast.error(errMsg);
       throw error;
     }
   };
@@ -815,7 +812,7 @@ const UserPage = () => {
     if (!response.ok) {
       const result = await response.json();
       console.error("Error fetching userprofile:", result.errorMessage);
-      setError(result.errMessage);
+      toast.error(result.errMessage || "Error fetching contact email");
       return;
     }
     const result = await response.json();
@@ -833,7 +830,7 @@ const UserPage = () => {
     if (!response.ok) {
       const result = await response.json();
       console.error("Error fetching userprofile:", result.errorMessage);
-      setError(result.errMessage);
+      toast.error(result.errMessage || "Error fetching contact phone");
       return;
     }
     const result = await response.json();
@@ -873,13 +870,11 @@ const UserPage = () => {
       }
       setContactEmail(formData.email || "");
       setContactPhone(formData.phone || "");
-      setError(null);
       setIsEditingContact(false);
     } catch (error) {
       console.error("Error saving contact info:", error);
-      setError(
-        error instanceof Error ? error.message : "Error saving contact info",
-      );
+      const errMsg = error instanceof Error ? error.message : "Error saving contact info";
+      toast.error(errMsg);
     }
   };
 
@@ -1003,7 +998,7 @@ const UserPage = () => {
       // Only redirect if not already redirecting to avoid loops
       if (!redirecting) {
         setRedirecting(true);
-        router.push("/signin");
+        router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
       }
       return;
     }

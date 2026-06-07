@@ -14,7 +14,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!loading && !user) {
       toast.error("Please sign in to view notifications");
-      router.push("/signin");
+      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
     }
   }, [loading, user, router]);
 

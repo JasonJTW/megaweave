@@ -40,11 +40,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const handlePrivateMessage = async (tab: { key: TabKey; title: string }) => {
     if (!user) {
       toast.error("Please log in to message.");
-      router.push("/signin");
+      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
       return;
     }
 
-    if (user.userId === post.author_user_id) {
+    if (user.userId === (post.author_user_id ?? post.user_id)) {
       toast.error("You cannot message yourself.");
       return;
     }
@@ -80,6 +80,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       });
     } catch (error) {
       console.error("Message error:", error);
+      console.error("author_user_id: ", post.author_user_id);
+      console.error("user_id (post): ", post.user_id);
+      console.error("user_id (current user): ", user.userId);
       toast.error(`Could not message ${post.username}`);
     }
   };
@@ -204,6 +207,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
   // ✅ 處理 Weaving Icon 點擊 (開啟索取輸入框)
   const handleWeavingIconClick = (tabKey: TabKey) => {
+    if (!user) {
+      toast.error("Please log in to request items.");
+      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+      return;
+    }
     // 1. 如果 Tab 沒開，先展開 Tab
     if (activeTab !== tabKey) {
       setActiveTab(tabKey);
@@ -220,11 +228,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     //* check login
     if (!user) {
       toast.error("Please log in to request items.");
+      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
       return;
     }
 
     // 防止自己索取自己的文章 (雖然前端檢查了，後端 weaves.ts 也會擋，但前端擋住體驗較好)
-    if (user.userId === post.author_user_id) {
+    if (user.userId === (post.author_user_id ?? post.user_id)) {
       // 假設 user 物件裡有 id，post 裡有 user_id
       toast.error("You cannot request your own items.");
       return;

@@ -499,6 +499,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         p.*,
         u.username,
         u.public_id as author_public_id,
+        u.id as author_user_id,
         u.email,
         u.avatar_url,
         c.name_en as category_name_en,

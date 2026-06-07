@@ -5,7 +5,7 @@ import React from "react";
 import MessageIcon from "../icons/MessageIcon";
 import { Button } from "@/components/ui/button";
 import ExpandIcon from "../icons/ExpandIcon";
-import WeavingIcon from "../icons/WeavingIcon";
+// import WeavingIcon from "../icons/WeavingIcon";
 import ExpandedIcon from "../icons/ExpandedIcon";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
@@ -25,26 +25,26 @@ const CommentCard: React.FC<CommentCardProps> = ({
   quantity, // ✅ 解構取出 quantity
   isOpen = false,
   onToggle,
-  onWeaving,
+  // onWeaving,
   onPrivateMessage,
 }) => {
   // ✅ 新增：控制數量選單的顯示狀態
 
   // 處理 WeavingIcon 點擊
-  const handleWeavingClick = () => {
-    // 檢查是否有庫存，如果沒有，則不允許操作
-    if (quantity !== undefined && quantity <= 0) {
-      toast.error("Item is out of stock (Left: 00). Cannot initiate request.");
-      return;
-    }
+  // const handleWeavingClick = () => {
+  //   // 檢查是否有庫存，如果沒有，則不允許操作
+  //   if (quantity !== undefined && quantity <= 0) {
+  //     toast.error("Item is out of stock (Left: 00). Cannot initiate request.");
+  //     return;
+  //   }
 
-    if (onWeaving) {
-      onWeaving(); // 通知父元件開啟 Weaving Input
-    } else {
-      // 預設行為（如果沒有傳遞 onWeaving prop）
-      toast.success("Weaving action triggered (No callback provided).");
-    }
-  };
+  //   if (onWeaving) {
+  //     onWeaving(); // 通知父元件開啟 Weaving Input
+  //   } else {
+  //     // 預設行為（如果沒有傳遞 onWeaving prop）
+  //     toast.success("Weaving action triggered (No callback provided).");
+  //   }
+  // };
 
   const handlePrivateMessageClick = () => {
     if (onPrivateMessage) {
@@ -80,7 +80,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
       </div>
 
       <div className="flex gap-[10px] items-center flex-shrink-0">
-        {/* 留言按鈕 + 數量 */}
+
+        {/* Private message for weaving button */}
         <Button
           variant="ghost"
           className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
@@ -88,6 +89,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
         >
           <PrivateMessageIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
         </Button>
+
+        {/* 留言按鈕 + 數量 */}
         <Button
           variant="ghost"
           className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
@@ -100,13 +103,13 @@ const CommentCard: React.FC<CommentCardProps> = ({
         </Button>
 
         {/* Weaving 按鈕 (現在用於開啟數量選擇器) */}
-        <Button
+        {/* <Button
           variant="ghost"
           className="px-0 hover:bg-transparent"
           onClick={handleWeavingClick}
         >
           <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
-        </Button>
+        </Button> */}
 
         {/* 展開/收合按鈕 */}
         <Button

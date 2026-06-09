@@ -16,10 +16,13 @@ import {
   // Info,
   // Mail,
   // GalleryHorizontalEnd,
+  LogOut,
   SquarePlus,
   NewspaperIcon,
   // FileText,
 } from "lucide-react";
+import { googleLogout } from "@react-oauth/google";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -51,7 +54,10 @@ type NavigationItem = {
   title: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
+  action?: "logout";
 };
+
+const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 import { useNotification } from "../contexts/NotificationContext";
 import WeavingIcon from "./icons/WeavingIcon";
@@ -67,7 +73,42 @@ const Navbar = () => {
   useChatSocket(null);
 
   const { conversations } = useConversations(); // Chat messages
-  const { user } = useUser(); // Check if user is logged in
+  const { user, mutate } = useUser(); // Check if user is logged in
+
+  const handleSignOut = async () => {
+    try {
+      try {
+        googleLogout();
+      } catch (googleError) {
+        console.warn("Error during Google logout:", googleError);
+      }
+
+      const response = await fetch(`${hostName}/api/signout`, {
+        cache: "no-store",
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          toast.error("You are not signed in");
+          return;
+        }
+
+        const errorMessage = await response.json();
+        throw new Error(errorMessage.errorMessage);
+      }
+
+      await mutate({ user: null }, false);
+      setIsMobileMenuOpen(false);
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Error signing out:", error);
+      toast.error(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
+    }
+  };
   const messageUnreadCount = conversations.reduce(
     (acc, c) => acc + c.unread_count,
     0,
@@ -122,6 +163,17 @@ const Navbar = () => {
       description: "Add to Home Screen",
       icon: SquarePlus,
     },
+    ...(user
+      ? [
+          {
+            href: "#",
+            title: "Sign Out",
+            description: "Log out of your account",
+            icon: LogOut,
+            action: "logout" as const,
+          },
+        ]
+      : []),
     // ...teamMenuItems,
     // {
     //   href: "/contact",
@@ -319,18 +371,42 @@ const Navbar = () => {
                     <div className="items-start">
                       {mobileNavItems.map((item, index) => {
                         const Icon = item.icon;
+                        const itemClassName = cn(
+                          "flex w-full items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-[16px] transition-all duration-200 group",
+                          item.action === "logout"
+                            ? "text-white"
+                            : isActivePath(item.href)
+                              ? "text-gray-900 bg-primary-30 "
+                              : "text-white ",
+                        );
+
+                        if (item.action === "logout") {
+                          return (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={handleSignOut}
+                              className={itemClassName}
+                            >
+                              <div className="flex-shrink-0">
+                                <Icon className="w-5 h-5 " />
+                              </div>
+                              <div className="flex-1 min-w-0 text-left">
+                                <div className="font-medium">{item.title}</div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {item.description}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        }
 
                         return (
                           <Link
                             key={index}
                             href={item.href}
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className={cn(
-                              "flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium text-[16px] transition-all duration-200 group",
-                              isActivePath(item.href)
-                                ? "text-gray-900 bg-primary-30 "
-                                : "text-white ",
-                            )}
+                            className={itemClassName}
                           >
                             <div className="flex-shrink-0">
                               <Icon className="w-5 h-5 " />

@@ -80,9 +80,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       });
     } catch (error) {
       console.error("Message error:", error);
-      console.error("author_user_id: ", post.author_user_id);
-      console.error("user_id (post): ", post.user_id);
-      console.error("user_id (current user): ", user.userId);
       toast.error(`Could not message ${post.username}`);
     }
   };

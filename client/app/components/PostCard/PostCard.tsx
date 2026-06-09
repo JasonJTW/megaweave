@@ -1,22 +1,22 @@
 // PostCard.tsx 重點改寫
 "use client";
-import React, { useState } from "react";
-import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
+import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
 import { User as UserIcon } from "lucide-react";
-import type { Post, Condition, Category } from "../../types/schema";
-import { Badge } from "@/components/ui/badge";
-import LocationIcon from "../icons/LocationIcon";
-import ClockIcon from "../icons/ClockIcon";
-import EyesIcon from "../icons/EyesIcon";
-import ShareBadgeIcon from "../icons/ShareBadgeIcon";
-import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
-import type { Weave } from "@/services/weaveService";
+import Image from "next/image";
+import React, { useState } from "react";
+import toast from "react-hot-toast";
+import type { Category, Condition, Post } from "../../types/schema";
 import AcceptIcon from "../icons/AcceptIcon";
 import CancelIcon from "../icons/CancelIcon";
-import SeekBadgeIcon from "../icons/WishBadgeIcon";
-import toast from "react-hot-toast";
+import ClockIcon from "../icons/ClockIcon";
+import EyesIcon from "../icons/EyesIcon";
+import LocationIcon from "../icons/LocationIcon";
 import SeekBadgeExpiredIcon from "../icons/SeekBadgeExpiredIcon";
+import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
+import ShareBadgeIcon from "../icons/ShareBadgeIcon";
+import SeekBadgeIcon from "../icons/WishBadgeIcon";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -304,9 +304,15 @@ function PostCardInner({
                   width={0}
                   height={0}
                   sizes="(min-width: 768px) 280px, 100vw"
-                  className={`w-full h-auto ${isExpired ? "grayscale" : ""} sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover`}
+                  className={`w-full h-auto ${isExpired ? "saturate-0 brightness-95" : ""} sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover`}
                   priority={!!isFirstVisible}
                 />
+                {isExpired && (
+                  <div
+                    className="absolute inset-0 bg-primary/40 mix-blend-multiply pointer-events-none"
+                    aria-hidden="true"
+                  />
+                )}
               </div>
 
               <div className="absolute w-full flex flex-row bottom-0 justify-between px-3 py-3">

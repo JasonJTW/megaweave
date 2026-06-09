@@ -117,7 +117,7 @@ const DrawerListItem = ({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          {/* <span className="type-h5 text-primary">{username}</span> */}
+          <span className="type-h5 text-primary">{username}</span>
           {statusLabel && (
             <span
               className={`inline-flex font-bold shrink-0 items-center gap-1 rounded-full px-2 py-0.5 type-body-t5 ${statusStyles[statusLabel].badge}`}

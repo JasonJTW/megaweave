@@ -364,7 +364,7 @@ router.post(
   },
 );
 
-// 獲取貼文列表 (帶分頁和篩選)
+// Get all posts api
 router.get("/", async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
@@ -484,7 +484,42 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// 獲取單個貼文詳情
+//* Get user's posts api
+router.get("/user", requireAuth, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.userId;
+
+        const postsQuery = `
+      SELECT 
+        p.*,
+        u.username,
+        u.public_id as author_public_id,
+        u.id as author_user_id,
+        u.avatar_url,
+        c.name_en as category_name_en,
+        l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
+        GROUP_CONCAT(i.image_url) as image_urls,
+        GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN locations l ON p.location_id = l.id
+      LEFT JOIN images i ON p.id = i.post_id
+      WHERE p.user_id = ?
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `;
+
+        const [userPosts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [userId]);
+        console.log("user's posts: ", userPosts)
+        res.status(200).json({ userPosts });
+    } catch (error) {
+        console.error("Get user's posts error:", error);
+        return res.status(500).json({ errorMessage: "Internal server error" });
+    }
+})
+
+//* Get post details api
 router.get("/:id", async (req: Request, res: Response) => {
   try {
     const postId = parseInt(req.params.id);
@@ -591,5 +626,8 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 /// like & unlike post api
 router.use("/:id/like", likeRouter);
+
+
+
 
 export default router;

@@ -40,7 +40,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const handlePrivateMessage = async (tab: { key: TabKey; title: string }) => {
     if (!user) {
       toast.error("Please log in to message.");
-      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+      );
       return;
     }
 
@@ -51,15 +53,19 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
     try {
       const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-      
-      const requestBody: { recipient_public_id: string; item_id?: number | string; post_title?: string } = { recipient_public_id: post.author_public_id };
-      if (tab.key !== 'all') {
-          requestBody.item_id = tab.key;
-          requestBody.post_title = tab.title;
+
+      const requestBody: {
+        recipient_public_id: string;
+        item_id?: number | string;
+        post_title?: string;
+      } = { recipient_public_id: post.author_public_id };
+      if (tab.key !== "all") {
+        requestBody.item_id = tab.key;
+        requestBody.post_title = tab.title;
       } else {
-          // If it's the main post, we can use the post ID or title
-          // Currently, let's just pass the post title for context
-          requestBody.post_title = post.title;
+        // If it's the main post, we can use the post ID or title
+        // Currently, let's just pass the post title for context
+        requestBody.post_title = post.title;
       }
 
       const res = await fetch(`${hostName}/api/messages/start`, {
@@ -206,7 +212,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const handleWeavingIconClick = (tabKey: TabKey) => {
     if (!user) {
       toast.error("Please log in to request items.");
-      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+      );
       return;
     }
     // 1. 如果 Tab 沒開，先展開 Tab
@@ -225,7 +233,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     //* check login
     if (!user) {
       toast.error("Please log in to request items.");
-      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+      );
       return;
     }
 

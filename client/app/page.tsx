@@ -1562,6 +1562,7 @@ const PostsApp = () => {
                           categoryId: parseInt(value),
                         })
                       }
+                      required
                     >
                       <SelectTrigger className="">
                         <SelectValue placeholder="Category" />
@@ -1591,6 +1592,7 @@ const PostsApp = () => {
                           conditionLevel: parseInt(value),
                         });
                       }}
+                      required
                     >
                       <SelectTrigger className="w-full ">
                         <SelectValue placeholder="Condition">
@@ -1657,6 +1659,7 @@ const PostsApp = () => {
                       defaultValue={createFormData.location}
                     />
                   </div>
+
                   <div className="flex items-center gap-[5px]">
                     <CalendarIcon className="w-[24px] h-[24px] text-primary" />
                     <Popover>
@@ -1664,12 +1667,14 @@ const PostsApp = () => {
                         <Button
                           variant="outline"
                           data-empty={!createFormData.expires_at}
-                          className="w-[212px] justify-between text-left font-normal data-[empty=true]:text-muted-foreground"
+                          className="w-[212px] justify-between text-left font-normal bg-white"
                         >
                           {createFormData.expires_at ? (
                             format(createFormData.expires_at, "PPP")
                           ) : (
-                            <span>Pick a date</span>
+                            <span className="font-ddin tracking-normal text-[14px] font-medium">
+                              Pick a expiry date
+                            </span>
                           )}
                           <CalendarIcon className="h-4 w-4 opacity-50" />
                         </Button>
@@ -1685,6 +1690,12 @@ const PostsApp = () => {
                             })
                           }
                           defaultMonth={createFormData.expires_at}
+                          disabled={(date) => {
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            return date < today;
+                          }}
+                          required
                         />
                       </PopoverContent>
                     </Popover>

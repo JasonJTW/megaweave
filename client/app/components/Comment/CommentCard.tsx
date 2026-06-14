@@ -9,7 +9,8 @@ import ExpandIcon from "../icons/ExpandIcon";
 import ExpandedIcon from "../icons/ExpandedIcon";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
-import PrivateMessageIcon from "../icons/PrivateMessageIcon";
+// import PrivateMessageIcon from "../icons/PrivateMessageIcon";
+import WeavingIcon from "../icons/WeavingIcon";
 interface CommentCardProps {
   title: string;
   count?: number;
@@ -80,14 +81,13 @@ const CommentCard: React.FC<CommentCardProps> = ({
       </div>
 
       <div className="flex gap-[10px] items-center flex-shrink-0">
-
         {/* Private message for weaving button */}
         <Button
           variant="ghost"
           className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
           onClick={handlePrivateMessageClick}
         >
-          <PrivateMessageIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
+          <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
         </Button>
 
         {/* 留言按鈕 + 數量 */}

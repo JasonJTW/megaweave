@@ -7,7 +7,7 @@ import Link from "next/link";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
 import MenuIcon from "./icons/MenuIcon";
-import MessageIcon from "./icons/MessageIcon";
+import DirectMessageIcon from "./icons/DirectMessageIcon";
 import { usePathname } from "next/navigation";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "../contexts/UserContext";
@@ -116,7 +116,7 @@ const Navbar = () => {
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
-    { href: "/messages", label: "Messages", icon: MessageIcon },
+    { href: "/messages", label: "Messages", icon: DirectMessageIcon },
     { href: "/notifications", label: "Notifications", icon: NotificationIcon },
     { href: "/user", label: "Profile", icon: UserIcon },
   ];
@@ -251,7 +251,7 @@ const Navbar = () => {
                 {user && (
                   <>
                     <Link href="/messages" className="relative group mr-2">
-                      <MessageIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
+                      <DirectMessageIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
                       <span className="sr-only">Messages</span>
                       {messageUnreadCount > 0 && (
                         <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">

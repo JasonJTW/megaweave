@@ -16,7 +16,7 @@ import NancyIcon from "../components/icons/NancyIcon";
 import YellowMonkeyIcon from "../components/icons/YellowMonkeyIcon";
 import MochaIcon from "../components/icons/MochaIcon";
 import SponsorBanner from "../components/icons/Sponsor";
-import { useUser } from "../contexts/UserContext";
+// import { useUser } from "../contexts/UserContext";
 
 const mantouSans = localFont({
   src: "../../public/fonts/MantouSans-Regular.ttf",
@@ -24,7 +24,7 @@ const mantouSans = localFont({
 });
 
 export default function EarthDayPage() {
-  const { user } = useUser();
+  // const { user } = useUser();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   // Lock body scroll when mobile menu is open
@@ -50,7 +50,7 @@ export default function EarthDayPage() {
           <div className="flex items-center space-x-2">
             {/* Logo Icon */}
             <Link
-              href={user ? "/" : "/signin?returnTo=/"}
+              href={"/"}
               className="w-8 h-8 flex items-center justify-center hover:opacity-70 transition-opacity"
             >
               <WeavingIcon className="text-primary" />

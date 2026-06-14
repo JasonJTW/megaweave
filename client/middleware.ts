@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  //* Allow all access to all page for now.
+  return NextResponse.next();
+
   const { pathname } = request.nextUrl;
 
   // 1. 只攔截 GET 請求（頁面導航），背景的 POST/PUT 等直接放行

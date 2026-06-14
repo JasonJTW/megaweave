@@ -4,7 +4,7 @@ import { messageService } from "./utils/messageService";
 import { Server } from "socket.io";
 import { memoryUpload, uploadToS3 } from "./upload";
 import { imageProcessor } from "./utils/imageProcessor";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
@@ -78,7 +78,7 @@ router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Requ
             const { url } = await uploadToS3(
                 processedBuffer,
                 "messages",
-                `${Date.now()}-${uuidv4()}.webp`
+                `${Date.now()}-${randomUUID()}.webp`
             );
             attachments.push({ url, type: 'image' });
         }

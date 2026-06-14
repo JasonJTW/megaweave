@@ -1,7 +1,6 @@
 //* upload.ts
 import multer from "multer";
 import { S3Client } from "@aws-sdk/client-s3";
-import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
 import { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { DeleteObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";

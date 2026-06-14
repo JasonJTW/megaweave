@@ -15,7 +15,7 @@ import { userRoles } from "./schema";
 import { connect } from "http2";
 import { th } from "zod/locales";
 import { uuid } from "zod";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
@@ -145,7 +145,7 @@ async function findOrCreateUser(
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    const public_id = uuidv4();
+    const public_id = randomUUID();
 
     const insertUsersValues = [
       email,

@@ -13,7 +13,7 @@ import {
 import { z } from "zod";
 import { hashPassword, generateSalt } from "./passwordHasher";
 import { handleError } from "./utils/errorHandler";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 
 const router: Router = express.Router();
 import mysql, { OkPacketParams, ResultSetHeader, RowDataPacket } from "mysql2";
@@ -72,7 +72,7 @@ router.post("/", async (req: Request, res: Response) => {
   console.log(`userExisted:`, userExisted);
 
   //* 3. Hash the password & Generate public_id
-  const public_id = uuidv4();
+  const public_id = randomUUID();
   console.log("Generated public_id: ", public_id);
   const salt = generateSalt();
   const hashedPassword = await hashPassword(user.password, salt);

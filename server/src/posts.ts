@@ -8,7 +8,7 @@ import { getRedisClient, connectRedis } from "./utils/redis";
 import multer from "multer";
 import multerS3 from "multer-s3";
 import { S3Client } from "@aws-sdk/client-s3";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import dotenv from "dotenv";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
@@ -45,7 +45,7 @@ const upload = multer({
     bucket: BUCKET_NAME!,
     key: function (req, file, cb) {
       const fileExtension = file.originalname.split(".").pop();
-      const fileName = `posts/${Date.now()}-${uuidv4()}.${fileExtension}`;
+      const fileName = `posts/${Date.now()}-${randomUUID()}.${fileExtension}`;
       cb(null, fileName);
     },
     contentType: multerS3.AUTO_CONTENT_TYPE,
@@ -285,7 +285,7 @@ router.post(
 
       if (files && files.length > 0) {
         for (const file of files) {
-          const fileId = uuidv4();
+          const fileId = randomUUID();
           const timestamp = Date.now();
 
           // Process main image

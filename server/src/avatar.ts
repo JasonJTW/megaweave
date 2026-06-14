@@ -8,7 +8,7 @@ import {
 import { imageProcessor } from "./utils/imageProcessor";
 import { Request, Response, Router } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import dotenv from "dotenv";
 import dbPool from "./utils/db";
 import { updateUserSession } from "./session";
@@ -41,7 +41,7 @@ router.post(
       const { key: avatarKey, url: avatarUrl } = await uploadToS3(
         processedBuffer,
         S3_BUCKET_AVATAR_FOLDER,
-        `${Date.now()}-${uuidv4()}.webp`
+        `${Date.now()}-${randomUUID()}.webp`
       );
 
       connection = await dbPool.getConnection();

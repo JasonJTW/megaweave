@@ -189,6 +189,7 @@ const UserPage = () => {
   const { refetchTeamMembers } = useTeam();
   const [posts, setPosts] = useState<Post[]>([]);
   const [weaves, setWeaves] = useState<Weave[]>([]);
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
   const { conditions } = usePost();
 
   // Avatar preview / upload states
@@ -446,6 +447,33 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error fetching user stats:", error);
       // 這裡可以選擇不設置錯誤，讓 stats 保持為 defaultStats (0, 0, 0)
+    }
+  };
+
+  const fetchUserPosts = async () => {
+    try {
+      const response = await fetchWithTimeout(
+        `${hostName}/api/posts/user`,
+        {
+          cache: "no-store",
+          method: "GET",
+          credentials: "include",
+        },
+        10000, //? 10 seconds timeout
+      );
+
+      if (!response.ok) {
+        const errorMessage = await response.json();
+        throw new Error(
+          errorMessage.errorMessage || "Failed to fetch user posts",
+        );
+      }
+      const statsData = await response.json();
+      const postsData = statsData.userPosts || [];
+      setUserPosts(postsData);
+      console.log("Fetched User Posts: ", postsData);
+    } catch (error) {
+      console.error("Error fetching user posts:", error);
     }
   };
 
@@ -767,7 +795,8 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      const errMsg = error instanceof Error ? error.message : "Error update contact email";
+      const errMsg =
+        error instanceof Error ? error.message : "Error update contact email";
       toast.error(errMsg);
       throw error;
     }
@@ -797,7 +826,8 @@ const UserPage = () => {
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      const errMsg = error instanceof Error ? error.message : "Error update contact phone";
+      const errMsg =
+        error instanceof Error ? error.message : "Error update contact phone";
       toast.error(errMsg);
       throw error;
     }
@@ -873,7 +903,8 @@ const UserPage = () => {
       setIsEditingContact(false);
     } catch (error) {
       console.error("Error saving contact info:", error);
-      const errMsg = error instanceof Error ? error.message : "Error saving contact info";
+      const errMsg =
+        error instanceof Error ? error.message : "Error saving contact info";
       toast.error(errMsg);
     }
   };
@@ -998,7 +1029,9 @@ const UserPage = () => {
       // Only redirect if not already redirecting to avoid loops
       if (!redirecting) {
         setRedirecting(true);
-        router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+        router.push(
+          `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+        );
       }
       return;
     }
@@ -1011,6 +1044,7 @@ const UserPage = () => {
         getContactPhone(),
         getUsername(),
         fetchStats(),
+        fetchUserPosts(),
         fetchWeaves(),
       ]);
     };
@@ -1438,7 +1472,15 @@ const UserPage = () => {
                 <div className="flex justify-between items-center mt-2">
                   <div className="flex items-center space-x-3"></div>
                   <button className="flex items-center space-x-2 text-primary-75 type-button-b2">
-                    <span>Joined in {user?.joined_at ? new Date(user.joined_at).toISOString().slice(0, 7).replace('-', '.') : ''}</span>
+                    <span>
+                      Joined in{" "}
+                      {user?.joined_at
+                        ? new Date(user.joined_at)
+                            .toISOString()
+                            .slice(0, 7)
+                            .replace("-", ".")
+                        : ""}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -1621,12 +1663,10 @@ const UserPage = () => {
         <div className="max-w-6xl mx-auto">
           <DrawerWrapper
             weaves={weaves}
-            sharePosts={sharePosts}
-            wishPosts={wishPosts}
             conditions={conditions}
             currentUserId={user.userId}
             fetchWeaves={fetchWeaves}
-            fetchStats={fetchStats}
+            userPosts={userPosts}
           />
         </div>
       </div>

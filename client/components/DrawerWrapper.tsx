@@ -2,15 +2,16 @@
 "use client";
 
 import DrawerList from "@/app/components/DrawerList";
+import UserPostCard from "@/app/components/PostCard/UserPostCard";
+import { usePost } from "@/app/contexts/PostContext";
 import type { Condition, Post } from "@/app/types/schema";
 import type { Weave } from "@/services/weaveService";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 
 interface DrawerWrapperProps {
   weaves?: Weave[];
-  sharePosts: Post[];
-  wishPosts: Post[];
+  userPosts: Post[];
   conditions: Condition[];
   currentUserId: number;
   fetchWeaves?: () => void;
@@ -19,16 +20,16 @@ interface DrawerWrapperProps {
 
 const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
   weaves,
-  sharePosts,
-  wishPosts,
+  userPosts,
   conditions,
   currentUserId,
   fetchWeaves,
-  fetchStats,
 }) => {
   // 💥 只有在這個 Client Component 內才呼叫 useSearchParams
   const searchParams = useSearchParams();
+  const router = useRouter();
   const highlightWeaveId = searchParams.get("highlightWeaveId");
+  const { categories } = usePost();
 
   const parsedHighlightId = highlightWeaveId
     ? Number(highlightWeaveId)
@@ -36,7 +37,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
 
   return (
     <>
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr] sm:gap-6">
         <div className="min-w-0">
           <DrawerList
             title="Weaving"
@@ -49,13 +50,34 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
           />
         </div>
         <div className="min-w-0">
+          <div className="mx-4 my-5 flex items-center justify-between px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark">
+            <div>Posts</div>
+          </div>
+
+          <div className="grid grid-cols-2 justify-items-center gap-5 px-4 sm:px-0 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {userPosts.map((p, i) => (
+              <div key={`post-${p.id}`}>
+                <UserPostCard
+                  post={p}
+                  conditions={conditions}
+                  categories={categories}
+                  onPostClick={() => router.push(`/item/${p.id}`)}
+                  isExpanded={true}
+                  isFirstVisible={i === 0}
+                  currentUserId={currentUserId}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* <div className="min-w-0">
           <DrawerList
             title="Share"
             posts={sharePosts}
             conditions={conditions}
             fetchWeaves={fetchStats}
           />
-        </div>
+        </div> */}
       </div>
       {/*    <DrawerList
         title="Wish"

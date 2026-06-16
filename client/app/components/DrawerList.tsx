@@ -4,8 +4,6 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
 import DrawerListItem from "./DrawerListItem";
-import ExpandedIcon from "./icons/ExpandedIcon";
-import ExpandIcon from "./icons/ExpandIcon";
 
 const MAX_VISIBLE_POSTS = 5;
 const LIST_ITEM_ESTIMATED_HEIGHT_PX = 120;
@@ -103,25 +101,8 @@ const DrawerList: React.FC<DrawerListProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-button-b1 text-megaweave-forest-dark">
+      <div className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark">
         <div>{title}</div>
-        <button
-          type="button"
-          onClick={handleExpand}
-          className="transition-transform duration-300"
-          aria-label={isExpanded ? "Collapse list" : "Expand list"}
-        >
-          <motion.div
-            animate={{ rotate: isExpanded ? 0 : 180 }}
-            transition={{
-              type: "spring",
-              stiffness: 200,
-              damping: 15,
-            }}
-          >
-            {isExpanded ? <ExpandedIcon /> : <ExpandIcon />}
-          </motion.div>
-        </button>
       </div>
 
       <motion.div

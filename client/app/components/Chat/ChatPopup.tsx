@@ -8,9 +8,10 @@ import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
 import WeavingIcon from "../icons/WeavingIcon";
 import { Button } from "@/components/ui/button";
+import PostInfoCard from "./PostInfoCard";
 
 export const ChatPopup = () => {
-  const { isOpen, conversationId, otherUser, closeChat } = useChatPopup();
+  const { isOpen, conversationId, otherUser, post, closeChat } = useChatPopup();
   const { user: currentUser } = useUser();
 
   if (!isOpen || !otherUser || !conversationId) return null;
@@ -61,7 +62,7 @@ export const ChatPopup = () => {
 
               {/* Giver Confirm Overlay */}
               {/*  if currentUser is giver (in conversation) */}
-
+              {post && <PostInfoCard post={post} />}
               <div className="absolute bottom-20 right-6 flex flex-col items-end gap-2 pointer-events-none">
                 <div className="flex items-center gap-6 pointer-events-auto">
                   <div className="relative bg-white border border-[#D9D9D9] px-4 py-2 rounded-full shadow-sm">

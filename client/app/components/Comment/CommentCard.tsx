@@ -47,11 +47,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
   //   }
   // };
 
-  const handlePrivateMessageClick = () => {
+  const handleWeavingMessageClick = () => {
     if (onPrivateMessage) {
       onPrivateMessage();
     } else {
-      toast.success("Private Message action triggered.");
+      toast.success("Weaving Message action triggered.");
     }
   };
 
@@ -85,7 +85,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
         <Button
           variant="ghost"
           className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
-          onClick={handlePrivateMessageClick}
+          onClick={handleWeavingMessageClick}
         >
           <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
         </Button>

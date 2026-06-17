@@ -79,11 +79,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
       const data = await res.json();
       console.log("data: ", data);
-      openChat(data.conversationId, {
-        public_id: post.author_public_id,
-        username: post.username,
-        avatar_url: post.avatar_url,
-      });
+      openChat(
+        data.conversationId,
+        {
+          public_id: post.author_public_id,
+          username: post.username,
+          avatar_url: post.avatar_url,
+        },
+        post,
+      );
     } catch (error) {
       console.error("Message error:", error);
       toast.error(`Could not message ${post.username}`);

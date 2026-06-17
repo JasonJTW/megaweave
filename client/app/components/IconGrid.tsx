@@ -1,20 +1,20 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-// import WeavingIcon from "./icons/WeavingIcon";
-// import ReuseIcon from "./icons/ReuseIcon";
-// import ElfIcon from "./icons/ElfIcon";
-// import CommonShareIcon from "./icons/CommonShareIcon";
-import ChristmasStarIcon from "./icons/ChineseNewYearIcon2";
-import ChristmasSock from "./icons/ChineseNewYearIcon1";
-import ChristmasTreeIcon from "./icons/ChineseNewYearIcon3";
-import ChristmasSnowmanIcon from "./icons/ChineseNewYearIcon4";
+import WeavingIcon from "./icons/WeavingIcon";
+import ReuseIcon from "./icons/ReuseIcon";
+import ElfIcon from "./icons/ElfIcon";
+import CommonShareIcon from "./icons/CommonShareIcon";
+// import ChristmasStarIcon from "./icons/ChineseNewYearIcon2";
+// import ChristmasSock from "./icons/ChineseNewYearIcon1";
+// import ChristmasTreeIcon from "./icons/ChineseNewYearIcon3";
+// import ChristmasSnowmanIcon from "./icons/ChineseNewYearIcon4";
 export default function IconGrid() {
   const icons = [
-    { id: "reuse", Icon: ChristmasStarIcon },
-    { id: "elf", Icon: ChristmasSock },
-    { id: "weaving", Icon: ChristmasTreeIcon },
-    { id: "common", Icon: ChristmasSnowmanIcon },
+    { id: "reuse", Icon: ReuseIcon },
+    { id: "elf", Icon: ElfIcon },
+    { id: "weaving", Icon: WeavingIcon },
+    { id: "common", Icon: CommonShareIcon },
   ];
 
   const [positions, setPositions] = useState([0, 1, 2, 3]);

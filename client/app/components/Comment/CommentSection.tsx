@@ -19,6 +19,7 @@ import {
   getComments,
   getCommentCounts,
 } from "@/services/commentService";
+import { mutate } from "swr";
 
 interface CommentSectionProps {
   post: Post;
@@ -57,15 +58,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       const requestBody: {
         recipient_public_id: string;
         item_id?: number | string;
-        post_title?: string;
+        item_title?: string;
       } = { recipient_public_id: post.author_public_id };
       if (tab.key !== "all") {
         requestBody.item_id = tab.key;
-        requestBody.post_title = tab.title;
+        requestBody.item_title = tab.title;
       } else {
         // If it's the main post, we can use the post ID or title
         // Currently, let's just pass the post title for context
-        requestBody.post_title = post.title;
+        requestBody.item_title = post.title;
       }
 
       const res = await fetch(`${hostName}/api/messages/start`, {
@@ -79,6 +80,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
       const data = await res.json();
       console.log("data: ", data);
+      
+      // Force SWR cache eviction for this conversation to prevent stale messages (dedupingInterval bypass)
+      await mutate(`${hostName}/api/messages/conversations/${data.conversationId}`, undefined, { revalidate: true });
+
+      // Change post to item and deal with All Item case
       openChat(
         data.conversationId,
         {

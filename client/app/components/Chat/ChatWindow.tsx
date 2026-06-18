@@ -59,6 +59,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
 
+  useEffect(() => {
+    mutate(); // Ensure fresh messages on mount
+  }, [conversationId, mutate]);
+
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -591,10 +595,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             const isLastReadMessage = lastReadIndex === index;
 
             if (msg.message_type === 'system_start_weaving') {
-                let postTitle = "";
+                let itemTitle = "";
                 try {
                     const metadata = typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata;
-                    postTitle = metadata?.post_title || "";
+                    itemTitle = metadata?.item_title || "";
                 } catch {
                     // Ignore parse error
                 }
@@ -604,7 +608,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
                       <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                       <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
-                        Start weaving {postTitle ? `for ${postTitle}` : "!"}
+                        Start weaving {itemTitle ? `for ${itemTitle}` : "!"}
                       </span>
                       <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                     </div>

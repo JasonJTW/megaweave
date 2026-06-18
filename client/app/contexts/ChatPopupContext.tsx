@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Post } from "../types/schema";
 
 interface ChatPopupOtherUser {
@@ -33,6 +33,38 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [otherUser, setOtherUser] = useState<ChatPopupOtherUser | null>(null);
   const [post, setPost] = useState<Post | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    const storedState = sessionStorage.getItem("chatPopupState");
+    if (storedState) {
+      try {
+        const parsed = JSON.parse(storedState);
+        if (parsed.isOpen && parsed.conversationId && parsed.otherUser) {
+          setConversationId(parsed.conversationId);
+          setOtherUser(parsed.otherUser);
+          if (parsed.post) setPost(parsed.post);
+          setIsOpen(true);
+        }
+      } catch (e) {
+        console.error("Failed to parse chatPopupState", e);
+      }
+    }
+    setIsInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (isInitialized) {
+      if (isOpen && conversationId && otherUser) {
+        sessionStorage.setItem(
+          "chatPopupState",
+          JSON.stringify({ isOpen, conversationId, otherUser, post })
+        );
+      } else {
+        sessionStorage.removeItem("chatPopupState");
+      }
+    }
+  }, [isOpen, conversationId, otherUser, post, isInitialized]);
 
   const openChat = (
     id: number,

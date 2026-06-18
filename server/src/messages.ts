@@ -121,7 +121,7 @@ router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Requ
 // POST /api/messages/start - Start conversation (get or create)
 router.post("/start", requireAuth, async (req: Request, res: Response) => {
     const senderId = req.user!.userId;
-    const { recipient_public_id, item_id, post_title } = req.body;
+    const { recipient_public_id, item_id, item_title } = req.body;
 
     if (!recipient_public_id) {
          return res.status(400).json({ errorMessage: "Recipient Public ID required" });
@@ -136,6 +136,9 @@ router.post("/start", requireAuth, async (req: Request, res: Response) => {
 
         // If it's a weaving consultation, check and insert system message
         if (item_id) {
+            // Remove any trailing system message so we don't pile them up
+            await messageService.removeTrailingSystemMessage(conversationId);
+
             const hasSystemMsg = await messageService.hasRecentSystemMessage(conversationId, 'system_start_weaving', item_id);
             
             if (!hasSystemMsg) {
@@ -145,7 +148,7 @@ router.post("/start", requireAuth, async (req: Request, res: Response) => {
                     "Start Weaving", 
                     undefined, 
                     "system_start_weaving", 
-                    { item_id, post_title }
+                    { item_id, item_title }
                 );
                 
                 // Emit via socket so the UI updates if already open

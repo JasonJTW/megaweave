@@ -7,7 +7,10 @@ import { useUser } from "@/app/contexts/UserContext";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 // Fetcher function
 const fetcher = async (url: string) => {
-  const res = await fetch(url, { credentials: "include" });
+  const res = await fetch(url, { 
+    credentials: "include",
+    cache: "no-store" 
+  });
   if (!res.ok) {
     const error = new Error("An error occurred while fetching the data.");
     throw error;

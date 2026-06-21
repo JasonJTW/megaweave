@@ -25,6 +25,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { compressImage } from "@/utils/imageProcessor";
+import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -59,9 +60,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
 
-  useEffect(() => {
-    mutate(); // Ensure fresh messages on mount
-  }, [conversationId, mutate]);
+  // Consume pendingItem from global context — represents the weaving intent
+  // before the user sends their first real message.
+  const { pendingItem, setPendingItem } = useChatPopup();
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -404,6 +405,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const content = inputValue;
     const filesToSend = [...selectedFiles];
     const previewUrls = [...previews];
+    // Capture and immediately clear the pending intent so it doesn't
+    // linger in the UI while the request is in-flight.
+    const itemToSend = pendingItem;
+    setPendingItem(null);
 
     setInputValue(""); // Clear input immediately
     setSelectedFiles([]);
@@ -442,6 +447,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       formData.append("recipient_public_id", otherUser.public_id);
       formData.append("content", content);
 
+      // If there is a pending weaving intent, include it so the backend
+      // can persist the system message in the same request.
+      if (itemToSend) {
+        formData.append("item_id", String(itemToSend.id));
+        formData.append("item_title", itemToSend.title);
+      }
+
       // Compress and append images
       for (const file of filesToSend) {
         const compressed = await compressImage(file, 1200, 1200, 0.85);
@@ -479,6 +491,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       toast.error(
         error instanceof Error ? error.message : "Failed to send message.",
       );
+      // Restore the pending item if the send failed so the user doesn't
+      // lose their weaving context.
+      if (itemToSend) setPendingItem(itemToSend);
       // If an error occurred, and the optimistic update was not reverted by !res.ok,
       // ensure it's removed here. This handles network errors or other exceptions.
       mutate((currentData) => {
@@ -527,6 +542,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       >
         {/* Anchor point for scrolling to bottom */}
         <div ref={messagesEndRef} />
+
+        {/* Optimistic "Start weaving" banner — rendered from local state
+            only (no DB write yet). Disappears when the user sends a message. */}
+        {pendingItem && (
+          <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
+            <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+            <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
+              Start weaving for {pendingItem.title}
+            </span>
+            <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+          </div>
+        )}
+
         {isLoading ? (
           <div className="text-center text-gray-400 mt-10">
             Loading messages...
@@ -548,7 +576,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             </p>
           </div>
         ) : (
-          messages.map((msg, index) => {
+          <>
+            {messages.map((msg, index) => {
             const myPublicId = currentUser?.public_id || "";
             const isMe = msg.sender_public_id === myPublicId;
 
@@ -748,7 +777,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 {dateHeader}
               </React.Fragment>
             );
-          })
+          })}
+
+          </>
         )}
         {hasMore && (
           <div

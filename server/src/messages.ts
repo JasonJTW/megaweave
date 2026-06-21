@@ -55,7 +55,7 @@ router.get("/conversations/:id", requireAuth, async (req: Request, res: Response
 router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Request, res: Response) => {
   const senderId = req.user!.userId;
   const senderPublicId = req.user!.public_id;
-  const { recipient_public_id, content } = req.body;
+  const { recipient_public_id, content, item_id, item_title } = req.body;
 
   if (!recipient_public_id || (!content && (!req.files || (req.files as Express.Multer.File[]).length === 0))) {
      return res.status(400).json({ errorMessage: "Recipient and content or image are required" });
@@ -87,11 +87,31 @@ router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Requ
     // 1. Get or Create Conversation
     const conversationId = await messageService.getConversationId(senderId, recipientId);
 
-    // 2. Create Message with attachments
+    const io: Server = res.locals.io;
+
+    // 2. If the user had a pending weaving intent, persist it as a system message first.
+    //    This only happens on the FIRST real message sent for a given item.
+    if (item_id && item_title) {
+        const sysMsg = await messageService.createMessage(
+            conversationId,
+            senderId,
+            "Start Weaving",
+            undefined,
+            "system_start_weaving",
+            { item_id, item_title }
+        );
+        if (io) {
+            const sysMsgDTO = messageService.toMessageDTO(sysMsg, senderPublicId);
+            const sysPayload = { ...sysMsgDTO, conversation_id: conversationId };
+            io.to(`user_${recipientId}`).emit("new_message", sysPayload);
+            io.to(`user_${senderId}`).emit("new_message", sysPayload);
+        }
+    }
+
+    // 3. Create the user's actual message
     const message = await messageService.createMessage(conversationId, senderId, content || "", attachments);
     
-    // 3. Socket Push
-    const io: Server = res.locals.io;
+    // 4. Socket Push
     const messageDTO = messageService.toMessageDTO(message, senderPublicId);
 
     console.log(`[POST /messages] res.locals.io instance:`, io ? "EXISTS" : "UNDEFINED");
@@ -118,10 +138,10 @@ router.post("/", requireAuth, memoryUpload.array("images", 10), async (req: Requ
   }
 });
 
-// POST /api/messages/start - Start conversation (get or create)
+// POST /api/messages/start - Get or create conversation (no DB message written here)
 router.post("/start", requireAuth, async (req: Request, res: Response) => {
     const senderId = req.user!.userId;
-    const { recipient_public_id, item_id, item_title } = req.body;
+    const { recipient_public_id } = req.body;
 
     if (!recipient_public_id) {
          return res.status(400).json({ errorMessage: "Recipient Public ID required" });
@@ -133,34 +153,6 @@ router.post("/start", requireAuth, async (req: Request, res: Response) => {
             return res.status(404).json({ errorMessage: "Recipient not found" });
         }
         const conversationId = await messageService.getConversationId(senderId, recipientId);
-
-        // If it's a weaving consultation, check and insert system message
-        if (item_id) {
-            // Remove any trailing system message so we don't pile them up
-            await messageService.removeTrailingSystemMessage(conversationId);
-
-            const hasSystemMsg = await messageService.hasRecentSystemMessage(conversationId, 'system_start_weaving', item_id);
-            
-            if (!hasSystemMsg) {
-                const sysMsg = await messageService.createMessage(
-                    conversationId, 
-                    senderId, 
-                    "Start Weaving", 
-                    undefined, 
-                    "system_start_weaving", 
-                    { item_id, item_title }
-                );
-                
-                // Emit via socket so the UI updates if already open
-                const io: Server = res.locals.io;
-                if (io) {
-                    const messageDTO = messageService.toMessageDTO(sysMsg, req.user!.public_id);
-                    const payload = { ...messageDTO, conversation_id: conversationId };
-                    io.to(`user_${recipientId}`).emit("new_message", payload);
-                    io.to(`user_${senderId}`).emit("new_message", payload);
-                }
-            }
-        }
 
         return res.json({ conversationId });
     } catch (error) {

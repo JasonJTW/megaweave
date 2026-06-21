@@ -266,50 +266,6 @@ export const messageService = {
       );
   },
 
-  hasRecentSystemMessage: async (conversationId: number, messageType: string, itemId: number): Promise<boolean> => {
-    const [rows] = await dbPool.execute<RowDataPacket[]>(
-      "SELECT id FROM messages WHERE conversation_id = ? AND message_type = ? AND JSON_EXTRACT(metadata, '$.item_id') = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)",
-      [conversationId, messageType, itemId]
-    );
-    return rows.length > 0;
-  },
-
-  removeTrailingSystemMessage: async (conversationId: number): Promise<void> => {
-    const connection = await dbPool.getConnection();
-    try {
-        await connection.beginTransaction();
-        const [rows] = await connection.execute<RowDataPacket[]>(
-            "SELECT id, message_type FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1",
-            [conversationId]
-        );
-        if (rows.length > 0 && rows[0].message_type === 'system_start_weaving') {
-            const msgId = rows[0].id;
-            // Delete attachments if any
-            await connection.execute("DELETE FROM message_attachments WHERE message_id = ?", [msgId]);
-            await connection.execute("DELETE FROM messages WHERE id = ?", [msgId]);
-            
-            // Update conversation last_message_id
-            const [prevRows] = await connection.execute<RowDataPacket[]>(
-                "SELECT id, created_at FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1",
-                [conversationId]
-            );
-            const lastMsgId = prevRows.length > 0 ? prevRows[0].id : null;
-            const lastMsgAt = prevRows.length > 0 ? prevRows[0].created_at : new Date();
-            
-            await connection.execute(
-                "UPDATE conversations SET last_message_id = ?, last_message_at = ? WHERE id = ?",
-                [lastMsgId, lastMsgAt, conversationId]
-            );
-        }
-        await connection.commit();
-    } catch (error) {
-        await connection.rollback();
-        console.error("Error removing trailing system message:", error);
-    } finally {
-        connection.release();
-    }
-  },
-
   // 7. Get Conversation Details by ID
   getConversationById: async (conversationId: number, userId: number): Promise<Conversation | null> => {
     const query = `

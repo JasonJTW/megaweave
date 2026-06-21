@@ -578,60 +578,63 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         ) : (
           <>
             {messages.map((msg, index) => {
-            const myPublicId = currentUser?.public_id || "";
-            const isMe = msg.sender_public_id === myPublicId;
+              const myPublicId = currentUser?.public_id || "";
+              const isMe = msg.sender_public_id === myPublicId;
 
-            const msgDate = parseDate(msg.created_at);
-            const olderMsg = messages[index + 1];
-            // Date separator logic
-            // Compare current message date with older message (next in list)
-            let showDateHeader = false;
-            if (olderMsg) {
-              const olderMsgDate = parseDate(olderMsg.created_at);
-              const isSameDay =
-                format(msgDate, "yyyy-MM-dd") ===
-                format(olderMsgDate, "yyyy-MM-dd");
-              if (!isSameDay) {
-                // Different day from previous message -> Show Header
-                showDateHeader = true;
+              const msgDate = parseDate(msg.created_at);
+              const olderMsg = messages[index + 1];
+              // Date separator logic
+              // Compare current message date with older message (next in list)
+              let showDateHeader = false;
+              if (olderMsg) {
+                const olderMsgDate = parseDate(olderMsg.created_at);
+                const isSameDay =
+                  format(msgDate, "yyyy-MM-dd") ===
+                  format(olderMsgDate, "yyyy-MM-dd");
+                if (!isSameDay) {
+                  // Different day from previous message -> Show Header
+                  showDateHeader = true;
+                }
+              } else {
+                // No older message in memory.
+                // Only show header if we are absolutely sure there are no more messages in the DB.
+                if (!hasMore) {
+                  showDateHeader = true;
+                }
               }
-            } else {
-              // No older message in memory.
-              // Only show header if we are absolutely sure there are no more messages in the DB.
-              if (!hasMore) {
-                showDateHeader = true;
-              }
-            }
 
-            const dateHeader = showDateHeader ? (
-              <div
-                key={`date-${msg.created_at}`}
-                className="flex justify-center my-4"
-              >
-                <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full uppercase">
-                  {isToday(msgDate)
-                    ? "Today"
-                    : isYesterday(msgDate)
-                      ? "Yesterday"
-                      : format(msgDate, "yyyy-MM-dd", { locale: zhTW })}
-                </span>
-              </div>
-            ) : null;
+              const dateHeader = showDateHeader ? (
+                <div
+                  key={`date-${msg.created_at}`}
+                  className="flex justify-center my-4"
+                >
+                  <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full uppercase">
+                    {isToday(msgDate)
+                      ? "Today"
+                      : isYesterday(msgDate)
+                        ? "Yesterday"
+                        : format(msgDate, "yyyy-MM-dd", { locale: zhTW })}
+                  </span>
+                </div>
+              ) : null;
 
-            const lastReadIndex = messages.findIndex(
-              (m) => m.sender_public_id === myPublicId && m.is_read,
-            );
-            const isLastReadMessage = lastReadIndex === index;
+              const lastReadIndex = messages.findIndex(
+                (m) => m.sender_public_id === myPublicId && m.is_read,
+              );
+              const isLastReadMessage = lastReadIndex === index;
 
-            if (msg.message_type === 'system_start_weaving') {
+              if (msg.message_type === "system_start_weaving") {
                 let itemTitle = "";
                 try {
-                    const metadata = typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata;
-                    itemTitle = metadata?.item_title || "";
+                  const metadata =
+                    typeof msg.metadata === "string"
+                      ? JSON.parse(msg.metadata)
+                      : msg.metadata;
+                  itemTitle = metadata?.item_title || "";
                 } catch {
-                    // Ignore parse error
+                  // Ignore parse error
                 }
-                
+
                 return (
                   <React.Fragment key={msg.id}>
                     <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
@@ -644,141 +647,144 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     {dateHeader}
                   </React.Fragment>
                 );
-            }
+              }
 
-            return (
-              <React.Fragment key={msg.id}>
-                <div
-                  className={cn(
-                    "flex w-full mb-4",
-                    isMe ? "justify-end" : "justify-start",
-                  )}
-                >
-                  {!isMe && (
-                    <Avatar className="w-8 h-8 mr-2 mt-1">
-                      <AvatarImage src={otherUser?.avatar_url} />
-                      <AvatarFallback>
-                        {otherUser?.username?.substring(0, 1).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+              return (
+                <React.Fragment key={msg.id}>
                   <div
                     className={cn(
-                      "flex flex-col",
-                      isMe ? "items-end" : "items-start",
+                      "flex w-full mb-4",
+                      isMe ? "justify-end" : "justify-start",
                     )}
                   >
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="mb-1">
-                        {msg.attachments.length === 1 ? (
-                          /* Single image - large, standalone */
-                          <div
-                            className="relative w-[280px] h-[210px] sm:w-[340px] sm:h-[255px] rounded-xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer active:opacity-80 transition-opacity"
-                            onClick={() =>
-                              openLightbox(msg.attachments![0].file_url)
-                            }
-                          >
-                            <Image
-                              src={msg.attachments[0].file_url}
-                              alt="Attachment"
-                              fill
-                              className="object-cover"
-                              sizes="340px"
-                              unoptimized={msg.attachments[0].file_url.startsWith(
-                                "blob:",
-                              )}
-                            />
-                          </div>
-                        ) : (
-                          /* Multiple images - grid */
-                          <div
-                            className={cn(
-                              "grid gap-1.5",
-                              msg.attachments.length === 2
-                                ? "grid-cols-2 w-[280px] sm:w-[340px]"
-                                : msg.attachments.length === 3
-                                  ? "grid-cols-2 w-[280px] sm:w-[340px]"
-                                  : "grid-cols-2 w-[280px] sm:w-[340px]",
-                            )}
-                          >
-                            {msg.attachments.map((att, attIdx) => (
-                              <div
-                                key={att.id}
-                                className={cn(
-                                  "relative rounded-xl overflow-hidden bg-gray-100 shadow-sm aspect-square cursor-pointer active:opacity-80 transition-opacity",
-                                  msg.attachments!.length === 3 &&
-                                    attIdx === 0 &&
-                                    "col-span-2 aspect-[2/1]",
-                                )}
-                                onClick={() => openLightbox(att.file_url)}
-                              >
-                                <Image
-                                  src={att.file_url}
-                                  alt="Attachment"
-                                  fill
-                                  className="object-cover"
-                                  sizes="170px"
-                                  unoptimized={att.file_url.startsWith("blob:")}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    {!isMe && (
+                      <Avatar className="w-8 h-8 mr-2 mt-1">
+                        <AvatarImage src={otherUser?.avatar_url} />
+                        <AvatarFallback>
+                          {otherUser?.username?.substring(0, 1).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
                     )}
-
-                    {msg.content && (
-                      <div
-                        className={cn(
-                          "px-4 py-2 rounded-2xl break-words shadow-sm max-w-[280px] sm:max-w-[340px]",
-                          isMe
-                            ? "bg-[#F2F2F2] text-[#4A4A4A] rounded-br-[4px]"
-                            : "bg-[#7C8F76] text-white rounded-bl-[4px]",
-                        )}
-                      >
-                        <p
-                          className={cn(
-                            "text-[14px] sm:text-base leading-relaxed",
-                            isPopup && "font-medium",
-                          )}
-                        >
-                          {msg.content}
-                        </p>
-                      </div>
-                    )}
-
                     <div
                       className={cn(
-                        "flex items-center mt-1 text-[10px]",
-                        isMe
-                          ? "justify-end text-blue-400"
-                          : "justify-start text-gray-400",
+                        "flex flex-col",
+                        isMe ? "items-end" : "items-start",
                       )}
                     >
-                      <span>{format(parseDate(msg.created_at), "HH:mm")}</span>
-                      {isMe && (
-                        <span className="ml-1 flex items-center h-3">
-                          {isLastReadMessage ? (
-                            <>
-                              <span className="mr-0.5">read</span>
-                              <CheckCheck className="w-3 h-3" />
-                            </>
-                          ) : // 如果不是最後一則已讀，則根據 is_read 顯示雙勾或單勾
-                          msg.is_read ? (
-                            <CheckCheck className="w-3 h-3" />
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div className="mb-1">
+                          {msg.attachments.length === 1 ? (
+                            /* Single image - large, standalone */
+                            <div
+                              className="relative w-[280px] h-[210px] sm:w-[340px] sm:h-[255px] rounded-xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer active:opacity-80 transition-opacity"
+                              onClick={() =>
+                                openLightbox(msg.attachments![0].file_url)
+                              }
+                            >
+                              <Image
+                                src={msg.attachments[0].file_url}
+                                alt="Attachment"
+                                fill
+                                className="object-cover"
+                                sizes="340px"
+                                unoptimized={msg.attachments[0].file_url.startsWith(
+                                  "blob:",
+                                )}
+                              />
+                            </div>
                           ) : (
-                            <Check className="w-3 h-3" />
+                            /* Multiple images - grid */
+                            <div
+                              className={cn(
+                                "grid gap-1.5",
+                                msg.attachments.length === 2
+                                  ? "grid-cols-2 w-[280px] sm:w-[340px]"
+                                  : msg.attachments.length === 3
+                                    ? "grid-cols-2 w-[280px] sm:w-[340px]"
+                                    : "grid-cols-2 w-[280px] sm:w-[340px]",
+                              )}
+                            >
+                              {msg.attachments.map((att, attIdx) => (
+                                <div
+                                  key={att.id}
+                                  className={cn(
+                                    "relative rounded-xl overflow-hidden bg-gray-100 shadow-sm aspect-square cursor-pointer active:opacity-80 transition-opacity",
+                                    msg.attachments!.length === 3 &&
+                                      attIdx === 0 &&
+                                      "col-span-2 aspect-[2/1]",
+                                  )}
+                                  onClick={() => openLightbox(att.file_url)}
+                                >
+                                  <Image
+                                    src={att.file_url}
+                                    alt="Attachment"
+                                    fill
+                                    className="object-cover"
+                                    sizes="170px"
+                                    unoptimized={att.file_url.startsWith(
+                                      "blob:",
+                                    )}
+                                  />
+                                </div>
+                              ))}
+                            </div>
                           )}
-                        </span>
+                        </div>
                       )}
+
+                      {msg.content && (
+                        <div
+                          className={cn(
+                            "px-4 py-2 rounded-2xl break-words shadow-sm max-w-[280px] sm:max-w-[340px]",
+                            isMe
+                              ? "bg-[#F2F2F2] text-[#4A4A4A] rounded-br-[4px]"
+                              : "bg-[#7C8F76] text-white rounded-bl-[4px]",
+                          )}
+                        >
+                          <p
+                            className={cn(
+                              "text-[14px] sm:text-base leading-relaxed",
+                              isPopup && "font-medium",
+                            )}
+                          >
+                            {msg.content}
+                          </p>
+                        </div>
+                      )}
+
+                      <div
+                        className={cn(
+                          "flex items-center mt-1 text-[10px]",
+                          isMe
+                            ? "justify-end text-blue-400"
+                            : "justify-start text-gray-400",
+                        )}
+                      >
+                        <span>
+                          {format(parseDate(msg.created_at), "HH:mm")}
+                        </span>
+                        {isMe && (
+                          <span className="ml-1 flex items-center h-3">
+                            {isLastReadMessage ? (
+                              <>
+                                <span className="mr-0.5">read</span>
+                                <CheckCheck className="w-3 h-3" />
+                              </>
+                            ) : // 如果不是最後一則已讀，則根據 is_read 顯示雙勾或單勾
+                            msg.is_read ? (
+                              <CheckCheck className="w-3 h-3" />
+                            ) : (
+                              <Check className="w-3 h-3" />
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                {dateHeader}
-              </React.Fragment>
-            );
-          })}
-
+                  {dateHeader}
+                </React.Fragment>
+              );
+            })}
           </>
         )}
         {hasMore && (

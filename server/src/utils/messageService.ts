@@ -260,9 +260,12 @@ export const messageService = {
       // Update last_read_message_id to the most recent message in the conversation
       await dbPool.execute(
           `UPDATE conversation_users 
-           SET last_read_message_id = (SELECT last_message_id FROM conversations WHERE id = ?) 
+           SET last_read_message_id = COALESCE(
+             (SELECT MAX(id) FROM messages WHERE conversation_id = ?),
+             (SELECT last_message_id FROM conversations WHERE id = ?)
+           ) 
            WHERE conversation_id = ? AND user_id = ?`,
-          [conversationId, conversationId, userId]
+          [conversationId, conversationId, conversationId, userId]
       );
   },
 

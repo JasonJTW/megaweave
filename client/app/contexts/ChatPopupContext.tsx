@@ -99,12 +99,15 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
     setIsOpen(false);
     // Optionally clear data after animation
     setTimeout(() => {
-      if (!isOpen) {
-        setConversationId(null);
-        setOtherUser(null);
-        setPost(null);
-        setPendingItem(null);
-      }
+      setIsOpen((latestIsOpen) => {
+        if (!latestIsOpen) {
+          setConversationId(null);
+          setOtherUser(null);
+          setPost(null);
+          setPendingItem(null);
+        }
+        return latestIsOpen;
+      });
     }, 300);
   };
 

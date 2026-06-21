@@ -19,7 +19,6 @@ import {
   getComments,
   getCommentCounts,
 } from "@/services/commentService";
-import { mutate } from "swr";
 
 interface CommentSectionProps {
   post: Post;
@@ -55,25 +54,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     try {
       const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-      const requestBody: {
-        recipient_public_id: string;
-        item_id?: number | string;
-        item_title?: string;
-      } = { recipient_public_id: post.author_public_id };
-      if (tab.key !== "all") {
-        requestBody.item_id = tab.key;
-        requestBody.item_title = tab.title;
-      } else {
-        // If it's the main post, we can use the post ID or title
-        // Currently, let's just pass the post title for context
-        requestBody.item_title = post.title;
-      }
-
       const res = await fetch(`${hostName}/api/messages/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ recipient_public_id: post.author_public_id }),
       });
 
       if (!res.ok) throw new Error("Failed to start conversation");
@@ -81,10 +66,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       const data = await res.json();
       console.log("data: ", data);
       
-      // Force SWR cache eviction for this conversation to prevent stale messages (dedupingInterval bypass)
-      await mutate(`${hostName}/api/messages/conversations/${data.conversationId}`, undefined, { revalidate: true });
-
-      // Change post to item and deal with All Item case
       openChat(
         data.conversationId,
         {
@@ -93,6 +74,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
           avatar_url: post.avatar_url,
         },
         post,
+        tab.key !== "all"
+          ? { id: tab.key, title: tab.title }
+          : { id: post.id, title: post.title },
       );
     } catch (error) {
       console.error("Message error:", error);

@@ -65,7 +65,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
       const data = await res.json();
       console.log("data: ", data);
-      
+
       openChat(
         data.conversationId,
         {
@@ -76,7 +76,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         post,
         tab.key !== "all"
           ? { id: tab.key, title: tab.title }
-          : { id: post.id, title: post.title },
+          : { id: post.id, title: "All Items" },
       );
     } catch (error) {
       console.error("Message error:", error);

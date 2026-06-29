@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { Post } from "../types/schema";
 
 interface ChatPopupOtherUser {
@@ -46,6 +46,8 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
   // It is written to the DB only when the user sends their first real message.
   const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  // Ref to track the pending closeChat timeout so we can cancel it on re-open
+  const closeChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const storedState = sessionStorage.getItem("chatPopupState");
@@ -85,11 +87,18 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
     currentPost?: Post,
     item?: PendingItem,
   ) => {
+    // Cancel any pending closeChat cleanup to avoid a race condition where
+    // closeChat's delayed setPost(null) would overwrite the post we're about
+    // to set here.
+    if (closeChatTimerRef.current) {
+      clearTimeout(closeChatTimerRef.current);
+      closeChatTimerRef.current = null;
+    }
     setConversationId(id);
     setOtherUser(user);
-    if (currentPost) {
-      setPost(currentPost);
-    }
+    // Always update post (even to null) so switching conversations never
+    // leaves stale post data from the previous chat.
+    setPost(currentPost ?? null);
     // Always update pendingItem (even to null) so switching items always reflects correctly
     setPendingItem(item ?? null);
     setIsOpen(true);
@@ -97,8 +106,12 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
 
   const closeChat = () => {
     setIsOpen(false);
-    // Optionally clear data after animation
-    setTimeout(() => {
+    // Clear data after the exit animation finishes (300ms).
+    // Store the timer ID so openChat can cancel it if the popup is re-opened
+    // before the timeout fires — otherwise the delayed setPost(null) would
+    // wipe out the new post that openChat just set.
+    closeChatTimerRef.current = setTimeout(() => {
+      closeChatTimerRef.current = null;
       setIsOpen((latestIsOpen) => {
         if (!latestIsOpen) {
           setConversationId(null);

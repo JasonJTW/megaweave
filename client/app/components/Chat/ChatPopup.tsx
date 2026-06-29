@@ -14,11 +14,9 @@ export const ChatPopup = () => {
   const { isOpen, conversationId, otherUser, post, closeChat } = useChatPopup();
   const { user: currentUser } = useUser();
 
-  if (!isOpen || !otherUser || !conversationId) return null;
-
   return (
     <AnimatePresence>
-      {isOpen && (
+      {isOpen && otherUser && conversationId && (
         <>
           {/* Backdrop */}
           <motion.div
@@ -35,7 +33,7 @@ export const ChatPopup = () => {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed bottom-4 left-4 right-4  max-w-[500px] mx-auto bg-white rounded-[40px] shadow-2xl z-[101] flex flex-col h-[85vh] overflow-hidden border border-primary-30"
+            className="fixed bottom-4 left-4 right-4  max-w-[500px] mx-auto bg-white rounded-[40px] shadow-2xl z-[101] flex flex-col h-[65vh] overflow-hidden border border-primary-30"
           >
             {/* Header (Always shown in Popup) */}
             <div className="px-8 pt-4 pb-2 flex items-center justify-between bg-white z-10">
@@ -62,7 +60,11 @@ export const ChatPopup = () => {
 
               {/* Giver Confirm Overlay */}
               {/*  if currentUser is giver (in conversation) */}
-              {post && <PostInfoCard post={post} />}
+              {post && (
+                <div className="absolute top-0 left-0 right-0 z-10">
+                  <PostInfoCard post={post} />
+                </div>
+              )}
               <div className="absolute bottom-20 right-6 flex flex-col items-end gap-2 pointer-events-none">
                 <div className="flex items-center gap-6 pointer-events-auto">
                   <div className="relative bg-white border border-[#D9D9D9] px-4 py-2 rounded-full shadow-sm">

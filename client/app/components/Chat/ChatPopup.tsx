@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import PostInfoCard from "./PostInfoCard";
 
 export const ChatPopup = () => {
-  const { isOpen, conversationId, otherUser, post, closeChat } = useChatPopup();
+  const { isOpen, conversationId, otherUser, post, pendingItem, closeChat } = useChatPopup();
   const { user: currentUser } = useUser();
 
   return (
@@ -62,7 +62,7 @@ export const ChatPopup = () => {
               {/*  if currentUser is giver (in conversation) */}
               {post && (
                 <div className="absolute top-0 left-0 right-0 z-10">
-                  <PostInfoCard post={post} />
+                  <PostInfoCard post={post} item={pendingItem} />
                 </div>
               )}
               <div className="absolute bottom-20 right-6 flex flex-col items-end gap-2 pointer-events-none">

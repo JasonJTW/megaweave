@@ -25,19 +25,24 @@ interface CommentSectionProps {
   user: User | null;
 }
 
-type TabKey = "all" | number;
+type ItemKey = "all" | number;
 
 const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey | null>(null);
+  const [activeItemKey, setActiveItemKey] = useState<ItemKey | null>(null);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { openChat } = useChatPopup();
-  // ✅ 新增：追蹤哪個 Tab 正在顯示 WeavingInput
-  const [weavingInputItem, setWeavingInputItem] = useState<TabKey | null>(null);
+  // ✅ 新增：追蹤哪個 Item 正在顯示 WeavingInput
+  const [weavingInputItem, setWeavingInputItem] = useState<ItemKey | null>(
+    null,
+  );
 
-  const handlePrivateMessage = async (tab: { key: TabKey; title: string }) => {
+  const handleWeavingMessage = async (item: {
+    key: ItemKey;
+    title: string;
+  }) => {
     if (!user) {
       toast.error("Please log in to message.");
       router.push(
@@ -74,9 +79,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
           avatar_url: post.avatar_url,
         },
         post,
-        tab.key !== "all"
-          ? { id: tab.key, title: tab.title }
-          : { id: post.id, title: "All Items" },
+        item.key !== "all"
+          ? { id: item.key, title: item.title }
+          : { id: post.id, title: "all" },
       );
     } catch (error) {
       console.error("Message error:", error);
@@ -94,12 +99,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     }
   }, [post.id]);
 
-  // 取得特定 tab 的留言
-  const fetchCommentsByTab = useCallback(
-    async (tab: TabKey) => {
+  // 取得特定 item 的留言
+  const fetchCommentsByItem = useCallback(
+    async (itemKey: ItemKey) => {
       try {
         setIsLoading(true);
-        const res = await getComments(post.id, tab);
+        const res = await getComments(post.id, itemKey);
         setComments(res.comments);
       } catch (err: unknown) {
         if (err instanceof Error) {
@@ -119,12 +124,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     fetchCounts();
   }, [fetchCounts]);
 
-  // 當 activeTab 改變時，載入該 tab 的留言
+  // 當 activeItemKey 改變時，載入該 item 的留言
   useEffect(() => {
-    if (activeTab !== null) {
-      fetchCommentsByTab(activeTab);
+    if (activeItemKey !== null) {
+      fetchCommentsByItem(activeItemKey);
     }
-  }, [activeTab, fetchCommentsByTab]);
+  }, [activeItemKey, fetchCommentsByItem]);
 
   // Deep linking logic
   useEffect(() => {
@@ -139,9 +144,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
           if (res.ok) {
             const data = await res.json();
             const itemId = data.comment.item_id;
-            const targetTab = itemId === null ? "all" : itemId;
+            const targetItemKey = itemId === null ? "all" : itemId;
 
-            setActiveTab(targetTab);
+            setActiveItemKey(targetItemKey);
 
             // Wait for comments to load and render, then scroll
             // We need to poll or use a ref mechanism, but a simple timeout works for now
@@ -158,7 +163,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
   // Scroll to hash when comments are updated
   useEffect(() => {
-    if (!isLoading && activeTab !== null) {
+    if (!isLoading && activeItemKey !== null) {
       const hash = window.location.hash;
       if (hash && hash.startsWith("#comment-")) {
         const id = hash.substring(1);
@@ -177,17 +182,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         }, 300); // delay after render
       }
     }
-  }, [isLoading, comments, activeTab]);
+  }, [isLoading, comments, activeItemKey]);
 
-  // 處理 tab 點擊
-  const handleTabClick = (tab: TabKey) => {
-    if (activeTab === tab) {
-      setActiveTab(null);
-      // 關閉 Tab 時，隱藏 Weaving Input
+  // 處理 item 點擊
+  const handleItemClick = (itemKey: ItemKey) => {
+    if (activeItemKey === itemKey) {
+      setActiveItemKey(null);
+      // 關閉時，隱藏 Weaving Input
       setWeavingInputItem(null);
     } else {
-      setActiveTab(tab);
-      // 切換 Tab 時，隱藏 Weaving Input
+      setActiveItemKey(itemKey);
+      // 切換時，隱藏 Weaving Input
       setWeavingInputItem(null);
     }
   };
@@ -195,15 +200,15 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   // 新增留言成功後重新載入
   const handleCommentSuccess = () => {
     fetchCounts();
-    if (activeTab !== null) {
-      fetchCommentsByTab(activeTab);
+    if (activeItemKey !== null) {
+      fetchCommentsByItem(activeItemKey);
     }
     // 成功發送索取後，關閉索取輸入框
     setWeavingInputItem(null);
   };
 
   // ✅ 處理 Weaving Icon 點擊 (開啟索取輸入框)
-  const handleWeavingIconClick = (tabKey: TabKey) => {
+  const handleWeavingIconClick = (itemKey: ItemKey) => {
     if (!user) {
       toast.error("Please log in to request items.");
       router.push(
@@ -211,17 +216,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       );
       return;
     }
-    // 1. 如果 Tab 沒開，先展開 Tab
-    if (activeTab !== tabKey) {
-      setActiveTab(tabKey);
+    // 1. 如果 Item 沒展開，先展開 Item
+    if (activeItemKey !== itemKey) {
+      setActiveItemKey(itemKey);
     }
     // 2. 顯示 Weaving Input
-    setWeavingInputItem(tabKey);
+    setWeavingInputItem(itemKey);
   };
 
   // ✅ 處理索取留言的提交邏輯
   const handleWeavingSubmit = async (
-    tabKey: TabKey,
+    itemKey: ItemKey,
     quantity: number | "all",
   ) => {
     //* check login
@@ -235,14 +240,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
     // 防止自己索取自己的文章 (雖然前端檢查了，後端 weaves.ts 也會擋，但前端擋住體驗較好)
     if (user.userId === (post.author_user_id ?? post.user_id)) {
-      // 假設 user 物件裡有 id，post 裡有 user_id
       toast.error("You cannot request your own items.");
       return;
     }
     try {
       // 1. 轉換 itemId
-      // 如果 tabKey 是 "all" 字串，後端對應為 null；否則就是具體的 item id (number)
-      const targetItemId = tabKey === "all" ? null : (tabKey as number);
+      // 如果 itemKey 是 "all" 字串，後端對應為 null；否則就是具體的 item id (number)
+      const targetItemId = itemKey === "all" ? null : (itemKey as number);
 
       // 2. 轉換 quantity
       // 如果前端回傳 "all" (字串)，代表是針對整篇貼文的索取，後端數量記為 1
@@ -254,16 +258,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         postId: post.id,
         itemId: targetItemId,
         quantity: targetQuantity,
-        // notes: "..." // 如果未來你有輸入備註的需求，可以加在這裡
       });
       console.log("newWeave:", newWeave);
       router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
       // 4. 成功處理
-      toast.success("Request sent successfully!"); // 建議未來改用 Toast 元件
+      toast.success("Request sent successfully!");
       handleCommentSuccess(); // 重新整理列表並關閉輸入框
     } catch (err: unknown) {
       console.error("Error creating weave:", err);
-      // 顯示錯誤訊息 (例如庫存不足、文章非 active 等)
       if (err instanceof Error) {
         toast.error(err.message);
       } else {
@@ -271,20 +273,21 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       }
     }
   };
-  // 取得特定 tab 的留言列表
-  const getTabComments = (tab: TabKey): Comment[] => {
-    const key = tab === "all" ? "all" : `item_${tab}`;
+
+  // 取得特定 item 的留言列表
+  const getItemComments = (itemKey: ItemKey): Comment[] => {
+    const key = itemKey === "all" ? "all" : `item_${itemKey}`;
     return comments[key] || [];
   };
 
-  // 取得特定 tab 的留言數
-  const getCount = (tab: TabKey): number => {
-    const key = tab === "all" ? "all" : `item_${tab}`;
+  // 取得特定 item 的留言數
+  const getCount = (itemKey: ItemKey): number => {
+    const key = itemKey === "all" ? "all" : `item_${itemKey}`;
     return counts[key] || 0;
   };
 
-  // Tab 列表
-  const tabs: { key: TabKey; title: string; quantity?: number }[] = [
+  // Items 列表
+  const items: { key: ItemKey; title: string; quantity?: number }[] = [
     { key: "all", title: "All" }, // All 沒有 quantity
     ...(post.items?.map((item) => ({
       key: item.id as number,
@@ -295,21 +298,21 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
   return (
     <div className="">
-      {/* 遍歷 Tab 列表，為每個 Tab 渲染一個區塊 */}
-      {tabs.map((tab) => (
-        <div key={tab.key} className="mb-[10px]">
+      {/* 遍歷 Items 列表，為每個 Item 渲染一個區塊 */}
+      {items.map((item) => (
+        <div key={item.key} className="mb-[10px]">
           <CommentCard
-            title={tab.title}
-            count={getCount(tab.key)}
-            quantity={tab.quantity}
-            isOpen={activeTab === tab.key}
-            onToggle={() => handleTabClick(tab.key)}
-            // ✅ All Tab 也允許發起 Weaving (索取所有)
-            onWeaving={() => handleWeavingIconClick(tab.key)}
-            onPrivateMessage={() => handlePrivateMessage(tab)}
+            title={item.title}
+            count={getCount(item.key)}
+            quantity={item.quantity}
+            isOpen={activeItemKey === item.key}
+            onToggle={() => handleItemClick(item.key)}
+            // ✅ All 也允許發起 Weaving (索取所有)
+            onWeaving={() => handleWeavingIconClick(item.key)}
+            onPrivateMessage={() => handleWeavingMessage(item)}
           />
           <AnimatePresence>
-            {activeTab === tab.key && (
+            {activeItemKey === item.key && (
               <motion.div
                 initial={{ opacity: 0.6, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -320,43 +323,42 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                 <div className=" p-4 bg-primary-5 rounded-b-[18px]">
                   <CommentInput
                     postId={post.id}
-                    itemId={tab.key === "all" ? "all" : tab.key}
+                    itemId={item.key === "all" ? "all" : item.key}
                     user={user}
                     placeholder={
-                      tab.key === "all"
+                      item.key === "all"
                         ? "Write a comment"
-                        : `Comment on ${tab.title}`
+                        : `Comment on ${item.title}`
                     }
                     onSuccess={handleCommentSuccess}
                   />
 
                   {/* ✅ 條件渲染 WeavingInput */}
-                  {weavingInputItem === tab.key && (
+                  {weavingInputItem === item.key && (
                     <WeavingInput
                       user={user}
-                      type={tab.key === "all" ? "all" : "item"} // 傳遞 type
-                      // All Tab 的 quantityLeft 設為 0 (或忽略)
-                      quantityLeft={tab.quantity ?? 0}
-                      onWeavingSubmit={(q) => handleWeavingSubmit(tab.key, q)}
+                      type={item.key === "all" ? "all" : "item"} // 傳遞 type
+                      // All 的 quantityLeft 設為 0 (或忽略)
+                      quantityLeft={item.quantity ?? 0}
+                      onWeavingSubmit={(q) => handleWeavingSubmit(item.key, q)}
                       onCancel={() => setWeavingInputItem(null)}
                     />
                   )}
 
                   {/* 留言列表 */}
                   <div className="mt-4">
-                    {/* ... (留言列表內容不變) ... */}
                     {isLoading ? (
                       <div className="py-4 text-center text-gray-500">
                         <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
                         <p className="mt-2 text-sm">Loading...</p>
                       </div>
-                    ) : getTabComments(tab.key).length === 0 ? (
+                    ) : getItemComments(item.key).length === 0 ? (
                       <div className="py-4 text-center text-gray-500 text-sm">
                         No comments yet. Be the first to comment!
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-100">
-                        {getTabComments(tab.key).map((comment) => (
+                        {getItemComments(item.key).map((comment) => (
                           <CommentItem
                             key={comment.id}
                             comment={comment}

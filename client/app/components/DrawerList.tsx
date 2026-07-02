@@ -1,5 +1,6 @@
 import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
@@ -32,7 +33,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
   const listRef = useRef<(HTMLDivElement | null)[]>([]);
   const shouldAutoExpand =
     weaves?.some((w) => w.id === highlightWeaveId) ?? false;
-  const [isExpanded, setIsExpanded] = useState(shouldAutoExpand);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -101,8 +102,16 @@ const DrawerList: React.FC<DrawerListProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark">
+      <div
+        onClick={handleExpand}
+        className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark cursor-pointer select-none"
+      >
         <div>{title}</div>
+        <ChevronDown
+          className={`h-5 w-5 transition-transform duration-200 ${
+            isExpanded ? "rotate-180" : ""
+          }`}
+        />
       </div>
 
       <motion.div

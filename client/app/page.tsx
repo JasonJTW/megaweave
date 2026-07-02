@@ -77,7 +77,7 @@ const PostsApp = () => {
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
-  const [isTourOpen, setIsTourOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(true);
   const [isWeavingExpanded, setIsWeavingExpanded] = useState(false);
   const weavingButtonRef = useRef<HTMLDivElement>(null);
 
@@ -181,6 +181,7 @@ const PostsApp = () => {
   const [searchCity, setSearchCity] = useState("");
   const [searchProvince, setSearchProvince] = useState(""); // Add province state
   const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
+  const [hideOverdue, setHideOverdue] = useState(false);
   const categoryInteractionLockRef = useRef(false);
 
   const getKey = useCallback(
@@ -229,13 +230,19 @@ const PostsApp = () => {
       if (!page?.posts) continue;
       for (const p of page.posts) {
         if (!seenIds.has(p.id)) {
+          if (hideOverdue) {
+            const isExpired = p.expires_at
+              ? new Date(p.expires_at) < new Date()
+              : false;
+            if (isExpired) continue;
+          }
           seenIds.add(p.id);
           allPosts.push(p);
         }
       }
     }
     return allPosts;
-  }, [data]);
+  }, [data, hideOverdue]);
 
   const loading = isValidating && (!data || data.length === 0);
   const refreshing = isValidating && data?.length === size;
@@ -947,9 +954,14 @@ const PostsApp = () => {
                     <ReuseIcon className="w-4 h-4 text-[#F0AF1E] shrink-0" />
                   </button>
                   <button
-                    className={`bg-transparent border border-gray-300 rounded-full flex items-center justify-center type-button-b1 font-semibold transition-all whitespace-nowrap ${
+                    className={`bg-transparent border rounded-full flex items-center justify-center type-button-b1 font-semibold transition-all whitespace-nowrap ${
                       isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    } ${
+                      hideOverdue
+                        ? "bg-[#ffebee] border-[#ffebee] text-megaweave-red-dark"
+                        : "border-gray-300 text-[#333]"
                     }`}
+                    onClick={() => setHideOverdue((prev) => !prev)}
                   >
                     Hide Overdue
                   </button>
@@ -1371,8 +1383,15 @@ const PostsApp = () => {
                   </div>
 
                   {/* Close Overdue Items Button */}
-                  <Button className="w-full bg-white text-megaweave-forest-dark font-semibold hover:bg-gray-100">
-                    Close Overdue Items
+                  <Button
+                    className={`w-full font-semibold border ${
+                      hideOverdue
+                        ? "bg-[#ffebee] text-megaweave-red-dark border-[#ffebee] hover:bg-red-100"
+                        : "bg-white text-megaweave-forest-dark border-transparent hover:bg-gray-100"
+                    }`}
+                    onClick={() => setHideOverdue((prev) => !prev)}
+                  >
+                    Hide Overdue
                   </Button>
                 </motion.div>
               </>

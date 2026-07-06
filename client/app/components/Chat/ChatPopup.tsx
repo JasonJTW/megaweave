@@ -18,10 +18,18 @@ export const ChatPopup = () => {
     otherUser,
     post,
     pendingItem,
+    setPendingItem,
     closeChat,
   } = useChatPopup();
   const { user: currentUser } = useUser();
   const router = useRouter();
+
+  // Keep the last non-null pendingItem so PostInfoCard doesn't lose its item
+  // title when setPendingItem(null) is called after the user sends a message.
+  const [displayedItem, setDisplayedItem] = React.useState(pendingItem);
+  React.useEffect(() => {
+    if (pendingItem) setDisplayedItem(pendingItem);
+  }, [pendingItem]);
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
   const handleWeavingSubmit = async (quantity: number | "all") => {
@@ -38,9 +46,9 @@ export const ChatPopup = () => {
     }
 
     try {
-      // pendingItem.id 為 "all" 時 itemId = null，否則為具體 item id
-      const isAll = !pendingItem || pendingItem.title === "all";
-      const targetItemId = isAll ? null : (pendingItem.id as number);
+      // displayedItem 保留最後選擇的 item；"all" 時 itemId = null
+      const isAll = !displayedItem || displayedItem.title === "all";
+      const targetItemId = isAll ? null : (displayedItem.id as number);
       const targetQuantity = typeof quantity === "number" ? quantity : 1;
 
       const newWeave = await createWeave({
@@ -48,6 +56,12 @@ export const ChatPopup = () => {
         itemId: targetItemId,
         quantity: targetQuantity,
       });
+
+      // Clear all UI state after a successful weave
+      setPendingItem(null);
+      setDisplayedItem(null);
+      closeChat();
+
       toast.success("Request sent successfully!");
       router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
     } catch (err: unknown) {
@@ -98,7 +112,7 @@ export const ChatPopup = () => {
             {post && (
               <PostInfoCard
                 post={post}
-                item={pendingItem}
+                item={displayedItem}
                 user={currentUser}
                 onWeavingSubmit={handleWeavingSubmit}
               />

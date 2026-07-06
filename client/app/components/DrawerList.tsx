@@ -1,5 +1,6 @@
 import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
+import { ChevronDown, LucideLoader2, LucideRefreshCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
@@ -32,7 +33,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
   const listRef = useRef<(HTMLDivElement | null)[]>([]);
   const shouldAutoExpand =
     weaves?.some((w) => w.id === highlightWeaveId) ?? false;
-  const [isExpanded, setIsExpanded] = useState(shouldAutoExpand);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -101,8 +102,16 @@ const DrawerList: React.FC<DrawerListProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark">
+      <div
+        onClick={handleExpand}
+        className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark cursor-pointer select-none"
+      >
         <div>{title}</div>
+        <ChevronDown
+          className={`h-5 w-5 transition-transform duration-200 ${
+            isExpanded ? "rotate-180" : ""
+          }`}
+        />
       </div>
 
       <motion.div
@@ -136,7 +145,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
         >
           {fetchWeaves && (
             <div className="mb-2 text-right">
-              {/*  <button
+              <button
                 type="button"
                 className="px-4"
                 onClick={handleRefresh}
@@ -153,50 +162,65 @@ const DrawerList: React.FC<DrawerListProps> = ({
                 >
                   <LucideRefreshCcw className="h-4 w-4" />
                 </motion.div>
-              </button> */}
+              </button>
             </div>
           )}
 
-          {postsToRender.length > 0 ? (
-            <div
-              className={`mx-4 flex flex-col gap-3 pb-2 ${shouldScrollList ? "overflow-y-auto" : ""}`}
-              style={
-                shouldScrollList
-                  ? { maxHeight: scrollableListMaxHeight }
-                  : undefined
-              }
-            >
-              {postsToRender.map((post, index) => {
-                const directWeave =
-                  weaves && weaves[index]?.post.id === post.id
-                    ? weaves[index]
-                    : undefined;
-                const weave = directWeave ?? postIdToWeaveMap.get(post.id);
-                const uniqueKey = weave
-                  ? `weave-${weave.id}`
-                  : `post-${post.id}`;
+          <div className="relative mx-4">
+            {isRefreshing && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/40 dark:bg-black/40 backdrop-blur-[0.5px] rounded-[20px] transition-all duration-300">
+                <div className="flex items-center gap-2.5 rounded-full bg-white/95 dark:bg-zinc-900/95 px-4 py-2 shadow-md border border-gray-100/50 dark:border-zinc-800">
+                  <LucideLoader2 className="h-4 w-4 animate-spin text-megaweave-forest" />
+                  <span className="text-xs font-semibold text-megaweave-forest-dark dark:text-zinc-200">
+                    Syncing status...
+                  </span>
+                </div>
+              </div>
+            )}
 
-                return (
-                  <div
-                    key={uniqueKey}
-                    ref={(el) => {
-                      listRef.current[index] = el;
-                    }}
-                  >
-                    <DrawerListItem
-                      post={post}
-                      weave={weave}
-                      currentUserId={currentUserId}
-                      isHighlighted={weave?.id === highlightWeaveId}
-                      onClick={() => router.push(`/item/${post.id}`)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-gray-500">{emptyMessage}</div>
-          )}
+            {postsToRender.length > 0 ? (
+              <div
+                className={`flex flex-col gap-3 pb-2 transition-all duration-300 ${
+                  isRefreshing ? "opacity-40 pointer-events-none select-none" : ""
+                } ${shouldScrollList ? "overflow-y-auto" : ""}`}
+                style={
+                  shouldScrollList
+                    ? { maxHeight: scrollableListMaxHeight }
+                    : undefined
+                }
+              >
+                {postsToRender.map((post, index) => {
+                  const directWeave =
+                    weaves && weaves[index]?.post.id === post.id
+                      ? weaves[index]
+                      : undefined;
+                  const weave = directWeave ?? postIdToWeaveMap.get(post.id);
+                  const uniqueKey = weave
+                    ? `weave-${weave.id}`
+                    : `post-${post.id}`;
+
+                  return (
+                    <div
+                      key={uniqueKey}
+                      ref={(el) => {
+                        listRef.current[index] = el;
+                      }}
+                    >
+                      <DrawerListItem
+                        post={post}
+                        weave={weave}
+                        currentUserId={currentUserId}
+                        isHighlighted={weave?.id === highlightWeaveId}
+                        onClick={() => router.push(`/item/${post.id}`)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-gray-500">{emptyMessage}</div>
+            )}
+          </div>
         </motion.div>
       </motion.div>
     </div>

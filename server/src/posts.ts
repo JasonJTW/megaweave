@@ -486,10 +486,10 @@ router.get("/", async (req: Request, res: Response) => {
 
 //* Get user's posts api
 router.get("/user", requireAuth, async (req: Request, res: Response) => {
-    try {
-        const userId = req.user!.userId;
+  try {
+    const userId = req.user!.userId;
 
-        const postsQuery = `
+    const postsQuery = `
       SELECT 
         p.*,
         u.username,
@@ -510,14 +510,16 @@ router.get("/user", requireAuth, async (req: Request, res: Response) => {
       ORDER BY p.created_at DESC
     `;
 
-        const [userPosts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [userId]);
-        console.log("user's posts: ", userPosts)
-        res.status(200).json({ userPosts });
-    } catch (error) {
-        console.error("Get user's posts error:", error);
-        return res.status(500).json({ errorMessage: "Internal server error" });
-    }
-})
+    const [userPosts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [
+      userId,
+    ]);
+    // console.log("user's posts: ", userPosts)
+    res.status(200).json({ userPosts });
+  } catch (error) {
+    console.error("Get user's posts error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
 
 //* Get post details api
 router.get("/:id", async (req: Request, res: Response) => {
@@ -626,8 +628,5 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 /// like & unlike post api
 router.use("/:id/like", likeRouter);
-
-
-
 
 export default router;

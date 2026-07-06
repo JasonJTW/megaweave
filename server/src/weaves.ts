@@ -4,6 +4,7 @@ import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { updateUserStats } from "./utils/updateUserStats";
 import { createNotification } from "./utils/notificationService";
+import { messageService } from "./utils/messageService";
 
 const router = Router();
 
@@ -238,13 +239,13 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       ]
     );
 
+    const targetUserId = initiatorId === giverId ? receiverId : giverId;
     let notificationSent = false;
     let debugInfo = {};
 
     // Notification Logic
     try {
       console.log("🔔 [Weave] Starting notification logic...");
-      const targetUserId = initiatorId === giverId ? receiverId : giverId;
       console.log(
         `🔔 [Weave] Initiator: ${initiatorId}, Giver: ${giverId}, Receiver: ${receiverId}`
       );
@@ -298,6 +299,65 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     } catch (e) {
       console.error("🔔 [Weave] Notification failed with error:", e);
       debugInfo = { error: String(e) };
+    }
+
+    // 建立聊天室對話的 System Message
+    try {
+      const conversationId = await messageService.getConversationId(initiatorId, targetUserId);
+      
+      // 取得 item 標題，如果沒有 itemId，標題可以使用 post 的標題
+      let itemTitle = "All Items";
+      if (itemId) {
+        const [itemRows] = await dbPool.execute<RowDataPacket[]>(
+          `SELECT title FROM items WHERE id = ?`,
+          [itemId]
+        );
+        if (itemRows.length > 0) {
+          itemTitle = itemRows[0].title;
+        }
+      } else {
+        const [postRows] = await dbPool.execute<RowDataPacket[]>(
+          `SELECT title FROM posts WHERE id = ?`,
+          [postId]
+        );
+        if (postRows.length > 0) {
+          itemTitle = `All Items - ${postRows[0].title}`;
+        }
+      }
+
+      // 取得貼文的第一張圖片
+      let imageUrl = null;
+      const [imgRows] = await dbPool.execute<RowDataPacket[]>(
+        `SELECT image_url FROM images WHERE post_id = ? ORDER BY id ASC LIMIT 1`,
+        [postId]
+      );
+      if (imgRows.length > 0) {
+        imageUrl = imgRows[0].image_url;
+      }
+
+      const newMetadata = { item_id: itemId, item_title: itemTitle, quantity, weave_id: result.insertId, post_id: postId, image_url: imageUrl };
+
+      const io = res.locals.io;
+      const senderPublicId = req.user!.public_id;
+
+      // 每次 Request 都新增一筆全新的 system_start_weaving 訊息（作為小卡）
+      const sysMsg = await messageService.createMessage(
+        conversationId,
+        initiatorId,
+        "Start Weaving",
+        undefined,
+        "system_start_weaving",
+        newMetadata
+      );
+
+      if (io) {
+        const sysMsgDTO = messageService.toMessageDTO(sysMsg, senderPublicId);
+        const sysPayload = { ...sysMsgDTO, conversation_id: conversationId };
+        io.to(`user_${targetUserId}`).emit("new_message", sysPayload);
+        io.to(`user_${initiatorId}`).emit("new_message", sysPayload);
+      }
+    } catch (msgErr) {
+      console.error("Failed to create weave system message:", msgErr);
     }
 
     return res.status(201).json({

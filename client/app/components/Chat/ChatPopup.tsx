@@ -35,7 +35,9 @@ export const ChatPopup = () => {
   const handleWeavingSubmit = async (quantity: number | "all") => {
     if (!currentUser) {
       toast.error("Please log in to request items.");
-      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+      );
       return;
     }
     if (!post) return;
@@ -60,10 +62,10 @@ export const ChatPopup = () => {
       // Clear all UI state after a successful weave
       setPendingItem(null);
       setDisplayedItem(null);
-      closeChat();
+      // closeChat();
 
       toast.success("Request sent successfully!");
-      router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
+      // router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
     } catch (err: unknown) {
       console.error("Weaving submit error:", err);
       if (err instanceof Error) {
@@ -109,7 +111,7 @@ export const ChatPopup = () => {
             </div>
 
             {/* PostInfoCard — 在 flex-col 文件流中，自然佔用高度並繼承父層寬度 */}
-            {post && (
+            {post && displayedItem && (
               <PostInfoCard
                 post={post}
                 item={displayedItem}

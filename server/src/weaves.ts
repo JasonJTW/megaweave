@@ -337,71 +337,27 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
       const newMetadata = { item_id: itemId, item_title: itemTitle, quantity, weave_id: result.insertId, post_id: postId, image_url: imageUrl };
 
-      // 檢查對話中最新的 system_start_weaving 訊息
-      const [existingMsgs] = await dbPool.execute<RowDataPacket[]>(
-        `SELECT id, metadata FROM messages WHERE conversation_id = ? AND message_type = 'system_start_weaving' ORDER BY id DESC LIMIT 1`,
-        [conversationId]
-      );
-
       const io = res.locals.io;
       const senderPublicId = req.user!.public_id;
 
-      let targetMsgId = null;
-      if (existingMsgs.length > 0) {
-        try {
-          const metaStr = existingMsgs[0].metadata;
-          const metaObj = typeof metaStr === 'string' ? JSON.parse(metaStr) : metaStr;
-          // 如果最新的系統訊息還沒有 weave_id，代表這是剛剛發送文字訊息時建立的「預備」卡片，我們就更新它
-          if (metaObj && !metaObj.weave_id) {
-            targetMsgId = existingMsgs[0].id;
-          }
-        } catch (e) {
-          console.error("Failed to parse metadata", e);
-        }
-      }
+      // 每次 Request 都新增一筆全新的 system_start_weaving 訊息（作為小卡）
+      const sysMsg = await messageService.createMessage(
+        conversationId,
+        initiatorId,
+        "Start Weaving",
+        undefined,
+        "system_start_weaving",
+        newMetadata
+      );
 
-      if (targetMsgId) {
-        // 已有舊的且無 weave_id 的 system_start_weaving，直接 UPDATE 補入 weave_id，不再新增
-        await dbPool.execute(
-          `UPDATE messages SET metadata = ? WHERE id = ?`,
-          [JSON.stringify(newMetadata), targetMsgId]
-        );
-
-        // Socket 推播更新後的訊息給雙方
-        if (io) {
-          const updatedPayload = {
-            id: targetMsgId,
-            conversation_id: conversationId,
-            sender_public_id: senderPublicId,
-            content: "Start Weaving",
-            message_type: "system_start_weaving",
-            metadata: newMetadata,
-            is_read: false,
-            created_at: new Date().toISOString(),
-          };
-          io.to(`user_${targetUserId}`).emit("update_message", updatedPayload);
-          io.to(`user_${initiatorId}`).emit("update_message", updatedPayload);
-        }
-      } else {
-        // 尚無 system_start_weaving，或是最新的已經有 weave_id 了，就新增一筆
-        const sysMsg = await messageService.createMessage(
-          conversationId,
-          initiatorId,
-          "Start Weaving",
-          undefined,
-          "system_start_weaving",
-          newMetadata
-        );
-
-        if (io) {
-          const sysMsgDTO = messageService.toMessageDTO(sysMsg, senderPublicId);
-          const sysPayload = { ...sysMsgDTO, conversation_id: conversationId };
-          io.to(`user_${targetUserId}`).emit("new_message", sysPayload);
-          io.to(`user_${initiatorId}`).emit("new_message", sysPayload);
-        }
+      if (io) {
+        const sysMsgDTO = messageService.toMessageDTO(sysMsg, senderPublicId);
+        const sysPayload = { ...sysMsgDTO, conversation_id: conversationId };
+        io.to(`user_${targetUserId}`).emit("new_message", sysPayload);
+        io.to(`user_${initiatorId}`).emit("new_message", sysPayload);
       }
     } catch (msgErr) {
-      console.error("Failed to create/update weave system message:", msgErr);
+      console.error("Failed to create weave system message:", msgErr);
     }
 
     return res.status(201).json({

@@ -84,7 +84,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
         {/* Private message for weaving button */}
         <Button
           variant="ghost"
-          className="px-0 py-0 flex items-center gap-1 hover:bg-transparent"
+          className={`px-0 py-0 flex items-center gap-1 hover:bg-transparent ${title == "All" || (quantity && quantity > 0) ? "" : "hidden"}`}
           onClick={handleWeavingMessageClick}
         >
           <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />

@@ -629,7 +629,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 let quantity = 1;
                 let imageUrl = "";
                 let weaveId = null;
-                let postId = null;
+                let currentItemId = null;
 
                 try {
                   const metadata =
@@ -640,18 +640,35 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   quantity = metadata?.quantity || 1;
                   imageUrl = metadata?.image_url || "";
                   weaveId = metadata?.weave_id || null;
-                  postId = metadata?.post_id || null;
+                  currentItemId = metadata?.item_id || null;
                 } catch {
                   // Ignore parse error
                 }
 
-                console.log("system_start_weaving metadata:", msg.metadata, "parsed weaveId:", weaveId);
+                // Check if there is an older system_start_weaving message for the same item in the message list
+                const hasOlderStartWeaving = messages
+                  .slice(index + 1)
+                  .some((m) => {
+                    if (m.message_type !== "system_start_weaving") return false;
+                    try {
+                      const mMeta =
+                        typeof m.metadata === "string"
+                          ? JSON.parse(m.metadata)
+                          : m.metadata;
+                      return String(mMeta?.item_id) === String(currentItemId);
+                    } catch {
+                      return false;
+                    }
+                  });
 
-                if (weaveId) {
-                  return (
-                    <React.Fragment key={msg.id}>
-                      <div className="w-full flex flex-col items-center">
-                        {/* 1. Start Weaving Banner (Dotted line text on top) */}
+                const shouldShowBanner = !weaveId || !hasOlderStartWeaving;
+                const shouldShowCard = !!weaveId;
+
+                return (
+                  <React.Fragment key={msg.id}>
+                    <div className="w-full flex flex-col items-center">
+                      {/* 1. Start Weaving Banner - Only show if not shown before for this item */}
+                      {shouldShowBanner && (
                         <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                           <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
@@ -659,13 +676,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                           </span>
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                         </div>
+                      )}
 
-                        {/* 2. Weaving Request Card (Directly below the banner) */}
+                      {/* 2. Weaving Request Card */}
+                      {shouldShowCard && (
                         <div className="flex flex-col items-center justify-center pb-4 w-full px-4">
                           <span className="text-[12px] font-bold text-[#9EB098] font-ddin uppercase tracking-wider mb-2">
                             Weaving Request Sent
                           </span>
-                          
+
                           <div className="w-full max-w-[360px] bg-primary-5 border border-primary-30/50 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow duration-200">
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               {imageUrl ? (
@@ -707,20 +726,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                             </div>
                           </div>
                         </div>
-                      </div>
-                      {dateHeader}
-                    </React.Fragment>
-                  );
-                }
-
-                return (
-                  <React.Fragment key={msg.id}>
-                    <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
-                      <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-                      <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
-                        Start weaving {itemTitle ? `for ${itemTitle}` : "!"}
-                      </span>
-                      <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                      )}
                     </div>
                     {dateHeader}
                   </React.Fragment>

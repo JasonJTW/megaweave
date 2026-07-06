@@ -269,7 +269,7 @@ function PostCardInner({
       )}
 
       {/*//* pt-3 for title margin */}
-      <div className="relative pt-3">
+      <div className="relative pt-3 min-h-[414px]">
         {post.type === "share" &&
           (isExpired ? (
             <ShareBadgeExpiredIcon className="absolute -top-1 right-5 z-20" />

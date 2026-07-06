@@ -304,14 +304,18 @@ function PostCardInner({
                   width={0}
                   height={0}
                   sizes="(min-width: 768px) 280px, 100vw"
-                  className={`w-full h-auto ${isExpired ? "saturate-0 brightness-95" : ""} sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover`}
+                  className="w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover"
                   priority={!!isFirstVisible}
                 />
                 {isExpired && (
                   <div
-                    className="absolute inset-0 bg-primary/40 mix-blend-multiply pointer-events-none"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50"
                     aria-hidden="true"
-                  />
+                  >
+                    <span className="font-ddin text-[28px] font-bold tracking-[0.12em] text-white sm:text-[32px]">
+                      OVERDUE
+                    </span>
+                  </div>
                 )}
               </div>
 

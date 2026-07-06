@@ -61,10 +61,10 @@ function UserPostCardInner({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
-      className="group relative h-[161px] w-[145px] cursor-pointer overflow-hidden rounded-[24px] bg-white font-ddin transition-all duration-300 hover:shadow-md"
+      className="group relative h-[161px] w-[145px] cursor-pointer rounded-[24px] bg-white font-ddin transition-all duration-300 hover:shadow-md"
     >
       {/* 圖片（常態顯示） */}
-      <div className="relative h-full w-full overflow-hidden bg-secondary/50">
+      <div className="relative h-full w-full bg-secondary/50">
         {imageSrc ? (
           <>
             <Image
@@ -72,16 +72,18 @@ function UserPostCardInner({
               alt={post.title}
               fill
               sizes="145px"
-              className={`object-cover transition-transform duration-300 group-hover:scale-[1.02] ${
-                isExpired ? "saturate-0 brightness-95" : ""
-              }`}
+              className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
               priority={!!isFirstVisible}
             />
             {isExpired && (
               <div
-                className="pointer-events-none absolute inset-0 bg-primary/40 mix-blend-multiply"
+                className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-black/50"
                 aria-hidden="true"
-              />
+              >
+                <span className="font-ddin text-[14px] font-bold tracking-[0.12em] text-white">
+                  OVERDUE
+                </span>
+              </div>
             )}
           </>
         ) : (
@@ -93,15 +95,15 @@ function UserPostCardInner({
         {/* 右上角標籤（常態顯示） */}
         {post.type === "share" &&
           (isExpired ? (
-            <ShareBadgeExpiredIcon className="absolute right-3 top-3 z-10 transition-opacity duration-200 group-hover:opacity-0" />
+            <ShareBadgeExpiredIcon className="absolute right-3 top-[-4px] z-10 transition-opacity duration-200 group-hover:opacity-0" />
           ) : (
-            <ShareBadgeIcon className="absolute right-3 top-3 z-10 transition-opacity duration-200 group-hover:opacity-0" />
+            <ShareBadgeIcon className="absolute right-3 top-[-4px] z-10 transition-opacity duration-200 group-hover:opacity-0" />
           ))}
         {post.type === "wish" &&
           (isExpired ? (
-            <SeekBadgeExpiredIcon className="absolute right-3 top-3 z-10 transition-opacity duration-200 group-hover:opacity-0" />
+            <SeekBadgeExpiredIcon className="absolute right-3 top-[-4px] z-10 transition-opacity duration-200 group-hover:opacity-0" />
           ) : (
-            <SeekBadgeIcon className="absolute right-3 top-3 z-10 transition-opacity duration-200 group-hover:opacity-0" />
+            <SeekBadgeIcon className="absolute right-3 top-[-4px] z-10 transition-opacity duration-200 group-hover:opacity-0" />
           ))}
 
         {/* hover 才顯示資訊 */}

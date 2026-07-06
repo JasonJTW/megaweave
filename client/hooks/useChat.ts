@@ -108,29 +108,44 @@ export const useChatSocket = (conversationId: number | null) => {
                     (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
                         if (!currentData) return currentData; // No-op: SWR fetch still in flight, don't corrupt cache
                         
-                        // 1. Check for duplicates by ID
-                        const isDuplicate = currentData.messages.some(m => m.id === newMessage.id);
-                        if (isDuplicate) {
-                            return currentData;
-                        }
-
-                        // 2. Check for optimistic message to replace (ID starts with 'temp-')
-                        const tempIndex = currentData.messages.findIndex(m => 
+                        let updatedMessages = [...currentData.messages];
+                        const tempIndex = updatedMessages.findIndex(m => 
                             String(m.id).startsWith("temp-") && 
                             m.content === newMessage.content && 
                             m.sender_public_id === newMessage.sender_public_id
                         );
 
                         if (tempIndex !== -1) {
-                            const newMessages = [...currentData.messages];
-                            newMessages[tempIndex] = newMessage;
-                            return { ...currentData, messages: newMessages };
+                            updatedMessages[tempIndex] = newMessage;
+                        } else {
+                            updatedMessages.push(newMessage);
                         }
 
-                        // 3. Otherwise, append
+                        // De-duplicate by message ID
+                        const seenIds = new Set();
+                        updatedMessages = updatedMessages.filter(m => {
+                            if (seenIds.has(m.id)) return false;
+                            seenIds.add(m.id);
+                            return true;
+                        });
+
+                        // Sort descending (latest first)
+                        updatedMessages.sort((a, b) => {
+                            const isTempA = String(a.id).startsWith("temp-");
+                            const isTempB = String(b.id).startsWith("temp-");
+                            if (isTempA && !isTempB) return -1;
+                            if (!isTempA && isTempB) return 1;
+                            if (isTempA && isTempB) {
+                                const timeA = parseInt(String(a.id).substring(5)) || 0;
+                                const timeB = parseInt(String(b.id).substring(5)) || 0;
+                                return timeB - timeA;
+                            }
+                            return Number(b.id) - Number(a.id);
+                        });
+
                         return {
                             ...currentData,
-                            messages: [newMessage, ...currentData.messages]
+                            messages: updatedMessages
                         };
                     },
                     false
@@ -254,9 +269,29 @@ export const useChatSocket = (conversationId: number | null) => {
         socket.on("new_message", handleNewMessage);
         socket.on("messages_read", handleMessagesRead);
 
+        // Handle in-place updates to existing messages (e.g. system_start_weaving gaining a weave_id)
+        const handleUpdateMessage = (updatedMessage: Message) => {
+            if (!conversationId || Number(conversationId) !== updatedMessage.conversation_id) return;
+            mutateMessages(
+                `${hostName}/api/messages/conversations/${conversationId}`,
+                (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
+                    if (!currentData) return currentData;
+                    return {
+                        ...currentData,
+                        messages: currentData.messages.map(m =>
+                            Number(m.id) === Number(updatedMessage.id) ? { ...m, ...updatedMessage } : m
+                        ),
+                    };
+                },
+                false
+            );
+        };
+        socket.on("update_message", handleUpdateMessage);
+
         return () => {
             socket.off("new_message", handleNewMessage);
             socket.off("messages_read", handleMessagesRead);
+            socket.off("update_message", handleUpdateMessage);
         };
     }, [socket, conversationId, mutateMessages, mutateConversations, user?.public_id]);
 

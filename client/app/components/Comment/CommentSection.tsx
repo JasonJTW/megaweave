@@ -8,10 +8,7 @@ import User from "../../types/user";
 import CommentCard from "./CommentCard";
 import CommentInput from "./CommentInput";
 import CommentItem from "./CommentItem";
-import { createWeave } from "@/services/weaveService";
 import { useRouter } from "next/navigation";
-// ✅ 引入 WeavingInput
-import WeavingInput from "./WeavingInput";
 import toast from "react-hot-toast";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import {
@@ -34,10 +31,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { openChat } = useChatPopup();
-  // ✅ 新增：追蹤哪個 Item 正在顯示 WeavingInput
-  const [weavingInputItem, setWeavingInputItem] = useState<ItemKey | null>(
-    null,
-  );
 
   const handleWeavingMessage = async (item: {
     key: ItemKey;
@@ -188,12 +181,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const handleItemClick = (itemKey: ItemKey) => {
     if (activeItemKey === itemKey) {
       setActiveItemKey(null);
-      // 關閉時，隱藏 Weaving Input
-      setWeavingInputItem(null);
     } else {
       setActiveItemKey(itemKey);
-      // 切換時，隱藏 Weaving Input
-      setWeavingInputItem(null);
     }
   };
 
@@ -202,75 +191,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     fetchCounts();
     if (activeItemKey !== null) {
       fetchCommentsByItem(activeItemKey);
-    }
-    // 成功發送索取後，關閉索取輸入框
-    setWeavingInputItem(null);
-  };
-
-  // ✅ 處理 Weaving Icon 點擊 (開啟索取輸入框)
-  const handleWeavingIconClick = (itemKey: ItemKey) => {
-    if (!user) {
-      toast.error("Please log in to request items.");
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
-      return;
-    }
-    // 1. 如果 Item 沒展開，先展開 Item
-    if (activeItemKey !== itemKey) {
-      setActiveItemKey(itemKey);
-    }
-    // 2. 顯示 Weaving Input
-    setWeavingInputItem(itemKey);
-  };
-
-  // ✅ 處理索取留言的提交邏輯
-  const handleWeavingSubmit = async (
-    itemKey: ItemKey,
-    quantity: number | "all",
-  ) => {
-    //* check login
-    if (!user) {
-      toast.error("Please log in to request items.");
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
-      return;
-    }
-
-    // 防止自己索取自己的文章 (雖然前端檢查了，後端 weaves.ts 也會擋，但前端擋住體驗較好)
-    if (user.userId === (post.author_user_id ?? post.user_id)) {
-      toast.error("You cannot request your own items.");
-      return;
-    }
-    try {
-      // 1. 轉換 itemId
-      // 如果 itemKey 是 "all" 字串，後端對應為 null；否則就是具體的 item id (number)
-      const targetItemId = itemKey === "all" ? null : (itemKey as number);
-
-      // 2. 轉換 quantity
-      // 如果前端回傳 "all" (字串)，代表是針對整篇貼文的索取，後端數量記為 1
-      // 如果是具體數字，則直接使用
-      const targetQuantity = typeof quantity === "number" ? quantity : 1;
-
-      // 3. 發送請求 (使用 fetch)
-      const newWeave = await createWeave({
-        postId: post.id,
-        itemId: targetItemId,
-        quantity: targetQuantity,
-      });
-      console.log("newWeave:", newWeave);
-      router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
-      // 4. 成功處理
-      toast.success("Request sent successfully!");
-      handleCommentSuccess(); // 重新整理列表並關閉輸入框
-    } catch (err: unknown) {
-      console.error("Error creating weave:", err);
-      if (err instanceof Error) {
-        toast.error(err.message);
-      } else {
-        toast.error("An unexpected error occurred.");
-      }
     }
   };
 
@@ -307,8 +227,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
             quantity={item.quantity}
             isOpen={activeItemKey === item.key}
             onToggle={() => handleItemClick(item.key)}
-            // ✅ All 也允許發起 Weaving (索取所有)
-            onWeaving={() => handleWeavingIconClick(item.key)}
             onPrivateMessage={() => handleWeavingMessage(item)}
           />
           <AnimatePresence>
@@ -320,7 +238,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 className="overflow-hidden"
               >
-                <div className=" p-4 bg-primary-5 rounded-b-[18px]">
+                <div className="p-4 bg-primary-5 rounded-b-[18px]">
                   <CommentInput
                     postId={post.id}
                     itemId={item.key === "all" ? "all" : item.key}
@@ -332,18 +250,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                     }
                     onSuccess={handleCommentSuccess}
                   />
-
-                  {/* ✅ 條件渲染 WeavingInput */}
-                  {weavingInputItem === item.key && (
-                    <WeavingInput
-                      user={user}
-                      type={item.key === "all" ? "all" : "item"} // 傳遞 type
-                      // All 的 quantityLeft 設為 0 (或忽略)
-                      quantityLeft={item.quantity ?? 0}
-                      onWeavingSubmit={(q) => handleWeavingSubmit(item.key, q)}
-                      onCancel={() => setWeavingInputItem(null)}
-                    />
-                  )}
 
                   {/* 留言列表 */}
                   <div className="mt-4">

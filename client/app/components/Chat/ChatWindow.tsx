@@ -405,8 +405,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const content = inputValue;
     const filesToSend = [...selectedFiles];
     const previewUrls = [...previews];
-    // Capture and immediately clear the pending intent so it doesn't
-    // linger in the UI while the request is in-flight.
+    // Capture and immediately clear the pending intent so the banner disappears
+    // once the user sends their first message.
     const itemToSend = pendingItem;
     setPendingItem(null);
 
@@ -543,8 +543,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {/* Anchor point for scrolling to bottom */}
         <div ref={messagesEndRef} />
 
-        {/* Optimistic "Start weaving" banner — rendered from local state
-            only (no DB write yet). Disappears when the user sends a message. */}
+        {/* Optimistic "Start weaving" banner — shows at the visual bottom of the
+            chat (near the input box) while the user is composing their first
+            message. Disappears once the message is sent. */}
         {pendingItem && (
           <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
             <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
@@ -625,24 +626,107 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
               if (msg.message_type === "system_start_weaving") {
                 let itemTitle = "";
+                let quantity = 1;
+                let imageUrl = "";
+                let weaveId = null;
+                let currentItemId = null;
+
                 try {
                   const metadata =
                     typeof msg.metadata === "string"
                       ? JSON.parse(msg.metadata)
                       : msg.metadata;
                   itemTitle = metadata?.item_title || "";
+                  quantity = metadata?.quantity || 1;
+                  imageUrl = metadata?.image_url || "";
+                  weaveId = metadata?.weave_id || null;
+                  currentItemId = metadata?.item_id || null;
                 } catch {
                   // Ignore parse error
                 }
 
+                // Check if there is an older system_start_weaving message for the same item in the message list
+                const hasOlderStartWeaving = messages
+                  .slice(index + 1)
+                  .some((m) => {
+                    if (m.message_type !== "system_start_weaving") return false;
+                    try {
+                      const mMeta =
+                        typeof m.metadata === "string"
+                          ? JSON.parse(m.metadata)
+                          : m.metadata;
+                      return String(mMeta?.item_id) === String(currentItemId);
+                    } catch {
+                      return false;
+                    }
+                  });
+
+                const shouldShowBanner = !weaveId || !hasOlderStartWeaving;
+                const shouldShowCard = !!weaveId;
+
                 return (
                   <React.Fragment key={msg.id}>
-                    <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
-                      <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-                      <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
-                        Start weaving {itemTitle ? `for ${itemTitle}` : "!"}
-                      </span>
-                      <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                    <div className="w-full flex flex-col items-center">
+                      {/* 1. Start Weaving Banner - Only show if not shown before for this item */}
+                      {shouldShowBanner && (
+                        <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
+                          <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                          <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
+                            Start weaving {itemTitle ? `for ${itemTitle}` : "!"}
+                          </span>
+                          <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                        </div>
+                      )}
+
+                      {/* 2. Weaving Request Card */}
+                      {shouldShowCard && (
+                        <div className="flex flex-col items-center justify-center pb-4 w-full px-4">
+                          <span className="text-[12px] font-bold text-[#9EB098] font-ddin uppercase tracking-wider mb-2">
+                            Weaving Request Sent
+                          </span>
+
+                          <div className="w-full max-w-[360px] bg-primary-5 border border-primary-30/50 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              {imageUrl ? (
+                                <div className="relative w-12 h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                                  <Image
+                                    fill
+                                    src={imageUrl}
+                                    className="object-cover"
+                                    alt={itemTitle}
+                                    sizes="48px"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-[9px] text-gray-400 flex-shrink-0">
+                                  No img
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1 text-left">
+                                <div className="font-bold text-[14px] text-gray-800 truncate leading-tight">
+                                  {itemTitle}
+                                </div>
+                                <div className="text-[11px] text-gray-500 leading-none mt-1">
+                                  Request Qty: {quantity}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-white">
+                                Pending
+                              </span>
+                              <Link
+                                href={`/user?highlightWeaveId=${weaveId}`}
+                                className="text-[11px] text-primary hover:underline font-bold"
+                              >
+                                View Detail &rarr;
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {dateHeader}
                   </React.Fragment>

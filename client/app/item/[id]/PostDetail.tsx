@@ -1,28 +1,24 @@
 //* item/id/page.tsx
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import {
-  ArrowLeft,
-  Heart,
-  Share2,
-  // User as UserIcon,
-} from "lucide-react";
-import ImageGallery from "../../components/ImageGallery/ImageGalley";
-import CommentSection from "../../components/Comment/CommentSection";
-import { Post, Condition } from "../../types/schema";
-import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
-import EyesIcon from "../../components/icons/EyesIcon";
+import { MessageButton } from "@/app/components/Chat/MessageButton";
+import ClockIcon from "@/app/components/icons/ClockIcon";
+import LocationIcon from "@/app/components/icons/LocationIcon";
+import MessageIcon from "@/app/components/icons/MessageIcon";
 import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
-import LocationIcon from "@/app/components/icons/LocationIcon";
-import ClockIcon from "@/app/components/icons/ClockIcon";
-import MessageIcon from "@/app/components/icons/MessageIcon";
-import { MessageButton } from "@/app/components/Chat/MessageButton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Heart, Share2 } from "lucide-react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import CommentSection from "../../components/Comment/CommentSection";
+import EyesIcon from "../../components/icons/EyesIcon";
+import ImageGallery from "../../components/ImageGallery/ImageGalley";
+import PostShareModal from "../../components/PostShareModal";
 import { useUser } from "../../contexts/UserContext";
+import { Condition, Post } from "../../types/schema";
 
 type PostDetailProps = {
   postId: string;
@@ -42,6 +38,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // 互動狀態
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // back and share bar
   const [hidden, setHidden] = useState(false);
@@ -296,7 +293,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 </Button>
               </div>
               <div className="flex items-center space-x-2">
-                <Button variant="ghost" onClick={handleIGShare} className="p-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShareModalOpen(true)}
+                  className="p-4"
+                >
                   <Share2 className="w-8 h-8" />
                 </Button>
                 {/* <Button
@@ -470,6 +471,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
           </div>
         </div>
       </div>
+      <PostShareModal
+        open={shareModalOpen}
+        onOpenChange={setShareModalOpen}
+        post={post}
+        condition={condition}
+        onInstagramShare={handleIGShare}
+      />
     </>
   );
 };

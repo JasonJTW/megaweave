@@ -335,7 +335,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         imageUrl = imgRows[0].image_url;
       }
 
-      const newMetadata = { item_id: itemId, item_title: itemTitle, quantity, weave_id: result.insertId, post_id: postId, image_url: imageUrl };
+      const postAuthorPublicId = await messageService.getPublicIdByUserId(postOwnerId);
+      const newMetadata = { item_id: itemId, item_title: itemTitle, quantity, weave_id: result.insertId, post_id: postId, image_url: imageUrl, post_type: postType, post_author_public_id: postAuthorPublicId };
 
       const io = res.locals.io;
       const senderPublicId = req.user!.public_id;

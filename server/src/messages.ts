@@ -5,6 +5,8 @@ import { Server } from "socket.io";
 import { memoryUpload, uploadToS3 } from "./upload";
 import { imageProcessor } from "./utils/imageProcessor";
 import { randomUUID } from "crypto";
+import { RowDataPacket } from "mysql2";
+import dbPool from "./utils/db";
 
 const router = Router();
 
@@ -87,7 +89,7 @@ router.post(
   async (req: Request, res: Response) => {
     const senderId = req.user!.userId;
     const senderPublicId = req.user!.public_id;
-    const { recipient_public_id, content, item_id, item_title } = req.body;
+    const { recipient_public_id, content, item_id, item_title, post_id } = req.body;
 
     if (
       !recipient_public_id ||
@@ -139,13 +141,32 @@ router.post(
       // 2. If the user had a pending weaving intent, persist it as a system message first.
       //    This only happens on the FIRST real message sent for a given item.
       if (item_id && item_title) {
+        const parsedPostId = post_id ? parseInt(post_id as string) : undefined;
+        let postType: string | undefined;
+        let postAuthorPublicId: string | undefined;
+        if (parsedPostId) {
+          const [postRows] = await dbPool.execute<RowDataPacket[]>(
+            "SELECT p.type, u.public_id FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?",
+            [parsedPostId]
+          );
+          if (postRows.length > 0) {
+            postType = postRows[0].type;
+            postAuthorPublicId = postRows[0].public_id;
+          }
+        }
         const sysMsg = await messageService.createMessage(
           conversationId,
           senderId,
           "Start Weaving",
           undefined,
           "system_start_weaving",
-          { item_id, item_title },
+          {
+            item_id,
+            item_title,
+            post_id: parsedPostId,
+            post_type: postType,
+            post_author_public_id: postAuthorPublicId,
+          },
         );
         if (io) {
           const sysMsgDTO = messageService.toMessageDTO(sysMsg, senderPublicId);

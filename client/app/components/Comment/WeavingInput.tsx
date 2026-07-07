@@ -1,4 +1,5 @@
 // components/Comment/WeavingInput.tsx
+// Need to be reviewed, probobly its a unused file
 "use client";
 
 import React, { useState, useRef } from "react";
@@ -39,7 +40,7 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
 
   const availableQuantities = Array.from(
     { length: Math.min(quantityLeft, MAX_WEAVING_QUANTITY) },
-    (_, i) => i + 1
+    (_, i) => i + 1,
   );
 
   // 移除了 handleClickOutside 邏輯，因為 Shadcn Select 會自動處理點擊外部關閉

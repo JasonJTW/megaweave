@@ -63,7 +63,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Consume pendingItem from global context — represents the weaving intent
   // before the user sends their first real message.
-  const { pendingItem, setPendingItem } = useChatPopup();
+  const { pendingItem, setPendingItem, post, conversationId: popupConvId } = useChatPopup();
+  // ponytail: activePost only used for optimistic banner, same conv check
+  const activePost = popupConvId === conversationId ? post : null;
 
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -453,6 +455,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       if (itemToSend) {
         formData.append("item_id", String(itemToSend.id));
         formData.append("item_title", itemToSend.title);
+        if (post && post.id) {
+          formData.append("post_id", String(post.id));
+        }
       }
 
       // Compress and append images
@@ -547,15 +552,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {/* Optimistic "Start weaving" banner — shows at the visual bottom of the
             chat (near the input box) while the user is composing their first
             message. Disappears once the message is sent. */}
-        {pendingItem && (
-          <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
-            <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-            <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
-              Start weaving for {pendingItem.title}
-            </span>
-            <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-          </div>
-        )}
+        {pendingItem && (() => {
+          let optimisticIsGiver = false;
+          if (activePost && currentUser) {
+            const isPostAuthor = activePost.author_public_id === currentUser.public_id;
+            optimisticIsGiver = (activePost.type === "share" || activePost.type === "commons") ? isPostAuthor : !isPostAuthor;
+          }
+          const optimisticBannerText = activePost
+            ? optimisticIsGiver
+              ? `Start weaving to give ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
+              : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
+            : `Start weaving for ${pendingItem.title}`;
+          return (
+            <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
+              <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+              <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
+                {optimisticBannerText}
+              </span>
+              <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+            </div>
+          );
+        })()}
 
         {isLoading ? (
           <div className="text-center text-gray-400 mt-10">
@@ -631,6 +648,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 let imageUrl = "";
                 let weaveId = null;
                 let currentItemId = null;
+                let postType: string | null = null;
+                let postAuthorPublicId: string | null = null;
 
                 try {
                   const metadata =
@@ -642,11 +661,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   imageUrl = metadata?.image_url || "";
                   weaveId = metadata?.weave_id || null;
                   currentItemId = metadata?.item_id || null;
+                  postType = metadata?.post_type || null;
+                  postAuthorPublicId = metadata?.post_author_public_id || null;
                 } catch {
                   // Ignore parse error
                 }
 
-                // Check if there is an older system_start_weaving message for the same item in the message list
+                // Determine role from metadata — no async fetch needed
+                const isPostAuthor = postAuthorPublicId === currentUser?.public_id;
+                const isGiver = postType
+                  ? (postType === "share" || postType === "commons") ? isPostAuthor : !isPostAuthor
+                  : false;
+
+                const bannerText = postType
+                  ? isGiver
+                    ? `Start weaving to give for ${itemTitle}`.trim()
+                    : `Start weaving to request for ${itemTitle}`.trim()
+                  : `Start weaving ${itemTitle ? `for ${itemTitle}` : "!"}`;
+
+                // Only show banner for the first occurrence per item
                 const hasOlderStartWeaving = messages
                   .slice(index + 1)
                   .some((m) => {
@@ -668,24 +701,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 return (
                   <React.Fragment key={msg.id}>
                     <div className="w-full flex flex-col items-center">
-                      {/* 1. Start Weaving Banner - Only show if not shown before for this item */}
                       {shouldShowBanner && (
                         <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                           <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
-                            Start weaving {itemTitle ? `for ${itemTitle}` : "!"}
+                            {bannerText}
                           </span>
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                         </div>
                       )}
-
-                      {/* 2. Weaving Request Card */}
                       {shouldShowCard && (
                         <WeavingRequestCard
                           itemTitle={itemTitle}
                           quantity={quantity}
                           imageUrl={imageUrl || undefined}
                           weaveId={weaveId!}
+                          isGiver={isGiver}
                         />
                       )}
                     </div>

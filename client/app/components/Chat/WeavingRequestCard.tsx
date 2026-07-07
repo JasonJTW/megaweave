@@ -8,6 +8,7 @@ interface WeavingRequestCardProps {
   quantity: number;
   imageUrl?: string;
   weaveId: number | string;
+  isGiver?: boolean;
 }
 
 const WeavingRequestCard: React.FC<WeavingRequestCardProps> = ({
@@ -15,11 +16,12 @@ const WeavingRequestCard: React.FC<WeavingRequestCardProps> = ({
   quantity,
   imageUrl,
   weaveId,
+  isGiver = false,
 }) => {
   return (
     <div className="flex flex-col items-center justify-center pb-4 w-full px-4">
       <span className="text-[12px] font-bold text-[#9EB098] font-ddin uppercase tracking-wider mb-2">
-        Weaving Request Sent
+        {isGiver ? "Weaving Request Received" : "Weaving Request Sent"}
       </span>
 
       <div className="w-full max-w-[360px] bg-primary-5 border border-primary-30/50 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-sm hover:shadow-md transition-shadow duration-200">

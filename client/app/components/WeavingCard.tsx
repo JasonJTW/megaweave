@@ -12,7 +12,7 @@ import WeavingIcon from "./icons/WeavingIcon";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-interface DrawerListItemProps {
+interface WeavesCardProps {
   post: Post;
   weave?: Weave;
   currentUserId?: number;
@@ -35,9 +35,15 @@ function getThumbnail(post: Post): string | undefined {
   return undefined;
 }
 
-function getDisplayUsername(post: Post, weave: Weave | undefined, currentUserId?: number): string {
+function getDisplayUsername(
+  post: Post,
+  weave: Weave | undefined,
+  currentUserId?: number,
+): string {
   if (weave && currentUserId) {
-    return currentUserId === weave.giver_id ? weave.receiver_name : weave.giver_name;
+    return currentUserId === weave.giver_id
+      ? weave.receiver_name
+      : weave.giver_name;
   }
   return post.username;
 }
@@ -46,27 +52,32 @@ type WeaveStatusLabel = "Weaved" | "Weaving" | "Canceled";
 
 function getWeaveStatusLabel(status: Weave["status"]): WeaveStatusLabel | null {
   switch (status) {
-    case "completed": return "Weaved";
-    case "pending": return "Weaving";
-    case "cancelled": return "Canceled";
-    default: return null;
+    case "completed":
+      return "Weaved";
+    case "pending":
+      return "Weaving";
+    case "cancelled":
+      return "Canceled";
+    default:
+      return null;
   }
 }
 
-const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> = {
-  Weaved:  { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
-  Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
-  Canceled:{ badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
-};
+const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> =
+  {
+    Weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
+    Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
+    Canceled: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
+  };
 
-const DrawerListItem = ({
+const WeavingCard = ({
   post,
   weave,
   currentUserId,
   onClick,
   isHighlighted,
   onWeaveStatusChange,
-}: DrawerListItemProps) => {
+}: WeavesCardProps) => {
   const thumbnail = getThumbnail(post);
   const username = getDisplayUsername(post, weave, currentUserId);
   const items = post.items ?? [];
@@ -76,8 +87,12 @@ const DrawerListItem = ({
   // ── Weave state ──────────────────────────────────────────────────────────
   const [isProcessing, setIsProcessing] = useState(false);
   const [localWeaveStatus, setLocalWeaveStatus] = useState(weave?.status);
-  const [localGiverConfirmed, setLocalGiverConfirmed] = useState(!!weave?.giver_confirmed);
-  const [localReceiverConfirmed, setLocalReceiverConfirmed] = useState(!!weave?.receiver_confirmed);
+  const [localGiverConfirmed, setLocalGiverConfirmed] = useState(
+    !!weave?.giver_confirmed,
+  );
+  const [localReceiverConfirmed, setLocalReceiverConfirmed] = useState(
+    !!weave?.receiver_confirmed,
+  );
 
   // Sync state when weave props change (e.g. after parent refreshes)
   React.useEffect(() => {
@@ -86,10 +101,12 @@ const DrawerListItem = ({
     setLocalReceiverConfirmed(!!weave?.receiver_confirmed);
   }, [weave?.status, weave?.giver_confirmed, weave?.receiver_confirmed]);
 
-  const isGiver    = currentUserId === weave?.giver_id;
+  const isGiver = currentUserId === weave?.giver_id;
   const isReceiver = currentUserId === weave?.receiver_id;
-  const hasIConfirmed    = isGiver ? localGiverConfirmed    : localReceiverConfirmed;
-  const hasOtherConfirmed = isGiver ? localReceiverConfirmed : localGiverConfirmed;
+  const hasIConfirmed = isGiver ? localGiverConfirmed : localReceiverConfirmed;
+  const hasOtherConfirmed = isGiver
+    ? localReceiverConfirmed
+    : localGiverConfirmed;
 
   const currentStatus = localWeaveStatus || weave?.status;
   const statusLabel = currentStatus ? getWeaveStatusLabel(currentStatus) : null;
@@ -97,8 +114,12 @@ const DrawerListItem = ({
   const displayUser =
     weave && currentUserId
       ? currentUserId === weave.giver_id
-        ? { name: weave.receiver_name, avatar: weave.receiver_avatar, role: "Receiver" }
-        : { name: weave.giver_name,    avatar: weave.giver_avatar,    role: "Giver" }
+        ? {
+            name: weave.receiver_name,
+            avatar: weave.receiver_avatar,
+            role: "Receiver",
+          }
+        : { name: weave.giver_name, avatar: weave.giver_avatar, role: "Giver" }
       : null;
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -116,14 +137,18 @@ const DrawerListItem = ({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`${hostName}/api/weaves/${weave.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "completed" }),
-      });
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: "completed" }),
+        },
+      );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.errorMessage || "Failed to update");
+      if (!response.ok)
+        throw new Error(data.errorMessage || "Failed to update");
 
       if (data.newStatus === "completed") {
         setLocalWeaveStatus("completed");
@@ -133,7 +158,9 @@ const DrawerListItem = ({
       } else {
         if (isGiver) setLocalGiverConfirmed(true);
         if (isReceiver) setLocalReceiverConfirmed(true);
-        toast.success("Your confirmation received. Waiting for the other party.");
+        toast.success(
+          "Your confirmation received. Waiting for the other party.",
+        );
       }
       onWeaveStatusChange?.();
     } catch (error) {
@@ -146,7 +173,10 @@ const DrawerListItem = ({
   const handleCancelWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!weave || isProcessing) return;
-    if (currentUserId !== weave.giver_id && currentUserId !== weave.receiver_id) {
+    if (
+      currentUserId !== weave.giver_id &&
+      currentUserId !== weave.receiver_id
+    ) {
       toast.error("You are not authorized to cancel this weave");
       return;
     }
@@ -158,20 +188,26 @@ const DrawerListItem = ({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`${hostName}/api/weaves/${weave.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "cancelled" }),
-      });
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: "cancelled" }),
+        },
+      );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.errorMessage || "Failed to cancel weave");
+      if (!response.ok)
+        throw new Error(data.errorMessage || "Failed to cancel weave");
 
       setLocalWeaveStatus("cancelled");
       toast.success("Weave cancelled successfully!");
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to cancel weave");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel weave",
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -189,7 +225,13 @@ const DrawerListItem = ({
       <div className="flex w-full gap-3">
         <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl bg-secondary/50">
           {thumbnail ? (
-            <Image src={thumbnail} alt={post.title} fill sizes="72px" className="object-cover" />
+            <Image
+              src={thumbnail}
+              alt={post.title}
+              fill
+              sizes="72px"
+              className="object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-xs text-primary-75">
               No image
@@ -204,7 +246,9 @@ const DrawerListItem = ({
               <span
                 className={`inline-flex font-bold shrink-0 items-center gap-1 rounded-full px-2 py-0.5 type-body-t5 ${statusStyles[statusLabel].badge}`}
               >
-                <WeavingIcon className={`h-3 w-3 ${statusStyles[statusLabel].icon}`} />
+                <WeavingIcon
+                  className={`h-3 w-3 ${statusStyles[statusLabel].icon}`}
+                />
                 {statusLabel}
               </span>
             )}
@@ -213,13 +257,17 @@ const DrawerListItem = ({
           {statusLabel && <div className="my-2 border-b border-primary-30" />}
 
           <p className="flex min-w-0 items-baseline type-body-t5 font-bold text-dark">
-            <span className={`min-w-0 truncate text-dark ${post.content ? "max-w-[50%]" : ""}`}>
+            <span
+              className={`min-w-0 truncate text-dark ${post.content ? "max-w-[50%]" : ""}`}
+            >
               {post.title}
             </span>
             {post.content && (
               <>
                 <span className="shrink-0">: </span>
-                <span className="min-w-0 max-w-[50%] truncate text-dark">{post.content}</span>
+                <span className="min-w-0 max-w-[50%] truncate text-dark">
+                  {post.content}
+                </span>
               </>
             )}
           </p>
@@ -232,10 +280,14 @@ const DrawerListItem = ({
                   className="flex items-center justify-between gap-2 type-body-t5 text-dark"
                 >
                   <span className="truncate">{item.title}</span>
-                  <span className="shrink-0 text-primary-75">*{item.quantity}</span>
+                  <span className="shrink-0 text-primary-75">
+                    *{item.quantity}
+                  </span>
                 </div>
               ))}
-              {hasMoreItems && <p className="type-body-t5 text-primary-75">......</p>}
+              {hasMoreItems && (
+                <p className="type-body-t5 text-primary-75">......</p>
+              )}
             </div>
           )}
         </div>
@@ -249,7 +301,12 @@ const DrawerListItem = ({
         >
           {displayUser.avatar ? (
             <div className="w-9 h-9 rounded-full overflow-hidden relative flex-shrink-0">
-              <Image src={displayUser.avatar} alt={displayUser.name} fill className="object-cover" />
+              <Image
+                src={displayUser.avatar}
+                alt={displayUser.name}
+                fill
+                className="object-cover"
+              />
             </div>
           ) : (
             <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
@@ -258,7 +315,9 @@ const DrawerListItem = ({
           )}
 
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-[#222] type-body-t4 font-semibold">{displayUser.name}</span>
+            <span className="text-[#222] type-body-t4 font-semibold">
+              {displayUser.name}
+            </span>
             <span className="text-[#666] type-body-t5">{displayUser.role}</span>
 
             {currentStatus === "pending" && (
@@ -297,7 +356,9 @@ const DrawerListItem = ({
                 className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
                 title={hasIConfirmed ? "You have confirmed" : "Complete weave"}
               >
-                <AcceptIcon className={`w-[18px] h-auto ${hasIConfirmed ? "stroke-[3px]" : ""}`} />
+                <AcceptIcon
+                  className={`w-[18px] h-auto ${hasIConfirmed ? "stroke-[3px]" : ""}`}
+                />
               </button>
               <button
                 onClick={handleCancelWeave}
@@ -315,7 +376,9 @@ const DrawerListItem = ({
             <div className="ml-auto">
               <span
                 className={`text-sm font-semibold ${
-                  currentStatus === "completed" ? "text-green-600" : "text-red-600"
+                  currentStatus === "completed"
+                    ? "text-green-600"
+                    : "text-red-600"
                 }`}
               >
                 {currentStatus === "completed" ? "✓ Completed" : "✗ Cancelled"}
@@ -328,4 +391,4 @@ const DrawerListItem = ({
   );
 };
 
-export default DrawerListItem;
+export default WeavingCard;

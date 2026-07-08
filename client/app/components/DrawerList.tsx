@@ -4,7 +4,7 @@ import { ChevronDown, LucideLoader2, LucideRefreshCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
-import DrawerListItem from "./DrawerListItem";
+import WeavingCard from "./WeavingCard";
 
 const MAX_VISIBLE_POSTS = 5;
 const LIST_ITEM_ESTIMATED_HEIGHT_PX = 120;
@@ -182,7 +182,9 @@ const DrawerList: React.FC<DrawerListProps> = ({
             {postsToRender.length > 0 ? (
               <div
                 className={`flex flex-col gap-3 pb-2 transition-all duration-300 ${
-                  isRefreshing ? "opacity-40 pointer-events-none select-none" : ""
+                  isRefreshing
+                    ? "opacity-40 pointer-events-none select-none"
+                    : ""
                 } ${shouldScrollList ? "overflow-y-auto" : ""}`}
                 style={
                   shouldScrollList
@@ -207,7 +209,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
                         listRef.current[index] = el;
                       }}
                     >
-                      <DrawerListItem
+                      <WeavingCard
                         post={post}
                         weave={weave}
                         currentUserId={currentUserId}
@@ -220,7 +222,9 @@ const DrawerList: React.FC<DrawerListProps> = ({
                 })}
               </div>
             ) : (
-              <div className="py-8 text-center text-gray-500">{emptyMessage}</div>
+              <div className="py-8 text-center text-gray-500">
+                {emptyMessage}
+              </div>
             )}
           </div>
         </motion.div>

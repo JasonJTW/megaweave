@@ -58,6 +58,7 @@ export const ChatPopup = () => {
         itemId: targetItemId,
         quantity: targetQuantity,
       });
+      void newWeave;
 
       // Clear all UI state after a successful weave
       setPendingItem(null);

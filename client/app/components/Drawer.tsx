@@ -13,8 +13,6 @@ interface DrawerProps {
   posts: Post[];
   conditions: Condition[];
   weaves?: Weave[];
-  currentUserId?: number;
-  onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
   fetchWeaves?: () => void | Promise<void>;
 }
@@ -24,8 +22,6 @@ const Drawer: React.FC<DrawerProps> = ({
   posts,
   conditions,
   weaves,
-  currentUserId,
-  onWeaveStatusChange,
   highlightWeaveId,
   fetchWeaves,
 }) => {
@@ -157,8 +153,6 @@ const Drawer: React.FC<DrawerProps> = ({
                 conditions={conditions}
                 onPostClick={(post) => router.push(`/item/${post.id}`)}
                 weaves={weaves}
-                currentUserId={currentUserId}
-                onWeaveStatusChange={onWeaveStatusChange}
                 highlightWeaveId={highlightWeaveId}
               />
             ) : (

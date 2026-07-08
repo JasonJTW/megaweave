@@ -14,8 +14,6 @@ interface FeedProps {
   conditions: Condition[];
   onPostClick: (post: Post) => void;
   weaves?: Weave[];
-  currentUserId?: number;
-  onWeaveStatusChange?: () => void;
   highlightWeaveId?: number;
   onCategoryClick?: (categoryId: number) => void;
   onLocationClick?: (
@@ -31,8 +29,6 @@ export default function Feed({
   conditions,
   onPostClick,
   weaves,
-  currentUserId,
-  onWeaveStatusChange,
   highlightWeaveId,
   onCategoryClick,
   onLocationClick,
@@ -277,9 +273,6 @@ export default function Feed({
                 onPostClick={handlePostClick}
                 isExpanded={true}
                 isFirstVisible={i === 0}
-                weave={weave} // ✅ 傳遞 weave 資料
-                currentUserId={currentUserId} // ✅ 傳遞當前用戶 ID
-                onWeaveStatusChange={onWeaveStatusChange}
                 onCategoryClick={onCategoryClick}
                 onLocationClick={onLocationClick}
               />

@@ -187,7 +187,6 @@ const UserPage = () => {
   const [stats, setStats] = useState<UserStats>(defaultStats);
   const router = useRouter();
   const { refetchTeamMembers } = useTeam();
-  const [posts, setPosts] = useState<Post[]>([]);
   const [weaves, setWeaves] = useState<Weave[]>([]);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const { conditions } = usePost();
@@ -434,9 +433,7 @@ const UserPage = () => {
           errorMessage.errorMessage || "Failed to fetch user stats",
         );
       }
-      const statsData = await response.json();
-      const postsData = statsData.posts || [];
-      setPosts(postsData);
+       const statsData = await response.json();
       console.log("Fetched User Stats: ", statsData);
 
       setStats({
@@ -1063,9 +1060,6 @@ const UserPage = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loading, redirecting, router]);
-
-  const sharePosts = posts.filter((post) => post.type === "share");
-  const wishPosts = posts.filter((post) => post.type === "wish");
 
   useEffect(() => {
     console.log("Fetched UserId: ", user?.userId);

@@ -1445,10 +1445,6 @@ const PostsApp = () => {
                   router.push(`/item/${post.id}`);
                 }}
                 weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
-                currentUserId={user?.userId}
-                onWeaveStatusChange={() => {
-                  mutate(); // 重新抓取資料
-                }}
                 onCategoryClick={(categoryId) => {
                   setSelectedCategory(categoryId.toString());
                   window.scrollTo({ top: 300, behavior: "smooth" });

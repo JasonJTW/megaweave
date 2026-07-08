@@ -28,6 +28,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
   currentUserId,
   highlightWeaveId,
   fetchWeaves,
+  onWeaveStatusChange,
 }) => {
   const router = useRouter();
   const listRef = useRef<(HTMLDivElement | null)[]>([]);
@@ -212,6 +213,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
                         currentUserId={currentUserId}
                         isHighlighted={weave?.id === highlightWeaveId}
                         onClick={() => router.push(`/item/${post.id}`)}
+                        onWeaveStatusChange={onWeaveStatusChange}
                       />
                     </div>
                   );

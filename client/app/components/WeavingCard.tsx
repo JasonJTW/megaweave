@@ -2,6 +2,7 @@
 
 import type { Weave } from "@/services/weaveService";
 import Image from "next/image";
+import Link from "next/link";
 import { User as UserIcon } from "lucide-react";
 import React from "react";
 import type { Post } from "../types/schema";
@@ -12,12 +13,22 @@ import { useWeaveActions } from "@/hooks/useWeaveActions";
 
 
 interface WeavesCardProps {
-  post: Post;
+  post?: Post;
   weave?: Weave;
   currentUserId?: number;
-  onClick: () => void;
+  onClick?: () => void;
   isHighlighted?: boolean;
   onWeaveStatusChange?: () => void;
+  // ── Compact / chat-inline mode ─────────────────────────────────────────
+  // When these are provided, the card renders a compact summary card
+  // (used in ChatWindow) without requiring a full Post or Weave object.
+  compactMode?: {
+    itemTitle: string;
+    quantity: number;
+    imageUrl?: string;
+    weaveId: number | string;
+    isGiver: boolean;
+  };
 }
 
 function getThumbnail(post: Post): string | undefined {
@@ -76,7 +87,59 @@ const WeavingCard = ({
   onClick,
   isHighlighted,
   onWeaveStatusChange,
+  compactMode,
 }: WeavesCardProps) => {
+  // ── Compact mode (chat inline card) ────────────────────────────────────
+  if (compactMode) {
+    const { itemTitle, quantity, imageUrl, weaveId, isGiver } = compactMode;
+    return (
+      <div className="flex w-full flex-col rounded-[20px] bg-white p-3 text-left">
+        {/* Row 1: thumbnail + item info — mirrors full-mode Row 1 */}
+        <div className="flex w-full gap-3">
+          <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl bg-secondary/50">
+            {imageUrl ? (
+              <Image src={imageUrl} alt={itemTitle} fill sizes="72px" className="object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-primary-75">
+                No image
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <span className="type-h5 text-primary">
+                {isGiver ? "Weaving Request Received" : "Weaving Request Sent"}
+              </span>
+              <span className="inline-flex font-bold shrink-0 items-center gap-1 rounded-full px-2 py-0.5 type-body-t5 bg-[#F5E6D3] text-[#CB5E32]">
+                <WeavingIcon className="h-3 w-3 text-[#CB5E32]" />
+                Weaving
+              </span>
+            </div>
+
+            <div className="my-2 border-b border-primary-30" />
+
+            <p className="type-body-t5 font-bold text-dark truncate">{itemTitle}</p>
+
+            <div className="mt-1 flex items-center justify-between">
+              <span className="type-body-t5 text-primary-75">Qty: {quantity}</span>
+              <Link
+                href={`/user?highlightWeaveId=${weaveId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="type-body-t5 text-primary hover:underline font-bold"
+              >
+                View Detail →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full mode requires a post object
+  if (!post) return null;
+
   const thumbnail = getThumbnail(post);
   const username = getDisplayUsername(post, weave, currentUserId);
   const items = post.items ?? [];
@@ -84,7 +147,6 @@ const WeavingCard = ({
   const hasMoreItems = items.length > 2;
 
   const {
-    isGiver,
     isReceiver,
     hasIConfirmed,
     hasOtherConfirmed,

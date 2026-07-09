@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { compressImage } from "@/utils/imageProcessor";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
-import WeavingRequestCard from "@/app/components/Chat/WeavingRequestCard";
+import WeavingCard from "@/app/components/WeavingCard";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -724,12 +724,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         </div>
                       )}
                       {shouldShowCard && (
-                        <WeavingRequestCard
-                          itemTitle={itemTitle}
-                          quantity={quantity}
-                          imageUrl={imageUrl || undefined}
-                          weaveId={weaveId!}
-                          isGiver={isGiver}
+                        <WeavingCard
+                          compactMode={{
+                            itemTitle,
+                            quantity,
+                            imageUrl: imageUrl || undefined,
+                            weaveId: weaveId!,
+                            isGiver,
+                          }}
                         />
                       )}
                     </div>

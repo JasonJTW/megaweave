@@ -63,7 +63,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
   // Consume pendingItem from global context — represents the weaving intent
   // before the user sends their first real message.
-  const { pendingItem, setPendingItem, post, conversationId: popupConvId } = useChatPopup();
+  const {
+    pendingItem,
+    setPendingItem,
+    post,
+    conversationId: popupConvId,
+  } = useChatPopup();
   // ponytail: activePost only used for optimistic banner, same conv check
   const activePost = popupConvId === conversationId ? post : null;
 
@@ -552,27 +557,32 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {/* Optimistic "Start weaving" banner — shows at the visual bottom of the
             chat (near the input box) while the user is composing their first
             message. Disappears once the message is sent. */}
-        {pendingItem && (() => {
-          let optimisticIsGiver = false;
-          if (activePost && currentUser) {
-            const isPostAuthor = activePost.author_public_id === currentUser.public_id;
-            optimisticIsGiver = (activePost.type === "share" || activePost.type === "commons") ? isPostAuthor : !isPostAuthor;
-          }
-          const optimisticBannerText = activePost
-            ? optimisticIsGiver
-              ? `Start weaving to give ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
-              : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
-            : `Start weaving for ${pendingItem.title}`;
-          return (
-            <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
-              <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-              <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
-                {optimisticBannerText}
-              </span>
-              <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-            </div>
-          );
-        })()}
+        {pendingItem &&
+          (() => {
+            let optimisticIsGiver = false;
+            if (activePost && currentUser) {
+              const isPostAuthor =
+                activePost.author_public_id === currentUser.public_id;
+              optimisticIsGiver =
+                activePost.type === "share" || activePost.type === "commons"
+                  ? isPostAuthor
+                  : !isPostAuthor;
+            }
+            const optimisticBannerText = activePost
+              ? optimisticIsGiver
+                ? `Start weaving to give ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
+                : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
+              : `Start weaving for ${pendingItem.title}`;
+            return (
+              <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
+                <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
+                  {optimisticBannerText}
+                </span>
+                <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+              </div>
+            );
+          })()}
 
         {isLoading ? (
           <div className="text-center text-gray-400 mt-10">
@@ -668,9 +678,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 }
 
                 // Determine role from metadata — no async fetch needed
-                const isPostAuthor = postAuthorPublicId === currentUser?.public_id;
+                const isPostAuthor =
+                  postAuthorPublicId === currentUser?.public_id;
                 const isGiver = postType
-                  ? (postType === "share" || postType === "commons") ? isPostAuthor : !isPostAuthor
+                  ? postType === "share" || postType === "commons"
+                    ? isPostAuthor
+                    : !isPostAuthor
                   : false;
 
                 const bannerText = postType
@@ -924,7 +937,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={
-              isPopup ? "你好，我想索取這件物品" : "Type a message..."
+              isPopup
+                ? "Hi! I'd like to request this item."
+                : "Type a message..."
             }
             className={cn(
               "flex-1",

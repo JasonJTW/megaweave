@@ -573,11 +573,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
               : `Start weaving for ${pendingItem.title}`;
             return (
-              <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
+              <div className="flex items-center justify-center gap-4 py-4 w-full my-2 min-w-0">
                 <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-                <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
+                <p className="text-[16px] font-bold text-[#9EB098] font-ddin max-w-[70%] min-w-0">
                   {optimisticBannerText}
-                </span>
+                </p>
                 <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
               </div>
             );
@@ -714,11 +714,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   <React.Fragment key={msg.id}>
                     <div className="w-full min-w-0 flex flex-col items-center">
                       {shouldShowBanner && (
-                        <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
+                        <div className="flex items-center justify-center gap-4 py-4 w-full my-2 min-w-0">
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-                          <span className="text-[16px] font-bold text-[#9EB098] font-ddin whitespace-nowrap">
+                          <p className="text-[16px] font-bold text-[#9EB098] font-ddin  max-w-[70%] min-w-0">
                             {bannerText}
-                          </span>
+                          </p>
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
                         </div>
                       )}

@@ -105,12 +105,12 @@ function PostCardInner({
                   width={0}
                   height={0}
                   sizes="(min-width: 768px) 280px, 100vw"
-                  className="w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover"
+                  className={`w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover ${isExpired && "contrast-50 brightness-105 opacity-70"}`}
                   priority={!!isFirstVisible}
                 />
                 {isExpired && (
                   <div
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
                     aria-hidden="true"
                   >
                     <span className="font-ddin text-[28px] font-bold tracking-[0.12em] text-white sm:text-[32px]">
@@ -161,7 +161,6 @@ function PostCardInner({
             <p className="text-black text-[18px] truncate sm:hidden">
               {post.content}
             </p>
-
 
             {/* <div className="min-h-[18px]">
               {post.tags && (
@@ -239,7 +238,6 @@ function PostCardInner({
                   {new Date(post.expires_at).toLocaleDateString()}
                 </div>
               )}
-
             </div>
           </div>
         </motion.div>

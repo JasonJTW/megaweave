@@ -11,7 +11,6 @@ import CancelIcon from "./icons/CancelIcon";
 import WeavingIcon from "./icons/WeavingIcon";
 import { useWeaveActions } from "@/hooks/useWeaveActions";
 
-
 interface WeavesCardProps {
   post?: Post;
   weave?: Weave;
@@ -19,12 +18,12 @@ interface WeavesCardProps {
   onClick?: () => void;
   isHighlighted?: boolean;
   onWeaveStatusChange?: () => void;
-  // ── Compact / chat-inline mode ─────────────────────────────────────────
+  // ── In-ChatWindow mode ─────────────────────────────────────────
   // When these are provided, the card renders a compact summary card
   // (used in ChatWindow) without requiring a full Post or Weave object.
-  compactMode?: {
+  inChatWindow?: {
     itemTitle: string;
-    quantity: number;
+    quantity: number | string;
     imageUrl?: string;
     weaveId: number | string;
     isGiver: boolean;
@@ -87,65 +86,8 @@ const WeavingCard = ({
   onClick,
   isHighlighted,
   onWeaveStatusChange,
-  compactMode,
+  inChatWindow,
 }: WeavesCardProps) => {
-  // ── Compact mode (chat inline card) ────────────────────────────────────
-  if (compactMode) {
-    const { itemTitle, quantity, imageUrl, weaveId, isGiver } = compactMode;
-    return (
-      <div className="flex w-full flex-col rounded-[20px] bg-white p-3 text-left">
-        {/* Row 1: thumbnail + item info — mirrors full-mode Row 1 */}
-        <div className="flex w-full gap-3">
-          <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl bg-secondary/50">
-            {imageUrl ? (
-              <Image src={imageUrl} alt={itemTitle} fill sizes="72px" className="object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-xs text-primary-75">
-                No image
-              </div>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <span className="type-h5 text-primary">
-                {isGiver ? "Weaving Request Received" : "Weaving Request Sent"}
-              </span>
-              <span className="inline-flex font-bold shrink-0 items-center gap-1 rounded-full px-2 py-0.5 type-body-t5 bg-[#F5E6D3] text-[#CB5E32]">
-                <WeavingIcon className="h-3 w-3 text-[#CB5E32]" />
-                Weaving
-              </span>
-            </div>
-
-            <div className="my-2 border-b border-primary-30" />
-
-            <p className="type-body-t5 font-bold text-dark truncate">{itemTitle}</p>
-
-            <div className="mt-1 flex items-center justify-between">
-              <span className="type-body-t5 text-primary-75">Qty: {quantity}</span>
-              <Link
-                href={`/user?highlightWeaveId=${weaveId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="type-body-t5 text-primary hover:underline font-bold"
-              >
-                View Detail →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Full mode requires a post object
-  if (!post) return null;
-
-  const thumbnail = getThumbnail(post);
-  const username = getDisplayUsername(post, weave, currentUserId);
-  const items = post.items ?? [];
-  const visibleItems = items.slice(0, 2);
-  const hasMoreItems = items.length > 2;
-
   const {
     isReceiver,
     hasIConfirmed,
@@ -156,11 +98,55 @@ const WeavingCard = ({
     handleCancelWeave,
   } = useWeaveActions({ weave, currentUserId, onWeaveStatusChange });
 
-  const currentStatus = localStatus || weave?.status;
+  // Early return only if neither inChatWindow nor post is provided
+  if (!inChatWindow && !post) return null;
+
+  const isInChatWindow = !!inChatWindow;
+
+  const thumbnail = isInChatWindow
+    ? inChatWindow.imageUrl
+    : post
+      ? getThumbnail(post)
+      : undefined;
+
+  const username = isInChatWindow
+    ? inChatWindow.isGiver
+      ? "Weaving Request Received"
+      : "Weaving Request Sent"
+    : post
+      ? getDisplayUsername(post, weave, currentUserId)
+      : "";
+
+  const currentStatus = isInChatWindow
+    ? "pending"
+    : localStatus || weave?.status;
   const statusLabel = currentStatus ? getWeaveStatusLabel(currentStatus) : null;
 
-  const displayUser =
-    weave && currentUserId
+  const cardTitle = isInChatWindow
+    ? inChatWindow.itemTitle
+    : post
+      ? post.title
+      : "";
+  const cardContent = isInChatWindow
+    ? undefined
+    : post
+      ? post.content
+      : undefined;
+
+  const visibleItems = isInChatWindow
+    ? []
+    : post?.items
+      ? post.items.slice(0, 2)
+      : [];
+  const hasMoreItems = isInChatWindow
+    ? false
+    : post?.items
+      ? post.items.length > 2
+      : false;
+
+  const displayUser = isInChatWindow
+    ? null
+    : weave && currentUserId
       ? currentUserId === weave.giver_id
         ? {
             name: weave.receiver_name,
@@ -173,10 +159,10 @@ const WeavingCard = ({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div
-      onClick={onClick}
-      className={`flex w-full flex-col rounded-[20px] bg-white p-3 text-left transition-shadow hover:shadow-sm cursor-pointer ${
-        isHighlighted ? "ring-2 ring-primary/40" : ""
-      }`}
+      onClick={isInChatWindow ? undefined : onClick}
+      className={`flex w-full flex-col rounded-[20px] bg-white p-3 text-left transition-shadow hover:shadow-sm ${
+        isInChatWindow ? "" : "cursor-pointer"
+      } ${isHighlighted ? "ring-2 ring-primary/40" : ""}`}
     >
       {/* Row 1: thumbnail + post info + status badge */}
       <div className="flex w-full gap-3">
@@ -184,7 +170,7 @@ const WeavingCard = ({
           {thumbnail ? (
             <Image
               src={thumbnail}
-              alt={post.title}
+              alt={cardTitle}
               fill
               sizes="72px"
               className="object-cover"
@@ -213,17 +199,17 @@ const WeavingCard = ({
 
           {statusLabel && <div className="my-2 border-b border-primary-30" />}
 
-          <p className="flex min-w-0 items-baseline type-body-t5 font-bold text-dark">
+          <p className="flex min-w-0 items-baseline type-body-t5 font-bold text-dark truncate">
             <span
-              className={`min-w-0 truncate text-dark ${post.content ? "max-w-[50%]" : ""}`}
+              className={`min-w-0 truncate ${cardContent ? "max-w-[50%]" : "w-full"}`}
             >
-              {post.title}
+              {cardTitle}
             </span>
-            {post.content && (
+            {cardContent && (
               <>
                 <span className="shrink-0">: </span>
                 <span className="min-w-0 max-w-[50%] truncate text-dark">
-                  {post.content}
+                  {cardContent}
                 </span>
               </>
             )}
@@ -245,6 +231,24 @@ const WeavingCard = ({
               {hasMoreItems && (
                 <p className="type-body-t5 text-primary-75">......</p>
               )}
+            </div>
+          )}
+
+          {isInChatWindow && (
+            <div className="mt-1.5 flex items-center justify-between type-body-t5">
+              <span className="text-primary-75">
+                {inChatWindow.itemTitle === "all" ||
+                inChatWindow.itemTitle.startsWith("All Items - ")
+                  ? "Request all item"
+                  : `Request Qty: ${inChatWindow.quantity}`}
+              </span>
+              <Link
+                href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-primary hover:underline font-bold text-xs"
+              >
+                View Detail →
+              </Link>
             </div>
           )}
         </div>

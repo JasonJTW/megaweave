@@ -547,8 +547,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Messages */}
       <div
         className={cn(
-          "flex-1 overflow-y-auto p-4 gap-4 flex flex-col-reverse",
-          isPopup ? "bg-white" : "bg-slate-50",
+          "flex-1 min-w-0 overflow-y-auto p-4 gap-4 flex flex-col-reverse bg-slate-50",
         )}
       >
         {/* Anchor point for scrolling to bottom */}
@@ -713,7 +712,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                 return (
                   <React.Fragment key={msg.id}>
-                    <div className="w-full flex flex-col items-center">
+                    <div className="w-full min-w-0 flex flex-col items-center">
                       {shouldShowBanner && (
                         <div className="flex items-center justify-center gap-4 py-4 w-full my-2">
                           <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
@@ -725,7 +724,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       )}
                       {shouldShowCard && (
                         <WeavingCard
-                          compactMode={{
+                          inChatWindow={{
                             itemTitle,
                             quantity,
                             imageUrl: imageUrl || undefined,

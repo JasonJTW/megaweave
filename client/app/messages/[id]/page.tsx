@@ -32,7 +32,7 @@ export default function ConversationPage() {
            </div>
            
            {/* Chat Window - Full width on mobile, Right side on desktop */}
-           <div className="w-full md:flex-1 h-full">
+           <div className="w-full md:flex-1 h-full min-w-0">
                {conversationId ? (
                    <ChatWindow 
                       conversationId={conversationId} 

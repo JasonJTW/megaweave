@@ -96,7 +96,7 @@ export const ChatPopup = () => {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed bottom-4 left-4 right-4 max-w-[500px] mx-auto bg-white rounded-[40px] shadow-2xl z-[101] flex flex-col h-[65vh] overflow-hidden border border-primary-30"
+            className="fixed bottom-4 left-4 right-4 max-w-[500px] mx-auto rounded-[40px] shadow-2xl z-[101] flex flex-col h-[65vh] overflow-hidden border border-primary-30"
           >
             {/* Header */}
             <div className="px-8 pt-4 pb-2 flex items-center justify-between bg-white z-10">

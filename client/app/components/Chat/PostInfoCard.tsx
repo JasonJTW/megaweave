@@ -71,7 +71,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
         這能確保長文字標題能自動縮小並套用 truncate 截斷，
         而不會把右側的按鈕和數量選擇器擠出容器之外。
       */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {firstImg ? (
           <Image
             width={48}
@@ -87,7 +87,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="font-bold text-[14px] text-gray-800 truncate leading-tight">
+          <div className="font-bold text-[14px] text-gray-800 line-clamp-2 leading-tight">
             {displayTitle}
           </div>
           <div className="text-[11px] text-gray-500 leading-none mt-1">
@@ -135,7 +135,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
 
           <Button
             onClick={handleSubmit}
-            className="h-[34px] px-3.5 bg-primary text-white text-[13px] font-bold rounded-full hover:bg-primary/90 flex-shrink-0"
+            className="h-[34px] w-auto px-3.5 bg-primary text-white text-[13px] font-bold rounded-full hover:bg-primary/90 flex-shrink-0"
           >
             Request
           </Button>

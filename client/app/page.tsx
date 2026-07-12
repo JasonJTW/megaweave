@@ -267,6 +267,60 @@ const PostsApp = () => {
     type: postType,
     items: [{ title: "", quantity: "" }],
   });
+  const [createFormFieldErrors, setCreateFormFieldErrors] = useState<{
+    images?: boolean;
+    categoryId?: boolean;
+    conditionLevel?: boolean;
+    title?: boolean;
+    location?: boolean;
+    content?: boolean;
+    expires_at?: boolean;
+    items?: Array<{ title?: boolean; quantity?: boolean }>;
+  }>({});
+
+  const invalidFieldBorderClass = (hasError?: boolean) =>
+    hasError ? "border-red-500" : "";
+
+  const invalidInputOnlyClass = (hasError?: boolean) =>
+    hasError ? "[&_input]:!border-red-500" : "";
+
+  const validateCreateForm = () => {
+    const itemErrors =
+      createFormData.items?.map((item) => ({
+        title: !item.title.trim(),
+        quantity:
+          item.quantity === "" ||
+          item.quantity === null ||
+          item.quantity === undefined ||
+          Number(item.quantity) < 1,
+      })) ?? [];
+
+    const errors = {
+      images: selectedImages.length === 0,
+      categoryId: !createFormData.categoryId,
+      conditionLevel:
+        createFormData.conditionLevel === null ||
+        createFormData.conditionLevel === undefined,
+      title: !createFormData.title.trim(),
+      location: !createFormData.location.trim(),
+      content: !createFormData.content.trim(),
+      expires_at: !createFormData.expires_at,
+      items: itemErrors,
+    };
+
+    setCreateFormFieldErrors(errors);
+
+    return (
+      !errors.images &&
+      !errors.categoryId &&
+      !errors.conditionLevel &&
+      !errors.title &&
+      !errors.location &&
+      !errors.content &&
+      !errors.expires_at &&
+      !itemErrors.some((item) => item.title || item.quantity)
+    );
+  };
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -348,6 +402,10 @@ const PostsApp = () => {
           const { province, city, route, zip } = extractAddress(place);
 
           console.log("Place selected:", place);
+          setCreateFormFieldErrors((prev) => ({
+            ...prev,
+            location: false,
+          }));
           setCreateFormData((prev) => ({
             ...prev,
             location: place.formatted_address || place.name || "",
@@ -547,15 +605,7 @@ const PostsApp = () => {
 
   //! 創建貼文
   const handleCreatePost = async () => {
-    const itemsInvalid = createFormData.items?.some(
-      (item) => !item.title.trim() || !item.quantity || item.quantity < 1,
-    );
-    if (
-      !createFormData.title.trim() ||
-      !createFormData.content.trim() ||
-      !createFormData.conditionLevel ||
-      !createFormData.categoryId
-    ) {
+    if (!validateCreateForm()) {
       toast.error("Required fields cannot be empty.");
       return;
     }
@@ -597,7 +647,7 @@ const PostsApp = () => {
       formData.append("categoryId", createFormData.categoryId!.toString());
       formData.append(
         "conditionLevel",
-        createFormData.conditionLevel.toString(),
+        createFormData.conditionLevel!.toString(),
       );
       if (createFormData.expires_at) {
         formData.append("expires_at", createFormData.expires_at.toISOString());
@@ -615,7 +665,11 @@ const PostsApp = () => {
         }
       }
 
-      if (!itemsInvalid) {
+      if (
+        !createFormData.items?.some(
+          (item) => !item.title.trim() || !item.quantity || item.quantity < 1,
+        )
+      ) {
         formData.append("items", JSON.stringify(createFormData.items));
         console.log(createFormData.items);
       }
@@ -629,6 +683,7 @@ const PostsApp = () => {
       if (response.ok) {
         setShowCreateForm(false);
         setSelectedImages([]);
+        setCreateFormFieldErrors({});
 
         /// Rest form data to initial state
         setCreateFormData({
@@ -678,7 +733,13 @@ const PostsApp = () => {
       return true;
     });
 
-    setSelectedImages((prev) => [...prev, ...validFiles]);
+    setSelectedImages((prev) => {
+      const next = [...prev, ...validFiles];
+      if (next.length > 0) {
+        setCreateFormFieldErrors((errors) => ({ ...errors, images: false }));
+      }
+      return next;
+    });
   };
 
   // 移除選中的圖片
@@ -1488,6 +1549,7 @@ const PostsApp = () => {
                   <button
                     onClick={() => {
                       setSelectedImages([]);
+                      setCreateFormFieldErrors({});
                       setShowCreateForm(false);
                     }}
                     className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-1"
@@ -1508,6 +1570,7 @@ const PostsApp = () => {
                       className="hidden"
                       id="image-upload"
                       disabled={selectedImages.length >= 5}
+                      required
                     />
                   </div>
 
@@ -1549,7 +1612,11 @@ const PostsApp = () => {
 
                   {/* 空狀態提示 */}
                   {selectedImages.length === 0 && (
-                    <div className=" bg-primary-30 rounded-lg p-6 min-h-[200px] flex justify-center items-center">
+                    <div
+                      className={`bg-primary-30 rounded-lg p-6 min-h-[200px] flex justify-center items-center${
+                        createFormFieldErrors.images ? " border border-red-500" : ""
+                      }`}
+                    >
                       <label
                         htmlFor="image-upload"
                         className={`inline-flex items-center px-4 py-2 cursor-pointer hover:scale-125 transition-all duration-200 ease-in-out  ${
@@ -1571,15 +1638,23 @@ const PostsApp = () => {
                   <div>
                     <Select
                       value={createFormData.categoryId?.toString()}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
+                        setCreateFormFieldErrors((prev) => ({
+                          ...prev,
+                          categoryId: false,
+                        }));
                         setCreateFormData({
                           ...createFormData,
                           categoryId: parseInt(value),
-                        })
-                      }
+                        });
+                      }}
                       required
                     >
-                      <SelectTrigger className="">
+                      <SelectTrigger
+                        className={invalidFieldBorderClass(
+                          createFormFieldErrors.categoryId,
+                        )}
+                      >
                         <SelectValue placeholder="Category" />
                       </SelectTrigger>
 
@@ -1602,6 +1677,10 @@ const PostsApp = () => {
                           : undefined
                       }
                       onValueChange={(value) => {
+                        setCreateFormFieldErrors((prev) => ({
+                          ...prev,
+                          conditionLevel: false,
+                        }));
                         setCreateFormData({
                           ...createFormData,
                           conditionLevel: parseInt(value),
@@ -1609,7 +1688,11 @@ const PostsApp = () => {
                       }}
                       required
                     >
-                      <SelectTrigger className="w-full ">
+                      <SelectTrigger
+                        className={`w-full ${invalidFieldBorderClass(
+                          createFormFieldErrors.conditionLevel,
+                        )}`}
+                      >
                         <SelectValue placeholder="Condition">
                           {/* 自訂顯示邏輯 */}
 
@@ -1634,19 +1717,26 @@ const PostsApp = () => {
                   </div>
 
                   {/* Title */}
-                  <div>
+                  <div
+                    className={invalidInputOnlyClass(
+                      createFormFieldErrors.title,
+                    )}
+                  >
                     <Input
                       type="text"
                       required
-                      className=""
                       placeholder="Title"
                       value={createFormData.title}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setCreateFormFieldErrors((prev) => ({
+                          ...prev,
+                          title: false,
+                        }));
                         setCreateFormData({
                           ...createFormData,
                           title: e.target.value,
-                        })
-                      }
+                        });
+                      }}
                     />
                   </div>
 
@@ -1667,12 +1757,29 @@ const PostsApp = () => {
                   </div>
                   <div className="flex items-center gap-[5px]">
                     <LocationIcon className="w-[24px] h-[24px] text-primary" />
-                    <Input
-                      ref={locationInputRef}
-                      type="text"
-                      placeholder="Location (City)"
-                      defaultValue={createFormData.location}
-                    />
+                    <div
+                      className={`flex-1 ${invalidInputOnlyClass(
+                        createFormFieldErrors.location,
+                      )}`}
+                    >
+                      <Input
+                        ref={locationInputRef}
+                        type="text"
+                        required
+                        placeholder="Location (City)"
+                        value={createFormData.location}
+                        onChange={(e) => {
+                          setCreateFormFieldErrors((prev) => ({
+                            ...prev,
+                            location: false,
+                          }));
+                          setCreateFormData({
+                            ...createFormData,
+                            location: e.target.value,
+                          });
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-[5px]">
@@ -1682,7 +1789,9 @@ const PostsApp = () => {
                         <Button
                           variant="outline"
                           data-empty={!createFormData.expires_at}
-                          className="w-[212px] justify-between text-left font-normal bg-white"
+                          className={`w-[212px] justify-between text-left font-normal bg-white ${invalidFieldBorderClass(
+                            createFormFieldErrors.expires_at,
+                          )}`}
                         >
                           {createFormData.expires_at ? (
                             format(createFormData.expires_at, "PPP")
@@ -1698,12 +1807,16 @@ const PostsApp = () => {
                         <Calendar
                           mode="single"
                           selected={createFormData.expires_at}
-                          onSelect={(date) =>
+                          onSelect={(date) => {
+                            setCreateFormFieldErrors((prev) => ({
+                              ...prev,
+                              expires_at: false,
+                            }));
                             setCreateFormData({
                               ...createFormData,
                               expires_at: date || undefined,
-                            })
-                          }
+                            });
+                          }}
                           defaultMonth={createFormData.expires_at}
                           disabled={(date) => {
                             const today = new Date();
@@ -1721,52 +1834,84 @@ const PostsApp = () => {
                       required
                       rows={4}
                       placeholder="description..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-[20px]"
+                      className={`w-full rounded-[20px] border px-3 py-2 ${
+                        createFormFieldErrors.content
+                          ? "border-red-500"
+                          : "border-gray-300"
+                      }`}
                       value={createFormData.content}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        setCreateFormFieldErrors((prev) => ({
+                          ...prev,
+                          content: false,
+                        }));
                         setCreateFormData({
                           ...createFormData,
                           content: e.target.value,
-                        })
-                      }
+                        });
+                      }}
                     />
                   </div>
 
                   {/* items */}
                   {createFormData.items!.map((item, i) => (
                     <div className="flex flex-row gap-2 w-full" key={i}>
-                      <Input
-                        type="text"
-                        required
-                        className="!flex-[3] "
-                        placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
-                        value={item.title}
-                        onChange={(e) => {
-                          const items = [...createFormData.items!];
-                          items[i].title = e.target.value;
-                          setCreateFormData({
-                            ...createFormData,
-                            items,
-                          });
-                        }}
-                      />
-                      <Input
-                        type="number"
-                        required
-                        className="!flex-[1] text-[12px] text-center placeholder:text-center"
-                        placeholder="Quantity"
-                        value={item.quantity ?? ""}
-                        onChange={(e) => {
-                          const items = [...createFormData.items!];
-                          items[i].quantity = e.target.value
-                            ? parseInt(e.target.value)
-                            : "";
-                          setCreateFormData({
-                            ...createFormData,
-                            items,
-                          });
-                        }}
-                      />
+                      <div
+                        className={`!flex-[3] ${invalidInputOnlyClass(
+                          createFormFieldErrors.items?.[i]?.title,
+                        )}`}
+                      >
+                        <Input
+                          type="text"
+                          required
+                          placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
+                          value={item.title}
+                          onChange={(e) => {
+                            const items = [...createFormData.items!];
+                            items[i].title = e.target.value;
+                            setCreateFormFieldErrors((prev) => {
+                              const nextItems = [...(prev.items ?? [])];
+                              nextItems[i] = { ...nextItems[i], title: false };
+                              return { ...prev, items: nextItems };
+                            });
+                            setCreateFormData({
+                              ...createFormData,
+                              items,
+                            });
+                          }}
+                        />
+                      </div>
+                      <div
+                        className={`!flex-[1] ${invalidInputOnlyClass(
+                          createFormFieldErrors.items?.[i]?.quantity,
+                        )}`}
+                      >
+                        <Input
+                          type="number"
+                          required
+                          className="!flex-[1] text-[12px] text-center placeholder:text-center"
+                          placeholder="Quantity"
+                          value={item.quantity ?? ""}
+                          onChange={(e) => {
+                            const items = [...createFormData.items!];
+                            items[i].quantity = e.target.value
+                              ? parseInt(e.target.value)
+                              : "";
+                            setCreateFormFieldErrors((prev) => {
+                              const nextItems = [...(prev.items ?? [])];
+                              nextItems[i] = {
+                                ...nextItems[i],
+                                quantity: false,
+                              };
+                              return { ...prev, items: nextItems };
+                            });
+                            setCreateFormData({
+                              ...createFormData,
+                              items,
+                            });
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                   <div className="flex space-x-3 ">

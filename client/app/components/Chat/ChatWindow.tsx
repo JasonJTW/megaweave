@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { compressImage } from "@/utils/imageProcessor";
@@ -56,10 +57,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   otherUser: propOtherUser,
   isPopup = false,
 }) => {
+  const router = useRouter();
   const { messages, conversation, isLoading, mutate, fetchMore, hasMore } =
     useMessages(conversationId);
   const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
+
+  const handleAvatarClick = () => {
+    if (otherUser?.public_id) {
+      router.push(`/profile/${otherUser.public_id}`);
+    }
+  };
 
   // Consume pendingItem from global context — represents the weaving intent
   // before the user sends their first real message.
@@ -532,7 +540,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <Link href="/messages" className="md:hidden mr-3">
             <ArrowLeft className="w-6 h-6" />
           </Link>
-          <Avatar className="w-10 h-10 mr-3">
+          <Avatar className="w-10 h-10 mr-3 cursor-pointer" onClick={handleAvatarClick}>
             <AvatarImage src={otherUser?.avatar_url} />
             <AvatarFallback>
               {otherUser?.username?.substring(0, 2).toUpperCase()}
@@ -590,7 +598,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 mb-10 w-full">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-              <Avatar className="w-12 h-12">
+              <Avatar className="w-12 h-12 cursor-pointer" onClick={handleAvatarClick}>
                 <AvatarImage src={otherUser?.avatar_url} />
                 <AvatarFallback>
                   {otherUser?.username?.substring(0, 2).toUpperCase()}
@@ -748,7 +756,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     )}
                   >
                     {!isMe && (
-                      <Avatar className="w-8 h-8 mr-2 mt-1">
+                      <Avatar className="w-8 h-8 mr-2 mt-1 cursor-pointer" onClick={handleAvatarClick}>
                         <AvatarImage src={otherUser?.avatar_url} />
                         <AvatarFallback>
                           {otherUser?.username?.substring(0, 1).toUpperCase()}

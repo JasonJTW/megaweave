@@ -379,7 +379,7 @@ router.get("/", async (req: Request, res: Response) => {
     const search = req.query.search as string;
     const type = req.query.type as string;
 
-    let whereConditions = ["p.status = ?"];
+    let whereConditions = ["p.status = ?", "p.deleted_at IS NULL"];
     let queryParams: any[] = [status];
 
     if (category_id) {
@@ -505,7 +505,7 @@ router.get("/user", requireAuth, async (req: Request, res: Response) => {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE p.user_id = ?
+      WHERE p.user_id = ? AND p.deleted_at IS NULL
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `;
@@ -545,7 +545,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN locations l ON p.location_id = l.id
-      WHERE p.id = ?
+      WHERE p.id = ? AND p.deleted_at IS NULL
     `;
 
     const [rows] = await dbPool.execute<RowDataPacket[]>(postQuery, [postId]);
@@ -622,6 +622,40 @@ router.get("/:id", async (req: Request, res: Response) => {
     res.status(200).json({ post });
   } catch (error) {
     console.error("Get post error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
+
+//* Delete post api (Soft Delete)
+router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.user!.userId;
+
+    if (isNaN(postId)) {
+      return res.status(400).json({ errorMessage: "Invalid post ID" });
+    }
+
+    // Check ownership and if already deleted
+    const checkQuery = "SELECT user_id FROM posts WHERE id = ? AND deleted_at IS NULL";
+    const [rows] = await dbPool.execute<RowDataPacket[]>(checkQuery, [postId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ errorMessage: "Post not found" });
+    }
+
+    const post = rows[0];
+    if (post.user_id !== userId) {
+      return res.status(403).json({ errorMessage: "Forbidden: You are not the owner of this post" });
+    }
+
+    // Perform soft delete
+    const deleteQuery = "UPDATE posts SET deleted_at = NOW() WHERE id = ?";
+    await dbPool.execute(deleteQuery, [postId]);
+
+    res.status(200).json({ message: "Post deleted successfully" });
+  } catch (error) {
+    console.error("Delete post error:", error);
     return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });

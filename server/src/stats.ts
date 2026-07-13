@@ -53,7 +53,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
       FROM posts p
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE p.user_id = ?
+      WHERE p.user_id = ? AND p.deleted_at IS NULL
       GROUP BY p.id -- 必須根據 posts 的主鍵分組
       ORDER BY p.created_at DESC
     `;

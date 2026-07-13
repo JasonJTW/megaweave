@@ -70,7 +70,7 @@ export async function updateUserStats(userId: string): Promise<UpdateResult> {
       -- 1. 聚合貼文數據
       LEFT JOIN (
         SELECT user_id, COUNT(*) AS post_count, SUM(likes_count) AS total_likes, SUM(comment_count) AS total_comments, SUM(view_count) AS total_views
-        FROM posts WHERE user_id = ?
+        FROM posts WHERE user_id = ? AND deleted_at IS NULL
         GROUP BY user_id
       ) AS p ON u.uid = p.user_id
       
@@ -78,7 +78,7 @@ export async function updateUserStats(userId: string): Promise<UpdateResult> {
       LEFT JOIN (
         SELECT p.user_id, COUNT(i.id) AS item_count, SUM(i.quantity) AS total_item_quantity, COUNT(DISTINCT p.id) AS posts_with_items
         FROM posts p JOIN items i ON p.id = i.post_id
-        WHERE p.user_id = ?
+        WHERE p.user_id = ? AND p.deleted_at IS NULL
         GROUP BY p.user_id
       ) AS i ON u.uid = i.user_id
       

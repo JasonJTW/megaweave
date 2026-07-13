@@ -16,6 +16,7 @@ export interface Post {
   likes_count: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string;
   username: string;
   category_name_en: string;
   image_urls?: string;

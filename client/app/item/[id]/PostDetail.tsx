@@ -8,7 +8,7 @@ import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Heart, Share2 } from "lucide-react";
+import { ArrowLeft, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
@@ -126,6 +126,34 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       }
     } catch (error) {
       console.error("Error toggling like:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this post? This action cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${hostName}/api/posts/${postId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        toast.success("Post deleted successfully");
+        router.push("/");
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.errorMessage || "Failed to delete post");
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast.error("Failed to delete post");
     }
   };
 
@@ -460,6 +488,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                     recipientName={post.username || "User"}
                     className="ml-2 border-0 hover:bg-transparent text-gray-500 hover:text-primary p-0 h-auto"
                   />
+                )}
+                {post.user_id && user?.userId === post.user_id && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleDelete}
+                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                    <span>Delete</span>
+                  </Button>
                 )}
               </div>
 

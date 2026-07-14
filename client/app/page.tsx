@@ -77,7 +77,7 @@ const PostsApp = () => {
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
-  const [isTourOpen, setIsTourOpen] = useState(true);
+  const [isTourOpen, setIsTourOpen] = useState(false);
   const [isWeavingExpanded, setIsWeavingExpanded] = useState(false);
   const weavingButtonRef = useRef<HTMLDivElement>(null);
 
@@ -109,8 +109,7 @@ const PostsApp = () => {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // const hasSeenTour = localStorage.getItem("megaweave_tour_seen");
-      const hasSeenTour = true;
+      const hasSeenTour = localStorage.getItem("megaweave_tour_seen");
       if (!hasSeenTour) {
         setTimeout(() => setIsTourOpen(true), 300);
       }
@@ -1614,7 +1613,9 @@ const PostsApp = () => {
                   {selectedImages.length === 0 && (
                     <div
                       className={`bg-primary-30 rounded-lg p-6 min-h-[200px] flex justify-center items-center${
-                        createFormFieldErrors.images ? " border border-red-500" : ""
+                        createFormFieldErrors.images
+                          ? " border border-red-500"
+                          : ""
                       }`}
                     >
                       <label

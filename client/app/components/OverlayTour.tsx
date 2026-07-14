@@ -137,12 +137,9 @@ export default function OverlayTour({
       }
       setCurrentStepIndex((prev) => prev + 1);
     } else {
-      // Tour finished — close and scroll to top
+      // Tour finished — delegate scroll to parent's onClose callback
       setShowMockDetail(false);
       onClose();
-      setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }, 100);
     }
   };
 
@@ -226,9 +223,6 @@ export default function OverlayTour({
   const handleClose = () => {
     setShowMockDetail(false);
     onClose();
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }, 100);
   };
 
   // For the message step, we render a completely different full-screen mock overlay

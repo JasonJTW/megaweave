@@ -185,6 +185,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   const handleIGShare = async () => {
+    //* IG Share require native app deep link, not supported in web app
     try {
       const response = await fetch(`/api/og?id=${postId}`);
       if (!response.ok) {
@@ -203,25 +204,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       toast.error("Failed to share");
     }
   };
-
-  // 格式化日期
-  // const formatDate = (dateString: string) => {
-  //   return new Date(dateString).toLocaleDateString("zh-TW", {
-  //     year: "numeric",
-  //     month: "long",
-  //     day: "numeric",
-  //     hour: "2-digit",
-  //     minute: "2-digit",
-  //   });
-  // };
-
-  // 獲取狀況等級顏色
-
-  // 獲取狀況等級名稱
-  // const getConditionName = (level: number) => {
-  //   const condition = conditions.find((c) => c.level === level);
-  //   return condition ? condition.name : `等級 ${level}`;
-  // };
 
   useEffect(() => {
     fetchConditions();

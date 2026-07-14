@@ -577,7 +577,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             }
             const optimisticBannerText = activePost
               ? optimisticIsGiver
-                ? `Start weaving to give ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
+                ? activePost.type === "wish"
+                  ? `Start weaving to offer ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
+                  : `Start weaving to give ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
                 : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
               : `Start weaving for ${pendingItem.title}`;
             return (
@@ -695,7 +697,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                 const bannerText = postType
                   ? isGiver
-                    ? `Start weaving to give for ${itemTitle}`.trim()
+                    ? postType === "wish"
+                      ? `Start weaving to offer for ${itemTitle}`.trim()
+                      : `Start weaving to give for ${itemTitle}`.trim()
                     : `Start weaving to request for ${itemTitle}`.trim()
                   : `Start weaving ${itemTitle ? `for ${itemTitle}` : "!"}`;
 

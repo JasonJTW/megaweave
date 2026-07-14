@@ -137,7 +137,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
             onClick={handleSubmit}
             className="h-[34px] w-auto px-3.5 bg-primary text-white text-[13px] font-bold rounded-full hover:bg-primary/90 flex-shrink-0"
           >
-            Request
+            {post.type === "wish" ? "Offer" : "Request"}
           </Button>
         </div>
       )}

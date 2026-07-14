@@ -1538,8 +1538,8 @@ const PostsApp = () => {
         </div>
         {/* Create Post */}
         {showCreateForm && (
-          <div className="fixed inset-0 flex z-50 bg-secondary overflow-y-auto font-ddin">
-            <div className="bg-secondary rounded-lg max-w-2xl w-full min-h-screen">
+          <div className="fixed inset-0 flex z-50 bg-secondary overflow-y-auto font-ddin justify-center">
+            <div className="bg-secondary rounded-lg max-w-2xl w-full min-h-screen md:max-w-5xl">
               <div className="p-6">
                 <div className="flex justify-center relative items-center border-b pb-2">
                   <h2 className="text-2xl font-bold text-gray-900 capitalize">
@@ -1557,62 +1557,26 @@ const PostsApp = () => {
                   </button>
                 </div>
 
-                {/* 圖片上傳區域 */}
-                <div>
-                  {/* 圖片上傳按鈕 */}
-                  <div className="mb-4">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                      id="image-upload"
-                      disabled={selectedImages.length >= 5}
-                      required
-                    />
-                  </div>
-
-                  {/* 已選圖片預覽 */}
-                  {selectedImages.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {selectedImages.map((image, index) => (
-                        <div key={index} className="relative group">
-                          <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={URL.createObjectURL(image)}
-                              alt={`預覽 ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
-                            {Math.round(image.size / 1024)}KB
-                          </div>
-                        </div>
-                      ))}
-                      {selectedImages.length < 5 && (
-                        <label
-                          htmlFor="image-upload"
-                          className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors border-2 border-dashed border-gray-300"
-                        >
-                          <AddIcon className="w-8 h-8 text-gray-400" />
-                        </label>
-                      )}
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+                  {/* 圖片上傳區域 */}
+                  <div className="w-full md:w-1/2 md:shrink-0">
+                    {/* 圖片上傳按鈕 */}
+                    <div className="mb-4">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                        id="image-upload"
+                        disabled={selectedImages.length >= 5}
+                        required
+                      />
                     </div>
-                  )}
 
-                  {/* 空狀態提示 */}
-                  {selectedImages.length === 0 && (
+                    {/* 上傳方塊（固定在上方） */}
                     <div
-                      className={`bg-primary-30 rounded-lg p-6 min-h-[200px] flex justify-center items-center${
+                      className={`flex min-h-[200px] items-center justify-center rounded-lg bg-primary-30 p-6 md:min-h-[320px]${
                         createFormFieldErrors.images
                           ? " border border-red-500"
                           : ""
@@ -1620,327 +1584,353 @@ const PostsApp = () => {
                     >
                       <label
                         htmlFor="image-upload"
-                        className={`inline-flex items-center px-4 py-2 cursor-pointer hover:scale-125 transition-all duration-200 ease-in-out  ${
+                        className={`inline-flex cursor-pointer items-center px-4 py-2 transition-all duration-200 ease-in-out hover:scale-125 ${
                           selectedImages.length >= 5
-                            ? "opacity-50 cursor-not-allowed"
+                            ? "pointer-events-none cursor-not-allowed opacity-50"
                             : ""
                         }`}
                       >
                         <AddIcon />
                       </label>
                     </div>
-                  )}
-                  <p className="text-xs text-gray-500 mt-1">
-                    10MB limit per image, up to 5 images
-                  </p>
-                </div>
-                <div className="space-y-[10px] mt-4">
-                  {/* Category */}
-                  <div>
-                    <Select
-                      value={createFormData.categoryId?.toString()}
-                      onValueChange={(value) => {
-                        setCreateFormFieldErrors((prev) => ({
-                          ...prev,
-                          categoryId: false,
-                        }));
-                        setCreateFormData({
-                          ...createFormData,
-                          categoryId: parseInt(value),
-                        });
-                      }}
-                      required
-                    >
-                      <SelectTrigger
-                        className={invalidFieldBorderClass(
-                          createFormFieldErrors.categoryId,
-                        )}
-                      >
-                        <SelectValue placeholder="Category" />
-                      </SelectTrigger>
 
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id.toString()}>
-                            {cat.name_en}
-                          </SelectItem>
+                    {/* 已選圖片預覽（顯示在上傳方塊下方，最多五格） */}
+                    {selectedImages.length > 0 && (
+                      <div className="mt-3 grid grid-cols-5 gap-2">
+                        {selectedImages.slice(0, 5).map((image, index) => (
+                          <div key={index} className="group relative">
+                            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={URL.createObjectURL(image)}
+                                alt={`預覽 ${index + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -right-1 -top-1 rounded-full bg-red-600 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Condition */}
-                  <div>
-                    <Select
-                      value={
-                        createFormData.conditionLevel !== null
-                          ? String(createFormData.conditionLevel)
-                          : undefined
-                      }
-                      onValueChange={(value) => {
-                        setCreateFormFieldErrors((prev) => ({
-                          ...prev,
-                          conditionLevel: false,
-                        }));
-                        setCreateFormData({
-                          ...createFormData,
-                          conditionLevel: parseInt(value),
-                        });
-                      }}
-                      required
-                    >
-                      <SelectTrigger
-                        className={`w-full ${invalidFieldBorderClass(
-                          createFormFieldErrors.conditionLevel,
-                        )}`}
-                      >
-                        <SelectValue placeholder="Condition">
-                          {/* 自訂顯示邏輯 */}
-
-                          {createFormData.conditionLevel !== null &&
-                            conditions.find(
-                              (c) => c.level === createFormData.conditionLevel,
-                            )?.name}
-                        </SelectValue>
-                      </SelectTrigger>
-
-                      <SelectContent>
-                        {conditions.map((condition) => (
-                          <SelectItem
-                            key={condition.id}
-                            value={String(condition.level)}
-                          >
-                            {condition.name} - {condition.description}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Title */}
-                  <div
-                    className={invalidInputOnlyClass(
-                      createFormFieldErrors.title,
+                      </div>
                     )}
-                  >
-                    <Input
-                      type="text"
-                      required
-                      placeholder="Title"
-                      value={createFormData.title}
-                      onChange={(e) => {
-                        setCreateFormFieldErrors((prev) => ({
-                          ...prev,
-                          title: false,
-                        }));
-                        setCreateFormData({
-                          ...createFormData,
-                          title: e.target.value,
-                        });
-                      }}
-                    />
                   </div>
-
-                  <div className="flex items-center gap-[5px]">
-                    <TagIcon className="w-[24px] h-[24px] text-primary" />
-                    <Input
-                      type="text"
-                      placeholder="Hashtag separate with commas"
-                      className=""
-                      value={createFormData.tags}
-                      onChange={(e) =>
-                        setCreateFormData({
-                          ...createFormData,
-                          tags: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center gap-[5px]">
-                    <LocationIcon className="w-[24px] h-[24px] text-primary" />
-                    <div
-                      className={`flex-1 ${invalidInputOnlyClass(
-                        createFormFieldErrors.location,
-                      )}`}
-                    >
-                      <Input
-                        ref={locationInputRef}
-                        type="text"
-                        required
-                        placeholder="Location (City)"
-                        value={createFormData.location}
-                        onChange={(e) => {
+                  <div className="w-full space-y-[10px] md:w-1/2">
+                    {/* Category */}
+                    <div>
+                      <Select
+                        value={createFormData.categoryId?.toString()}
+                        onValueChange={(value) => {
                           setCreateFormFieldErrors((prev) => ({
                             ...prev,
-                            location: false,
+                            categoryId: false,
                           }));
                           setCreateFormData({
                             ...createFormData,
-                            location: e.target.value,
+                            categoryId: parseInt(value),
+                          });
+                        }}
+                        required
+                      >
+                        <SelectTrigger
+                          className={invalidFieldBorderClass(
+                            createFormFieldErrors.categoryId,
+                          )}
+                        >
+                          <SelectValue placeholder="Category" />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name_en}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Condition */}
+                    <div>
+                      <Select
+                        value={
+                          createFormData.conditionLevel !== null
+                            ? String(createFormData.conditionLevel)
+                            : undefined
+                        }
+                        onValueChange={(value) => {
+                          setCreateFormFieldErrors((prev) => ({
+                            ...prev,
+                            conditionLevel: false,
+                          }));
+                          setCreateFormData({
+                            ...createFormData,
+                            conditionLevel: parseInt(value),
+                          });
+                        }}
+                        required
+                      >
+                        <SelectTrigger
+                          className={`w-full ${invalidFieldBorderClass(
+                            createFormFieldErrors.conditionLevel,
+                          )}`}
+                        >
+                          <SelectValue placeholder="Condition">
+                            {/* 自訂顯示邏輯 */}
+
+                            {createFormData.conditionLevel !== null &&
+                              conditions.find(
+                                (c) =>
+                                  c.level === createFormData.conditionLevel,
+                              )?.name}
+                          </SelectValue>
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {conditions.map((condition) => (
+                            <SelectItem
+                              key={condition.id}
+                              value={String(condition.level)}
+                            >
+                              {condition.name} - {condition.description}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Title */}
+                    <div
+                      className={invalidInputOnlyClass(
+                        createFormFieldErrors.title,
+                      )}
+                    >
+                      <Input
+                        type="text"
+                        required
+                        placeholder="Title"
+                        value={createFormData.title}
+                        onChange={(e) => {
+                          setCreateFormFieldErrors((prev) => ({
+                            ...prev,
+                            title: false,
+                          }));
+                          setCreateFormData({
+                            ...createFormData,
+                            title: e.target.value,
                           });
                         }}
                       />
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-[5px]">
-                    <CalendarIcon className="w-[24px] h-[24px] text-primary" />
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          data-empty={!createFormData.expires_at}
-                          className={`w-[212px] justify-between text-left font-normal bg-white ${invalidFieldBorderClass(
-                            createFormFieldErrors.expires_at,
-                          )}`}
-                        >
-                          {createFormData.expires_at ? (
-                            format(createFormData.expires_at, "PPP")
-                          ) : (
-                            <span className="font-ddin tracking-normal text-[14px] font-medium">
-                              Pick a expiry date
-                            </span>
-                          )}
-                          <CalendarIcon className="h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={createFormData.expires_at}
-                          onSelect={(date) => {
+                    <div className="flex items-center gap-[5px]">
+                      <TagIcon className="w-[24px] h-[24px] text-primary" />
+                      <Input
+                        type="text"
+                        placeholder="Hashtag separate with commas"
+                        className=""
+                        value={createFormData.tags}
+                        onChange={(e) =>
+                          setCreateFormData({
+                            ...createFormData,
+                            tags: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center gap-[5px]">
+                      <LocationIcon className="w-[24px] h-[24px] text-primary" />
+                      <div
+                        className={`flex-1 ${invalidInputOnlyClass(
+                          createFormFieldErrors.location,
+                        )}`}
+                      >
+                        <Input
+                          ref={locationInputRef}
+                          type="text"
+                          required
+                          placeholder="Location (City)"
+                          value={createFormData.location}
+                          onChange={(e) => {
                             setCreateFormFieldErrors((prev) => ({
                               ...prev,
-                              expires_at: false,
+                              location: false,
                             }));
                             setCreateFormData({
                               ...createFormData,
-                              expires_at: date || undefined,
-                            });
-                          }}
-                          defaultMonth={createFormData.expires_at}
-                          disabled={(date) => {
-                            const today = new Date();
-                            today.setHours(0, 0, 0, 0);
-                            return date < today;
-                          }}
-                          required
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div>
-                    <textarea
-                      required
-                      rows={4}
-                      placeholder="description..."
-                      className={`w-full rounded-[20px] border px-3 py-2 ${
-                        createFormFieldErrors.content
-                          ? "border-red-500"
-                          : "border-gray-300"
-                      }`}
-                      value={createFormData.content}
-                      onChange={(e) => {
-                        setCreateFormFieldErrors((prev) => ({
-                          ...prev,
-                          content: false,
-                        }));
-                        setCreateFormData({
-                          ...createFormData,
-                          content: e.target.value,
-                        });
-                      }}
-                    />
-                  </div>
-
-                  {/* items */}
-                  {createFormData.items!.map((item, i) => (
-                    <div className="flex flex-row gap-2 w-full" key={i}>
-                      <div
-                        className={`!flex-[3] ${invalidInputOnlyClass(
-                          createFormFieldErrors.items?.[i]?.title,
-                        )}`}
-                      >
-                        <Input
-                          type="text"
-                          required
-                          placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
-                          value={item.title}
-                          onChange={(e) => {
-                            const items = [...createFormData.items!];
-                            items[i].title = e.target.value;
-                            setCreateFormFieldErrors((prev) => {
-                              const nextItems = [...(prev.items ?? [])];
-                              nextItems[i] = { ...nextItems[i], title: false };
-                              return { ...prev, items: nextItems };
-                            });
-                            setCreateFormData({
-                              ...createFormData,
-                              items,
-                            });
-                          }}
-                        />
-                      </div>
-                      <div
-                        className={`!flex-[1] ${invalidInputOnlyClass(
-                          createFormFieldErrors.items?.[i]?.quantity,
-                        )}`}
-                      >
-                        <Input
-                          type="number"
-                          required
-                          className="!flex-[1] text-[12px] text-center placeholder:text-center"
-                          placeholder="Quantity"
-                          value={item.quantity ?? ""}
-                          onChange={(e) => {
-                            const items = [...createFormData.items!];
-                            items[i].quantity = e.target.value
-                              ? parseInt(e.target.value)
-                              : "";
-                            setCreateFormFieldErrors((prev) => {
-                              const nextItems = [...(prev.items ?? [])];
-                              nextItems[i] = {
-                                ...nextItems[i],
-                                quantity: false,
-                              };
-                              return { ...prev, items: nextItems };
-                            });
-                            setCreateFormData({
-                              ...createFormData,
-                              items,
+                              location: e.target.value,
                             });
                           }}
                         />
                       </div>
                     </div>
-                  ))}
-                  <div className="flex space-x-3 ">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setCreateFormData({
-                          ...createFormData,
-                          items: [
-                            ...(createFormData.items ?? []),
-                            { title: "", quantity: "" },
-                          ],
-                        });
-                      }}
-                      className="bg-white text-primary shadow-none border border-primary-30 text-[18pt] leading-[18px] py-[8px]"
-                    >
-                      +
-                    </Button>
-                  </div>
-                  <div className="flex justify-end space-x-3 pt-4">
-                    <Button
-                      type="button"
-                      onClick={handleCreatePost}
-                      disabled={isCreating}
-                      className="disabled:opacity-50"
-                    >
-                      {isCreating ? "Posting..." : "Create Post"}
-                    </Button>
+
+                    <div className="flex items-center gap-[5px]">
+                      <CalendarIcon className="w-[24px] h-[24px] text-primary" />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            data-empty={!createFormData.expires_at}
+                            className={`w-[212px] justify-between text-left font-normal bg-white ${invalidFieldBorderClass(
+                              createFormFieldErrors.expires_at,
+                            )}`}
+                          >
+                            {createFormData.expires_at ? (
+                              format(createFormData.expires_at, "PPP")
+                            ) : (
+                              <span className="font-ddin tracking-normal text-[14px] font-medium">
+                                Pick a expiry date
+                              </span>
+                            )}
+                            <CalendarIcon className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={createFormData.expires_at}
+                            onSelect={(date) => {
+                              setCreateFormFieldErrors((prev) => ({
+                                ...prev,
+                                expires_at: false,
+                              }));
+                              setCreateFormData({
+                                ...createFormData,
+                                expires_at: date || undefined,
+                              });
+                            }}
+                            defaultMonth={createFormData.expires_at}
+                            disabled={(date) => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              return date < today;
+                            }}
+                            required
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div>
+                      <textarea
+                        required
+                        rows={4}
+                        placeholder="description..."
+                        className={`w-full rounded-[20px] border px-3 py-2 ${
+                          createFormFieldErrors.content
+                            ? "border-red-500"
+                            : "border-gray-300"
+                        }`}
+                        value={createFormData.content}
+                        onChange={(e) => {
+                          setCreateFormFieldErrors((prev) => ({
+                            ...prev,
+                            content: false,
+                          }));
+                          setCreateFormData({
+                            ...createFormData,
+                            content: e.target.value,
+                          });
+                        }}
+                      />
+                    </div>
+
+                    {/* items */}
+                    {createFormData.items!.map((item, i) => (
+                      <div className="flex flex-row gap-2 w-full" key={i}>
+                        <div
+                          className={`!flex-[3] ${invalidInputOnlyClass(
+                            createFormFieldErrors.items?.[i]?.title,
+                          )}`}
+                        >
+                          <Input
+                            type="text"
+                            required
+                            placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
+                            value={item.title}
+                            onChange={(e) => {
+                              const items = [...createFormData.items!];
+                              items[i].title = e.target.value;
+                              setCreateFormFieldErrors((prev) => {
+                                const nextItems = [...(prev.items ?? [])];
+                                nextItems[i] = {
+                                  ...nextItems[i],
+                                  title: false,
+                                };
+                                return { ...prev, items: nextItems };
+                              });
+                              setCreateFormData({
+                                ...createFormData,
+                                items,
+                              });
+                            }}
+                          />
+                        </div>
+                        <div
+                          className={`!flex-[1] ${invalidInputOnlyClass(
+                            createFormFieldErrors.items?.[i]?.quantity,
+                          )}`}
+                        >
+                          <Input
+                            type="number"
+                            required
+                            className="!flex-[1] text-[12px] text-center placeholder:text-center"
+                            placeholder="Quantity"
+                            value={item.quantity ?? ""}
+                            onChange={(e) => {
+                              const items = [...createFormData.items!];
+                              items[i].quantity = e.target.value
+                                ? parseInt(e.target.value)
+                                : "";
+                              setCreateFormFieldErrors((prev) => {
+                                const nextItems = [...(prev.items ?? [])];
+                                nextItems[i] = {
+                                  ...nextItems[i],
+                                  quantity: false,
+                                };
+                                return { ...prev, items: nextItems };
+                              });
+                              setCreateFormData({
+                                ...createFormData,
+                                items,
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex space-x-3 ">
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setCreateFormData({
+                            ...createFormData,
+                            items: [
+                              ...(createFormData.items ?? []),
+                              { title: "", quantity: "" },
+                            ],
+                          });
+                        }}
+                        className="bg-white text-primary shadow-none border border-primary-30 text-[18pt] leading-[18px] py-[8px]"
+                      >
+                        +
+                      </Button>
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-4">
+                      <Button
+                        type="button"
+                        onClick={handleCreatePost}
+                        disabled={isCreating}
+                        className="disabled:opacity-50"
+                      >
+                        {isCreating ? "Posting..." : "Create Post"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

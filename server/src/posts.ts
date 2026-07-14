@@ -626,6 +626,188 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
+//* Edit post API (PUT /:id)
+// 直接沿用 CreatePostSchema，所有欄位改為 optional（Zod .partial()），
+// 並額外加上編輯專用的 deleteImageIds 欄位。
+const EditPostSchema = CreatePostSchema.partial().extend({
+  expiresAt: z.string().datetime().optional().nullable(), // 允許傳 null 清除到期時間
+  deleteImageIds: z.array(z.number().int().positive()).optional(), // 要刪除的圖片 ID 列表
+});
+
+type EditPostSchemaType = z.infer<typeof EditPostSchema>;
+
+router.put(
+  "/:id",
+  requireAuth,
+  memoryUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const postId = parseInt(req.params.id);
+    const userId = req.user!.userId;
+    const files = req.files as Express.Multer.File[];
+
+    if (isNaN(postId)) {
+      return res.status(400).json({ errorMessage: "Invalid post ID" });
+    }
+
+    // 1. coerce multipart 字串 → 正確型別，再驗證
+    let incoming: EditPostSchemaType;
+    try {
+      const raw = {
+        ...req.body,
+        ...(req.body.categoryId    && { categoryId:    parseInt(req.body.categoryId) }),
+        ...(req.body.conditionLevel && { conditionLevel: parseInt(req.body.conditionLevel) }),
+        ...(req.body.lat           && { lat: parseFloat(req.body.lat) }),
+        ...(req.body.lng           && { lng: parseFloat(req.body.lng) }),
+        ...(req.body.expiresAt === "" && { expiresAt: null }),
+        ...(req.body.items         && { items: JSON.parse(req.body.items) }),
+        ...(req.body.deleteImageIds && { deleteImageIds: JSON.parse(req.body.deleteImageIds) }),
+      };
+      incoming = EditPostSchema.parse(raw);
+    } catch (error) {
+      console.error("Edit post validation error:", error);
+      return handleError(error, res);
+    }
+
+    let connection: any;
+    try {
+      // 2. 撈現有資料（同時確認存在 & 所有權）
+      const [rows] = await dbPool.execute<RowDataPacket[]>(
+        "SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL",
+        [postId],
+      );
+      if (rows.length === 0) return res.status(404).json({ errorMessage: "Post not found" });
+      if (rows[0].user_id !== userId) return res.status(403).json({ errorMessage: "Forbidden: You are not the owner of this post" });
+
+      const existing = rows[0];
+
+      // 3. 驗證分類（若有更新）
+      if (incoming.categoryId !== undefined) {
+        if (!(await validateCategory(incoming.categoryId))) {
+          return res.status(400).json({ errorMessage: "Invalid category" });
+        }
+      }
+
+      connection = await dbPool.getConnection();
+      await connection.beginTransaction();
+
+      // 4. 處理地點更新
+      let locationId = existing.location_id;
+      if (incoming.place_id && incoming.full_address && incoming.lat !== undefined && incoming.lng !== undefined) {
+        locationId = await findOrCreateLocation(connection, {
+          place_id: incoming.place_id,
+          full_address: incoming.full_address,
+          province: incoming.province,
+          city: incoming.city,
+          route: incoming.route,
+          zip: incoming.zip,
+          lat: incoming.lat,
+          lng: incoming.lng,
+        });
+      }
+
+      // 5. Merge 現有資料 + 傳入資料，固定 UPDATE（和 Create Post 對稱）
+      const merged = {
+        title:           incoming.title           ?? existing.title,
+        content:         incoming.content         ?? existing.content,
+        status:          incoming.status          ?? existing.status,
+        type:            incoming.type            ?? existing.type,
+        tags:            incoming.tags            ?? existing.tags ?? null,
+        categoryId:      incoming.categoryId      ?? existing.category_id,
+        conditionLevel:  incoming.conditionLevel  ?? existing.condition_level,
+        expiresAt:       "expiresAt" in incoming
+                           ? (incoming.expiresAt ? new Date(incoming.expiresAt) : null)
+                           : existing.expires_at,
+      };
+
+      await connection.execute(
+        `UPDATE posts
+         SET title = ?, content = ?, status = ?, type = ?, tags = ?,
+             category_id = ?, condition_level = ?, expires_at = ?,
+             location_id = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [
+          merged.title, merged.content, merged.status, merged.type, merged.tags,
+          merged.categoryId, merged.conditionLevel, merged.expiresAt,
+          locationId, postId,
+        ],
+      );
+
+      // 6. 更新 Items（先清除舊的再重新插入）
+      if (incoming.items?.length) {
+        await connection.execute("DELETE FROM items WHERE post_id = ?", [postId]);
+        const placeholders = incoming.items.map(() => "(?, ?, ?, NOW(), NOW())").join(", ");
+        const values = incoming.items.flatMap((item) => [postId, item.title, item.quantity]);
+        await connection.execute(
+          `INSERT INTO items (post_id, title, quantity, created_at, updated_at) VALUES ${placeholders}`,
+          values,
+        );
+      }
+
+      // 7. 刪除指定圖片
+      if (incoming.deleteImageIds?.length) {
+        const ph = incoming.deleteImageIds.map(() => "?").join(", ");
+        const args = [...incoming.deleteImageIds, postId];
+        const [imgRows] = await connection.execute(
+          `SELECT s3_key, thumbnail_s3_key FROM images WHERE id IN (${ph}) AND post_id = ?`,
+          args,
+        ) as [RowDataPacket[], any];
+
+        await connection.execute(`DELETE FROM images WHERE id IN (${ph}) AND post_id = ?`, args);
+
+        const keysToDelete = imgRows.flatMap((img: any) =>
+          [img.s3_key, img.thumbnail_s3_key].filter(Boolean),
+        );
+        if (keysToDelete.length > 0) await deleteS3Files(keysToDelete);
+      }
+
+      // 8. 上傳新圖片
+      if (files?.length) {
+        const uploadedImages = await Promise.all(
+          files.map(async (file) => {
+            const fileId = randomUUID();
+            const timestamp = Date.now();
+            const [mainBuffer, thumbBuffer] = await Promise.all([
+              imageProcessor.processPostImage(file.buffer),
+              imageProcessor.createThumbnail(file.buffer),
+            ]);
+            const [{ key, url }, { key: thumbKey, url: thumbnailUrl }] = await Promise.all([
+              uploadToS3(mainBuffer, "posts", `${timestamp}-${fileId}.webp`),
+              uploadToS3(thumbBuffer, "posts", `${timestamp}-${fileId}-thumb.webp`),
+            ]);
+            return { url, thumbnailUrl, key, thumbKey };
+          }),
+        );
+        await insertImages(connection, postId, uploadedImages);
+      }
+
+      await connection.commit();
+
+      const [updatedPost] = await dbPool.execute<RowDataPacket[]>(
+        `SELECT p.*, u.username, u.public_id as author_public_id, u.id as author_user_id,
+                u.avatar_url, c.name_en as category_name_en,
+                l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code,
+                GROUP_CONCAT(i.image_url) as image_urls,
+                GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+         FROM posts p
+         LEFT JOIN users u ON p.user_id = u.id
+         LEFT JOIN categories c ON p.category_id = c.id
+         LEFT JOIN locations l ON p.location_id = l.id
+         LEFT JOIN images i ON p.id = i.post_id
+         WHERE p.id = ? GROUP BY p.id`,
+        [postId],
+      );
+
+      res.status(200).json({ message: "Post updated successfully", post: updatedPost[0] });
+    } catch (error) {
+      if (connection) await connection.rollback();
+      console.error("⚠️ Edit post error:", error);
+      return res.status(500).json({ errorMessage: "Internal server error" });
+    } finally {
+      if (connection) connection.release();
+    }
+  },
+);
+
 //* Delete post api (Soft Delete)
 router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {

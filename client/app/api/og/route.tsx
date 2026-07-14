@@ -1,30 +1,26 @@
 // app/api/og/route.ts
 import { ImageResponse } from "next/og";
 import sharp from "sharp";
+import fs from "fs/promises";
+import path from "path";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-// preload font
-const font = fetch(
-  new URL("./D-DIN-PRO-600-SemiBold.otf", import.meta.url)
-).then((res) => res.arrayBuffer());
-
-// preload headers
-const headers = {
-  share: fetch(new URL("../../../public/assets/PostShareShare.svg", import.meta.url)).then((res) => res.arrayBuffer()),
-  wish: fetch(new URL("../../../public/assets/PostShareWish.svg", import.meta.url)).then((res) => res.arrayBuffer()),
-  commons: fetch(new URL("../../../public/assets/PostShareWeaving.svg", import.meta.url)).then((res) => res.arrayBuffer()),
-};
-
 export async function GET(req: Request) {
-  const fontData = await font;
-  const resolvedHeaders = {
-    share: await headers.share,
-    wish: await headers.wish,
-    commons: await headers.commons,
-  };
-
   try {
+    const fontPath = path.join(process.cwd(), "app/api/og/D-DIN-PRO-600-SemiBold.otf");
+    const fontData = await fs.readFile(fontPath);
+
+    const shareSvgPath = path.join(process.cwd(), "public/assets/PostShareShare.svg");
+    const wishSvgPath = path.join(process.cwd(), "public/assets/PostShareWish.svg");
+    const commonsSvgPath = path.join(process.cwd(), "public/assets/PostShareWeaving.svg");
+
+    const resolvedHeaders = {
+      share: await fs.readFile(shareSvgPath),
+      wish: await fs.readFile(wishSvgPath),
+      commons: await fs.readFile(commonsSvgPath),
+    };
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

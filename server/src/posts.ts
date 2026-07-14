@@ -441,7 +441,7 @@ router.get("/", async (req: Request, res: Response) => {
       LEFT JOIN images i ON p.id = i.post_id
       WHERE ${whereClause}
       GROUP BY p.id
-      ORDER BY p.created_at DESC
+      ORDER BY (p.expires_at IS NOT NULL AND p.expires_at < NOW()) ASC, p.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
 

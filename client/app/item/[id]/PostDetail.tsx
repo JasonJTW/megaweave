@@ -18,6 +18,7 @@ import EyesIcon from "../../components/icons/EyesIcon";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
 import PostShareModal from "../../components/PostShareModal";
 import { useUser } from "../../contexts/UserContext";
+import { useNavbar } from "../../contexts/NavBarContext";
 import { Post } from "../../types/schema";
 
 type PostDetailProps = {
@@ -39,9 +40,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const [likeCount, setLikeCount] = useState(0);
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
-  // back and share bar
-  const [hidden, setHidden] = useState(false);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  // back and share bar — sync with Navbar visibility
+  const { isNavbarVisible } = useNavbar();
   // 獲取當前用戶
   // No longer need local fetchUser as we use useUser() hook
 
@@ -197,24 +197,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     }
   }, [postId, fetchPost]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
 
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        // 向下滾且離頂端超過100px才隱藏
-        setHidden(true);
-      } else {
-        // 向上滾或回到頂端時顯示
-        setHidden(false);
-      }
-
-      setLastScrollY(currentScrollY);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY]);
 
   // 如果沒有 postId，顯示錯誤
   if (!postId) {
@@ -269,8 +252,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <div className="min-h-screen bg-[#f5f5f3] font-ddin">
         {/* 標題列 */}
         <div
-          className={`fixed left-0 top-20 right-0 z-[21] transition-transform duration-300 bg-[#f5f4f3] ${
-            hidden ? "-translate-y-[250%]" : "translate-y-[0]"
+          className={`fixed left-0 top-20 right-0 z-[21] transition-transform duration-100 bg-[#f5f4f3] ${
+            isNavbarVisible ? "translate-y-[0]" : "-translate-y-[250%]"
           }`}
         >
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">

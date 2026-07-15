@@ -2,7 +2,7 @@
 
 import EyesIcon from "@/app/components/icons/EyesIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
-import type { Condition, Post } from "@/app/types/schema";
+import type { Post } from "@/app/types/schema";
 import { Badge } from "@/components/ui/badge";
 import * as Dialog from "@radix-ui/react-dialog";
 import Image from "next/image";
@@ -17,7 +17,6 @@ interface PostShareModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   post: Post;
-  condition?: Condition;
   onInstagramShare: () => void;
 }
 
@@ -25,7 +24,6 @@ const PostShareModal = ({
   open,
   onOpenChange,
   post,
-  condition,
   onInstagramShare,
 }: PostShareModalProps) => {
   const imageUrls = post.image_urls
@@ -100,7 +98,9 @@ const PostShareModal = ({
                         {post.view_count}
                       </Badge>
                     )}
-                    {condition && <Badge>{condition.name}</Badge>}
+                    {post.condition_name && (
+                      <Badge>{post.condition_name}</Badge>
+                    )}
                   </div>
                 </div>
 

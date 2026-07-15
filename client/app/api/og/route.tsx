@@ -68,15 +68,7 @@ export async function GET(req: Request) {
     const headerBase64 = Buffer.from(headerBuffer).toString("base64");
     const headerSrc = `data:image/svg+xml;base64,${headerBase64}`;
 
-    // Condition matching
-    const staticConditions = [
-      { level: 1, name: "全新" },
-      { level: 2, name: "近全新" },
-      { level: 3, name: "良好" },
-      { level: 4, name: "普通" },
-      { level: 5, name: "需要維修" },
-    ];
-    const condition = staticConditions.find((c) => c.level === post.condition_level);
+
 
     // Location matching
     const locationText =
@@ -241,7 +233,7 @@ export async function GET(req: Request) {
                   )}
 
                   {/* Condition Badge */}
-                  {condition && (
+                  {post.condition_name && (
                     <div
                       style={{
                         display: "flex",
@@ -258,7 +250,7 @@ export async function GET(req: Request) {
                           fontFamily: "D-DIN-PRO, 'PingFang TC', sans-serif",
                         }}
                       >
-                        {condition.name}
+                        {post.condition_name}
                       </span>
                     </div>
                   )}

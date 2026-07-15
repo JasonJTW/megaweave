@@ -19,6 +19,7 @@ export interface Post {
   deleted_at?: string;
   username: string;
   category_name_en: string;
+  condition_name?: string;
   image_urls?: string;
   thumbnail_urls?: string;
   avatar_url?: string;

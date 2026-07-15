@@ -324,11 +324,13 @@ router.post(
         p.*,
         u.username,
         c.name_en as category_name_en,
+        cond.name as condition_name,
         l.place_id, l.full_address, l.province, l.city, l.lat, l.lng,
         GROUP_CONCAT(i.image_url) as image_urls
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
       WHERE p.id = ?
@@ -431,12 +433,14 @@ router.get("/", async (req: Request, res: Response) => {
         u.id as author_user_id,
         u.avatar_url,
         c.name_en as category_name_en,
+        cond.name as condition_name,
         l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.image_url) as image_urls,
         GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
       WHERE ${whereClause}
@@ -497,12 +501,14 @@ router.get("/user", requireAuth, async (req: Request, res: Response) => {
         u.id as author_user_id,
         u.avatar_url,
         c.name_en as category_name_en,
+        cond.name as condition_name,
         l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.image_url) as image_urls,
         GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
       WHERE p.user_id = ? AND p.deleted_at IS NULL
@@ -540,10 +546,12 @@ router.get("/:id", async (req: Request, res: Response) => {
         u.email,
         u.avatar_url,
         c.name_en as category_name_en,
+        cond.name as condition_name,
         l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       WHERE p.id = ? AND p.deleted_at IS NULL
     `;
@@ -784,13 +792,14 @@ router.put(
 
       const [updatedPost] = await dbPool.execute<RowDataPacket[]>(
         `SELECT p.*, u.username, u.public_id as author_public_id, u.id as author_user_id,
-                u.avatar_url, c.name_en as category_name_en,
+                u.avatar_url, c.name_en as category_name_en, cond.name as condition_name,
                 l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code,
                 GROUP_CONCAT(i.image_url) as image_urls,
                 GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
          FROM posts p
          LEFT JOIN users u ON p.user_id = u.id
          LEFT JOIN categories c ON p.category_id = c.id
+         LEFT JOIN conditions cond ON p.condition_level = cond.level
          LEFT JOIN locations l ON p.location_id = l.id
          LEFT JOIN images i ON p.id = i.post_id
          WHERE p.id = ? GROUP BY p.id`,

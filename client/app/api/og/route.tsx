@@ -14,6 +14,12 @@ export async function GET(req: Request) {
     );
     const fontData = await fs.readFile(fontPath);
 
+    const fontPath400 = path.join(
+      process.cwd(),
+      "app/api/og/D-DIN-PRO-400-Regular.otf",
+    );
+    const fontData400 = await fs.readFile(fontPath400);
+
     const shareSvgPath = path.join(
       process.cwd(),
       "public/assets/PostShareShare.svg",
@@ -148,9 +154,8 @@ export async function GET(req: Request) {
                 position: "relative",
                 width: "520px",
                 height: "520px",
-                borderRadius: "40px",
+                borderRadius: "20px",
                 backgroundColor: "rgba(234, 235, 230, 0.3)",
-                overflow: "hidden",
               }}
             >
               {finalImageSrc ? (
@@ -161,6 +166,7 @@ export async function GET(req: Request) {
                     width: "100%",
                     height: "100%",
                     objectFit: "cover",
+                    borderRadius: "20px",
                   }}
                 />
               ) : (
@@ -259,9 +265,10 @@ export async function GET(req: Request) {
                   >
                     <span
                       style={{
-                        color: "white",
-                        fontSize: "24px",
+                        color: "black",
+                        fontSize: "14px",
                         fontFamily: "D-DIN-PRO, 'PingFang TC', sans-serif",
+                        fontWeight: 400,
                       }}
                     >
                       {post.condition_name}
@@ -378,6 +385,12 @@ export async function GET(req: Request) {
             data: fontData,
             style: "normal",
             weight: 600,
+          },
+          {
+            name: "D-DIN-PRO",
+            data: fontData400,
+            style: "normal",
+            weight: 400,
           },
         ],
       },

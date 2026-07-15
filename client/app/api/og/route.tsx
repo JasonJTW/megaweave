@@ -252,7 +252,7 @@ export async function GET(req: Request) {
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      backgroundColor: "#3b6232",
+                      backgroundColor: "#f5f4f3",
                       padding: "6px 20px",
                       borderRadius: "20px",
                     }}

@@ -180,10 +180,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       const shareCard = new File([blob], "post.png", { type: "image/png" });
       const title = `${post?.title} | ${post?.type} by ${post?.username}`;
       await navigator.share({
-        // title: title,
-        text: title,
-        files: [shareCard],
+        title: title,
         url: window.location.href,
+        files: [shareCard],
       });
     } catch (error) {
       console.error(error);
@@ -196,8 +195,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       fetchPost();
     }
   }, [postId, fetchPost]);
-
-
 
   // 如果沒有 postId，顯示錯誤
   if (!postId) {

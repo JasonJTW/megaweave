@@ -18,7 +18,7 @@ import EyesIcon from "../../components/icons/EyesIcon";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
 import PostShareModal from "../../components/PostShareModal";
 import { useUser } from "../../contexts/UserContext";
-import { Condition, Post } from "../../types/schema";
+import { Post } from "../../types/schema";
 
 type PostDetailProps = {
   postId: string;
@@ -31,7 +31,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
-  const [conditions, setConditions] = useState<Condition[]>([]);
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
 
@@ -43,7 +42,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // back and share bar
   const [hidden, setHidden] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const condition = conditions.find((c) => c.level === post?.condition_level);
   // 獲取當前用戶
   // No longer need local fetchUser as we use useUser() hook
 
@@ -84,19 +82,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       setLoading(false);
     }
   }, [hostName, postId, user]);
-
-  // 獲取狀況等級
-  const fetchConditions = useCallback(async () => {
-    try {
-      const response = await fetch(`${hostName}/api/conditions`);
-      const data = await response.json();
-      if (response.ok) {
-        setConditions(data.conditions);
-      }
-    } catch (error) {
-      console.error("Error fetching conditions:", error);
-    }
-  }, [hostName]);
 
   // 處理按讚
   const handleLike = async () => {
@@ -204,10 +189,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       toast.error("Failed to share");
     }
   };
-
-  useEffect(() => {
-    fetchConditions();
-  }, [fetchConditions]);
 
   useEffect(() => {
     if (postId) {
@@ -351,9 +332,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                             </Badge>
                           </div>
                         )}
-                        {condition && (
+                        {post.condition_name && (
                           <div className=" flex items-center">
-                            <Badge>{condition.name}</Badge>
+                            <Badge>{post.condition_name}</Badge>
                           </div>
                         )}
                       </div>
@@ -495,7 +476,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         open={shareModalOpen}
         onOpenChange={setShareModalOpen}
         post={post}
-        condition={condition}
         onInstagramShare={handleIGShare}
       />
     </>

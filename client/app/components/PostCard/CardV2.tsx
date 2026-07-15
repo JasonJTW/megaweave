@@ -24,7 +24,6 @@ interface PostCardProps {
 const CardV2 = ({
   // i,
   post,
-  conditions,
   onPostClick,
   categories,
 }: // progress,
@@ -35,7 +34,6 @@ PostCardProps) => {
 
   // const scale = useTransform(progress, range, [1, targetScale]);
 
-  const condition = conditions.find((c) => c.level === post.condition_level);
   const category = categories.find((c) => c.id === post.category_id);
 
   return (
@@ -87,9 +85,9 @@ PostCardProps) => {
                   </div>
                 )}
                 {/* Condition tag */}
-                {condition && (
+                {post.condition_name && (
                   <div className=" flex items-center">
-                    <Badge>{condition.name}</Badge>
+                    <Badge>{post.condition_name}</Badge>
                   </div>
                 )}
               </div>

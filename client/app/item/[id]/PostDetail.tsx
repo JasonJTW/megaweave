@@ -178,9 +178,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       }
       const blob = await response.blob();
       const shareCard = new File([blob], "post.png", { type: "image/png" });
+      const title = `${post?.title} | ${post?.type} by ${post?.username}`;
       await navigator.share({
-        title: post?.title,
-        text: `${post?.title}\n${post?.content}`,
+        title: title,
+        // text: `${post?.title}\n${post?.content}`,
         files: [shareCard],
         url: window.location.href,
       });

@@ -14,7 +14,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description =
     post?.content?.slice(0, 100)?.replace(/\n/g, " ") ||
     "No description available";
-  const title = post?.title || "Untitled";
+  const title = post?.title
+    ? `${post.title} | ${post.type} by ${post.username}`
+    : "Untitled";
 
   return {
     title,

@@ -71,8 +71,11 @@ export async function GET(req: Request) {
         if (imageResponse.ok) {
           const arrayBuffer = await imageResponse.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
-          const pngBuffer = await sharp(buffer).png().toBuffer();
-          finalImageSrc = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+          const pngBuffer = await sharp(buffer)
+            .resize(600, 600, { fit: "inside" })
+            .jpeg({ quality: 100 })
+            .toBuffer();
+          finalImageSrc = `data:image/jpeg;base64,${pngBuffer.toString("base64")}`;
         } else {
           console.error("Failed to fetch image:", imageResponse.status);
         }

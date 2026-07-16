@@ -124,8 +124,6 @@ export async function GET(req: Request) {
             display: "flex",
             flexDirection: "column",
             width: "600px",
-            boxShadow:
-              "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
           }}
         >
           {/* Header SVG banner */}

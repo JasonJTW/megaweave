@@ -377,8 +377,8 @@ export async function GET(req: Request) {
         </div>
       </div>,
       {
-        width: 720,
-        height: 1280,
+        width: 630,
+        height: 1200,
         fonts: [
           {
             name: "D-DIN-PRO",

@@ -380,7 +380,7 @@ export async function GET(req: Request) {
         </div>
       </div>,
       {
-        width: 630,
+        width: 900,
         height: 1200,
         fonts: [
           {

@@ -14,20 +14,13 @@ import {
   DEFAULT_REFRESH_THRESHOLD,
 } from "@/hooks/use-pull-to-refresh";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import Feed from "./components/PostCard/Feed";
 import { usePost } from "./contexts/PostContext";
-import { LucideLoader2, X, CalendarIcon } from "lucide-react";
+import { LucideLoader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
 import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
-import { Post, PostsResponse, CreatePostFormData } from "./types/schema";
+import { Post, PostsResponse } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImage } from "@/utils/imageProcessor";
 import OverlayTour, { TourStep } from "./components/OverlayTour";
@@ -36,7 +29,6 @@ import { useRouter } from "next/navigation";
 import { useUser } from "./contexts/UserContext";
 // const AdSense = dynamic(() => import("@/components/AdSense"), { ssr: false });
 import IconGrid from "./components/IconGrid";
-import AddIcon from "./components/icons/AddIcon";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,14 +38,13 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+import PostFormModal, { PostFormSubmitData } from "./components/PostFormModal";
 
 import {
   RefractiveDiv,
   RefractiveButton,
 } from "./components/Refractive.client";
 
-import TagIcon from "./components/icons/TagIcon";
-import LocationIcon from "./components/icons/LocationIcon";
 import DeleteIcon from "./components/icons/DeleteIcon";
 import SearchIcon from "./components/icons/SearchIcon";
 import ElfIcon from "./components/icons/ElfIcon";
@@ -255,82 +246,15 @@ const PostsApp = () => {
   const [postType, setPostType] = useState<Post["type"]>("share");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [createFormData, setCreateFormData] = useState<CreatePostFormData>({
-    title: "",
-    content: "",
-    location: "",
-    tags: "",
-    categoryId: null as number | null,
-    conditionLevel: null as number | null,
-    type: postType,
-    items: [{ title: "", quantity: "" }],
-  });
-  const [createFormFieldErrors, setCreateFormFieldErrors] = useState<{
-    images?: boolean;
-    categoryId?: boolean;
-    conditionLevel?: boolean;
-    title?: boolean;
-    location?: boolean;
-    content?: boolean;
-    expires_at?: boolean;
-    items?: Array<{ title?: boolean; quantity?: boolean }>;
-  }>({});
-
-  const invalidFieldBorderClass = (hasError?: boolean) =>
-    hasError ? "border-red-500" : "";
-
-  const invalidInputOnlyClass = (hasError?: boolean) =>
-    hasError ? "[&_input]:!border-red-500" : "";
-
-  const validateCreateForm = () => {
-    const itemErrors =
-      createFormData.items?.map((item) => ({
-        title: !item.title.trim(),
-        quantity:
-          item.quantity === "" ||
-          item.quantity === null ||
-          item.quantity === undefined ||
-          Number(item.quantity) < 1,
-      })) ?? [];
-
-    const errors = {
-      images: selectedImages.length === 0,
-      categoryId: !createFormData.categoryId,
-      conditionLevel:
-        createFormData.conditionLevel === null ||
-        createFormData.conditionLevel === undefined,
-      title: !createFormData.title.trim(),
-      location: !createFormData.location.trim(),
-      content: !createFormData.content.trim(),
-      expires_at: !createFormData.expires_at,
-      items: itemErrors,
-    };
-
-    setCreateFormFieldErrors(errors);
-
-    return (
-      !errors.images &&
-      !errors.categoryId &&
-      !errors.conditionLevel &&
-      !errors.title &&
-      !errors.location &&
-      !errors.content &&
-      !errors.expires_at &&
-      !itemErrors.some((item) => item.title || item.quantity)
-    );
-  };
+  // (Form states and validations extracted to PostFormModal)
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const searchButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const locationInputRef = useRef<HTMLInputElement | null>(null);
   const searchLocationInputRef = useRef<HTMLInputElement | null>(null); // Add ref for search input
   const desktopSearchLocationInputRef = useRef<HTMLInputElement | null>(null); // Add ref for desktop search input
 
-  const autocompleteInstanceRef =
-    useRef<google.maps.places.Autocomplete | null>(null);
   const autocompleteSearchInstanceRef =
     useRef<google.maps.places.Autocomplete | null>(null); // Add ref for search autocomplete
   const desktopAutocompleteSearchInstanceRef =
@@ -368,71 +292,6 @@ const PostsApp = () => {
 
     return { province, city, route, zip };
   };
-
-  useEffect(() => {
-    if (
-      !showCreateForm ||
-      !locationInputRef.current ||
-      autocompleteInstanceRef.current ||
-      !window.google?.maps?.places
-    ) {
-      return;
-    }
-
-    try {
-      // Initialize the traditional Autocomplete
-      const autocomplete = new google.maps.places.Autocomplete(
-        locationInputRef.current,
-        {
-          types: ["geocode"], // Street-level precision
-          componentRestrictions: { country: "tw" }, // Restrict to Taiwan
-          fields: [
-            "address_components",
-            "formatted_address",
-            "geometry",
-            "place_id",
-          ],
-        },
-      );
-
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
-        if (place && place.geometry && place.geometry.location) {
-          const { province, city, route, zip } = extractAddress(place);
-
-          console.log("Place selected:", place);
-          setCreateFormFieldErrors((prev) => ({
-            ...prev,
-            location: false,
-          }));
-          setCreateFormData((prev) => ({
-            ...prev,
-            location: place.formatted_address || place.name || "",
-            place_id: place.place_id,
-            province,
-            city,
-            route,
-            zip,
-            lat: place.geometry!.location!.lat(),
-            lng: place.geometry!.location!.lng(),
-          }));
-        }
-      });
-
-      autocompleteInstanceRef.current = autocomplete;
-    } catch (error) {
-      console.warn("Failed to initialize create form autocomplete:", error);
-    }
-
-    return () => {
-      if (autocompleteInstanceRef.current) {
-        google.maps.event.clearInstanceListeners(
-          autocompleteInstanceRef.current,
-        );
-        autocompleteInstanceRef.current = null;
-      }
-    };
-  }, [showCreateForm]);
 
   // Add useEffect for Search Autocomplete (Desktop)
   useEffect(() => {
@@ -603,59 +462,33 @@ const PostsApp = () => {
   };
 
   //! 創建貼文
-  const handleCreatePost = async () => {
-    if (!validateCreateForm()) {
-      toast.error("Required fields cannot be empty.");
-      return;
-    }
-
+  const handleCreatePost = async (data: PostFormSubmitData) => {
     setIsCreating(true);
-
     try {
       const formData = new FormData();
-
-      // 添加表單數據
-      formData.append("title", createFormData.title);
-      formData.append("content", createFormData.content);
-      formData.append("location", createFormData.location);
-      if (createFormData.place_id) {
-        formData.append("place_id", createFormData.place_id);
-      }
-      if (createFormData.location) {
-        formData.append("full_address", createFormData.location);
-      }
-      if (createFormData.province) {
-        formData.append("province", createFormData.province);
-      }
-      if (createFormData.city) {
-        formData.append("city", createFormData.city);
-      }
-      if (createFormData.route) {
-        formData.append("route", createFormData.route);
-      }
-      if (createFormData.zip) {
-        formData.append("zip", createFormData.zip);
-      }
-      if (createFormData.lat !== undefined && createFormData.lat !== null) {
-        formData.append("lat", createFormData.lat.toString());
-      }
-      if (createFormData.lng !== undefined && createFormData.lng !== null) {
-        formData.append("lng", createFormData.lng.toString());
-      }
-      formData.append("tags", createFormData.tags);
-      formData.append("categoryId", createFormData.categoryId!.toString());
-      formData.append(
-        "conditionLevel",
-        createFormData.conditionLevel!.toString(),
-      );
-      if (createFormData.expires_at) {
-        formData.append("expires_at", createFormData.expires_at.toISOString());
+      formData.append("title", data.title);
+      formData.append("content", data.content);
+      formData.append("location", data.location);
+      if (data.place_id) formData.append("place_id", data.place_id);
+      if (data.location) formData.append("full_address", data.location);
+      if (data.province) formData.append("province", data.province);
+      if (data.city) formData.append("city", data.city);
+      if (data.route) formData.append("route", data.route);
+      if (data.zip) formData.append("zip", data.zip);
+      if (data.lat !== undefined && data.lat !== null)
+        formData.append("lat", data.lat.toString());
+      if (data.lng !== undefined && data.lng !== null)
+        formData.append("lng", data.lng.toString());
+      formData.append("tags", data.tags);
+      formData.append("categoryId", data.categoryId.toString());
+      formData.append("conditionLevel", data.conditionLevel.toString());
+      if (data.expires_at) {
+        formData.append("expires_at", data.expires_at.toISOString());
       }
       formData.append("type", postType);
 
-      //TODO: Add Share Commons option
-      // 添加圖片文件 (先壓縮)
-      for (const image of selectedImages) {
+      // 壓縮並添加圖片
+      for (const image of data.newImages) {
         const compressedBlob = await compressImage(image, 1200, 1200, 0.85);
         if (compressedBlob) {
           formData.append("images", compressedBlob, "image.webp");
@@ -664,38 +497,18 @@ const PostsApp = () => {
         }
       }
 
-      if (
-        !createFormData.items?.some(
-          (item) => !item.title.trim() || !item.quantity || item.quantity < 1,
-        )
-      ) {
-        formData.append("items", JSON.stringify(createFormData.items));
-        console.log(createFormData.items);
+      if (data.items && data.items.length > 0) {
+        formData.append("items", JSON.stringify(data.items));
       }
 
       const response = await fetch(`${hostName}/api/posts`, {
         method: "POST",
-        body: formData, // 使用 FormData 而不是 JSON
+        body: formData,
         credentials: "include",
       });
 
       if (response.ok) {
         setShowCreateForm(false);
-        setSelectedImages([]);
-        setCreateFormFieldErrors({});
-
-        /// Rest form data to initial state
-        setCreateFormData({
-          title: "",
-          content: "",
-          location: "",
-          tags: "",
-          categoryId: null,
-          conditionLevel: null,
-          type: postType,
-          items: [{ title: "", quantity: 1 }],
-          expires_at: undefined,
-        });
         mutate(); // 重新獲取貼文列表
       } else {
         const errorData = await response.json();
@@ -708,53 +521,6 @@ const PostsApp = () => {
       setIsCreating(false);
     }
   };
-
-  // 處理圖片選擇
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-
-    // 限制最多 5 張圖片
-    if (selectedImages.length + files.length > 5) {
-      toast.error("Limit of 5 images exceeded");
-      return;
-    }
-
-    // 檢查文件大小和類型
-    const validFiles = files.filter((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} exceeds 10MB size limit`);
-        return false;
-      }
-      if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name} Not a valid image file`);
-        return false;
-      }
-      return true;
-    });
-
-    setSelectedImages((prev) => {
-      const next = [...prev, ...validFiles];
-      if (next.length > 0) {
-        setCreateFormFieldErrors((errors) => ({ ...errors, images: false }));
-      }
-      return next;
-    });
-  };
-
-  // 移除選中的圖片
-  const removeImage = (index: number) => {
-    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // 當分類加載完成後設置默認值
-  useEffect(() => {
-    if (categories.length > 0 && createFormData.categoryId === 1) {
-      setCreateFormData((prev) => ({
-        ...prev,
-        categoryId: categories[0].id,
-      }));
-    }
-  }, [categories, createFormData.categoryId]);
 
   // (SWR automatically handles refetching when getKey dependencies change)
   useEffect(() => {
@@ -769,15 +535,6 @@ const PostsApp = () => {
       document.body.style.overflow = "";
     };
   }, [showCreateForm]);
-
-  // Add this useEffect to clean up blob URLs
-  useEffect(() => {
-    return () => {
-      selectedImages.forEach((image) => {
-        URL.revokeObjectURL(URL.createObjectURL(image));
-      });
-    };
-  }, [selectedImages]);
 
   return (
     <>
@@ -1537,406 +1294,14 @@ const PostsApp = () => {
           )}
         </div>
         {/* Create Post */}
-        {showCreateForm && (
-          <div className="fixed inset-0 flex z-50 bg-secondary overflow-y-auto font-ddin justify-center">
-            <div className="bg-secondary rounded-lg max-w-2xl w-full min-h-screen md:max-w-5xl">
-              <div className="p-6">
-                <div className="flex justify-center relative items-center border-b pb-2">
-                  <h2 className="text-2xl font-bold text-gray-900 capitalize">
-                    {postType}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setSelectedImages([]);
-                      setCreateFormFieldErrors({});
-                      setShowCreateForm(false);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 absolute -right-2 -top-1"
-                  >
-                    <DeleteIcon />
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
-                  {/* 圖片上傳區域 */}
-                  <div className="w-full md:w-1/2 md:shrink-0">
-                    {/* 圖片上傳按鈕 */}
-                    <div className="mb-4">
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                        id="image-upload"
-                        disabled={selectedImages.length >= 5}
-                        required
-                      />
-                    </div>
-
-                    {/* 上傳方塊（固定在上方） */}
-                    <div
-                      className={`flex min-h-[200px] items-center justify-center rounded-lg bg-primary-30 p-6 md:min-h-[320px]${
-                        createFormFieldErrors.images
-                          ? " border border-red-500"
-                          : ""
-                      }`}
-                    >
-                      <label
-                        htmlFor="image-upload"
-                        className={`inline-flex cursor-pointer items-center px-4 py-2 transition-all duration-200 ease-in-out hover:scale-125 ${
-                          selectedImages.length >= 5
-                            ? "pointer-events-none cursor-not-allowed opacity-50"
-                            : ""
-                        }`}
-                      >
-                        <AddIcon />
-                      </label>
-                    </div>
-
-                    {/* 已選圖片預覽（顯示在上傳方塊下方，最多五格） */}
-                    {selectedImages.length > 0 && (
-                      <div className="mt-3 grid grid-cols-5 gap-2">
-                        {selectedImages.slice(0, 5).map((image, index) => (
-                          <div key={index} className="group relative">
-                            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={URL.createObjectURL(image)}
-                                alt={`預覽 ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute -right-1 -top-1 rounded-full bg-red-600 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="w-full space-y-[10px] md:w-1/2">
-                    {/* Category */}
-                    <div>
-                      <Select
-                        value={createFormData.categoryId?.toString()}
-                        onValueChange={(value) => {
-                          setCreateFormFieldErrors((prev) => ({
-                            ...prev,
-                            categoryId: false,
-                          }));
-                          setCreateFormData({
-                            ...createFormData,
-                            categoryId: parseInt(value),
-                          });
-                        }}
-                        required
-                      >
-                        <SelectTrigger
-                          className={invalidFieldBorderClass(
-                            createFormFieldErrors.categoryId,
-                          )}
-                        >
-                          <SelectValue placeholder="Category" />
-                        </SelectTrigger>
-
-                        <SelectContent>
-                          {categories.map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id.toString()}>
-                              {cat.name_en}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Condition */}
-                    <div>
-                      <Select
-                        value={
-                          createFormData.conditionLevel !== null
-                            ? String(createFormData.conditionLevel)
-                            : undefined
-                        }
-                        onValueChange={(value) => {
-                          setCreateFormFieldErrors((prev) => ({
-                            ...prev,
-                            conditionLevel: false,
-                          }));
-                          setCreateFormData({
-                            ...createFormData,
-                            conditionLevel: parseInt(value),
-                          });
-                        }}
-                        required
-                      >
-                        <SelectTrigger
-                          className={`w-full ${invalidFieldBorderClass(
-                            createFormFieldErrors.conditionLevel,
-                          )}`}
-                        >
-                          <SelectValue placeholder="Condition">
-                            {/* 自訂顯示邏輯 */}
-
-                            {createFormData.conditionLevel !== null &&
-                              conditions.find(
-                                (c) =>
-                                  c.level === createFormData.conditionLevel,
-                              )?.name}
-                          </SelectValue>
-                        </SelectTrigger>
-
-                        <SelectContent>
-                          {conditions.map((condition) => (
-                            <SelectItem
-                              key={condition.id}
-                              value={String(condition.level)}
-                            >
-                              {condition.name} - {condition.description}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Title */}
-                    <div
-                      className={invalidInputOnlyClass(
-                        createFormFieldErrors.title,
-                      )}
-                    >
-                      <Input
-                        type="text"
-                        required
-                        placeholder="Title"
-                        value={createFormData.title}
-                        onChange={(e) => {
-                          setCreateFormFieldErrors((prev) => ({
-                            ...prev,
-                            title: false,
-                          }));
-                          setCreateFormData({
-                            ...createFormData,
-                            title: e.target.value,
-                          });
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-[5px]">
-                      <TagIcon className="w-[24px] h-[24px] text-primary" />
-                      <Input
-                        type="text"
-                        placeholder="Hashtag separate with commas"
-                        className=""
-                        value={createFormData.tags}
-                        onChange={(e) =>
-                          setCreateFormData({
-                            ...createFormData,
-                            tags: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center gap-[5px]">
-                      <LocationIcon className="w-[24px] h-[24px] text-primary" />
-                      <div
-                        className={`flex-1 ${invalidInputOnlyClass(
-                          createFormFieldErrors.location,
-                        )}`}
-                      >
-                        <Input
-                          ref={locationInputRef}
-                          type="text"
-                          required
-                          placeholder="Location (City)"
-                          value={createFormData.location}
-                          onChange={(e) => {
-                            setCreateFormFieldErrors((prev) => ({
-                              ...prev,
-                              location: false,
-                            }));
-                            setCreateFormData({
-                              ...createFormData,
-                              location: e.target.value,
-                            });
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-[5px]">
-                      <CalendarIcon className="w-[24px] h-[24px] text-primary" />
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            data-empty={!createFormData.expires_at}
-                            className={`w-[212px] justify-between text-left font-normal bg-white ${invalidFieldBorderClass(
-                              createFormFieldErrors.expires_at,
-                            )}`}
-                          >
-                            {createFormData.expires_at ? (
-                              format(createFormData.expires_at, "PPP")
-                            ) : (
-                              <span className="font-ddin tracking-normal text-[14px] font-medium">
-                                Pick a expiry date
-                              </span>
-                            )}
-                            <CalendarIcon className="h-4 w-4 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={createFormData.expires_at}
-                            onSelect={(date) => {
-                              setCreateFormFieldErrors((prev) => ({
-                                ...prev,
-                                expires_at: false,
-                              }));
-                              setCreateFormData({
-                                ...createFormData,
-                                expires_at: date || undefined,
-                              });
-                            }}
-                            defaultMonth={createFormData.expires_at}
-                            disabled={(date) => {
-                              const today = new Date();
-                              today.setHours(0, 0, 0, 0);
-                              return date < today;
-                            }}
-                            required
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    <div>
-                      <textarea
-                        required
-                        rows={4}
-                        placeholder="description..."
-                        className={`w-full rounded-[20px] border px-3 py-2 ${
-                          createFormFieldErrors.content
-                            ? "border-red-500"
-                            : "border-gray-300"
-                        }`}
-                        value={createFormData.content}
-                        onChange={(e) => {
-                          setCreateFormFieldErrors((prev) => ({
-                            ...prev,
-                            content: false,
-                          }));
-                          setCreateFormData({
-                            ...createFormData,
-                            content: e.target.value,
-                          });
-                        }}
-                      />
-                    </div>
-
-                    {/* items */}
-                    {createFormData.items!.map((item, i) => (
-                      <div className="flex flex-row gap-2 w-full" key={i}>
-                        <div
-                          className={`!flex-[3] ${invalidInputOnlyClass(
-                            createFormFieldErrors.items?.[i]?.title,
-                          )}`}
-                        >
-                          <Input
-                            type="text"
-                            required
-                            placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
-                            value={item.title}
-                            onChange={(e) => {
-                              const items = [...createFormData.items!];
-                              items[i].title = e.target.value;
-                              setCreateFormFieldErrors((prev) => {
-                                const nextItems = [...(prev.items ?? [])];
-                                nextItems[i] = {
-                                  ...nextItems[i],
-                                  title: false,
-                                };
-                                return { ...prev, items: nextItems };
-                              });
-                              setCreateFormData({
-                                ...createFormData,
-                                items,
-                              });
-                            }}
-                          />
-                        </div>
-                        <div
-                          className={`!flex-[1] ${invalidInputOnlyClass(
-                            createFormFieldErrors.items?.[i]?.quantity,
-                          )}`}
-                        >
-                          <Input
-                            type="number"
-                            required
-                            className="!flex-[1] text-[12px] text-center placeholder:text-center"
-                            placeholder="Quantity"
-                            value={item.quantity ?? ""}
-                            onChange={(e) => {
-                              const items = [...createFormData.items!];
-                              items[i].quantity = e.target.value
-                                ? parseInt(e.target.value)
-                                : "";
-                              setCreateFormFieldErrors((prev) => {
-                                const nextItems = [...(prev.items ?? [])];
-                                nextItems[i] = {
-                                  ...nextItems[i],
-                                  quantity: false,
-                                };
-                                return { ...prev, items: nextItems };
-                              });
-                              setCreateFormData({
-                                ...createFormData,
-                                items,
-                              });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex space-x-3 ">
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setCreateFormData({
-                            ...createFormData,
-                            items: [
-                              ...(createFormData.items ?? []),
-                              { title: "", quantity: "" },
-                            ],
-                          });
-                        }}
-                        className="bg-white text-primary shadow-none border border-primary-30 text-[18pt] leading-[18px] py-[8px]"
-                      >
-                        +
-                      </Button>
-                    </div>
-                    <div className="flex justify-end space-x-3 pt-4">
-                      <Button
-                        type="button"
-                        onClick={handleCreatePost}
-                        disabled={isCreating}
-                        className="disabled:opacity-50"
-                      >
-                        {isCreating ? "Posting..." : "Create Post"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <PostFormModal
+          isOpen={showCreateForm}
+          onClose={() => setShowCreateForm(false)}
+          title={postType}
+          submitButtonText="Create Post"
+          isSubmitting={isCreating}
+          onSubmit={handleCreatePost}
+        />
       </div>
     </>
   );

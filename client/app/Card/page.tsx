@@ -41,7 +41,7 @@ const CardPage = () => {
 
   return (
     <>
-      <div className="mb-[100vh] relative" ref={container}>
+      <div className="relative mb-[100vh]" ref={container}>
         {posts.map((post, index) => {
           const targetScale = 1 - (posts.length - index) * 0.05;
           return (

@@ -40,30 +40,30 @@ PostCardProps) => {
     // Card Container
     <div
       ref={container}
-      className="flex items-center justify-center h-screen sticky top-0 font-ddin font-medium"
+      className="sticky top-0 flex h-screen items-center justify-center font-ddin font-medium"
       onClick={() => onPostClick(post)}
     >
       {/* Card */}
       <motion.div
-        className="w-full mx-7 cursor-pointer rounded-[30px] border-red-300 border bg-megaweave-blue-light overflow-hidden transition-all duration-300 py-0 relative  flex flex-col pb-[17px]"
+        className="relative mx-7 flex w-full cursor-pointer flex-col overflow-hidden rounded-[30px] border border-red-300 bg-megaweave-blue-light py-0 pb-[17px] transition-all duration-300"
         // style={{ top: `calc(-10% + ${i * 68}px)` }}
       >
         <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="font-semibold font-ddin text-[36px] text-gray-800 truncate">
+          <h2 className="truncate font-ddin text-[36px] font-semibold text-gray-800">
             {post.title}
           </h2>
-          <div className="hidden md:flex items-center text-gray-500 text-sm">
-            <UserIcon className="w-4 h-4 mr-1" />
+          <div className="hidden items-center text-sm text-gray-500 md:flex">
+            <UserIcon className="mr-1 h-4 w-4" />
             {post.username}
           </div>
         </div>
 
         {post.image_urls && post.image_urls.length > 0 && (
           // imageContainer
-          <div className="flex justify-center mb-0 rounded-[20px] overflow-hidden mx-4">
+          <div className="mx-4 mb-0 flex justify-center overflow-hidden rounded-[20px]">
             {/* inner */}
-            <div className="relative w-full h-64 md:h-80 ">
-              <motion.div className="relative w-full h-64 md:h-80 ">
+            <div className="relative h-64 w-full md:h-80">
+              <motion.div className="relative h-64 w-full md:h-80">
                 <Image
                   src={post.image_urls.split(",")[0]}
                   alt={post.title}
@@ -77,7 +77,7 @@ PostCardProps) => {
 
               {/* tags */}
 
-              <div className="absolute flex flex-row gap-[6px] bottom-0 right-0 m-3">
+              <div className="absolute bottom-0 right-0 m-3 flex flex-row gap-[6px]">
                 {/* Category tag */}
                 {category && (
                   <div className="flex items-center">
@@ -86,7 +86,7 @@ PostCardProps) => {
                 )}
                 {/* Condition tag */}
                 {post.condition_name && (
-                  <div className=" flex items-center">
+                  <div className="flex items-center">
                     <Badge>{post.condition_name}</Badge>
                   </div>
                 )}
@@ -95,8 +95,8 @@ PostCardProps) => {
           </div>
         )}
 
-        <div className="bg-white flex flex-col p-4 mx-4 mt-[14px]  rounded-[20px]">
-          <p className="text-black text-[18px] mb-[10px] truncate">
+        <div className="mx-4 mt-[14px] flex flex-col rounded-[20px] bg-white p-4">
+          <p className="mb-[10px] truncate text-[18px] text-black">
             {post.content}
           </p>
           <div className="min-h-[18px]">
@@ -107,7 +107,7 @@ PostCardProps) => {
                     <TagIcon className="text-primary" />
                     <span
                       key={i}
-                      className="text-[16px]  text-megaweave-forest-dark px-2 "
+                      className="px-2 text-[16px] text-megaweave-forest-dark"
                     >
                       {tag.trim()}
                     </span>
@@ -116,7 +116,7 @@ PostCardProps) => {
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-[6px] mt-[6px]">
+          <div className="mt-[6px] flex flex-col gap-[6px]">
             {post.location && (
               <div className="flex items-center gap-2 text-[16px] leading-[18px]">
                 <LocationIcon className="text-primary" />

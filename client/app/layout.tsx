@@ -162,14 +162,14 @@ export default function RootLayout({
           <UserProvider>
             <SocketProvider>
               <NavbarProvider>
-                  <NotificationProvider>
-                    <ChatPopupProvider>
-                      <Navbar />
-                      <ChatPopup />
+                <NotificationProvider>
+                  <ChatPopupProvider>
+                    <Navbar />
+                    <ChatPopup />
 
-                      {/* Facebook SDK */}
-                      <Script id="facebook-sdk" strategy="afterInteractive">
-                        {`
+                    {/* Facebook SDK */}
+                    <Script id="facebook-sdk" strategy="afterInteractive">
+                      {`
                   window.fbAsyncInit = function() {
                     FB.init({
                       appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
@@ -189,24 +189,22 @@ export default function RootLayout({
                      fjs.parentNode.insertBefore(js, fjs);
                    }(document, 'script', 'facebook-jssdk'));
                 `}
-                      </Script>
-                      <Script
-                        id="google-maps"
-                        strategy="afterInteractive"
-                        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
-                      />
-                      <GoogleOAuthProvider
-                        clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-                      >
-                        <TeamProvider>
-                          <PostProvider>
-                              {children}
-                          </PostProvider>
-                        </TeamProvider>
-                      </GoogleOAuthProvider>
-                      <Footer />
-                    </ChatPopupProvider>
-                  </NotificationProvider>
+                    </Script>
+                    <Script
+                      id="google-maps"
+                      strategy="afterInteractive"
+                      src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
+                    />
+                    <GoogleOAuthProvider
+                      clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+                    >
+                      <TeamProvider>
+                        <PostProvider>{children}</PostProvider>
+                      </TeamProvider>
+                    </GoogleOAuthProvider>
+                    <Footer />
+                  </ChatPopupProvider>
+                </NotificationProvider>
               </NavbarProvider>
             </SocketProvider>
           </UserProvider>

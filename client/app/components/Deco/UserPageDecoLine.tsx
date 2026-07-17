@@ -10,7 +10,7 @@ interface UserPageDecoLineProps {
 export default function UserPageDecoLine({ className }: UserPageDecoLineProps) {
   return (
     <div
-      className={`flex-1 justify-between h-[24px] flex text-megaweave-forest-dark pb-4 ${
+      className={`flex h-[24px] flex-1 justify-between pb-4 text-megaweave-forest-dark ${
         className || ""
       }`}
     >

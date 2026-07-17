@@ -134,7 +134,7 @@ export interface Attachment {
   id: number;
   message_id: number;
   file_url: string;
-  file_type: 'image' | 'video' | 'file';
+  file_type: "image" | "video" | "file";
   created_at: string;
 }
 

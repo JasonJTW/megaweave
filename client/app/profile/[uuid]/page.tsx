@@ -150,15 +150,15 @@ const PublicProfilePage = () => {
   if (loading) {
     return (
       <>
-        <div className="fixed inset-0 bg-megaweave-forest-dark -z-10"></div>
-        <div className="min-h-screen bg-megaweave-forest-dark flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-megaweave-forest-dark"></div>
+        <div className="flex min-h-screen items-center justify-center bg-megaweave-forest-dark">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             className="text-center"
           >
-            <div className="w-16 h-16 border-4 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin mx-auto mb-4"></div>
-            <h1 className="text-megaweave-cream text-2xl font-medium">
+            <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-megaweave-gold/30 border-t-megaweave-red-light"></div>
+            <h1 className="text-2xl font-medium text-megaweave-cream">
               Loading...
             </h1>
           </motion.div>
@@ -171,9 +171,9 @@ const PublicProfilePage = () => {
   if (error) {
     return (
       <>
-        <div className="fixed inset-0 bg-megaweave-brown -z-10"></div>
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
-          <Alert className="max-w-md bg-red-950/50 border-red-500/30">
+        <div className="fixed inset-0 -z-10 bg-megaweave-brown"></div>
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
+          <Alert className="max-w-md border-red-500/30 bg-red-950/50">
             <AlertDescription className="text-red-300">
               {error}
             </AlertDescription>
@@ -187,8 +187,8 @@ const PublicProfilePage = () => {
   if (!profileData) {
     return (
       <>
-        <div className="fixed inset-0 bg-megaweave-brown -z-10"></div>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-megaweave-brown"></div>
+        <div className="flex min-h-screen items-center justify-center">
           <p className="text-gray-400">No profile data available</p>
         </div>
       </>
@@ -198,28 +198,28 @@ const PublicProfilePage = () => {
   // Main render
   return (
     <>
-      <div className="fixed inset-0 bg-primary-5 -z-10 font-ddin"></div>
-      <div className="min-h-screen  px-0 sm:px-6 md:px-12 lg:px-16">
+      <div className="fixed inset-0 -z-10 bg-primary-5 font-ddin"></div>
+      <div className="min-h-screen px-0 sm:px-6 md:px-12 lg:px-16">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="py-4 px-6"
+          className="px-6 py-4"
         >
-          <div className="flex items-start min-w-full">
+          <div className="flex min-w-full items-start">
             <Button
               variant="ghost"
               onClick={() => router.back()}
-              className="p-4 text-left w-8"
+              className="w-8 p-4 text-left"
             >
-              <ArrowLeft className="w-8 h-8" />
+              <ArrowLeft className="h-8 w-8" />
             </Button>
           </div>
         </motion.header>
 
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="mx-auto max-w-6xl px-6 py-5 font-ddin">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
             {/* Profile Card */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -227,10 +227,10 @@ const PublicProfilePage = () => {
               transition={{ delay: 0.1 }}
               className="lg:col-span-1"
             >
-              <div className="bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="rounded-[30px] border border-primary-30 bg-white p-6 transition-all duration-300 hover:border-gray-600/40">
                 {/* Avatar */}
-                <div className="text-center mb-6">
-                  <div className="w-full max-w-72 h-80 max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto shadow-lg shadow-blue-500/20 relative overflow-hidden">
+                <div className="mb-6 text-center">
+                  <div className="relative mx-auto mb-2 flex h-80 max-h-80 w-full max-w-72 items-center justify-center overflow-hidden rounded-2xl bg-secondary/50 text-2xl font-bold shadow-lg shadow-blue-500/20">
                     {profileData.avatar_url ? (
                       <div className="absolute inset-0">
                         <Image
@@ -242,7 +242,7 @@ const PublicProfilePage = () => {
                         />
                       </div>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-6xl text-gray-400">
+                      <div className="flex h-full w-full items-center justify-center text-6xl text-gray-400">
                         {profileData.username?.charAt(0).toUpperCase() || "?"}
                       </div>
                     )}
@@ -250,9 +250,9 @@ const PublicProfilePage = () => {
                 </div>
 
                 {/* User Info */}
-                <div className="text-center space-y-3">
+                <div className="space-y-3 text-center">
                   <h2
-                    className="text-xl font-bold text-[#222]  "
+                    className="text-xl font-bold text-[#222]"
                     style={{
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -267,7 +267,7 @@ const PublicProfilePage = () => {
 
                   {/* Role Badge */}
                   <div className="flex justify-center">
-                    <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 text-white">
+                    <span className="inline-flex items-center rounded-full border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 px-4 py-2 text-sm font-medium text-white">
                       {profileData.role}
                     </span>
                   </div>
@@ -278,7 +278,7 @@ const PublicProfilePage = () => {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="mt-4 p-3 bg-gradient-to-r from-megaweave-blue/10 to-megaweave-blue-light/10 rounded-lg relative"
+                      className="relative mt-4 rounded-lg bg-gradient-to-r from-megaweave-blue/10 to-megaweave-blue-light/10 p-3"
                       style={{
                         border: "2px solid #3b82f6",
                         boxShadow: `
@@ -297,7 +297,7 @@ const PublicProfilePage = () => {
                           height={20}
                           unoptimized
                         />
-                        <p className="text-md text-megaweave-blue-light font-ddin font-bold tracking-widest">
+                        <p className="text-md font-ddin font-bold tracking-widest text-megaweave-blue-light">
                           Contributor
                         </p>
                       </div>
@@ -308,27 +308,27 @@ const PublicProfilePage = () => {
                 {/* Stats (Optional - 可以移除或改成真實數據) */}
                 {/* Stats */}
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
-                    <div className="type-h3 text-[#222]  ">
+                  <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
+                    <div className="type-h3 text-[#222]">
                       {String(stats.postCount).padStart(2, "0")}
                     </div>
-                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
+                    <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
                       post
                     </div>
                   </div>
-                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
-                    <div className="type-h3 text-[#222] ">
+                  <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
+                    <div className="type-h3 text-[#222]">
                       {String(stats.weaveCount).padStart(2, "0")}
                     </div>
-                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
+                    <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
                       weaved
                     </div>
                   </div>
-                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
-                    <div className="type-h3 text-[#222] ">
+                  <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
+                    <div className="type-h3 text-[#222]">
                       {String(stats.points).padStart(2, "0")}
                     </div>
-                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
+                    <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
                       point
                     </div>
                   </div>
@@ -341,13 +341,13 @@ const PublicProfilePage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="lg:col-span-2 space-y-6"
+              className="space-y-6 lg:col-span-2"
             >
               {/* Bio Section */}
-              <div className="bg-white  border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold flex items-center space-x-2">
-                    <UserIcon className="w-5 h-5 text-megaweave-forest-dark" />
+              <div className="rounded-2xl border border-primary-30 bg-white p-6 transition-all duration-300 hover:border-gray-600/40">
+                <div className="mb-6 flex items-center justify-between">
+                  <h3 className="flex items-center space-x-2 text-xl font-semibold">
+                    <UserIcon className="h-5 w-5 text-megaweave-forest-dark" />
                     <div className="type-button-b1 text-megaweave-forest-dark">
                       About Me
                     </div>
@@ -357,12 +357,12 @@ const PublicProfilePage = () => {
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-primary leading-relaxed whitespace-pre-line break-words"
+                  className="whitespace-pre-line break-words leading-relaxed text-primary"
                 >
                   {profileData.bio ? (
                     renderTextWithUrls(profileData.bio)
                   ) : (
-                    <span className="text-gray-500 italic">
+                    <span className="italic text-gray-500">
                       No bio available
                     </span>
                   )}

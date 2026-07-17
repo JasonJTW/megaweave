@@ -187,7 +187,7 @@ const WeavingCard = ({
             <span className="type-h5 text-primary">{username}</span>
             {statusLabel && (
               <span
-                className={`inline-flex font-bold shrink-0 items-center gap-1 rounded-full px-2 py-0.5 type-body-t5 ${statusStyles[statusLabel].badge}`}
+                className={`type-body-t5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-bold ${statusStyles[statusLabel].badge}`}
               >
                 <WeavingIcon
                   className={`h-3 w-3 ${statusStyles[statusLabel].icon}`}
@@ -199,7 +199,7 @@ const WeavingCard = ({
 
           {statusLabel && <div className="my-2 border-b border-primary-30" />}
 
-          <p className="flex min-w-0 items-baseline type-body-t5 font-bold text-dark truncate">
+          <p className="type-body-t5 flex min-w-0 items-baseline truncate font-bold text-dark">
             <span
               className={`min-w-0 truncate ${cardContent ? "max-w-[50%]" : "w-full"}`}
             >
@@ -220,7 +220,7 @@ const WeavingCard = ({
               {visibleItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between gap-2 type-body-t5 text-dark"
+                  className="type-body-t5 flex items-center justify-between gap-2 text-dark"
                 >
                   <span className="truncate">{item.title}</span>
                   <span className="shrink-0 text-primary-75">
@@ -235,7 +235,7 @@ const WeavingCard = ({
           )}
 
           {isInChatWindow && (
-            <div className="mt-1.5 flex items-center justify-between type-body-t5">
+            <div className="type-body-t5 mt-1.5 flex items-center justify-between">
               <span className="text-primary-75">
                 {inChatWindow.itemTitle === "all" ||
                 inChatWindow.itemTitle.startsWith("All Items - ")
@@ -245,7 +245,7 @@ const WeavingCard = ({
               <Link
                 href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
                 onClick={(e) => e.stopPropagation()}
-                className="text-primary hover:underline font-bold text-xs"
+                className="text-xs font-bold text-primary hover:underline"
               >
                 View Detail →
               </Link>
@@ -257,11 +257,11 @@ const WeavingCard = ({
       {/* Row 2: displayUser info + action buttons (only when weave exists) */}
       {displayUser && (
         <div
-          className="mt-3 w-full bg-primary-5 rounded-[16px] px-[16px] py-[10px] flex items-center gap-2 text-gray-600 text-sm"
+          className="mt-3 flex w-full items-center gap-2 rounded-[16px] bg-primary-5 px-[16px] py-[10px] text-sm text-gray-600"
           onClick={(e) => e.stopPropagation()}
         >
           {displayUser.avatar ? (
-            <div className="w-9 h-9 rounded-full overflow-hidden relative flex-shrink-0">
+            <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full">
               <Image
                 src={displayUser.avatar}
                 alt={displayUser.name}
@@ -270,27 +270,27 @@ const WeavingCard = ({
               />
             </div>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
-              <UserIcon className="w-5 h-5 text-gray-600" />
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gray-300">
+              <UserIcon className="h-5 w-5 text-gray-600" />
             </div>
           )}
 
-          <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-[#222] type-body-t4 font-semibold">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="type-body-t4 font-semibold text-[#222]">
               {displayUser.name}
             </span>
-            <span className="text-[#666] type-body-t5">{displayUser.role}</span>
+            <span className="type-body-t5 text-[#666]">{displayUser.role}</span>
 
             {currentStatus === "pending" && (
               <div className="mt-1 flex flex-col gap-1">
                 {!hasIConfirmed ? (
-                  <span className="text-orange-500 text-xs font-medium">
+                  <span className="text-xs font-medium text-orange-500">
                     {isReceiver
                       ? "Received the item? Click the checkmark to confirm."
                       : "Handed over the item? Click the checkmark to confirm."}
                   </span>
                 ) : !hasOtherConfirmed ? (
-                  <span className="text-blue-600 text-xs mt-1 animate-pulse">
+                  <span className="mt-1 animate-pulse text-xs text-blue-600">
                     {isReceiver
                       ? `Received confirmed. Waiting for ${displayUser.name} to confirm handover...`
                       : `Handover confirmed. Waiting for ${displayUser.name} to confirm receipt...`}
@@ -298,7 +298,7 @@ const WeavingCard = ({
                 ) : null}
 
                 {!hasIConfirmed && hasOtherConfirmed && (
-                  <span className="text-green-600 text-xs font-bold">
+                  <span className="text-xs font-bold text-green-600">
                     {isReceiver
                       ? `${displayUser.name} confirmed handover. Please confirm receipt!`
                       : `${displayUser.name} confirmed receipt. Please confirm handover!`}
@@ -310,7 +310,7 @@ const WeavingCard = ({
 
           {/* Action buttons — pending only */}
           {currentStatus === "pending" && (
-            <div className="text-megaweave-forest-dark flex gap-[16px] ml-auto shrink-0">
+            <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
               <button
                 onClick={handleCompleteWeave}
                 disabled={isProcessing || hasIConfirmed}
@@ -318,7 +318,7 @@ const WeavingCard = ({
                 title={hasIConfirmed ? "You have confirmed" : "Complete weave"}
               >
                 <AcceptIcon
-                  className={`w-[18px] h-auto ${hasIConfirmed ? "stroke-[3px]" : ""}`}
+                  className={`h-auto w-[18px] ${hasIConfirmed ? "stroke-[3px]" : ""}`}
                 />
               </button>
               <button
@@ -327,7 +327,7 @@ const WeavingCard = ({
                 className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
                 title="Cancel weave"
               >
-                <CancelIcon className="w-[18px] h-auto" />
+                <CancelIcon className="h-auto w-[18px]" />
               </button>
             </div>
           )}

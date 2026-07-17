@@ -44,7 +44,7 @@ export default function Feed({
   // state + ref pair to avoid stale closures
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
   const activeIndexRef = useRef<number | null>(activeIndex);
-  
+
   // Intersection Observer for Infinite Scroll using react-intersection-observer
   const { ref: loadingRef, inView } = useInView({
     rootMargin: "800px 0px", // Trigger fetch when the bottom is still 800px away
@@ -242,7 +242,7 @@ export default function Feed({
   );
 
   return (
-    <div className="feed-snap snap-y snap-mandatory sm:snap-none sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6 sm:gap-y-[30px] sm:auto-rows-max px-4 sm:px-0">
+    <div className="feed-snap snap-y snap-mandatory px-4 sm:grid sm:snap-none sm:auto-rows-max sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6 sm:gap-y-[30px] sm:px-0">
       {posts.map((p, i) => {
         // ✅ 取得對應的 weave 資料
         // ✅ 修正邏輯：
@@ -264,7 +264,7 @@ export default function Feed({
               ref={(el) => {
                 cardRefs.current[i] = el;
               }}
-              className="snap-child snap-center sm:snap-align-none pb-4 sm:pb-0"
+              className="snap-child snap-center pb-4 sm:snap-align-none sm:pb-0"
             >
               <PostCard
                 post={p}
@@ -280,26 +280,29 @@ export default function Feed({
 
             {/* Desktop-only Sprite Injection */}
             {i === 1 && (
-              <div className="hidden sm:flex w-full relative items-end justify-end self-end">
-                <ElfIcon className="w-full h-full text-[#CB5E32]" />
+              <div className="relative hidden w-full items-end justify-end self-end sm:flex">
+                <ElfIcon className="h-full w-full text-[#CB5E32]" />
               </div>
             )}
             {i === 3 && (
-              <div className="hidden sm:flex w-full relative items-end justify-end self-end">
-                <WazowskiIcon className="w-full h-full" />
+              <div className="relative hidden w-full items-end justify-end self-end sm:flex">
+                <WazowskiIcon className="h-full w-full" />
               </div>
             )}
             {i === 8 && (
-              <div className="hidden sm:flex w-full relative items-end justify-end self-end">
-                <WeavingIcon className="w-full h-full text-[#3B6232]  mt-10" />
+              <div className="relative hidden w-full items-end justify-end self-end sm:flex">
+                <WeavingIcon className="mt-10 h-full w-full text-[#3B6232]" />
               </div>
             )}
           </React.Fragment>
         );
       })}
       {hasMore && (
-        <div ref={loadingRef} className="w-full flex justify-center py-8 sm:col-span-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div
+          ref={loadingRef}
+          className="flex w-full justify-center py-8 sm:col-span-full"
+        >
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
         </div>
       )}
     </div>

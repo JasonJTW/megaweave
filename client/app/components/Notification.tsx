@@ -44,23 +44,23 @@ export default function NotificationList() {
     );
 
   return (
-    <div className="w-full max-w-2xl mx-auto font-ddin">
-      <div className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/20 overflow-hidden shadow-sm">
+    <div className="mx-auto w-full max-w-2xl font-ddin">
+      <div className="overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-sm backdrop-blur-md">
         {/* Header */}
-        <div className="p-6 border-b border-megaweave-sand bg-gradient-to-r from-megaweave-cream to-white flex justify-between items-center">
+        <div className="flex items-center justify-between border-b border-megaweave-sand bg-gradient-to-r from-megaweave-cream to-white p-6">
           <h2 className="text-2xl font-bold text-megaweave-forest-dark">
             Notifications
           </h2>
           <button
             onClick={handleMarkAllRead}
-            className="text-sm text-megaweave-green hover:underline"
+            className="text-megaweave-green text-sm hover:underline"
           >
             Mark all as read
           </button>
         </div>
 
         {/* Content */}
-        <div className="bg-slate-50/50 min-h-[400px]">
+        <div className="min-h-[400px] bg-slate-50/50">
           <div className="divide-y divide-gray-100">
             <AnimatePresence mode="popLayout">
               {notifications.length === 0 ? (
@@ -76,12 +76,12 @@ export default function NotificationList() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     onClick={() => handleNotificationClick(n)}
-                    className={`group flex gap-4 p-4 transition-all duration-200 cursor-pointer hover:bg-white ${
+                    className={`group flex cursor-pointer gap-4 p-4 transition-all duration-200 hover:bg-white ${
                       n.is_read ? "bg-transparent opacity-70" : "bg-blue-50/30"
                     }`}
                   >
                     <div
-                      className={`shrink-0 flex items-center justify-center w-10 h-10 rounded-full ${
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                         n.type === "LIKE"
                           ? "bg-pink-100 text-pink-500"
                           : n.type === "COMMENT"
@@ -102,7 +102,7 @@ export default function NotificationList() {
                           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                         </svg>
                       ) : n.type === "COMMENT" ? (
-                        <MessageIcon className="w-5 h-5" />
+                        <MessageIcon className="h-5 w-5" />
                       ) : (
                         <svg
                           width="20"
@@ -126,24 +126,24 @@ export default function NotificationList() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <div className="flex justify-between items-start">
+                      <div className="flex items-start justify-between">
                         <h4
-                          className={`font-semibold text-sm ${n.is_read ? "text-gray-700" : "text-gray-900"}`}
+                          className={`text-sm font-semibold ${n.is_read ? "text-gray-700" : "text-gray-900"}`}
                         >
                           {n.title}
                         </h4>
-                        <span className="text-xs text-gray-400 whitespace-nowrap ml-2">
+                        <span className="ml-2 whitespace-nowrap text-xs text-gray-400">
                           {new Date(n.created_at).toLocaleDateString()}
                         </span>
                       </div>
                       <p
-                        className={`text-sm mt-1 line-clamp-2 ${n.is_read ? "text-gray-500" : "text-gray-800"}`}
+                        className={`mt-1 line-clamp-2 text-sm ${n.is_read ? "text-gray-500" : "text-gray-800"}`}
                       >
                         {n.content}
                       </p>
                     </div>
                     {!n.is_read && (
-                      <div className="self-center w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
+                      <div className="h-2 w-2 shrink-0 self-center rounded-full bg-red-500"></div>
                     )}
                   </motion.div>
                 ))

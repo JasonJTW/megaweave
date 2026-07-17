@@ -28,11 +28,11 @@ export default function InstallPage() {
 
   return (
     <>
-      <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
-      <div className=" bg-primary-5 flex flex-col items-center justify-between pt-40 px-6 pb-4 font-ddin">
+      <div className="fixed inset-0 -z-10 bg-[#F4F5F3]"></div>
+      <div className="flex flex-col items-center justify-between bg-primary-5 px-6 pb-4 pt-40 font-ddin">
         {/* 上半部：品牌與 Icon */}
-        <div className="flex flex-col items-center animate-fade-in">
-          <div className="h-[130px] w-[130px] overflow-hidden rounded-[22%] border bg-white border-primary-30">
+        <div className="animate-fade-in flex flex-col items-center">
+          <div className="h-[130px] w-[130px] overflow-hidden rounded-[22%] border border-primary-30 bg-white">
             <Image
               src="/apple-touch-icon.png"
               alt="Logo"
@@ -46,24 +46,24 @@ export default function InstallPage() {
           </h1>
         </div>
 
-        <div className="w-full max-w-sm flex flex-col items-center">
+        <div className="flex w-full max-w-sm flex-col items-center">
           <div className="mx-10 flex flex-col items-end">
-            <div className="flex mt-10 mb-1 relative bg-primary-15 rounded-2xl px-2 py-6 text-center ">
-              <p className="text-gray-700 font-semibold text-[16px] leading-relaxed">
+            <div className="relative mb-1 mt-10 flex rounded-2xl bg-primary-15 px-2 py-6 text-center">
+              <p className="text-[16px] font-semibold leading-relaxed text-gray-700">
                 Tap the{" "}
-                <span className="inline-block align-baseline px-1">
-                  <ShareLinkIcon className="text-primary ml-1" />
+                <span className="inline-block px-1 align-baseline">
+                  <ShareLinkIcon className="ml-1 text-primary" />
                 </span>{" "}
                 /{" "}
-                <span className="inline-block align-baseline px-1">
-                  <MoreIcon className="text-primary mr-1" />
+                <span className="inline-block px-1 align-baseline">
+                  <MoreIcon className="mr-1 text-primary" />
                 </span>{" "}
                 icon and select &quot;...More&quot; and then &quot;Add to Home
                 Screen&quot; to add a shortcut.
               </p>
             </div>
-            <div className="bg-primary-15 w-[18px] h-[18px] rounded-full mb-1"></div>
-            <div className="bg-primary-15 w-[10px] h-[10px] rounded-full"></div>
+            <div className="mb-1 h-[18px] w-[18px] rounded-full bg-primary-15"></div>
+            <div className="h-[10px] w-[10px] rounded-full bg-primary-15"></div>
           </div>
           <InstallGroup className="mt-6" />
         </div>

@@ -65,32 +65,32 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   };
 
   return (
-    <div className="w-full h-[80px] bg-primary-15 font-ddin border-b border-primary-30 flex items-center px-3 gap-2 flex-shrink-0">
+    <div className="flex h-[80px] w-full flex-shrink-0 items-center gap-2 border-b border-primary-30 bg-primary-15 px-3 font-ddin">
       {/* 
         左半邊：使用 w-0 flex-1 min-w-0 組合，
         這能確保長文字標題能自動縮小並套用 truncate 截斷，
         而不會把右側的按鈕和數量選擇器擠出容器之外。
       */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         {firstImg ? (
           <Image
             width={48}
             height={48}
             src={firstImg}
-            className="aspect-square object-cover rounded-md flex-shrink-0"
+            className="aspect-square flex-shrink-0 rounded-md object-cover"
             alt={post.title}
           />
         ) : (
-          <div className="w-[48px] h-[48px] bg-gray-200 rounded-md flex items-center justify-center text-[9px] text-gray-400 flex-shrink-0">
+          <div className="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-md bg-gray-200 text-[9px] text-gray-400">
             No img
           </div>
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="font-bold text-[14px] text-gray-800 line-clamp-2 leading-tight">
+          <div className="line-clamp-2 text-[14px] font-bold leading-tight text-gray-800">
             {displayTitle}
           </div>
-          <div className="text-[11px] text-gray-500 leading-none mt-1">
+          <div className="mt-1 text-[11px] leading-none text-gray-500">
             {!isAllMode ? `Left: ${quantityLeft}` : `Post ID: #${post.id}`}
           </div>
         </div>
@@ -98,9 +98,9 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
 
       {/* 右半邊：數量選擇器與 Request 送出按鈕 */}
       {onWeavingSubmit && (
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center gap-2">
           {isAllMode ? (
-            <div className="flex items-center justify-center h-[34px] px-3 bg-white border border-gray-300 rounded-full select-none">
+            <div className="flex h-[34px] select-none items-center justify-center rounded-full border border-gray-300 bg-white px-3">
               <span className="text-[12px] font-bold text-gray-700">All</span>
             </div>
           ) : (
@@ -108,7 +108,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
               value={String(selectedQuantity)}
               onValueChange={(val) => setSelectedQuantity(Number(val))}
             >
-              <SelectTrigger className="h-[34px] min-w-[56px] px-3 rounded-full bg-white border-gray-300 text-[13px] font-bold text-gray-800 hover:border-gray-400 focus:ring-1 focus:ring-primary/10">
+              <SelectTrigger className="h-[34px] min-w-[56px] rounded-full border-gray-300 bg-white px-3 text-[13px] font-bold text-gray-800 hover:border-gray-400 focus:ring-1 focus:ring-primary/10">
                 <SelectValue placeholder={selectedQuantity} />
               </SelectTrigger>
               {/* 
@@ -116,7 +116,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                 並提高 z-index 避免被 popup 遮擋。
               */}
               <SelectContent
-                className="max-h-[200px] min-w-[56px] rounded-[10px] z-[150]"
+                className="z-[150] max-h-[200px] min-w-[56px] rounded-[10px]"
                 position="popper"
                 align="center"
               >
@@ -135,7 +135,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
 
           <Button
             onClick={handleSubmit}
-            className="h-[34px] w-auto px-3.5 bg-primary text-white text-[13px] font-bold rounded-full hover:bg-primary/90 flex-shrink-0"
+            className="h-[34px] w-auto flex-shrink-0 rounded-full bg-primary px-3.5 text-[13px] font-bold text-white hover:bg-primary/90"
           >
             {post.type === "wish" ? "Offer" : "Request"}
           </Button>

@@ -117,10 +117,10 @@ const MemberPage = () => {
   if (loading) {
     return (
       <>
-        <div className="fixed inset-0 bg-primary-75 -z-10"></div>
-        <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-primary-75"></div>
+        <div className="flex min-h-screen items-center justify-center bg-primary-75">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary mx-auto mb-4"></div>
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-secondary"></div>
             <p className="text-secondary">Loading member data...</p>
           </div>
         </div>
@@ -131,15 +131,15 @@ const MemberPage = () => {
   if (error || !member) {
     return (
       <>
-        <div className="fixed inset-0 bg-primary-75 -z-10"></div>
-        <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-primary-75"></div>
+        <div className="flex min-h-screen items-center justify-center bg-primary-75">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-secondary mb-4">
+            <h2 className="mb-4 text-2xl font-bold text-secondary">
               {error || "Member not found"}
             </h2>
             <Button
               onClick={() => router.push("/about")}
-              className="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800"
+              className="rounded-full bg-black px-6 py-2 text-white hover:bg-gray-800"
             >
               Back to About
             </Button>
@@ -151,14 +151,14 @@ const MemberPage = () => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-primary-75 -z-10"></div>
-      <div className="min-h-screen bg-primary-75 overflow-hidden relative">
+      <div className="fixed inset-0 -z-10 bg-primary-75"></div>
+      <div className="relative min-h-screen overflow-hidden bg-primary-75">
         {/* Navigation Controls - 添加動畫效果 */}
         <div
-          className={`fixed top-20 left-8 z-50 transition-all duration-300 ease-in-out ${
+          className={`fixed left-8 top-20 z-50 transition-all duration-300 ease-in-out ${
             isNavVisible
               ? "translate-y-0 opacity-100"
-              : "-translate-y-20 opacity-0 pointer-events-none"
+              : "pointer-events-none -translate-y-20 opacity-0"
           }`}
         >
           <Button
@@ -166,22 +166,22 @@ const MemberPage = () => {
             size="sm"
             onClick={handlePrevious}
             disabled={!canGoPrevious}
-            className={`rounded-full px-6 py-2 mr-4 transition-colors duration-200 ${
+            className={`mr-4 rounded-full px-6 py-2 transition-colors duration-200 ${
               canGoPrevious
                 ? "bg-black text-white hover:bg-gray-800"
-                : "bg-gray-400 text-gray-600 cursor-not-allowed opacity-50"
+                : "cursor-not-allowed bg-gray-400 text-gray-600 opacity-50"
             }`}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Prev
           </Button>
         </div>
 
         <div
-          className={`fixed top-20 right-8 z-50 flex gap-4 transition-all duration-300 ease-in-out ${
+          className={`fixed right-8 top-20 z-50 flex gap-4 transition-all duration-300 ease-in-out ${
             isNavVisible
               ? "translate-y-0 opacity-100"
-              : "-translate-y-20 opacity-0 pointer-events-none"
+              : "pointer-events-none -translate-y-20 opacity-0"
           }`}
         >
           <Button
@@ -192,28 +192,28 @@ const MemberPage = () => {
             className={`rounded-full px-6 py-2 transition-colors duration-200 ${
               canGoNext
                 ? "bg-black text-white hover:bg-gray-800"
-                : "bg-gray-400 text-gray-600 cursor-not-allowed opacity-50"
+                : "cursor-not-allowed bg-gray-400 text-gray-600 opacity-50"
             }`}
           >
             Next
-            <ArrowRight className="w-4 h-4 ml-2" />
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            className="bg-black text-white hover:bg-gray-800 rounded-full p-2"
+            className="rounded-full bg-black p-2 text-white hover:bg-gray-800"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
         <div className="px-10 md:px-20">
           {/* Header with Member Location */}
-          <div className="pt-20 pb-10">
+          <div className="pb-10 pt-20">
             <div className="flex items-center justify-between">
               {member.location && (
-                <div className="bg-black text-white px-4 py-2 text-sm rounded-full">
+                <div className="rounded-full bg-black px-4 py-2 text-sm text-white">
                   {member.location}
                 </div>
               )}
@@ -221,18 +221,18 @@ const MemberPage = () => {
           </div>
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-12 lg:gap-20 pb-20">
+          <div className="grid grid-cols-1 gap-12 pb-20 lg:grid-cols-[1fr_2fr] lg:gap-20">
             {/* Left Column - Member Image and Basic Info */}
             <div className="space-y-8">
               {/* Member Image */}
               <div className="relative">
-                <div className="relative w-full aspect-[3/4]">
+                <div className="relative aspect-[3/4] w-full">
                   <Image
                     src={member.avatar_url}
                     alt={member.member_name}
                     fill
                     priority
-                    className="object-cover bg-gray-200 rounded-xl shadow-lg "
+                    className="rounded-xl bg-gray-200 object-cover shadow-lg"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                 </div>
@@ -240,16 +240,16 @@ const MemberPage = () => {
 
               {/* Member Name and Department */}
               <div>
-                <h1 className="text-4xl md:text-5xl text-secondary font-bold mb-2">
+                <h1 className="mb-2 text-4xl font-bold text-secondary md:text-5xl">
                   {member.member_name}
                 </h1>
-                <p className="text-xl text-secondary/75 mb-4">{member.title}</p>
+                <p className="mb-4 text-xl text-secondary/75">{member.title}</p>
               </div>
 
               {/* Contact Information */}
               {member.email && (
                 <div className="mb-3">
-                  <p className="text-sm text-secondary/75 uppercase tracking-wide mb-1">
+                  <p className="mb-1 text-sm uppercase tracking-wide text-secondary/75">
                     Email
                   </p>
                   <p className="text-secondary">{member.email}</p>
@@ -258,7 +258,7 @@ const MemberPage = () => {
 
               {member.websites && member.websites?.length > 0 && (
                 <div className="mb-3">
-                  <p className="text-sm text-secondary/75 uppercase tracking-wide mb-1">
+                  <p className="mb-1 text-sm uppercase tracking-wide text-secondary/75">
                     Website
                   </p>
                   {member.websites.map((website, index) => (
@@ -267,7 +267,7 @@ const MemberPage = () => {
                       href={website.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-secondary hover:text-secondary/75 transition-colors duration-150 flex items-center gap-2"
+                      className="flex items-center gap-2 text-secondary transition-colors duration-150 hover:text-secondary/75"
                     >
                       {website.url}
                     </a>
@@ -281,10 +281,10 @@ const MemberPage = () => {
               {/* Profile Section */}
               {member.member_bio && (
                 <div>
-                  <h2 className="text-2xl text-secondary mb-6 pb-4 border-b border-megaweave-stone">
+                  <h2 className="mb-6 border-b border-megaweave-stone pb-4 text-2xl text-secondary">
                     Profile
                   </h2>
-                  <p className="text-lg text-secondary leading-relaxed">
+                  <p className="text-lg leading-relaxed text-secondary">
                     {member.member_bio}
                   </p>
                 </div>
@@ -293,7 +293,7 @@ const MemberPage = () => {
               {/* Experience Section */}
               {member.experience && member.experience.length > 0 && (
                 <div>
-                  <h2 className="text-2xl text-secondary mb-6 pb-4 border-b border-megaweave-stone">
+                  <h2 className="mb-6 border-b border-megaweave-stone pb-4 text-2xl text-secondary">
                     Experience
                   </h2>
                   <div className="space-y-6">
@@ -307,11 +307,11 @@ const MemberPage = () => {
                             <p className="text-secondary-75 mb-2">
                               {exp.company}
                             </p>
-                            <p className="text-secondary leading-relaxed">
+                            <p className="leading-relaxed text-secondary">
                               {exp.description}
                             </p>
                           </div>
-                          <div className="text-sm text-secondary-75 ml-4 flex-shrink-0">
+                          <div className="text-secondary-75 ml-4 flex-shrink-0 text-sm">
                             {exp.year}
                           </div>
                         </div>
@@ -324,14 +324,14 @@ const MemberPage = () => {
               {/* Skills Section */}
               {member.skills && member.skills.length > 0 && (
                 <div>
-                  <h2 className="text-2xl text-secondary mb-6 pb-4 border-b border-megaweave-stone">
+                  <h2 className="mb-6 border-b border-megaweave-stone pb-4 text-2xl text-secondary">
                     Skills & Expertise
                   </h2>
                   <div className="flex flex-wrap gap-3">
                     {member.skills.map((skill, index) => (
                       <span
                         key={index}
-                        className="bg-secondary-75 text-white px-4 py-2 rounded-full text-sm"
+                        className="bg-secondary-75 rounded-full px-4 py-2 text-sm text-white"
                       >
                         {skill}
                       </span>

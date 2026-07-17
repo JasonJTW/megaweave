@@ -39,9 +39,9 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
   if (lines.length > 1) initY = -12;
 
   const svgList = [
-    <div key="shape-1" className="w-1/3 absolute -top-[2%] -right-[2%]">
+    <div key="shape-1" className="absolute -right-[2%] -top-[2%] w-1/3">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -68,9 +68,9 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
       </svg>
     </div>,
 
-    <div key="shape-2" className="w-1/3 absolute top-[40%] -right-[18%]">
+    <div key="shape-2" className="absolute -right-[18%] top-[40%] w-1/3">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 115 94"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -98,9 +98,9 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
       </svg>
     </div>,
 
-    <div key="shape-3" className="w-1/3 absolute top-[10%] -right-[18%]">
+    <div key="shape-3" className="absolute -right-[18%] top-[10%] w-1/3">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -127,9 +127,9 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
       </svg>
     </div>,
 
-    <div key="shape-4" className="w-1/3 absolute -top-[4%] left-0">
+    <div key="shape-4" className="absolute -top-[4%] left-0 w-1/3">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 112 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -156,9 +156,9 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
       </svg>
     </div>,
 
-    <div key="shape-5" className="w-1/3 absolute bottom-[40%] -left-[17%]">
+    <div key="shape-5" className="absolute -left-[17%] bottom-[40%] w-1/3">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 130 91"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -185,9 +185,9 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
       </svg>
     </div>,
 
-    <div key="shape-6" className="w-1/3 absolute top-[12%] -left-[17%]">
+    <div key="shape-6" className="absolute -left-[17%] top-[12%] w-1/3">
       <svg
-        className="w-full h-auto"
+        className="h-auto w-full"
         viewBox="0 0 120 120"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -258,30 +258,30 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
   return (
     <div
       key={member.user_id}
-      className="relative sm:w-[270px] md:w-[450px] lg:w-[540px] min-w-[270px] shrink-0 hover:cursor-pointer justify-self-center"
+      className="relative min-w-[270px] shrink-0 justify-self-center hover:cursor-pointer sm:w-[270px] md:w-[450px] lg:w-[540px]"
       onClick={handleClick}
     >
       <div
         ref={containerRef}
-        className="relative "
+        className="relative"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onMouseMove={handleMouseMove}
       >
-        <div className="relative w-full aspect-[3/4]">
+        <div className="relative aspect-[3/4] w-full">
           <Image
             src={member.avatar_url}
             alt={member.member_name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover bg-gray-200 rounded-5xl"
+            className="rounded-5xl bg-gray-200 object-cover"
           />
         </div>
 
         {/* Tooltip - 只在這個卡片 hover 時顯示 */}
         {showTooltip && (
           <div
-            className="absolute z-10 bg-black text-white px-4 py-2 rounded-lg pointer-events-none transition-opacity duration-200"
+            className="pointer-events-none absolute z-10 rounded-lg bg-black px-4 py-2 text-white transition-opacity duration-200"
             style={{
               left: mousePosition.x + 10,
               top: mousePosition.y - 40,
@@ -289,7 +289,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
             }}
           >
             <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
+              <div className="h-2 w-2 rounded-full bg-white"></div>
               <span>View Detail</span>
             </div>
           </div>
@@ -299,7 +299,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
       <div>
         <TitleWithBgRender text={title} />
       </div>
-      <p className="text-4xl text-black mt-8 mb-20 font-ddin font-extrabold">
+      <p className="mb-20 mt-8 font-ddin text-4xl font-extrabold text-black">
         {member.member_name}
       </p>
     </div>
@@ -313,10 +313,10 @@ const TeamInfoPage = () => {
   if (loading) {
     return (
       <>
-        <div className="fixed inset-0 -z-10 bg-primary-75  "></div>
-        <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-primary-75"></div>
+        <div className="flex min-h-screen items-center justify-center bg-primary-75">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary mx-auto mb-4"></div>
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-secondary"></div>
             <p className="text-secondary">Loading team members...</p>
           </div>
         </div>
@@ -327,13 +327,13 @@ const TeamInfoPage = () => {
   if (error) {
     return (
       <>
-        <div className="fixed inset-0 -z-10 bg-primary-75  "></div>
-        <div className="min-h-screen bg-primary-75 flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-primary-75"></div>
+        <div className="flex min-h-screen items-center justify-center bg-primary-75">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-secondary mb-4">
+            <h2 className="mb-4 text-2xl font-bold text-secondary">
               Error loading team members
             </h2>
-            <p className="text-secondary/75 mb-4">{error}</p>
+            <p className="mb-4 text-secondary/75">{error}</p>
           </div>
         </div>
       </>
@@ -342,19 +342,19 @@ const TeamInfoPage = () => {
 
   return (
     <>
-      <div className="fixed inset-0 -z-10 bg-primary-5  "></div>
-      <div className="min-h-screen bg-primary-5 overflow-hidden sm:px-8 md:px-16 lg:px-24 xl:px-32">
-        <div className="md:px-20 flex flex-col">
+      <div className="fixed inset-0 -z-10 bg-primary-5"></div>
+      <div className="min-h-screen overflow-hidden bg-primary-5 sm:px-8 md:px-16 lg:px-24 xl:px-32">
+        <div className="flex flex-col md:px-20">
           {/* Header */}
-          <div className="pt-10 pb-6">
-            <div className="w-fit mx-auto">
-              <h1 className="text-5xl sm:text-[50px] md:text-[110px] lg:text-[130px] xl:text-[160px] font-bold leading-none text-primary font-ddin text-center">
+          <div className="pb-6 pt-10">
+            <div className="mx-auto w-fit">
+              <h1 className="text-center font-ddin text-5xl font-bold leading-none text-primary sm:text-[50px] md:text-[110px] lg:text-[130px] xl:text-[160px]">
                 MEGAWEAVING
               </h1>
-              <h2 className="text-2xl md:text-5xl text-primary-75 md:text-dark leading-relaxed mt-[20px] md:mt-[60px] font-ddin font-medium text-left">
+              <h2 className="mt-[20px] text-left font-ddin text-2xl font-medium leading-relaxed text-primary-75 md:mt-[60px] md:text-5xl md:text-dark">
                 Weaving Commons of
               </h2>
-              <h2 className="text-2xl md:text-5xl text-primary-75 md:text-dark leading-relaxed md:mt-[60px] mb-4 font-ddin font-medium text-left">
+              <h2 className="mb-4 text-left font-ddin text-2xl font-medium leading-relaxed text-primary-75 md:mt-[60px] md:text-5xl md:text-dark">
                 Shared Resources.
               </h2>
             </div>
@@ -362,11 +362,11 @@ const TeamInfoPage = () => {
 
           {/* Content */}
           <div className="pb-20">
-            <div className="max-w-full mx-auto  text-center item-center">
-              <div className=" mb-20 md:mb-60 flex justify-center ">
+            <div className="item-center mx-auto max-w-full text-center">
+              <div className="mb-20 flex justify-center md:mb-60">
                 {/* The SVG for mobile & sm */}
                 <svg
-                  className="block md:hidden w-full h-auto"
+                  className="block h-auto w-full md:hidden"
                   preserveAspectRatio="xMidYMid meet"
                   width="402"
                   height="1077"
@@ -670,42 +670,45 @@ const TeamInfoPage = () => {
               {/* Key Frame Section */}
 
               <div className="mx-10 mt-2 md:mt-20">
-                <div className="flex items-center justify-center h-full">
+                <div className="flex h-full items-center justify-center">
                   <img src="/assets/KeyFrame.svg" />
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-[#333333] mb-[27px] pb-30 pt-20 font-bold font-ddin relative">
+                <h3 className="pb-30 relative mb-[27px] pt-20 font-ddin text-2xl font-bold text-[#333333] sm:text-[20px] md:text-[50px]">
                   大量交織 megaweaving
                 </h3>
-                <div className="flex items-center justify-center h-full">
+                <div className="flex h-full items-center justify-center">
                   <img src="/assets/megaweaving.svg" />
                 </div>
 
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-[#333333]  pb-[27px] pt-[60px] font-bold font-ddin relative">
+                <h3 className="relative pb-[27px] pt-[60px] font-ddin text-2xl font-bold text-[#333333] sm:text-[20px] md:text-[50px]">
                   資源 Resources
                 </h3>
-                <div className="flex items-center justify-center h-full">
+                <div className="flex h-full items-center justify-center">
                   <img src="/assets/Resources.svg" />
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-[#333333]  mb-[27px] pt-[50px] font-bold font-ddin relative">
+                <h3 className="relative mb-[27px] pt-[50px] font-ddin text-2xl font-bold text-[#333333] sm:text-[20px] md:text-[50px]">
                   橋接 Bridging
                 </h3>
-                <div className="flex items-center justify-center h-full">
+                <div className="flex h-full items-center justify-center">
                   <img src="/assets/Bridging.svg" />
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-megaweave-forest mb-[26px] pb-30 pt-[50px] font-bold font-ddin relative">
+                <h3 className="pb-30 relative mb-[26px] pt-[50px] font-ddin text-2xl font-bold text-megaweave-forest sm:text-[20px] md:text-[50px]">
                   織友 Weaver
                 </h3>
-                <div id="our-team" className="flex items-center justify-center h-full mb-[100px]">
+                <div
+                  id="our-team"
+                  className="mb-[100px] flex h-full items-center justify-center"
+                >
                   <img src="/assets/Weaver.svg" />
                 </div>
               </div>
               {/* Partner Section */}
               <div className="mt-10 md:mt-80">
-                <div className="flex items-center justify-center h-full">
+                <div className="flex h-full items-center justify-center">
                   <img src="/assets/OurTeam.svg" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16 mt-8 items-center justify-center">
+                <div className="mb-16 mt-8 grid grid-cols-1 items-center justify-center gap-8 md:grid-cols-2">
                   {teamMembers.map((member) => (
                     <MemberCard
                       key={member.user_id}
@@ -714,13 +717,13 @@ const TeamInfoPage = () => {
                     />
                   ))}
                 </div>
-                <h3 className="text-2xl sm:text-[20px] md:text-[50px] text-black mb-2 pt-6 font-bold font-ddin relative">
+                <h3 className="relative mb-2 pt-6 font-ddin text-2xl font-bold text-black sm:text-[20px] md:text-[50px]">
                   OUR PARTNER
                 </h3>
-                <h4 className="text-xl sm:text-[14px] md:text-[40px] text-black font-bold font-ddin relative">
+                <h4 className="relative font-ddin text-xl font-bold text-black sm:text-[14px] md:text-[40px]">
                   FAB DAO Green Sofa 綠沙發
                 </h4>
-                <h4 className="text-xl sm:text-[14px] md:text-[40px] text-black font-bold font-ddin relative mb-[90px]">
+                <h4 className="relative mb-[90px] font-ddin text-xl font-bold text-black sm:text-[14px] md:text-[40px]">
                   FAB DAO 行動客廳
                 </h4>
               </div>
@@ -728,15 +731,15 @@ const TeamInfoPage = () => {
               {/* Timeline Section */}
               <div>
                 {/* Timeline in mobile & small */}
-                <div className="md:hidden flex items-center justify-center h-full w-full">
+                <div className="flex h-full w-full items-center justify-center md:hidden">
                   <img src="/assets/Timeline-title.svg" />
                 </div>
-                <div className="flex md:hidden items-center justify-center h-full pt-12">
+                <div className="flex h-full items-center justify-center pt-12 md:hidden">
                   <img src="/assets/Timeline-narrow.svg" />
                 </div>
 
                 {/* Timeline in md & large */}
-                <div className="hidden md:flex lg:flex items-center justify-center h-full pt-20">
+                <div className="hidden h-full items-center justify-center pt-20 md:flex lg:flex">
                   <img src="/assets/Timeline-wide.svg" />
                 </div>
               </div>

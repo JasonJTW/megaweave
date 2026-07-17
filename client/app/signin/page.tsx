@@ -276,14 +276,14 @@ function SigninForm() {
 
   return (
     <>
-      <div className="min-h-screen flex items-center justify-center bg-secondary md:bg-[#000000]/80 overflow-x-hidden font-ddin relative">
+      <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-secondary font-ddin md:bg-[#000000]/80">
         <motion.div
           initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: easeInOut }}
-          className="w-full max-w-md md:max-w-[640px] z-10"
+          className="z-10 w-full max-w-md md:max-w-[640px]"
         >
-          <div className="bg-secondary md:bg-white rounded-2xl md:rounded-[60px] p-8 md:px-16 md:py-12 space-y-6 md:space-y-8 flex flex-col items-center shadow-none md:shadow-2xl">
+          <div className="flex flex-col items-center space-y-6 rounded-2xl bg-secondary p-8 shadow-none md:space-y-8 md:rounded-[60px] md:bg-white md:px-16 md:py-12 md:shadow-2xl">
             <div className="flex w-full justify-center">
               <div className="relative">
                 <Image
@@ -291,35 +291,35 @@ function SigninForm() {
                   alt="megaweaving icon"
                   width={150}
                   height={150}
-                  className="object-cover md:w-[130px] md:h-[130px]"
+                  className="object-cover md:h-[130px] md:w-[130px]"
                   priority
                 />
                 {/* The '+' overlay seen in Figma */}
-                <div className="hidden md:flex absolute inset-0 items-center justify-center text-white text-4xl font-bold">
+                <div className="absolute inset-0 hidden items-center justify-center text-4xl font-bold text-white md:flex">
                   +
                 </div>
               </div>
             </div>
 
             {/* title */}
-            <div className="flex flex-col items-center w-full text-center">
-              <div className="hidden md:block text-[48px] md:text-[36px] font-bold text-megaweave-forest-dark leading-tight">
+            <div className="flex w-full flex-col items-center text-center">
+              <div className="hidden text-[48px] font-bold leading-tight text-megaweave-forest-dark md:block md:text-[36px]">
                 Welcome to megaweaving!
               </div>
-              <div className="md:hidden text-[48px] font-bold text-megaweave-forest-dark leading-tight">
+              <div className="text-[48px] font-bold leading-tight text-megaweave-forest-dark md:hidden">
                 {mode === "register" ? "Register" : "Log in"}
               </div>
-              <div className="hidden md:block text-[#888888] type-body-t3 mt-2">
+              <div className="type-body-t3 mt-2 hidden text-[#888888] md:block">
                 {mode === "register"
                   ? "Register before start weaving."
                   : "Log in to continue weaving."}
               </div>
             </div>
 
-            <div className="relative flex items-center bg-secondary md:bg-gray-100 rounded-full p-1 w-full h-[50px] md:h-[60px] overflow-hidden">
+            <div className="relative flex h-[50px] w-full items-center overflow-hidden rounded-full bg-secondary p-1 md:h-[60px] md:bg-gray-100">
               {/* Single Sliding Pill - Explicit horizontal motion only */}
               <motion.div
-                className="absolute top-1 bottom-1 left-1 bg-megaweave-forest rounded-full z-0"
+                className="absolute bottom-1 left-1 top-1 z-0 rounded-full bg-megaweave-forest"
                 initial={false}
                 animate={{
                   x: mode === "login" ? "0%" : "100%",
@@ -330,7 +330,7 @@ function SigninForm() {
                 transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
               />
               <button
-                className={`relative flex-1 h-full flex items-center justify-center transition-colors duration-300 z-10 type-button-b2 md:type-button-b1 ${
+                className={`type-button-b2 relative z-10 flex h-full flex-1 items-center justify-center transition-colors duration-300 md:type-button-b1 ${
                   mode === "login" ? "text-white" : "text-megaweave-forest-dark"
                 }`}
                 onClick={handleLoginClick}
@@ -338,7 +338,7 @@ function SigninForm() {
                 Log in
               </button>
               <button
-                className={`relative flex-1 h-full flex items-center justify-center transition-colors duration-300 z-10 type-button-b2 md:type-button-b1 ${
+                className={`type-button-b2 relative z-10 flex h-full flex-1 items-center justify-center transition-colors duration-300 md:type-button-b1 ${
                   mode === "register"
                     ? "text-white"
                     : "text-megaweave-forest-dark"
@@ -349,12 +349,12 @@ function SigninForm() {
               </button>
             </div>
 
-            <div className="w-full h-[1px] bg-megaweave-stone/20 mb-2" />
+            <div className="mb-2 h-[1px] w-full bg-megaweave-stone/20" />
 
-            <div className="flex flex-col gap-4 w-full px-4">
+            <div className="flex w-full flex-col gap-4 px-4">
               <Button
                 variant={"outline"}
-                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 text-megaweave-forest-dark type-button-b1"
+                className="type-button-b1 w-full border text-megaweave-forest-dark transition-all duration-200 hover:bg-gray-50 md:h-12 md:rounded-full md:border-gray-300"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
@@ -373,7 +373,7 @@ function SigninForm() {
                 <svg
                   role="img"
                   viewBox="0 0 24 24"
-                  className="w-5 h-5 mr-2"
+                  className="mr-2 h-5 w-5"
                   fill="currentColor"
                 >
                   <path d={siGoogle.path} />
@@ -393,14 +393,14 @@ function SigninForm() {
               </div>
               <Button
                 variant={"outline"}
-                className="w-full md:rounded-full border md:border-gray-300 md:h-12 hover:bg-gray-50 transition-all duration-200 text-megaweave-forest-dark type-button-b1"
+                className="type-button-b1 w-full border text-megaweave-forest-dark transition-all duration-200 hover:bg-gray-50 md:h-12 md:rounded-full md:border-gray-300"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >
                 <svg
                   role="img"
                   viewBox="0 0 24 24"
-                  className="w-5 h-5 mr-2"
+                  className="mr-2 h-5 w-5"
                   fill="currentColor"
                 >
                   <path d={siFacebook.path} />
@@ -409,18 +409,18 @@ function SigninForm() {
               </Button>
             </div>
             <div className="relative">
-              <div className="relative flex justify-center text-megaweave-forest-dark font-ddin font-semibold">
-                <span className="bg-transparent px-2 select-none">or</span>
+              <div className="relative flex justify-center font-ddin font-semibold text-megaweave-forest-dark">
+                <span className="select-none bg-transparent px-2">or</span>
               </div>
             </div>
 
             {mode === "login" && (
-              <form onSubmit={handleSubmit} className="w-full px-4 space-y-6">
+              <form onSubmit={handleSubmit} className="w-full space-y-6 px-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label
                       htmlFor="email"
-                      className="text-secondary-foreground md:hidden px-1"
+                      className="text-secondary-foreground px-1 md:hidden"
                     >
                       Email
                     </Label>
@@ -431,13 +431,13 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
+                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label
                       htmlFor="password"
-                      className="text-secondary-foreground md:hidden px-1"
+                      className="text-secondary-foreground px-1 md:hidden"
                     >
                       Password
                     </Label>
@@ -449,14 +449,14 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
+                        className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
                       />
                       <button
                         type="button"
                         onClick={() => {
                           setShowPassword(!showPassword);
                         }}
-                        className="absolute right-9 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-emerald-700 transition duration-300"
+                        className="absolute right-9 top-1/2 -translate-y-1/2 transform text-gray-400 transition duration-300 hover:text-emerald-700"
                       >
                         {showPassword ? (
                           <EyeClosed size={20} />
@@ -487,7 +487,7 @@ function SigninForm() {
                 <div className="flex items-center">
                   <Button
                     type="submit"
-                    className="w-full bg-primary-75 md:h-12 transition-all duration-200 z-10"
+                    className="z-10 w-full bg-primary-75 transition-all duration-200 md:h-12"
                     disabled={!email || !password || loading}
                   >
                     {loading ? "Logging in..." : "Log in"}
@@ -499,13 +499,13 @@ function SigninForm() {
             {mode === "register" && (
               <form
                 onSubmit={handleSignupSubmit}
-                className="w-full px-4 space-y-6"
+                className="w-full space-y-6 px-4"
               >
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label
                       htmlFor="username"
-                      className="text-secondary-foreground md:hidden px-1"
+                      className="text-secondary-foreground px-1 md:hidden"
                     >
                       UserName
                     </Label>
@@ -516,14 +516,14 @@ function SigninForm() {
                       onChange={(e) => setUserName(e.target.value)}
                       required
                       placeholder="Enter your username"
-                      className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
+                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label
                       htmlFor="email"
-                      className="text-secondary-foreground md:hidden px-1"
+                      className="text-secondary-foreground px-1 md:hidden"
                     >
                       Email
                     </Label>
@@ -534,13 +534,13 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
+                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label
                       htmlFor="password"
-                      className="text-secondary-foreground md:hidden px-1"
+                      className="text-secondary-foreground px-1 md:hidden"
                     >
                       Password
                     </Label>
@@ -552,14 +552,14 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary md:bg-gray-100 md:border-none md:rounded-full md:h-12 md:px-6 text-primary"
+                        className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
                       />
                       <button
                         type="button"
                         onClick={() => {
                           setShowPassword(!showPassword);
                         }}
-                        className="absolute right-9 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-emerald-700 transition duration-300"
+                        className="absolute right-9 top-1/2 -translate-y-1/2 transform text-gray-400 transition duration-300 hover:text-emerald-700"
                       >
                         {showPassword ? (
                           <EyeClosed size={20} />
@@ -590,7 +590,7 @@ function SigninForm() {
                 <div className="flex items-center">
                   <Button
                     type="submit"
-                    className="w-full bg-primary-75 md:h-12 transition-all duration-200 z-10"
+                    className="z-10 w-full bg-primary-75 transition-all duration-200 md:h-12"
                     disabled={!username || !email || !password || loading}
                   >
                     {loading ? "Registering..." : "Sign up"}
@@ -598,10 +598,10 @@ function SigninForm() {
                 </div>
               </form>
             )}
-            <div className="flex justify-center text-[12px] md:text-sm mt-5">
+            <div className="mt-5 flex justify-center text-[12px] md:text-sm">
               <a
                 href=""
-                className="text-primary md:text-megaweave-forest-dark items-center hover:text-emerald-700 font-bold"
+                className="items-center font-bold text-primary hover:text-emerald-700 md:text-megaweave-forest-dark"
               >
                 Forget password?
               </a>

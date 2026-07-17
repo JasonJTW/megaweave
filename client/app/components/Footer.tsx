@@ -14,18 +14,18 @@ const Footer: FC = () => {
   return (
     <footer
       className={cn(
-        "overflow-hidden sticky z-40 bottom-0 bg-[#f4f5f3] text-[#14321f] font-ddin max-w-full transition-transform duration-300 ease-in-out",
+        "sticky bottom-0 z-40 max-w-full overflow-hidden bg-[#f4f5f3] font-ddin text-[#14321f] transition-transform duration-300 ease-in-out",
         isNavbarVisible ? "translate-y-0" : "translate-y-full",
       )}
     >
       {/* 頂端細線（幾乎不可見） */}
 
       {/* 主要內容區（置於 logo 之上） */}
-      <div className="max-w-full px-[30px] pt-[50px] pb-[11px]  border-t-[1px] border-primary/30">
+      <div className="max-w-full border-t-[1px] border-primary/30 px-[30px] pb-[11px] pt-[50px]">
         {/* Top: logo + nav */}
-        <div className="flex flex-row items-start sm:items-center sm:w-full sm:justify-between ">
+        <div className="flex flex-row items-start sm:w-full sm:items-center sm:justify-between">
           <div className="flex flex-row items-center">
-            <WeavingIcon className="w-[50px] h-[50px] sm:w-[80px] sm:h-[80px] mr-12 sm:mr-7 text-megaweave-forest" />
+            <WeavingIcon className="mr-12 h-[50px] w-[50px] text-megaweave-forest sm:mr-7 sm:h-[80px] sm:w-[80px]" />
             {/* Desktop Megaweaving logo*/}
             {/* <div className="hidden sm:text-center sm:mb-[8px] sm:block ">
               <span
@@ -38,14 +38,14 @@ const Footer: FC = () => {
           </div>
 
           {/* 導航：兩欄布局 */}
-          <div className="flex-1 sm:flex-none sm:mr-[45px]">
-            <div className="grid grid-cols-2 sm:flex sm:flex-row sm:gap-[100px] text-[12px] sm:type-button-b2 font-ddin font-medium">
+          <div className="flex-1 sm:mr-[45px] sm:flex-none">
+            <div className="grid grid-cols-2 font-ddin text-[12px] font-medium sm:type-button-b2 sm:flex sm:flex-row sm:gap-[100px]">
               <div>
                 <ul className="space-y-[2px] sm:space-y-4">
                   <li>
                     <Link
                       href="/about"
-                      className="inline-block  hover:underline transition-all duration-200"
+                      className="inline-block transition-all duration-200 hover:underline"
                     >
                       About Us
                     </Link>
@@ -53,7 +53,7 @@ const Footer: FC = () => {
                   <li>
                     <Link
                       href="/about#our-team"
-                      className="inline-block  hover:underline transition-all duration-200"
+                      className="inline-block transition-all duration-200 hover:underline"
                     >
                       megaweaving Team
                     </Link>
@@ -66,7 +66,7 @@ const Footer: FC = () => {
                   <li>
                     <Link
                       href="https://www.facebook.com/groups/1596603907320118"
-                      className="inline-block hover:underline transition-all duration-200"
+                      className="inline-block transition-all duration-200 hover:underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -76,7 +76,7 @@ const Footer: FC = () => {
                   <li>
                     <Link
                       href="https://www.instagram.com/studio_megaweaving?igsh=cTBxdHphMThldzg0"
-                      className="inline-block hover:underline transition-all duration-200"
+                      className="inline-block transition-all duration-200 hover:underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -92,7 +92,7 @@ const Footer: FC = () => {
         {/* logo 區域 - 為了讓 logo 完整顯示，不被覆蓋 */}
         <div className="mt-9">
           {/* Mobile Megaweaving logo*/}
-          <div className="text-center mb-[8px] w-full sm:hidden">
+          <div className="mb-[8px] w-full text-center sm:hidden">
             {/* <span
               aria-hidden
               className="pointer-events-none select-none block  text-[clamp(50px,15vw,400px)] font-extrabold leading-none text-primary/30 tracking-normal"
@@ -102,22 +102,22 @@ const Footer: FC = () => {
           </div>
 
           {/* 分隔線（在 logo 下方） */}
-          <hr className="border-t-[0.5px] border-primary/25 mb-[8px]" />
+          <hr className="mb-[8px] border-t-[0.5px] border-primary/25" />
 
           {/* Tablet & Desktop: 三欄布局 */}
-          <div className="w-full text-[8px] sm:type-body-t5 font-medium">
+          <div className="w-full text-[8px] font-medium sm:type-body-t5">
             <div className="grid grid-cols-3 text-center sm:flex sm:items-center sm:justify-between">
               <div className="text-left">© megaweaving 2025</div>
 
               <Link
                 href="#"
-                className="hover:underline transition-all duration-200 sm:ml-auto sm:mr-6"
+                className="transition-all duration-200 hover:underline sm:ml-auto sm:mr-6"
               >
                 Privacy Policy
               </Link>
               <Link
                 href="#"
-                className="text-right hover:underline transition-all duration-200"
+                className="text-right transition-all duration-200 hover:underline"
               >
                 Terms of Service
               </Link>

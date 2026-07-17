@@ -50,7 +50,9 @@ export function useWeaveActions({
   const isGiver = currentUserId === weave?.giver_id;
   const isReceiver = currentUserId === weave?.receiver_id;
   const hasIConfirmed = isGiver ? localGiverConfirmed : localReceiverConfirmed;
-  const hasOtherConfirmed = isGiver ? localReceiverConfirmed : localGiverConfirmed;
+  const hasOtherConfirmed = isGiver
+    ? localReceiverConfirmed
+    : localGiverConfirmed;
 
   const handleCompleteWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -67,14 +69,18 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`${hostName}/api/weaves/${weave.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "completed" }),
-      });
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: "completed" }),
+        },
+      );
       const data = await response.json();
-      if (!response.ok) throw new Error(data.errorMessage || "Failed to update");
+      if (!response.ok)
+        throw new Error(data.errorMessage || "Failed to update");
 
       if (data.newStatus === "completed") {
         setLocalStatus("completed");
@@ -84,7 +90,9 @@ export function useWeaveActions({
       } else {
         if (isGiver) setLocalGiverConfirmed(true);
         if (isReceiver) setLocalReceiverConfirmed(true);
-        toast.success("Your confirmation received. Waiting for the other party.");
+        toast.success(
+          "Your confirmation received. Waiting for the other party.",
+        );
       }
       onWeaveStatusChange?.();
     } catch (error) {
@@ -97,7 +105,10 @@ export function useWeaveActions({
   const handleCancelWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!weave || isProcessing) return;
-    if (currentUserId !== weave.giver_id && currentUserId !== weave.receiver_id) {
+    if (
+      currentUserId !== weave.giver_id &&
+      currentUserId !== weave.receiver_id
+    ) {
       toast.error("You are not authorized to cancel this weave");
       return;
     }
@@ -109,12 +120,15 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(`${hostName}/api/weaves/${weave.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "cancelled" }),
-      });
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: "cancelled" }),
+        },
+      );
       const data = await response.json();
       if (!response.ok)
         throw new Error(data.errorMessage || "Failed to cancel weave");

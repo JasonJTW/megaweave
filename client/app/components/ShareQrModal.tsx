@@ -52,7 +52,7 @@ const ShareQrModal = ({
               {username || "User Name"}
             </Dialog.Title>
 
-            <Dialog.Description className="mt-2 text-[12px] leading-tight text-primary-75 whitespace-nowrap">
+            <Dialog.Description className="mt-2 whitespace-nowrap text-[12px] leading-tight text-primary-75">
               Scan QRCode to contact with others.
             </Dialog.Description>
 

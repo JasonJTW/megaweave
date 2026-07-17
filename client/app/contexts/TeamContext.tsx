@@ -40,7 +40,7 @@ export const TeamProvider: React.FC<TeamProviderProps> = ({ children }) => {
       setTeamMembers(members);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch team members"
+        err instanceof Error ? err.message : "Failed to fetch team members",
       );
     } finally {
       setLoading(false);

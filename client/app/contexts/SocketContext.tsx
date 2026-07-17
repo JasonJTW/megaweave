@@ -11,7 +11,9 @@ interface SocketContextType {
   isConnected: boolean;
 }
 
-export const SocketContext = createContext<SocketContextType | undefined>(undefined);
+export const SocketContext = createContext<SocketContextType | undefined>(
+  undefined,
+);
 
 export const useSocketContext = () => {
   const context = useContext(SocketContext);
@@ -37,7 +39,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Don't reconnect if we already have a socket for this user
     // However, if userId changes, we need to reconnect. The dependency array handles this.
-    
+
     console.log("🔌 Initializing socket for user:", userId);
 
     const socketInstance = io(hostName || "", {
@@ -51,15 +53,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
       socketInstance.emit("join_room", userId.toString());
     });
 
-  
-
     socketInstance.on("disconnect", () => {
       setIsConnected(false);
     });
-    
+
     socketInstance.on("connect_error", (err) => {
-        console.error("❌ Socket Connection Error:", err.message);
-        setIsConnected(false);
+      console.error("❌ Socket Connection Error:", err.message);
+      setIsConnected(false);
     });
 
     setSocket(socketInstance);

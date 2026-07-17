@@ -86,7 +86,7 @@ const PostShareModal = ({
                       />
                     </div>
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center type-body-t5 text-primary-75">
+                    <div className="type-body-t5 flex h-full w-full items-center justify-center text-primary-75">
                       No image
                     </div>
                   )}

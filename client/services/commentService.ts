@@ -50,7 +50,7 @@ export interface CommentCountsResponse {
  * 創建留言
  */
 export async function createComment(
-  params: CreateCommentParams
+  params: CreateCommentParams,
 ): Promise<Comment> {
   const res = await fetch(`${hostName}/api/comments`, {
     method: "POST",
@@ -83,7 +83,7 @@ export async function createComment(
  */
 export async function getComments(
   postId: number,
-  itemId?: number | "all" //
+  itemId?: number | "all", //
 ): Promise<CommentsResponse> {
   let url = `${hostName}/api/comments?post_id=${postId}`;
 
@@ -109,7 +109,7 @@ export async function getComments(
  * 取得各 item 的留言數量
  */
 export async function getCommentCounts(
-  postId: number
+  postId: number,
 ): Promise<CommentCountsResponse> {
   const res = await fetch(`${hostName}/api/comments/counts?post_id=${postId}`, {
     method: "GET",

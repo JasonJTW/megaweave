@@ -5,7 +5,7 @@ export async function compressImage(
   file: File,
   maxWidth = 1200,
   maxHeight = 1200,
-  quality = 0.8
+  quality = 0.8,
 ): Promise<Blob | null> {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -41,7 +41,7 @@ export async function compressImage(
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        
+
         // Use WebP if supported, otherwise fallback to JPEG
         canvas.toBlob(
           (blob) => {
@@ -49,11 +49,15 @@ export async function compressImage(
               resolve(blob);
             } else {
               // Final fallback to JPEG if WebP blob creation fails
-              canvas.toBlob((jpegBlob) => resolve(jpegBlob), "image/jpeg", quality);
+              canvas.toBlob(
+                (jpegBlob) => resolve(jpegBlob),
+                "image/jpeg",
+                quality,
+              );
             }
           },
           "image/webp",
-          quality
+          quality,
         );
       };
       img.onerror = () => resolve(null);

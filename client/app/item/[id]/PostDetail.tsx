@@ -258,9 +258,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // 如果沒有 postId，顯示錯誤
   if (!postId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <h2 className="mb-4 text-2xl font-bold text-gray-900">
             Invalid Post ID
           </h2>
           <Button
@@ -276,17 +276,17 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (!post) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <h2 className="mb-4 text-2xl font-bold text-gray-900">
             {"Post not found"}
           </h2>
           <Button
@@ -337,15 +337,15 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-[#f5f4f3] -z-10"></div>
+      <div className="fixed inset-0 -z-10 bg-[#f5f4f3]"></div>
       <div className="min-h-screen bg-[#f5f5f3] font-ddin">
         {/* 標題列 */}
         <div
-          className={`fixed left-0 top-20 right-0 z-[21] transition-transform duration-100 bg-[#f5f4f3] ${
+          className={`fixed left-0 right-0 top-20 z-[21] bg-[#f5f4f3] transition-transform duration-100 ${
             isNavbarVisible ? "translate-y-[0]" : "-translate-y-[250%]"
           }`}
         >
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+          <div className="mx-auto max-w-4xl px-4 py-2 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Button
@@ -353,7 +353,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   onClick={() => router.back()}
                   className="p-4"
                 >
-                  <ArrowLeft className="w-8 h-8" />
+                  <ArrowLeft className="h-8 w-8" />
                 </Button>
               </div>
               <div className="flex items-center space-x-2">
@@ -362,17 +362,17 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   onClick={() => setShareModalOpen(true)}
                   className="p-4"
                 >
-                  <Share2 className="w-8 h-8" />
+                  <Share2 className="h-8 w-8" />
                 </Button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-4xl mx-8 px-5 sm:px-6 lg:px-8 py-5 my-[70px] bg-white rounded-[30px]">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="mx-8 my-[70px] max-w-4xl rounded-[30px] bg-white px-5 py-5 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* 左側：圖片和主要內容 */}
-            <div className="lg:col-span-2 space-y-[15px]">
+            <div className="space-y-[15px] lg:col-span-2">
               {/* 圖片輪播 */}
 
               {images.length > 0 && (
@@ -384,22 +384,22 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                     {post.type === "wish" && (
                       <WishBadgeIcon className="absolute -top-1 right-5 z-20" />
                     )}
-                    <div className="bg-white rounded-[20px] shadow-sm overflow-hidden relative">
+                    <div className="relative overflow-hidden rounded-[20px] bg-white shadow-sm">
                       <ImageGallery images={images} />
 
                       {/* tags */}
-                      <div className="absolute w-full flex flex-row bottom-0 justify-between px-5 py-5">
+                      <div className="absolute bottom-0 flex w-full flex-row justify-between px-5 py-5">
                         {/* Condition tag */}
                         {post.view_count > 0 && (
-                          <div className=" flex items-center">
-                            <Badge className="bg-[#7c7c7c] text-white font-ddin font-normal text-[14px] px-2">
-                              <EyesIcon className="mr-[4px] " />
+                          <div className="flex items-center">
+                            <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
+                              <EyesIcon className="mr-[4px]" />
                               {post.view_count}
                             </Badge>
                           </div>
                         )}
                         {post.condition_name && (
-                          <div className=" flex items-center">
+                          <div className="flex items-center">
                             <Badge>{post.condition_name}</Badge>
                           </div>
                         )}
@@ -408,16 +408,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   </div>
                 </>
               )}
-              <h1 className="text-2xl font-bold font-ddin text-[36px] text-gray-900 mb-4">
+              <h1 className="mb-4 font-ddin text-2xl text-[36px] font-bold text-gray-900">
                 {post.title}
               </h1>
               {/* 分類和狀況 */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="mb-4 flex flex-wrap gap-2">
                 <Badge>{post.category_name_en}</Badge>
               </div>
               {/* 內容 */}
-              <div className="prose prose-gray max-w-none mb-6">
-                <p className="text-gray-700 whitespace-pre-wrap break-words">
+              <div className="prose prose-gray mb-6 max-w-none">
+                <p className="whitespace-pre-wrap break-words text-gray-700">
                   {post.content}
                 </p>
               </div>
@@ -427,12 +427,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                     {post.tags.split(",").map((tag, i) => (
                       <div
                         key={i}
-                        className="flex items-center bg-secondary rounded-[10pt] px-[4px] py-[2px]"
+                        className="flex items-center rounded-[10pt] bg-secondary px-[4px] py-[2px]"
                       >
                         {/* <TagIcon className="text-primary" /> */}
                         <span
                           key={i}
-                          className="text-[16px]  text-megaweave-forest-dark px-2 font-medium font-ddin tracking-wider"
+                          className="px-2 font-ddin text-[16px] font-medium tracking-wider text-megaweave-forest-dark"
                         >
                           #{tag.trim()}
                         </span>
@@ -446,7 +446,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   post.city ||
                   post.route ||
                   post.full_address) && (
-                  <div className="flex items-center gap-2  ">
+                  <div className="flex items-center gap-2">
                     <LocationIcon className="text-primary" />
                     {[post.province, post.city, post.route]
                       .filter(Boolean)
@@ -454,7 +454,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   </div>
                 )}
                 {post.expires_at && (
-                  <div className="flex items-center gap-2  ">
+                  <div className="flex items-center gap-2">
                     <ClockIcon className="text-primary" />
                     {new Date(post.expires_at).toLocaleDateString()}
                   </div>
@@ -463,10 +463,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
               {/* 貼文內容 */}
               <div
-                className="flex items-center bg-[#fafafa] rounded-[30px] p-[9px]"
+                className="flex items-center rounded-[30px] bg-[#fafafa] p-[9px]"
                 onClick={handleAvatarClick}
               >
-                <div className="relative w-[50px] h-[50px] items-center justify-center">
+                <div className="relative h-[50px] w-[50px] items-center justify-center">
                   {post.avatar_url ? (
                     <Image
                       fill
@@ -475,7 +475,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       className="rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-xl">
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-xl">
                       {post.username ? post.username.charAt(0) : "?"}
                     </div>
                   )}
@@ -487,35 +487,35 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 </div>
               </div>
               {/* 互動按鈕 */}
-              <div className="flex items-center justify-start pb-4 border-b border-megaweave-blue">
+              <div className="flex items-center justify-start border-b border-megaweave-blue pb-4">
                 <Button
                   variant="ghost"
                   onClick={handleLike}
-                  className={`w-14 inline-flex items-center space-x-[1px] ${
+                  className={`inline-flex w-14 items-center space-x-[1px] ${
                     isLiked ? "text-red-500" : "text-gray-500"
                   }`}
                 >
                   <Heart
-                    className={`w-5 h-5 ${isLiked ? "fill-current" : ""}`}
+                    className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`}
                   />
                   <span className="text-black">{likeCount}</span>
                 </Button>
                 <Button
                   variant="ghost"
-                  className="items-center w-14 space-x-[1px] text-gray-500"
+                  className="w-14 items-center space-x-[1px] text-gray-500"
                   onClick={() =>
                     document
                       .getElementById("comments")
                       ?.scrollIntoView({ behavior: "smooth" })
                   }
                 >
-                  <MessageIcon className="w-5 h-5 text-dark" />
+                  <MessageIcon className="h-5 w-5 text-dark" />
                 </Button>
                 {post.user_id && user?.userId !== post.user_id && (
                   <MessageButton
                     recipientPublicId={post.author_public_id}
                     recipientName={post.username || "User"}
-                    className="ml-2 border-0 hover:bg-transparent text-gray-500 hover:text-primary p-0 h-auto"
+                    className="ml-2 h-auto border-0 p-0 text-gray-500 hover:bg-transparent hover:text-primary"
                   />
                 )}
                 {post.user_id && user?.userId === post.user_id && (
@@ -523,17 +523,17 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                     <Button
                       variant="ghost"
                       onClick={() => setShowEditForm(true)}
-                      className="text-gray-500 hover:text-primary hover:bg-gray-50 flex items-center gap-1"
+                      className="flex items-center gap-1 text-gray-500 hover:bg-gray-50 hover:text-primary"
                     >
-                      <EditIcon className="w-5 h-5" />
+                      <EditIcon className="h-5 w-5" />
                       <span>Edit</span>
                     </Button>
                     <Button
                       variant="ghost"
                       onClick={handleDelete}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
+                      className="flex items-center gap-1 text-red-500 hover:bg-red-50 hover:text-red-700"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="h-5 w-5" />
                       <span>Delete</span>
                     </Button>
                   </div>
@@ -541,7 +541,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
               </div>
 
               {/* 評論區 */}
-              <div id="comments" className="bg-white rounded-lg shadow-sm">
+              <div id="comments" className="rounded-lg bg-white shadow-sm">
                 <CommentSection post={post} user={user} />
               </div>
             </div>

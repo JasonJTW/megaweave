@@ -23,7 +23,9 @@ const fetcher = async (url: string) => {
 
   if (!res.ok) {
     if (res.status === 401) {
-      const error: Error & { info?: unknown; status?: number } = new Error("An error occurred while fetching the data.");
+      const error: Error & { info?: unknown; status?: number } = new Error(
+        "An error occurred while fetching the data.",
+      );
       error.info = res.status;
       error.status = res.status;
       throw error;
@@ -33,28 +35,30 @@ const fetcher = async (url: string) => {
   return data;
 };
 
-export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const { data, error, isLoading, mutate } = useSWR(
     `${hostName}/api/currentUser`,
     fetcher,
     {
-       shouldRetryOnError: false, // Don't retry if 401
-       revalidateOnFocus: true,
-       dedupingInterval: 30000,
-    }
+      shouldRetryOnError: false, // Don't retry if 401
+      revalidateOnFocus: true,
+      dedupingInterval: 30000,
+    },
   );
 
   // If 401, data might be undefined even if we caught it, or we handle it via error.
   // API likely returns { user: ... }
   const user: User | null = data?.user || null;
-  
+
   // Explicitly check for 401 to determine "authenticated" vs "error"
   // If error is 401, it's just "not logged in", not a system error.
   const isUnauthorized = error?.status === 401;
   const actualError = isUnauthorized ? null : error;
-  
+
   const loading = isLoading;
 
   const refreshUser = async () => {

@@ -58,10 +58,10 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative max-w-full mt-3 flex gap-3 py-[2px] items-start"
+      className="relative mt-3 flex max-w-full items-start gap-3 py-[2px]"
     >
       {/* 1. Avatar (不變) */}
-      <div className="flex-shrink-0 w-[40px] h-[40px] relative">
+      <div className="relative h-[40px] w-[40px] flex-shrink-0">
         {user?.avatar_url ? (
           <Image
             src={user.avatar_url}
@@ -70,8 +70,8 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
             className="rounded-full object-cover"
           />
         ) : (
-          <div className="w-full h-full rounded-full bg-gray-300 flex items-center justify-center">
-            <span className="text-gray-600 text-xs">
+          <div className="flex h-full w-full items-center justify-center rounded-full bg-gray-300">
+            <span className="text-xs text-gray-600">
               {user?.username?.charAt(0) || "?"}
             </span>
           </div>
@@ -79,28 +79,28 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
       </div>
 
       {/* 2. 內容區域 */}
-      <div className="flex flex-col items-start flex-1 min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col items-start">
         {/* 2a. 用戶名 (不變) */}
-        <span className="text-[14px] leading-[14px] font-medium text-gray-900 whitespace-nowrap mb-1">
+        <span className="mb-1 whitespace-nowrap text-[14px] font-medium leading-[14px] text-gray-900">
           {user?.username} (me)
         </span>
 
         {/* 2b. 輸入區塊 */}
         <div className="flex items-center gap-2">
           {/* 左側：想索取 + 圖示 (不變) */}
-          <div className="flex items-center bg-white rounded-[20px] h-[40px] px-4 gap-3 shadow-sm">
-            <p className="text-[15px] font-medium text-gray-800 whitespace-nowrap">
+          <div className="flex h-[40px] items-center gap-3 rounded-[20px] bg-white px-4 shadow-sm">
+            <p className="whitespace-nowrap text-[15px] font-medium text-gray-800">
               Request
             </p>
             <WeavingIcon className="h-5 w-5 text-primary" />
-            <UnlockIcon className="w-5 h-5 text-primary" />
+            <UnlockIcon className="h-5 w-5 text-primary" />
           </div>
 
           {/* 右側：數量選擇器 或 "All" 標籤 */}
           <div className="relative">
             {type === "all" ? (
               // 情況一：顯示 "All" 標籤 (靜態)
-              <div className="flex items-center justify-center h-[40px] min-w-[56px] px-3 bg-white border border-gray-300 rounded-[22px] select-none">
+              <div className="flex h-[40px] min-w-[56px] select-none items-center justify-center rounded-[22px] border border-gray-300 bg-white px-3">
                 <span className="text-[16px] font-medium text-gray-800">
                   All
                 </span>
@@ -113,9 +113,7 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
               >
                 <SelectTrigger
                   // 這裡使用了與你原本 button 幾乎一樣的 CSS
-                  className="h-[40px] min-w-[65px] px-[16px] rounded-[22px] bg-white border-gray-300 
-                  text-[16px] font-bold text-gray-800 
-                  hover:border-gray-400 focus:ring-2 focus:ring-primary/10 data-[state=open]:border-primary"
+                  className="h-[40px] min-w-[65px] rounded-[22px] border-gray-300 bg-white px-[16px] text-[16px] font-bold text-gray-800 hover:border-gray-400 focus:ring-2 focus:ring-primary/10 data-[state=open]:border-primary"
                 >
                   <SelectValue placeholder={selectedQuantity} />
                 </SelectTrigger>
@@ -141,17 +139,17 @@ const WeavingInput: React.FC<WeavingInputProps> = ({
         </div>
 
         {/* 2c. 操作按鈕 (不變) */}
-        <div className="flex gap-2 mt-2 ml-1">
+        <div className="ml-1 mt-2 flex gap-2">
           <Button
             onClick={handleSubmit}
-            className="h-[28px] px-4 py-0 bg-primary text-white text-xs rounded-full hover:bg-primary/90"
+            className="h-[28px] rounded-full bg-primary px-4 py-0 text-xs text-white hover:bg-primary/90"
           >
             Submit
           </Button>
           <Button
             variant="ghost"
             onClick={onCancel}
-            className="h-[28px] px-3 py-0 text-gray-500 text-xs hover:text-gray-700 hover:bg-transparent"
+            className="h-[28px] px-3 py-0 text-xs text-gray-500 hover:bg-transparent hover:text-gray-700"
           >
             Cancel
           </Button>

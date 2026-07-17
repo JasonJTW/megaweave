@@ -16,7 +16,7 @@ export type UsePullToRefreshReturn = {
   pullPosition: number;
 };
 export type UsePullToRefresh = (
-  params: UsePullToRefreshParams
+  params: UsePullToRefreshParams,
 ) => UsePullToRefreshReturn;
 
 const isValid = (maximumPullLength: number, refreshThreshold: number) =>
@@ -40,7 +40,7 @@ export const usePullToRefresh: UsePullToRefresh = ({
 
       if (touch) setPullStartPosition(touch.screenY);
     },
-    [isDisabled]
+    [isDisabled],
   );
 
   const onPulling = useCallback(
@@ -59,7 +59,7 @@ export const usePullToRefresh: UsePullToRefresh = ({
       if (currentPullLength <= maximumPullLength)
         setPullPosition(() => currentPullLength);
     },
-    [isDisabled, maximumPullLength, pullStartPosition]
+    [isDisabled, maximumPullLength, pullStartPosition],
   );
 
   const onEndPull = useCallback(() => {
@@ -106,7 +106,7 @@ export const usePullToRefresh: UsePullToRefresh = ({
       return;
     console.warn(
       "usePullToRefresh",
-      `'maximumPullLength' (currently ${maximumPullLength})  should be bigger or equal than 'refreshThreshold' (currently ${refreshThreshold})`
+      `'maximumPullLength' (currently ${maximumPullLength})  should be bigger or equal than 'refreshThreshold' (currently ${refreshThreshold})`,
     );
   }, [maximumPullLength, refreshThreshold, isDisabled]);
 

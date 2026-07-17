@@ -51,7 +51,7 @@ export default function Signup() {
       setSignupError(
         error instanceof Error
           ? error.message
-          : "An unexpected error occurred during Facebook sign in"
+          : "An unexpected error occurred during Facebook sign in",
       );
     } finally {
       setLoading(false);
@@ -98,7 +98,7 @@ export default function Signup() {
       setSignupError(
         error instanceof Error
           ? error.message
-          : "An unexpected error occurred during Google sign in"
+          : "An unexpected error occurred during Google sign in",
       );
     } finally {
       setLoading(false);
@@ -160,7 +160,7 @@ export default function Signup() {
     } catch (error) {
       console.log(error);
       setSignupError(
-        error instanceof Error ? error.message : "An unexpected error occurred"
+        error instanceof Error ? error.message : "An unexpected error occurred",
       );
     } finally {
       setLoading(false);
@@ -199,30 +199,30 @@ export default function Signup() {
           setLoading(false);
         }
       },
-      { scope: "email,public_profile" }
+      { scope: "email,public_profile" },
     );
   };
 
   return (
     <>
       <div className="fixed inset-0 -z-10 bg-gradient-to-br from-stone-800 to-primary"></div>
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         <motion.div
           initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: easeInOut }}
           className="w-full max-w-md"
         >
-          <div className="bg-secondary rounded-2xl shadow-2xl p-8 m-6 space-y-6">
-            <div className="text-left space-y-1">
-              <h1 className="text-3xl font-mono tracking-wider text-primary">
+          <div className="m-6 space-y-6 rounded-2xl bg-secondary p-8 shadow-2xl">
+            <div className="space-y-1 text-left">
+              <h1 className="font-mono text-3xl tracking-wider text-primary">
                 Sign up
               </h1>
-              <p className="text-muted-foreground font-mono tracking-tighter text-sm">
+              <p className="font-mono text-sm tracking-tighter text-muted-foreground">
                 Good to have you here!
               </p>
               {signupError && (
-                <div className="text-red-400 text-sm justify-self-end">
+                <div className="justify-self-end text-sm text-red-400">
                   * {signupError}
                 </div>
               )}
@@ -240,7 +240,7 @@ export default function Signup() {
                     onChange={(e) => setUserName(e.target.value)}
                     required
                     placeholder="Enter your username"
-                    className="bg-secondary text-primary border-primary"
+                    className="border-primary bg-secondary text-primary"
                   />
                 </div>
 
@@ -255,7 +255,7 @@ export default function Signup() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     placeholder="Enter your email"
-                    className="bg-secondary text-primary "
+                    className="bg-secondary text-primary"
                   />
                 </div>
                 <div className="space-y-2">
@@ -270,7 +270,7 @@ export default function Signup() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="Enter your password"
-                      className="bg-secondary text-primary "
+                      className="bg-secondary text-primary"
                     />
                     <button
                       type="button"
@@ -278,7 +278,7 @@ export default function Signup() {
                         setShowPassword(!showPassword);
                         console.log(showPassword);
                       }}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-300 hover:text-emerald-700 transition duration-300"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 transform text-emerald-300 transition duration-300 hover:text-emerald-700"
                     >
                       {showPassword ? (
                         <EyeClosed size={20} />
@@ -313,10 +313,10 @@ export default function Signup() {
                 </div>
               </div>
 
-              <div className="flex items-center mt-4">
+              <div className="mt-4 flex items-center">
                 <Button
                   type="submit"
-                  className="w-full bg-primary-50 text-black hover:bg-gradient-to-br from-primary  to-primary-50 hover:shadow-primary-15 shadow-2xl transition-all duration-200 hover:mb-8 z-10"
+                  className="z-10 w-full bg-primary-50 from-primary to-primary-50 text-black shadow-2xl transition-all duration-200 hover:mb-8 hover:bg-gradient-to-br hover:shadow-primary-15"
                   disabled={!username || !email || !password || loading}
                 >
                   {loading ? "Signing up..." : "Sign up"}
@@ -327,7 +327,7 @@ export default function Signup() {
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-primary" />
               </div>
-              <div className="relative flex justify-center text-xs text-primary uppercase">
+              <div className="relative flex justify-center text-xs uppercase text-primary">
                 <span className="bg-secondary px-2 text-muted-foreground">
                   Or continue with
                 </span>
@@ -335,15 +335,14 @@ export default function Signup() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Button
-                className="w-full bg-primary-50 text-black
-                 hover:bg-primary-30 transition-all duration-200"
+                className="w-full bg-primary-50 text-black transition-all duration-200 hover:bg-primary-30"
                 onClick={handleFacebookLogin}
                 disabled={!isFBReady || loading}
               >
                 <svg
                   role="img"
                   viewBox="0 0 24 24"
-                  className="w-5 h-5 mr-2"
+                  className="mr-2 h-5 w-5"
                   fill="currentColor"
                 >
                   <path d={siFacebook.path} />
@@ -351,11 +350,11 @@ export default function Signup() {
                 {isFBReady ? "Facebook" : "Loading Facebook..."}
               </Button>
               <Button
-                className="w-full bg-primary-50 text-black hover:bg-primary-30 transition-all duration-200"
+                className="w-full bg-primary-50 text-black transition-all duration-200 hover:bg-primary-30"
                 disabled={loading}
                 onClick={() => {
                   const container = document.getElementById(
-                    "hidden-google-signin"
+                    "hidden-google-signin",
                   );
                   const googleButton =
                     container?.querySelector('[role="button"]');
@@ -370,7 +369,7 @@ export default function Signup() {
                 <svg
                   role="img"
                   viewBox="0 0 24 24"
-                  className="w-5 h-5 mr-2"
+                  className="mr-2 h-5 w-5"
                   fill="currentColor"
                 >
                   <path d={siGoogle.path} />
@@ -394,7 +393,7 @@ export default function Signup() {
               Already have an account?{" "}
               <a
                 href="/signin"
-                className="text-primary underline text-sm hover:text-emerald-700"
+                className="text-sm text-primary underline hover:text-emerald-700"
               >
                 Sign in
               </a>

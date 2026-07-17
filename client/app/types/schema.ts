@@ -24,6 +24,7 @@ export interface Post {
   thumbnail_urls?: string;
   avatar_url?: string;
   items?: Item[];
+  images?: { id: number; image_url: string; thumbnail_url?: string }[];
   author_public_id: string;
   author_user_id: number;
   place_id?: string;

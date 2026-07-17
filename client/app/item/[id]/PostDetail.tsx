@@ -6,12 +6,17 @@ import LocationIcon from "@/app/components/icons/LocationIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";
 import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
+import EditIcon from "@/app/components/icons/EditIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { compressImage } from "@/utils/imageProcessor";
 import { ArrowLeft, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
+import PostFormModal, {
+  PostFormSubmitData,
+} from "../../components/PostFormModal";
 import toast from "react-hot-toast";
 import CommentSection from "../../components/Comment/CommentSection";
 import EyesIcon from "../../components/icons/EyesIcon";
@@ -27,8 +32,6 @@ type PostDetailProps = {
 
 const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const router = useRouter();
-  // const params = useParams();
-  // const postId = params.id as string;
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
@@ -40,10 +43,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const [likeCount, setLikeCount] = useState(0);
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
+  // 編輯狀態
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   // back and share bar — sync with Navbar visibility
   const { isNavbarVisible } = useNavbar();
-  // 獲取當前用戶
-  // No longer need local fetchUser as we use useUser() hook
 
   // 獲取貼文詳情
   const fetchPost = useCallback(async () => {
@@ -58,7 +63,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
       if (response.ok) {
         setPost(data.post);
-        console.log(data.post);
         setLikeCount(data.post.likes_count);
 
         // 檢查用戶是否已按讚
@@ -82,6 +86,80 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       setLoading(false);
     }
   }, [hostName, postId, user]);
+
+  // 處理更新貼文
+  const handleUpdatePost = async (data: PostFormSubmitData) => {
+    setIsUpdating(true);
+    try {
+      const formData = new FormData();
+      formData.append("title", data.title);
+      formData.append("content", data.content);
+      formData.append("location", data.location);
+      if (data.place_id) formData.append("place_id", data.place_id);
+      if (data.location) formData.append("full_address", data.location);
+      if (data.province) formData.append("province", data.province);
+      if (data.city) formData.append("city", data.city);
+      if (data.route) formData.append("route", data.route);
+      if (data.zip) formData.append("zip", data.zip);
+      if (data.lat !== undefined && data.lat !== null)
+        formData.append("lat", data.lat.toString());
+      if (data.lng !== undefined && data.lng !== null)
+        formData.append("lng", data.lng.toString());
+      formData.append("tags", data.tags);
+      formData.append("categoryId", data.categoryId.toString());
+      formData.append("conditionLevel", data.conditionLevel.toString());
+      if (data.expires_at) {
+        formData.append("expiresAt", data.expires_at.toISOString());
+      } else {
+        formData.append("expiresAt", "");
+      }
+
+      // items
+      if (data.items && data.items.length > 0) {
+        const validItems = data.items.filter(
+          (item) => item.title.trim() !== "" && item.quantity !== "",
+        );
+        if (validItems.length > 0) {
+          formData.append("items", JSON.stringify(validItems));
+        }
+      }
+
+      // deleteImageIds
+      if (data.deletedImageIds && data.deletedImageIds.length > 0) {
+        formData.append("deleteImageIds", JSON.stringify(data.deletedImageIds));
+      }
+
+      // new images
+      for (const image of data.newImages) {
+        const compressedBlob = await compressImage(image, 1200, 1200, 0.85);
+        if (compressedBlob) {
+          formData.append("images", compressedBlob, "image.webp");
+        } else {
+          formData.append("images", image);
+        }
+      }
+
+      const response = await fetch(`${hostName}/api/posts/${postId}`, {
+        method: "PUT",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        toast.success("Post updated successfully");
+        setShowEditForm(false);
+        fetchPost(); // Refresh page data without changing URL layout
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.errorMessage || "Failed to update post");
+      }
+    } catch (error) {
+      console.error("Error updating post:", error);
+      toast.error("Failed to update post");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   // 處理按讚
   const handleLike = async () => {
@@ -142,27 +220,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     }
   };
 
-  // 分享功能
-  // const handleNativeShare = async () => {
-  //   try {
-  //     await navigator.share({
-  //       title: post?.title,
-  //       text: `${post?.title}\n${post?.content}`,
-  //       url: window.location.href,
-  //     });
-  //   } catch (error) {
-  //     if (error instanceof DOMException && error.name !== "AbortError") {
-  //       alert("分享失敗,請稍後再試");
-  //     }
-  //   }
-  // };
-
-  // const handleLineShare = () => {
-  //   const shareText = `${post?.title}\n${post?.content}\n${window.location.href}`;
-  //   const encodedText = encodeURIComponent(shareText);
-  //   window.open(`https://line.me/R/msg/text/?${encodedText}`, "_blank");
-  // };
-
   const handleAvatarClick = () => {
     if (post?.author_public_id) {
       router.push(`/profile/${post.author_public_id}`);
@@ -170,7 +227,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   const handleIGShare = async () => {
-    //* IG Share require native app deep link, not supported in web app
+    //* IG Share to story with link requires native app deep link, not supported in web app
     try {
       const response = await fetch(`/api/og?id=${postId}`);
       if (!response.ok) {
@@ -185,8 +242,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         files: [shareCard],
       });
     } catch (error) {
-      console.error(error);
-      toast.error("Failed to share");
+      if (error instanceof DOMException && error.name !== "AbortError") {
+        console.error(error);
+        toast.error("Failed to share");
+      }
     }
   };
 
@@ -202,13 +261,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            無效的貼文ID
+            Invalid Post ID
           </h2>
           <Button
             onClick={() => router.push("/forms")}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            回到主頁
+            Back
           </Button>
         </div>
       </div>
@@ -243,6 +302,39 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
   const images = post.image_urls ? post.image_urls.split(",") : [];
 
+  const initialFormData = {
+    title: post.title,
+    content: post.content,
+    location:
+      [post.province, post.city, post.route].filter(Boolean).join("") ||
+      post.full_address ||
+      "",
+    tags: post.tags || "",
+    categoryId: post.category_id,
+    conditionLevel: post.condition_level,
+    expires_at: post.expires_at ? new Date(post.expires_at) : undefined,
+    items:
+      post.items && post.items.length > 0
+        ? post.items.map((item) => ({
+            title: item.title,
+            quantity: item.quantity,
+          }))
+        : [{ title: "", quantity: 1 }],
+    place_id: post.place_id,
+    province: post.province,
+    city: post.city,
+    route: post.route,
+    zip: post.zip_code,
+    lat: post.lat,
+    lng: post.lng,
+  };
+
+  const existingImages =
+    post.images?.map((img) => ({
+      id: img.id,
+      image_url: img.image_url,
+    })) || [];
+
   return (
     <>
       <div className="fixed inset-0 bg-[#f5f4f3] -z-10"></div>
@@ -272,13 +364,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 >
                   <Share2 className="w-8 h-8" />
                 </Button>
-                {/* <Button
-                  variant="ghost"
-                  onClick={handleNativeShare}
-                  className="p-4"
-                >
-                  <Share2 className="w-8 h-8" />
-                </Button> */}
               </div>
             </div>
           </div>
@@ -434,14 +519,24 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   />
                 )}
                 {post.user_id && user?.userId === post.user_id && (
-                  <Button
-                    variant="ghost"
-                    onClick={handleDelete}
-                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                    <span>Delete</span>
-                  </Button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowEditForm(true)}
+                      className="text-gray-500 hover:text-primary hover:bg-gray-50 flex items-center gap-1"
+                    >
+                      <EditIcon className="w-5 h-5" />
+                      <span>Edit</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleDelete}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      <span>Delete</span>
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -458,6 +553,17 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         onOpenChange={setShareModalOpen}
         post={post}
         onInstagramShare={handleIGShare}
+      />
+
+      <PostFormModal
+        isOpen={showEditForm}
+        onClose={() => setShowEditForm(false)}
+        title="Edit Post"
+        submitButtonText="Save Changes"
+        isSubmitting={isUpdating}
+        initialData={initialFormData}
+        existingImages={existingImages}
+        onSubmit={handleUpdatePost}
       />
     </>
   );

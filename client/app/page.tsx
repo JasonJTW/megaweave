@@ -149,7 +149,7 @@ const PostsApp = () => {
       content: (
         <span>
           Click
-          <div className="inline-block px-2 py-1 mx-2 align-top bg-white rounded-full">
+          <div className="mx-2 inline-block rounded-full bg-white px-2 py-1 align-top">
             <PrivateMessageIcon />
           </div>
           button to send a private message and request weaving with the owner of
@@ -547,65 +547,65 @@ const PostsApp = () => {
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       />
-      <div className=" fixed inset-0 bg-[#F4F5F3] -z-10"></div>
-      <div className="min-h-screen ">
+      <div className="fixed inset-0 -z-10 bg-[#F4F5F3]"></div>
+      <div className="min-h-screen">
         {/* <AdSense style={{ display: "block", minHeight: "250px" }} /> */}
         {/* === Desktop Head Area === */}
         <div
           ref={desktopHeaderRef}
-          className="hidden font-ddin md:flex flex-col w-full max-w-7xl mx-auto px-8 pt-8 pb-4 relative z-20"
+          className="relative z-20 mx-auto hidden w-full max-w-7xl flex-col px-8 pb-4 pt-8 font-ddin md:flex"
         >
-          <div className="flex justify-between items-stretch gap-12 max-h-[640px]">
+          <div className="flex max-h-[640px] items-stretch justify-between gap-12">
             {/* Left Column: IconGrid */}
-            <div className="flex-1 w-[50%] max-w-[640px] flex items-center">
-              <div className="w-full aspect-square">
+            <div className="flex w-[50%] max-w-[640px] flex-1 items-center">
+              <div className="aspect-square w-full">
                 {!showCreateForm && <IconGrid />}
               </div>
             </div>
 
             {/* Right Column: Stacked Action Buttons */}
-            <div className="flex flex-col py-8 gap-8 w-[35%] max-h-[640px]">
+            <div className="flex max-h-[640px] w-[35%] flex-col gap-8 py-8">
               <Button
-                className="bg-primary-15 border-[2px] border-primary-30 hover:border-white relative flex-1 flex justify-start items-center pl-8 pr-0 py-0 overflow-hidden rounded-full shadow-none w-full max-h-[160px]"
+                className="relative flex max-h-[160px] w-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 py-0 pl-8 pr-0 shadow-none hover:border-white"
                 onClick={() => handleCreatePostButtonClick("wish")}
               >
-                <span className="text-3xl font-bold ml-2 tracking-wide text-megaweave-forest-dark relative z-10">
+                <span className="relative z-10 ml-2 text-3xl font-bold tracking-wide text-megaweave-forest-dark">
                   + Wish
                 </span>
-                <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 h-full aspect-square pointer-events-none flex items-center justify-center">
-                  <ElfIcon className="!w-full !h-full text-[#CB5E32]" />
+                <div className="pointer-events-none absolute right-[-10px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
+                  <ElfIcon className="!h-full !w-full text-[#CB5E32]" />
                 </div>
               </Button>
 
               <Button
-                className="bg-primary-15 border-[2px] border-primary-30 hover:border-white relative flex-1 flex justify-start items-center pl-8 pr-0 py-0 overflow-hidden rounded-full shadow-none w-full max-h-[160px]"
+                className="relative flex max-h-[160px] w-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 py-0 pl-8 pr-0 shadow-none hover:border-white"
                 onClick={() => handleCreatePostButtonClick("share")}
               >
-                <span className="text-3xl font-bold ml-2 tracking-wide text-megaweave-forest-dark relative z-10">
+                <span className="relative z-10 ml-2 text-3xl font-bold tracking-wide text-megaweave-forest-dark">
                   + Share
                 </span>
-                <div className="absolute right-[-10px] top-1/2 -translate-y-1/2 h-full aspect-square pointer-events-none flex items-center justify-center">
-                  <WazowskiIcon className="!w-full !h-full" />
+                <div className="pointer-events-none absolute right-[-10px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
+                  <WazowskiIcon className="!h-full !w-full" />
                 </div>
               </Button>
 
               <Button
                 disabled
-                className="bg-[#3B6232] border-[2px] border-transparent text-white relative flex-1 flex justify-start items-center pl-8 pr-0 py-0 overflow-hidden rounded-full shadow-none w-full opacity-80 cursor-not-allowed max-h-[160px]"
+                className="relative flex max-h-[160px] w-full flex-1 cursor-not-allowed items-center justify-start overflow-hidden rounded-full border-[2px] border-transparent bg-[#3B6232] py-0 pl-8 pr-0 text-white opacity-80 shadow-none"
               >
-                <div className="flex flex-col text-left ml-2 relative z-10">
+                <div className="relative z-10 ml-2 flex flex-col text-left">
                   <span className="text-[20px] font-bold leading-tight text-white opacity-90">
                     + Common
                   </span>
                   <span className="text-[20px] font-bold leading-tight text-white opacity-90">
                     Share
                   </span>
-                  <span className="text-xs font-bold mt-1 tracking-wider text-white opacity-80">
+                  <span className="mt-1 text-xs font-bold tracking-wider text-white opacity-80">
                     Coming soon
                   </span>
                 </div>
-                <div className="absolute right-[-20px] top-1/2 -translate-y-1/2 h-full aspect-square pointer-events-none flex items-center justify-center">
-                  <WeavingIcon className="!w-full !h-full text-[#2c4b25] opacity-50" />
+                <div className="pointer-events-none absolute right-[-20px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
+                  <WeavingIcon className="!h-full !w-full text-[#2c4b25] opacity-50" />
                 </div>
               </Button>
             </div>
@@ -622,7 +622,7 @@ const PostsApp = () => {
         {/* Desktop search & filter bar — fixed when stuck, static when not */}
         <div
           ref={barRef}
-          className="hidden md:block bg-[#f4f5f3] z-20"
+          className="z-20 hidden bg-[#f4f5f3] md:block"
           style={
             isStuck
               ? {
@@ -637,24 +637,24 @@ const PostsApp = () => {
           }
         >
           {/* Inner wrapper mirrors the original max-w / padding */}
-          <div className="max-w-7xl mx-auto px-8 pt-4 pb-2">
+          <div className="mx-auto max-w-7xl px-8 pb-2 pt-4">
             <div
-              className={`w-full flex ${
+              className={`flex w-full ${
                 isStuck ? "flex-row items-center gap-1 lg:gap-2" : "flex-col"
               }`}
             >
               {/* Search Bar */}
               <div
-                className={`bg-white shadow-none rounded-full flex flex-row items-center border-[2px] border-transparent transition-all duration-300 ${
+                className={`flex flex-row items-center rounded-full border-[2px] border-transparent bg-white shadow-none transition-all duration-300 ${
                   isStuck
-                    ? "flex-1 min-w-[100px] py-1 px-4 h-12"
-                    : "w-full mb-4 py-4 px-6"
+                    ? "h-12 min-w-[100px] flex-1 px-4 py-1"
+                    : "mb-4 w-full px-6 py-4"
                 }`}
               >
                 <input
                   type="text"
                   placeholder="Search"
-                  className={`bg-transparent border-0 outline-none focus:outline-none focus:ring-0 p-0 w-full h-auto placeholder:text-primary-50 transition-all duration-300 ${
+                  className={`h-auto w-full border-0 bg-transparent p-0 outline-none transition-all duration-300 placeholder:text-primary-50 focus:outline-none focus:ring-0 ${
                     isStuck ? "type-body-t2" : "type-h3"
                   }`}
                   value={searchTerm}
@@ -662,24 +662,24 @@ const PostsApp = () => {
                 />
                 {searchTerm ? (
                   <button onClick={() => setSearchTerm("")}>
-                    <X className="w-5 h-5 text-[#333] shrink-0 ml-2" />
+                    <X className="ml-2 h-5 w-5 shrink-0 text-[#333]" />
                   </button>
                 ) : (
-                  <div className="w-5 h-5 ml-2 shrink-0 border-none bg-transparent" />
+                  <div className="ml-2 h-5 w-5 shrink-0 border-none bg-transparent" />
                 )}
               </div>
               <div
-                className={`flex gap-1 lg:gap-2 items-center type-button-b1 transition-all duration-300 ${
+                className={`type-button-b1 flex items-center gap-1 transition-all duration-300 lg:gap-2 ${
                   isStuck
                     ? "flex-none"
-                    : "w-full flex-wrap xl:flex-nowrap justify-between"
+                    : "w-full flex-wrap justify-between xl:flex-nowrap"
                 }`}
               >
                 <div
-                  className={`bg-white rounded-full flex items-center justify-between text-[#333] transition-all duration-300 ${
+                  className={`flex items-center justify-between rounded-full bg-white text-[#333] transition-all duration-300 ${
                     isStuck
-                      ? "flex-none w-[130px] lg:w-[150px]"
-                      : "flex-1 min-w-[130px]"
+                      ? "w-[130px] flex-none lg:w-[150px]"
+                      : "min-w-[130px] flex-1"
                   }`}
                 >
                   <Select
@@ -689,8 +689,8 @@ const PostsApp = () => {
                     }
                   >
                     <SelectTrigger
-                      className={`bg-transparent border-0 shadow-none focus:ring-0 w-full flex items-center justify-between truncate transition-all duration-300 ${
-                        isStuck ? "px-3 lg:px-4 py-2 h-10" : "px-4 lg:px-6 py-6"
+                      className={`flex w-full items-center justify-between truncate border-0 bg-transparent shadow-none transition-all duration-300 focus:ring-0 ${
+                        isStuck ? "h-10 px-3 py-2 lg:px-4" : "px-4 py-6 lg:px-6"
                       }`}
                     >
                       <SelectValue placeholder="Category" />
@@ -706,15 +706,15 @@ const PostsApp = () => {
                   </Select>
                 </div>
                 <div
-                  className={`bg-white rounded-full flex items-center justify-between text-[#333] font-semibold transition-all duration-300 ${
+                  className={`flex items-center justify-between rounded-full bg-white font-semibold text-[#333] transition-all duration-300 ${
                     isStuck
-                      ? "flex-none w-[140px] lg:w-[160px] pl-2 pr-1 lg:px-4 h-10"
-                      : "flex-1 min-w-[130px] py-1 px-4 lg:px-6"
+                      ? "h-10 w-[140px] flex-none pl-2 pr-1 lg:w-[160px] lg:px-4"
+                      : "min-w-[130px] flex-1 px-4 py-1 lg:px-6"
                   }`}
                 >
                   <Input
                     ref={desktopSearchLocationInputRef}
-                    className="bg-transparent border-0 outline-none focus-visible:ring-0 shadow-none pl-1 pr-4 h-auto text-[#333] font-semibold w-full placeholder:text-[#333] min-w-0 placeholder:type-body-t2 !type-body-t2"
+                    className="!type-body-t2 h-auto w-full min-w-0 border-0 bg-transparent pl-1 pr-4 font-semibold text-[#333] shadow-none outline-none placeholder:type-body-t2 placeholder:text-[#333] focus-visible:ring-0"
                     type="text"
                     placeholder="Location"
                     value={locationInput}
@@ -734,14 +734,14 @@ const PostsApp = () => {
                   />
                 </div>
                 <div
-                  className={`flex flex-nowrap items-center transition-all duration-300 ${isStuck ? "gap-1 lg:gap-2" : "gap-2 lg:gap-4 overflow-x-auto overflow-y-hidden hide-scrollbar"}`}
+                  className={`flex flex-nowrap items-center transition-all duration-300 ${isStuck ? "gap-1 lg:gap-2" : "hide-scrollbar gap-2 overflow-x-auto overflow-y-hidden lg:gap-4"}`}
                 >
                   <button
-                    className={`bg-transparent border rounded-full flex items-center justify-center gap-1 lg:gap-2 type-button-b1 font-semibold transition-all whitespace-nowrap ${
-                      isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    className={`type-button-b1 flex items-center justify-center gap-1 whitespace-nowrap rounded-full border bg-transparent font-semibold transition-all lg:gap-2 ${
+                      isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       postFilterType === "wish"
-                        ? "bg-[#fbe9e7] border-[#fbe9e7] text-megaweave-forest-dark"
+                        ? "border-[#fbe9e7] bg-[#fbe9e7] text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() =>
@@ -751,14 +751,14 @@ const PostsApp = () => {
                     }
                   >
                     Wish Only{" "}
-                    <ElfIcon className="w-4 h-4 text-[#CB5E32] shrink-0" />
+                    <ElfIcon className="h-4 w-4 shrink-0 text-[#CB5E32]" />
                   </button>
                   <button
-                    className={`bg-transparent border rounded-full flex items-center justify-center gap-1 lg:gap-2 type-button-b1 font-semibold transition-all whitespace-nowrap ${
-                      isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    className={`type-button-b1 flex items-center justify-center gap-1 whitespace-nowrap rounded-full border bg-transparent font-semibold transition-all lg:gap-2 ${
+                      isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       postFilterType === "share"
-                        ? "bg-[#fff3e0] border-[#fff3e0] text-megaweave-forest-dark"
+                        ? "border-[#fff3e0] bg-[#fff3e0] text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() =>
@@ -768,14 +768,14 @@ const PostsApp = () => {
                     }
                   >
                     Share Only{" "}
-                    <ReuseIcon className="w-4 h-4 text-[#F0AF1E] shrink-0" />
+                    <ReuseIcon className="h-4 w-4 shrink-0 text-[#F0AF1E]" />
                   </button>
                   <button
-                    className={`bg-transparent border rounded-full flex items-center justify-center type-button-b1 font-semibold transition-all whitespace-nowrap ${
-                      isStuck ? "px-2 lg:px-3 py-1.5" : "px-4 lg:px-6 py-2"
+                    className={`type-button-b1 flex items-center justify-center whitespace-nowrap rounded-full border bg-transparent font-semibold transition-all ${
+                      isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       hideOverdue
-                        ? "bg-[#ffebee] border-[#ffebee] text-megaweave-red-dark"
+                        ? "border-[#ffebee] bg-[#ffebee] text-megaweave-red-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() => setHideOverdue((prev) => !prev)}
@@ -788,14 +788,14 @@ const PostsApp = () => {
           </div>
         </div>
         <div
-          className={`hidden md:block sticky transition-all duration-150 ease-in-out ${
+          className={`sticky hidden transition-all duration-150 ease-in-out md:block ${
             isNavbarVisible ? "top-[152px]" : "top-[72px]"
-          } mt-8 mb-4 bg-[#f4f5f3] ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
+          } mb-4 mt-8 bg-[#f4f5f3] ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
         >
           {/* 全局透明遮罩：當 Weaving 展開時，攔截所有外部點擊並防止事件穿透 */}
           {isWeavingExpanded && (
             <div
-              className="fixed inset-0 z-[-1] bg-transparent cursor-default"
+              className="fixed inset-0 z-[-1] cursor-default bg-transparent"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsWeavingExpanded(false);
@@ -804,23 +804,23 @@ const PostsApp = () => {
           )}
 
           {/* Mirror the Feed wrapper padding so the grid columns align exactly */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {/* Same grid definition as Feed: sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center */}
-            <div className="sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6 relative">
+            <div className="relative sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6">
               {/* 2 cols (<936px): full | 3+ cols (>=936px): all-except-last
                   936px = viewport where 3×280px + 2×24px gap fits with sm:px-6 (48px) padding */}
               <div className="sm:[grid-column:1/-1] min-[936px]:[grid-column:1/-2]">
-                <LetsStartWeavingBanner className="w-full h-auto" />
+                <LetsStartWeavingBanner className="h-auto w-full" />
               </div>
 
               {/* Collapsible Weaving button — only in the last column when 3+ cols */}
               {isStuck && (
-                <div className="hidden min-[936px]:flex min-[936px]:[grid-column:-2/-1] items-stretch justify-center overflow-visible">
+                <div className="hidden items-stretch justify-center overflow-visible min-[936px]:flex min-[936px]:[grid-column:-2/-1]">
                   <div
                     ref={weavingButtonRef}
                     onMouseEnter={() => setIsWeavingExpanded(true)}
                     onMouseLeave={() => setIsWeavingExpanded(false)}
-                    className="relative flex items-stretch justify-center w-full h-full font-ddin overflow-visible"
+                    className="relative flex h-full w-full items-stretch justify-center overflow-visible font-ddin"
                   >
                     {/* Main "+ Weaving" pill button */}
                     <button
@@ -828,34 +828,22 @@ const PostsApp = () => {
                         e.stopPropagation();
                         setIsWeavingExpanded(!isWeavingExpanded);
                       }}
-                      className={`
-                        w-full h-full rounded-full
-                        bg-megaweave-forest-dark text-white font-extrabold text-3xl tracking-wide
-                        flex items-center justify-center
-                        transition-all duration-300 ease-in-out
-                        ${
-                          isWeavingExpanded
-                            ? "opacity-0 scale-95 pointer-events-none z-10"
-                            : "opacity-100 scale-100 z-30"
-                        }
-                      `}
+                      className={`flex h-full w-full items-center justify-center rounded-full bg-megaweave-forest-dark text-3xl font-extrabold tracking-wide text-white transition-all duration-300 ease-in-out ${
+                        isWeavingExpanded
+                          ? "pointer-events-none z-10 scale-95 opacity-0"
+                          : "z-30 scale-100 opacity-100"
+                      } `}
                     >
                       + Weaving
                     </button>
 
                     {/* Expanded sub-buttons — anchored to right, expand left to cover banner */}
                     <div
-                      className={`
-                        absolute right-0 top-0 bg-white p-2 rounded-full shadow-md
-                        flex flex-row items-center gap-3 font-extrabold text-3xl
-                        transition-all duration-300 ease-in-out
-                        h-full
-                        ${
-                          isWeavingExpanded
-                            ? "opacity-100 scale-x-100 pointer-events-auto z-20"
-                            : "opacity-0 scale-x-90 origin-right pointer-events-none z-0"
-                        }
-                      `}
+                      className={`absolute right-0 top-0 flex h-full flex-row items-center gap-3 rounded-full bg-white p-2 text-3xl font-extrabold shadow-md transition-all duration-300 ease-in-out ${
+                        isWeavingExpanded
+                          ? "pointer-events-auto z-20 scale-x-100 opacity-100"
+                          : "pointer-events-none z-0 origin-right scale-x-90 opacity-0"
+                      } `}
                     >
                       {/* + Wish */}
                       <button
@@ -864,17 +852,13 @@ const PostsApp = () => {
                           handleCreatePostButtonClick("wish");
                           setIsWeavingExpanded(false);
                         }}
-                        className="
-                          flex-1 h-full rounded-full relative
-                          bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
-                          flex items-center justify-start pl-6 pr-16 overflow-hidden transition-colors duration-150
-                        "
+                        className="relative flex h-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 pl-6 pr-16 tracking-wide text-megaweave-forest-dark transition-colors duration-150 hover:border-primary"
                       >
-                        <span className="whitespace-nowrap relative z-10">
+                        <span className="relative z-10 whitespace-nowrap">
                           + Wish
                         </span>
-                        <div className="absolute right-0 top-0 bottom-0 aspect-square flex items-center justify-center shrink-0 pointer-events-none">
-                          <ElfIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-red-dark" />
+                        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex aspect-square shrink-0 items-center justify-center">
+                          <ElfIcon className="absolute -bottom-6 -right-4 !h-[95%] !w-full text-megaweave-red-dark" />
                         </div>
                       </button>
 
@@ -885,17 +869,13 @@ const PostsApp = () => {
                           handleCreatePostButtonClick("share");
                           setIsWeavingExpanded(false);
                         }}
-                        className="
-                          flex-1 h-full rounded-full relative
-                          bg-primary-15 border-[2px] border-primary-30 hover:border-primary text-megaweave-forest-dark tracking-wide
-                          flex items-center justify-start pl-6 pr-16 overflow-hidden transition-colors duration-150
-                        "
+                        className="relative flex h-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 pl-6 pr-16 tracking-wide text-megaweave-forest-dark transition-colors duration-150 hover:border-primary"
                       >
-                        <span className="whitespace-nowrap relative z-10">
+                        <span className="relative z-10 whitespace-nowrap">
                           + Share
                         </span>
-                        <div className="absolute right-0 top-0 bottom-0 aspect-square flex items-center justify-center shrink-0 pointer-events-none">
-                          <ReuseIcon className="absolute -bottom-6 -right-4 !w-full !h-[95%] text-megaweave-gold" />
+                        <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex aspect-square shrink-0 items-center justify-center">
+                          <ReuseIcon className="absolute -bottom-6 -right-4 !h-[95%] !w-full text-megaweave-gold" />
                         </div>
                       </button>
                     </div>
@@ -906,7 +886,7 @@ const PostsApp = () => {
           </div>
         </div>
 
-        <div className="md:hidden max-w-7xl mx-auto px-4 pt-4 sm:px-6 lg:px-8 ">
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 md:hidden lg:px-8">
           {!showCreateForm && <IconGrid />}
         </div>
         <div
@@ -926,44 +906,43 @@ const PostsApp = () => {
           </div>
         </div>
         <RefractiveDiv
-          className={` md:hidden max-w-7xl mx-auto flex flex-col px-8 pb-[20px] pt-[20px] sticky z-20 transition-all duration-150 ${
+          className={`sticky z-20 mx-auto flex max-w-7xl flex-col px-8 pb-[20px] pt-[20px] transition-all duration-150 md:hidden ${
             isNavbarVisible ? "top-[80px]" : "top-[0px]"
-          }
-         `}
+          } `}
           refraction={{
             radius: 40,
             blur: 4,
             bezelWidth: 20,
           }}
         >
-          <div className="flex justify-between items-center w-full">
+          <div className="flex w-full items-center justify-between">
             <Button
               id="tour-wish"
-              className="bg-megaweave-red-dark  border-megaweave-red-light border-[2px] text-[#efd0c4] py-[32px] mr-[10px] shadow-none duration-150"
+              className="mr-[10px] border-[2px] border-megaweave-red-light bg-megaweave-red-dark py-[32px] text-[#efd0c4] shadow-none duration-150"
               onClick={() => {
                 handleCreatePostButtonClick("wish");
               }}
             >
               + Wish
-              <ElfIcon className="text-[#efd0c4] !w-[18px] !h-[18px]" />
+              <ElfIcon className="!h-[18px] !w-[18px] text-[#efd0c4]" />
             </Button>
             <Button
               id="tour-share"
-              className="bg-megaweave-gold border-megaweave-gold-light border-[2px] text-[#fbe7c6] py-[32px] shadow-none duration-150"
+              className="border-[2px] border-megaweave-gold-light bg-megaweave-gold py-[32px] text-[#fbe7c6] shadow-none duration-150"
               onClick={() => {
                 handleCreatePostButtonClick("share");
               }}
             >
               + Share
-              <ReuseIcon className="text-[#fbe7c6] !w-[18px] !h-[18px]" />
+              <ReuseIcon className="!h-[18px] !w-[18px] text-[#fbe7c6]" />
             </Button>
           </div>
 
           {/* Active Category Filter Tag - Sticky underneath buttons */}
-          <div className="flex flex-wrap gap-2 mt-2 justify-start">
+          <div className="mt-2 flex flex-wrap justify-start gap-2">
             {selectedCategory && (
               <Badge
-                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                className="flex cursor-pointer items-center gap-2 bg-primary-75 py-2 pl-3 pr-2 text-sm text-white transition-colors"
                 onClick={() => setSelectedCategory("")}
               >
                 <span>
@@ -971,12 +950,12 @@ const PostsApp = () => {
                   {categories.find((c) => c.id.toString() === selectedCategory)
                     ?.name_en || "Unknown"}
                 </span>
-                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+                <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
             {searchProvince && (
               <Badge
-                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                className="flex cursor-pointer items-center gap-2 bg-primary-75 py-2 pl-3 pr-2 text-sm text-white transition-colors"
                 onClick={() => {
                   setSearchProvince("");
                   // Clear location input if it matches ONLY this province to avoid confusion
@@ -985,30 +964,30 @@ const PostsApp = () => {
                 }}
               >
                 <span>Province: {searchProvince}</span>
-                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+                <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
             {searchCity && (
               <Badge
-                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                className="flex cursor-pointer items-center gap-2 bg-primary-75 py-2 pl-3 pr-2 text-sm text-white transition-colors"
                 onClick={() => {
                   setSearchCity("");
                 }}
               >
                 <span>City: {searchCity}</span>
-                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+                <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
             {selectedLocation && (
               <Badge
-                className="flex items-center gap-2 pl-3 pr-2 py-2 text-sm bg-primary-75 text-white transition-colors cursor-pointer"
+                className="flex cursor-pointer items-center gap-2 bg-primary-75 py-2 pl-3 pr-2 text-sm text-white transition-colors"
                 onClick={() => {
                   setSelectedLocation("");
                   setLocationInput(""); // Clear the input too as it's likely a direct text search
                 }}
               >
                 <span>Location: {selectedLocation}</span>
-                <X className="w-3 h-3 hover:text-red-300 transition-colors" />
+                <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
             {/* If we have specific route filter via handleLocationClick, we might want to show it.
@@ -1076,7 +1055,7 @@ const PostsApp = () => {
                       mass: 0.8,
                     },
                   }}
-                  className="fixed bottom-24 right-8 left-8 sm:left-auto z-[60] bg-megaweave-forest-dark/80 backdrop-blur-[3px] rounded-[30px] rounded-br-none p-6 shadow-2xl shadow-black/50 origin-bottom-right flex-col"
+                  className="fixed bottom-24 left-8 right-8 z-[60] origin-bottom-right flex-col rounded-[30px] rounded-br-none bg-megaweave-forest-dark/80 p-6 shadow-2xl shadow-black/50 backdrop-blur-[3px] sm:left-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Search Input */}
@@ -1094,12 +1073,12 @@ const PostsApp = () => {
                       className="absolute right-4 top-1/2 -translate-y-1/2"
                       onClick={() => setSearchTerm("")}
                     >
-                      <DeleteIcon className="w-[18px] h-[18px]" />
+                      <DeleteIcon className="h-[18px] w-[18px]" />
                     </button>
                   </div>
 
                   {/* Filter Buttons Row 1 */}
-                  <div className="flex flex-col gap-[10px] mb-4">
+                  <div className="mb-4 flex flex-col gap-[10px]">
                     <div className="w-full">
                       <Select
                         onOpenChange={(open) => {
@@ -1141,7 +1120,7 @@ const PostsApp = () => {
                     <div className="w-full">
                       <Input
                         ref={searchLocationInputRef}
-                        className="text-megaweave-forest-dark w-full "
+                        className="w-full text-megaweave-forest-dark"
                         type="text"
                         placeholder="Location"
                         value={locationInput}
@@ -1170,11 +1149,11 @@ const PostsApp = () => {
                   </div>
 
                   {/* Filter Buttons Row 2 */}
-                  <div className="flex gap-[10px] mb-4">
+                  <div className="mb-4 flex gap-[10px]">
                     <Button
                       className={`flex-1 ${
                         postFilterType == "wish" ? "bg-primary-50" : "bg-white"
-                      } text-megaweave-forest-dark  flex items-center justify-center gap-2 px-1`}
+                      } flex items-center justify-center gap-2 px-1 text-megaweave-forest-dark`}
                       onClick={() => {
                         if (postFilterType == "wish") {
                           setPostFilterType("");
@@ -1182,12 +1161,12 @@ const PostsApp = () => {
                       }}
                     >
                       Wish Only
-                      <ElfIcon className="w-5 h-5 flex-shrink-0" />
+                      <ElfIcon className="h-5 w-5 flex-shrink-0" />
                     </Button>
                     <Button
                       className={`flex-1 ${
                         postFilterType == "share" ? "bg-primary-50" : "bg-white"
-                      } text-megaweave-forest-dark  flex items-center justify-center gap-2 px-1`}
+                      } flex items-center justify-center gap-2 px-1 text-megaweave-forest-dark`}
                       onClick={() => {
                         if (postFilterType == "share") {
                           setPostFilterType("");
@@ -1195,16 +1174,16 @@ const PostsApp = () => {
                       }}
                     >
                       Share Only
-                      <ReuseIcon className="w-5 h-5 flex-shrink-0" />
+                      <ReuseIcon className="h-5 w-5 flex-shrink-0" />
                     </Button>
                   </div>
 
                   {/* Close Overdue Items Button */}
                   <Button
-                    className={`w-full font-semibold border ${
+                    className={`w-full border font-semibold ${
                       hideOverdue
-                        ? "bg-[#ffebee] text-megaweave-red-dark border-[#ffebee] hover:bg-red-100"
-                        : "bg-white text-megaweave-forest-dark border-transparent hover:bg-gray-100"
+                        ? "border-[#ffebee] bg-[#ffebee] text-megaweave-red-dark hover:bg-red-100"
+                        : "border-transparent bg-white text-megaweave-forest-dark hover:bg-gray-100"
                     }`}
                     onClick={() => setHideOverdue((prev) => !prev)}
                   >
@@ -1220,7 +1199,7 @@ const PostsApp = () => {
               setIsMenuOpen((pref) => !pref);
             }}
             className={
-              " fixed bottom-6 right-8 z-50 w-[70px] h-[60px] rounded-[30px] p-0 shadow-lg flex items-center justify-center transition-colors duration-300 bg-megaweave-forest-dark/30"
+              "fixed bottom-6 right-8 z-50 flex h-[60px] w-[70px] items-center justify-center rounded-[30px] bg-megaweave-forest-dark/30 p-0 shadow-lg transition-colors duration-300"
             }
             refraction={{
               radius: 20,
@@ -1228,17 +1207,17 @@ const PostsApp = () => {
               bezelWidth: 20,
             }}
           >
-            <SearchIcon className=" text-white" />
+            <SearchIcon className="text-white" />
           </RefractiveButton>
         </>
         {/* Error message and posts*/}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <div className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
           {/* 錯誤提示 */}
 
           {/* 下拉刷新時顯示的頂部 Spinner (不會隱藏 Feed) */}
           {refreshing && (
-            <div className="flex justify-center py-4 transition-all animate-in fade-in slide-in-from-top-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="flex animate-in justify-center py-4 transition-all fade-in slide-in-from-top-4">
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
             </div>
           )}
 
@@ -1250,7 +1229,7 @@ const PostsApp = () => {
           {/* 貼文網格 */}
           {loading && posts.length === 0 ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <div id="tour-feed" className="w-full">

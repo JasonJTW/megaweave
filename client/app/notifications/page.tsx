@@ -14,16 +14,18 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!loading && !user) {
       toast.error("Please sign in to view notifications");
-      router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+      );
     }
   }, [loading, user, router]);
 
   if (loading) {
     return (
-      <div className="min-h-screen pt-24 pb-12 px-4 flex items-center justify-center bg-megaweave-cream">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-megaweave-forest border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-megaweave-forest font-medium">
+      <div className="flex min-h-screen items-center justify-center bg-megaweave-cream px-4 pb-12 pt-24">
+        <div className="flex animate-pulse flex-col items-center">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-megaweave-forest border-t-transparent"></div>
+          <p className="font-medium text-megaweave-forest">
             Loading notifications...
           </p>
         </div>
@@ -37,11 +39,11 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <div className="bg-[#f5f4f3] inset-0 " />
-      <div className="min-h-screen pt-8 pb-12 px-4 font-ddin">
-        <div className="max-w-7xl mx-auto">
+      <div className="inset-0 bg-[#f5f4f3]" />
+      <div className="min-h-screen px-4 pb-12 pt-8 font-ddin">
+        <div className="mx-auto max-w-7xl">
           <div className="mb-10 text-center">
-            <h1 className="type-h4 text-megaweave-forest-dark mb-3">
+            <h1 className="type-h4 mb-3 text-megaweave-forest-dark">
               Notification
             </h1>
           </div>

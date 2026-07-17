@@ -73,14 +73,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
   return (
     // 移除 `py-3`，讓外部容器控制間距
-    <div 
-      id={`comment-${comment.id}`}
-      className="relative max-w-full mt-3"
-    >
-      <div className="flex gap-2  py-[2px] px-0 items-start">
+    <div id={`comment-${comment.id}`} className="relative mt-3 max-w-full">
+      <div className="flex items-start gap-2 px-0 py-[2px]">
         {/* avatar*/}
         <div
-          className="flex-shrink-0 w-[36px] h-[36px] relative cursor-pointer hover:opacity-80 transition-opacity mt-[8px]" // 調整大小和 mt 讓其與文字頂部對齊
+          className="relative mt-[8px] h-[36px] w-[36px] flex-shrink-0 cursor-pointer transition-opacity hover:opacity-80" // 調整大小和 mt 讓其與文字頂部對齊
           onClick={handleAvatarClick}
           role="button"
           tabIndex={0}
@@ -98,33 +95,33 @@ const CommentItem: React.FC<CommentItemProps> = ({
               className="rounded-full object-cover"
             />
           ) : (
-            <div className="w-full h-full rounded-full bg-gray-300 flex items-center justify-center">
-              <span className="text-gray-600 text-xs">
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-gray-300">
+              <span className="text-xs text-gray-600">
                 {comment.username?.charAt(0) || "?"}
               </span>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col items-start flex-1 min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col items-start">
           <button
             onClick={handleAvatarClick}
-            className="text-[14px] leading-[14px] font-medium text-gray-900 hover:text-primary transition-colors hover:underline whitespace-nowrap" // 保持用戶名不換行
+            className="whitespace-nowrap text-[14px] font-medium leading-[14px] text-gray-900 transition-colors hover:text-primary hover:underline" // 保持用戶名不換行
           >
             {comment.username || `User ${comment.public_id}`}
           </button>
-          <div className="flex items-center justify-between w-full bg-white rounded-[16px] min-h-[32px] pl-3 pr-2 mt-1">
+          <div className="mt-1 flex min-h-[32px] w-full items-center justify-between rounded-[16px] bg-white pl-3 pr-2">
             {" "}
             {/* 使用 bg-gray-50 模擬氣泡背景 */}
             {/* 留言內容 */}
-            <p className="py-2 text-sm text-gray-700 break-words overflow-hidden text-ellipsis mx-2 whitespace-pre-line break-all">
+            <p className="mx-2 overflow-hidden text-ellipsis whitespace-pre-line break-words break-all py-2 text-sm text-gray-700">
               {comment.content}
             </p>
             {/* 🔥 問題 2 修正點：鎖頭和時間 */}
-            <div className="flex items-center flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center">
               {/* 鎖頭圖標：我們把它放在 P 標籤後面，但仍位於氣泡容器內 */}
               {comment.is_private === undefined && (
-                <UnlockIcon className="w-4 h-4 text-gray-400" />
+                <UnlockIcon className="h-4 w-4 text-gray-400" />
               )}{" "}
               {/* 假設 is_private 決定是否顯示 */}
               {/* 時間：在設計稿 2 中，時間是在氣泡外的，但在您的程式碼中是在氣泡內。我們遵循設計稿 2 的氣泡外顯示。
@@ -141,7 +138,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
         {/* 回覆按鈕 */}
         <button
           onClick={() => setShowReplyInput(!showReplyInput)}
-          className="hover:text-primary transition-colors"
+          className="transition-colors hover:text-primary"
         >
           {showReplyInput ? "cancel" : "reply"}
         </button>
@@ -158,7 +155,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
       </div>
       {/* 回覆輸入框 */}
       {showReplyInput && (
-        <div className="mt-2 ml-[32px]">
+        <div className="ml-[32px] mt-2">
           {" "}
           {/* 調整 ml 以對齊內容 */}
           <CommentInput
@@ -176,8 +173,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
       {/* 子留言（遞迴渲染） - 調整線條樣式和位置 */}
       {comment.children && comment.children.length > 0 && (
         // 子留言的縮進和線條
-        <div className="mt-2 ml-4 relative">
-          <div className="absolute left-[15px] top-0 bottom-0 w-[1px] bg-gray-300"></div>
+        <div className="relative ml-4 mt-2">
+          <div className="absolute bottom-0 left-[15px] top-0 w-[1px] bg-gray-300"></div>
           <div className="pl-6">
             {comment.children.map((child) => (
               <CommentItem

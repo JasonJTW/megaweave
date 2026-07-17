@@ -238,7 +238,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                 transition={{ duration: 0.2, ease: "easeInOut" }}
                 className="overflow-hidden"
               >
-                <div className="p-4 bg-primary-5 rounded-b-[18px]">
+                <div className="rounded-b-[18px] bg-primary-5 p-4">
                   <CommentInput
                     postId={post.id}
                     itemId={item.key === "all" ? "all" : item.key}
@@ -255,11 +255,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                   <div className="mt-4">
                     {isLoading ? (
                       <div className="py-4 text-center text-gray-500">
-                        <div className="animate-spin w-5 h-5 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+                        <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                         <p className="mt-2 text-sm">Loading...</p>
                       </div>
                     ) : getItemComments(item.key).length === 0 ? (
-                      <div className="py-4 text-center text-gray-500 text-sm">
+                      <div className="py-4 text-center text-sm text-gray-500">
                         No comments yet. Be the first to comment!
                       </div>
                     ) : (

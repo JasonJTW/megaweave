@@ -14,12 +14,7 @@ import ScrollHandIcon from "./icons/ScrollHandIcon";
 import AlertIcon from "./icons/AlertIcon";
 import PrivateMessageIcon from "./icons/PrivateMessageIcon";
 export type TourStepType =
-  | "welcome"
-  | "wish"
-  | "share"
-  | "scroll"
-  | "rules"
-  | "message";
+  "welcome" | "wish" | "share" | "scroll" | "rules" | "message";
 
 export type TourStep = {
   targetId?: string;
@@ -246,74 +241,74 @@ export default function OverlayTour({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="fixed inset-0 z-[105] bg-[#f5f4f3] overflow-hidden pointer-events-none"
+            className="pointer-events-none fixed inset-0 z-[105] overflow-hidden bg-[#f5f4f3]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Mock Top Bar */}
-            <div className="px-4 py-3 mt-[70px] flex items-center justify-between">
-              <div className="p-2 rounded-lg">
-                <ArrowLeft className="w-6 h-6 text-gray-800" />
+            <div className="mt-[70px] flex items-center justify-between px-4 py-3">
+              <div className="rounded-lg p-2">
+                <ArrowLeft className="h-6 w-6 text-gray-800" />
               </div>
-              <div className="p-2 rounded-lg">
-                <Share2 className="w-6 h-6 text-gray-800" />
+              <div className="rounded-lg p-2">
+                <Share2 className="h-6 w-6 text-gray-800" />
               </div>
             </div>
 
             {/* Mock PostDetail Content */}
-            <div className="mx-8 px-5 py-5 bg-white rounded-[30px]">
+            <div className="mx-8 rounded-[30px] bg-white px-5 py-5">
               {/* Mock Image */}
               <div className="relative">
                 <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
-                <div className="bg-gray-200 rounded-[20px] w-full aspect-[4/3] flex items-center justify-center">
-                  <span className="text-gray-400 text-lg">📷</span>
+                <div className="flex aspect-[4/3] w-full items-center justify-center rounded-[20px] bg-gray-200">
+                  <span className="text-lg text-gray-400">📷</span>
                 </div>
               </div>
 
               {/* Mock Title */}
-              <h1 className="text-2xl font-bold font-ddin text-gray-900 mt-4 mb-2">
+              <h1 className="mb-2 mt-4 font-ddin text-2xl font-bold text-gray-900">
                 Post Title
               </h1>
 
               {/* Mock Category */}
-              <div className="flex gap-2 mb-3">
-                <span className="px-3 py-1 bg-secondary rounded-full text-sm font-medium">
+              <div className="mb-3 flex gap-2">
+                <span className="rounded-full bg-secondary px-3 py-1 text-sm font-medium">
                   Category
                 </span>
               </div>
 
               {/* Mock Description */}
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">
+              <p className="mb-4 text-sm leading-relaxed text-gray-600">
                 This is a sample post description showing what the detail page
                 looks like...
               </p>
 
               {/* Mock Avatar Row */}
-              <div className="flex items-center bg-[#fafafa] rounded-[30px] p-[9px] mb-3">
-                <div className="w-[50px] h-[50px] rounded-full bg-gray-300 flex items-center justify-center text-xl">
+              <div className="mb-3 flex items-center rounded-[30px] bg-[#fafafa] p-[9px]">
+                <div className="flex h-[50px] w-[50px] items-center justify-center rounded-full bg-gray-300 text-xl">
                   U
                 </div>
                 <div className="ml-[18px]">
-                  <h3 className="font-semibold text-gray-900 text-sm">
+                  <h3 className="text-sm font-semibold text-gray-900">
                     Username (owner)
                   </h3>
                 </div>
               </div>
 
               {/* Mock Action Bar — with highlighted message button */}
-              <div className="flex items-center justify-start pb-4 border-b border-megaweave-blue">
+              <div className="flex items-center justify-start border-b border-megaweave-blue pb-4">
                 <button className="inline-flex items-center space-x-1 px-3 py-2 text-gray-500">
-                  <Heart className="w-5 h-5" />
-                  <span className="text-black text-sm">12</span>
+                  <Heart className="h-5 w-5" />
+                  <span className="text-sm text-black">12</span>
                 </button>
                 <button className="inline-flex items-center space-x-1 px-3 py-2 text-gray-500">
-                  <MessageSquare className="w-5 h-5" />
+                  <MessageSquare className="h-5 w-5" />
                 </button>
                 {/* THIS is the highlighted private message button */}
                 <div
                   id="tour-message"
                   className="inline-flex items-center px-2 py-1"
                 >
-                  <PrivateMessageIcon className="w-5 h-5 text-gray-500" />
+                  <PrivateMessageIcon className="h-5 w-5 text-gray-500" />
                 </div>
               </div>
             </div>
@@ -327,7 +322,7 @@ export default function OverlayTour({
         initial={false}
         animate={spotlightStyle}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed pointer-events-none"
+        className="pointer-events-none fixed"
         style={{
           boxShadow: isMessageStep
             ? "0 0 0 9999px rgba(0, 0, 0, 0.80)"
@@ -343,14 +338,14 @@ export default function OverlayTour({
           e.stopPropagation();
           handleClose();
         }}
-        className="absolute top-6 right-6 z-[120] text-white transition-colors"
+        className="absolute right-6 top-6 z-[120] text-white transition-colors"
         aria-label="Close tour"
       >
         <X size={18} strokeWidth={6} />
       </button>
 
       {/* Absolute Tooltip Card Container */}
-      <div className="absolute inset-x-0 inset-y-0 flex items-center justify-center pointer-events-none z-[115]">
+      <div className="pointer-events-none absolute inset-x-0 inset-y-0 z-[115] flex items-center justify-center">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStepIndex}
@@ -358,23 +353,23 @@ export default function OverlayTour({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className={`relative max-w-[80%] w-[340px] mx-[63px] ${
+            className={`relative mx-[63px] w-[340px] max-w-[80%] ${
               step?.layoutType === "scroll" || step?.layoutType === "message"
                 ? "bg-transparent"
                 : "bg-[#F1F1F1]/90"
-            } ${step.layoutType === "wish" || step.layoutType === "share" ? "-mt-56" : ""} ${step.layoutType === "rules" ? "py-[30px]" : ""} ${step.layoutType === "message" ? "mt-[20px]" : ""} text-megaweave-forest-dark p-5 rounded-[24px] shadow-2xl pointer-events-auto`}
+            } ${step.layoutType === "wish" || step.layoutType === "share" ? "-mt-56" : ""} ${step.layoutType === "rules" ? "py-[30px]" : ""} ${step.layoutType === "message" ? "mt-[20px]" : ""} pointer-events-auto rounded-[24px] p-5 text-megaweave-forest-dark shadow-2xl`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Contextual Decorations based on Layout Type */}
             {step?.layoutType === "welcome" && (
               <>
-                <div className="absolute -top-[40px] -left-[20px] w-16 h-16 pointer-events-none">
+                <div className="pointer-events-none absolute -left-[20px] -top-[40px] h-16 w-16">
                   <WazowskiIcon />
                 </div>
-                <div className="w-28 h-28 pointer-events-none mx-auto">
-                  <WeavingIcon className="w-full h-full text-[#3B6232]" />
+                <div className="pointer-events-none mx-auto h-28 w-28">
+                  <WeavingIcon className="h-full w-full text-[#3B6232]" />
                 </div>
-                <div className="absolute bottom-0 -right-[30px] w-16 h-16 pointer-events-none">
+                <div className="pointer-events-none absolute -right-[30px] bottom-0 h-16 w-16">
                   <SeekIcon2 />
                 </div>
               </>
@@ -382,7 +377,7 @@ export default function OverlayTour({
 
             {step?.layoutType === "wish" && (
               <>
-                <div className="absolute -top-[50px] right-[30px] w-16 h-16 pointer-events-none text-[#714f36]">
+                <div className="pointer-events-none absolute -top-[50px] right-[30px] h-16 w-16 text-[#714f36]">
                   <SeekIcon2 />
                 </div>
               </>
@@ -390,7 +385,7 @@ export default function OverlayTour({
 
             {step?.layoutType === "share" && (
               <>
-                <div className="absolute -top-14 left-[30px] w-16 h-16 pointer-events-none">
+                <div className="pointer-events-none absolute -top-14 left-[30px] h-16 w-16">
                   <WazowskiIcon />
                 </div>
               </>
@@ -398,17 +393,17 @@ export default function OverlayTour({
 
             {step?.layoutType === "scroll" && (
               <div className="flex flex-col items-center text-white">
-                <div className="flex flex-col items-center mb-6">
+                <div className="mb-6 flex flex-col items-center">
                   <DashlineIcon />
                   <motion.div
                     animate={{ y: [0, -30, 0] }}
                     transition={{ repeat: Infinity, duration: 2 }}
                     className="absolute top-1/3 ml-14 text-white"
                   >
-                    <ScrollHandIcon className="w-16 h-16" />
+                    <ScrollHandIcon className="h-16 w-16" />
                   </motion.div>
                 </div>
-                <div className="bg-[#EEEEEE] text-megaweave-forest-dark type-button-b1 p-5 rounded-xl shadow-lg absolute top-1/2 -right-4 w-[126px] text-left">
+                <div className="type-button-b1 absolute -right-4 top-1/2 w-[126px] rounded-xl bg-[#EEEEEE] p-5 text-left text-megaweave-forest-dark shadow-lg">
                   {step.content}
                 </div>
               </div>
@@ -416,7 +411,7 @@ export default function OverlayTour({
 
             {step?.layoutType === "rules" && (
               <>
-                <div className="absolute -top-[65px] left-1/2 -translate-x-1/2 w-20 h-20 rounded-full flex items-center justify-center pointer-events-none">
+                <div className="pointer-events-none absolute -top-[65px] left-1/2 flex h-20 w-20 -translate-x-1/2 items-center justify-center rounded-full">
                   <AlertIcon />
                 </div>
               </>
@@ -424,10 +419,10 @@ export default function OverlayTour({
 
             {step?.layoutType === "message" && (
               <>
-                <div className="absolute -top-20 right-1/2 w-16 h-16 pointer-events-none">
-                  <div className="relative w-28 h-28 pointer-events-none mx-auto">
-                    <div className="absolute inset-[30%] bg-white rounded-sm" />
-                    <WeavingIcon className="relative w-full h-full text-[#3B6232]" />
+                <div className="pointer-events-none absolute -top-20 right-1/2 h-16 w-16">
+                  <div className="pointer-events-none relative mx-auto h-28 w-28">
+                    <div className="absolute inset-[30%] rounded-sm bg-white" />
+                    <WeavingIcon className="relative h-full w-full text-[#3B6232]" />
                   </div>
                 </div>
               </>
@@ -436,9 +431,9 @@ export default function OverlayTour({
             {/* Standard Text Content area */}
             {step?.layoutType !== "scroll" && (
               <div
-                className={`${step.layoutType === "welcome" ? "mt-12" : ""} ${step.layoutType === "message" ? "bg-[#F1F1F1]/90 rounded-[24px] p-5" : ""} text-center flex flex-col items-center justify-center font-ddin`}
+                className={`${step.layoutType === "welcome" ? "mt-12" : ""} ${step.layoutType === "message" ? "rounded-[24px] bg-[#F1F1F1]/90 p-5" : ""} flex flex-col items-center justify-center text-center font-ddin`}
               >
-                <div className="type-button-b1 text-left text-megaweave-forest-dark whitespace-pre-wrap">
+                <div className="type-button-b1 whitespace-pre-wrap text-left text-megaweave-forest-dark">
                   {step?.content}
                 </div>
               </div>
@@ -455,7 +450,7 @@ export default function OverlayTour({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed pointer-events-none text-[#efd0c4] z-[120]"
+            className="pointer-events-none fixed z-[120] text-[#efd0c4]"
             style={{
               top: targetRect.bottom + 40,
               right: 54,
@@ -473,7 +468,7 @@ export default function OverlayTour({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed pointer-events-none text-[#fbe7c6] z-[120]"
+            className="pointer-events-none fixed z-[120] text-[#fbe7c6]"
             style={{
               top: targetRect.bottom + 40,
               right: 54,
@@ -487,7 +482,7 @@ export default function OverlayTour({
       </AnimatePresence>
 
       {/* Fixed Bottom Dots Navigation */}
-      <div className="fixed bottom-8 inset-x-0 flex justify-center space-x-2.5 z-[120] pointer-events-none">
+      <div className="pointer-events-none fixed inset-x-0 bottom-8 z-[120] flex justify-center space-x-2.5">
         {steps.map((_, idx) => (
           <div
             key={idx}

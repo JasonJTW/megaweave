@@ -22,7 +22,7 @@ const renderTextWithUrls = (text: string) => {
           href={part}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-400 hover:text-blue-300 transition-colors duration-150"
+          className="text-blue-400 transition-colors duration-150 hover:text-blue-300"
         >
           {part}
         </a>

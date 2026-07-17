@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  ReactNode,
+} from "react";
 import { Post } from "../types/schema";
 
 interface ChatPopupOtherUser {
@@ -73,7 +80,13 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
       if (isOpen && conversationId && otherUser) {
         sessionStorage.setItem(
           "chatPopupState",
-          JSON.stringify({ isOpen, conversationId, otherUser, post, pendingItem })
+          JSON.stringify({
+            isOpen,
+            conversationId,
+            otherUser,
+            post,
+            pendingItem,
+          }),
         );
       } else {
         sessionStorage.removeItem("chatPopupState");
@@ -126,7 +139,16 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <ChatPopupContext.Provider
-      value={{ isOpen, conversationId, otherUser, post, pendingItem, setPendingItem, openChat, closeChat }}
+      value={{
+        isOpen,
+        conversationId,
+        otherUser,
+        post,
+        pendingItem,
+        setPendingItem,
+        openChat,
+        closeChat,
+      }}
     >
       {children}
     </ChatPopupContext.Provider>

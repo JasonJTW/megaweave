@@ -42,13 +42,13 @@ export default function IconGrid() {
   return (
     <div className="bg-megaweave-secondary">
       <div
-        className="overflow-hidden flex items-center justify-center p-2"
+        className="flex items-center justify-center overflow-hidden p-2"
         style={{ contain: "layout paint" }}
       >
         <motion.div
           layout
           layoutScroll={false}
-          className="grid grid-cols-2 grid-rows-2 gap-0 w-full"
+          className="grid w-full grid-cols-2 grid-rows-2 gap-0"
         >
           {positions.map((iconIndex) => {
             const { id, Icon } = icons[iconIndex];
@@ -71,9 +71,9 @@ export default function IconGrid() {
                   willChange: "transform",
                   color,
                 }}
-                className="flex items-center justify-center aspect-square "
+                className="flex aspect-square items-center justify-center"
               >
-                <Icon className="w-full h-full " />
+                <Icon className="h-full w-full" />
               </motion.div>
             );
           })}

@@ -7,9 +7,9 @@ import { useUser } from "@/app/contexts/UserContext";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 // Fetcher function
 const fetcher = async (url: string) => {
-  const res = await fetch(url, { 
+  const res = await fetch(url, {
     credentials: "include",
-    cache: "no-store" 
+    cache: "no-store",
   });
   if (!res.ok) {
     const error = new Error("An error occurred while fetching the data.");
@@ -18,16 +18,13 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
-
-
 export const useConversations = () => {
   const { user } = useUser();
   const userId = user?.userId;
-  
-  const { data, error, isLoading, mutate } = useSWR<{ conversations: Conversation[] }>(
-    userId ? `${hostName}/api/messages/conversations` : null,
-    fetcher
-  );
+
+  const { data, error, isLoading, mutate } = useSWR<{
+    conversations: Conversation[];
+  }>(userId ? `${hostName}/api/messages/conversations` : null, fetcher);
 
   return {
     conversations: data?.conversations || [],
@@ -38,12 +35,18 @@ export const useConversations = () => {
 };
 
 export const useMessages = (conversationId: number | null) => {
-  const { data, error, isLoading, mutate } = useSWR<{ messages: Message[], hasMore: boolean, conversation?: Conversation }>(
-    conversationId ? `${hostName}/api/messages/conversations/${conversationId}` : null,
+  const { data, error, isLoading, mutate } = useSWR<{
+    messages: Message[];
+    hasMore: boolean;
+    conversation?: Conversation;
+  }>(
+    conversationId
+      ? `${hostName}/api/messages/conversations/${conversationId}`
+      : null,
     fetcher,
     {
       revalidateOnFocus: false, // Socket handles real-time updates; auto-revalidation causes race conditions with markAsRead
-    }
+    },
   );
 
   const fetchMore = async () => {
@@ -51,23 +54,27 @@ export const useMessages = (conversationId: number | null) => {
 
     // The messages are sorted newest first. The last message is the oldest one.
     const lastMessageId = data.messages[data.messages.length - 1].id;
-    
+
     try {
-      const res = await fetch(`${hostName}/api/messages/conversations/${conversationId}?before_id=${lastMessageId}`, {
-          credentials: "include"
-      });
+      const res = await fetch(
+        `${hostName}/api/messages/conversations/${conversationId}?before_id=${lastMessageId}`,
+        {
+          credentials: "include",
+        },
+      );
       if (!res.ok) throw new Error("Failed to fetch more messages");
-      
+
       const newData = await res.json();
-      
+
       // Update the SWR cache by appending new messages to the end
       mutate((current) => {
-          if (!current) return { messages: newData.messages, hasMore: newData.hasMore };
-          return {
-              ...current,
-              messages: [...current.messages, ...newData.messages],
-              hasMore: newData.hasMore
-          };
+        if (!current)
+          return { messages: newData.messages, hasMore: newData.hasMore };
+        return {
+          ...current,
+          messages: [...current.messages, ...newData.messages],
+          hasMore: newData.hasMore,
+        };
       }, false);
     } catch (err) {
       console.error("fetchMore error:", err);
@@ -86,258 +93,306 @@ export const useMessages = (conversationId: number | null) => {
 };
 
 export const useChatSocket = (conversationId: number | null) => {
-    const { user } = useUser();
-    const { socket } = useSocket();
-    const { mutate: mutateMessages } = useSWRConfig();
-    const { mutate: mutateConversations } = useSWRConfig(); // Global mutate to update conversation list
+  const { user } = useUser();
+  const { socket } = useSocket();
+  const { mutate: mutateMessages } = useSWRConfig();
+  const { mutate: mutateConversations } = useSWRConfig(); // Global mutate to update conversation list
 
-    useEffect(() => {
-        if (!socket) {
-            return;
-        }
+  useEffect(() => {
+    if (!socket) {
+      return;
+    }
 
-        const handleNewMessage = (newMessage: Message) => {
+    const handleNewMessage = (newMessage: Message) => {
+      const isCurrentConversationInHook =
+        conversationId && Number(conversationId) === newMessage.conversation_id;
 
-            const isCurrentConversationInHook = conversationId && Number(conversationId) === newMessage.conversation_id;
+      // 1. Update Messages list (Local Update)
+      // ONLY execute this if this hook instance is for the current conversation
+      if (isCurrentConversationInHook) {
+        mutateMessages(
+          `${hostName}/api/messages/conversations/${conversationId}`,
+          (
+            currentData: { messages: Message[]; hasMore: boolean } | undefined,
+          ) => {
+            if (!currentData) return currentData; // No-op: SWR fetch still in flight, don't corrupt cache
 
-            // 1. Update Messages list (Local Update)
-            // ONLY execute this if this hook instance is for the current conversation
-            if (isCurrentConversationInHook) {
-                mutateMessages(
-                    `${hostName}/api/messages/conversations/${conversationId}`,
-                    (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
-                        if (!currentData) return currentData; // No-op: SWR fetch still in flight, don't corrupt cache
-                        
-                        let updatedMessages = [...currentData.messages];
-                        const tempIndex = updatedMessages.findIndex(m => 
-                            String(m.id).startsWith("temp-") && 
-                            m.content === newMessage.content && 
-                            m.sender_public_id === newMessage.sender_public_id
-                        );
+            let updatedMessages = [...currentData.messages];
+            const tempIndex = updatedMessages.findIndex(
+              (m) =>
+                String(m.id).startsWith("temp-") &&
+                m.content === newMessage.content &&
+                m.sender_public_id === newMessage.sender_public_id,
+            );
 
-                        if (tempIndex !== -1) {
-                            updatedMessages[tempIndex] = newMessage;
-                        } else {
-                            updatedMessages.push(newMessage);
-                        }
-
-                        // De-duplicate by message ID
-                        const seenIds = new Set();
-                        updatedMessages = updatedMessages.filter(m => {
-                            if (seenIds.has(m.id)) return false;
-                            seenIds.add(m.id);
-                            return true;
-                        });
-
-                        // Sort descending (latest first)
-                        updatedMessages.sort((a, b) => {
-                            const isTempA = String(a.id).startsWith("temp-");
-                            const isTempB = String(b.id).startsWith("temp-");
-                            if (isTempA && !isTempB) return -1;
-                            if (!isTempA && isTempB) return 1;
-                            if (isTempA && isTempB) {
-                                const timeA = parseInt(String(a.id).substring(5)) || 0;
-                                const timeB = parseInt(String(b.id).substring(5)) || 0;
-                                return timeB - timeA;
-                            }
-                            return Number(b.id) - Number(a.id);
-                        });
-
-                        return {
-                            ...currentData,
-                            messages: updatedMessages
-                        };
-                    },
-                    false
-                );
+            if (tempIndex !== -1) {
+              updatedMessages[tempIndex] = newMessage;
+            } else {
+              updatedMessages.push(newMessage);
             }
 
-            // 2. Update Conversation List (Global Update)
-            // ONLY execute this in the Global Listener (where conversationId is null)
-            // This prevents double updates (+2) when multiple hooks are mounted.
-            if (conversationId === null) {
-                mutateConversations(
-                    `${hostName}/api/messages/conversations`,
-                    (currentData: { conversations: Conversation[] } | undefined) => {
-                        if (!currentData) return currentData;
-                        
-                        const conversations = currentData.conversations;
-                        const existingIndex = conversations.findIndex(c => Number(c.id) === Number(newMessage.conversation_id));
-                        
-                        if (existingIndex !== -1) {
-                            const path = window.location.pathname;
-                            const pathParts = path.split('/');
-                            const activeConversationId = (pathParts[1] === 'messages' && pathParts[2]) ? Number(pathParts[2]) : null;
-                            
-                            const isBeingViewed = activeConversationId === Number(newMessage.conversation_id);
-                            const isFocused = document.hasFocus();
-                            
-                           
+            // De-duplicate by message ID
+            const seenIds = new Set();
+            updatedMessages = updatedMessages.filter((m) => {
+              if (seenIds.has(m.id)) return false;
+              seenIds.add(m.id);
+              return true;
+            });
 
-                            let shouldIncrement = false;
-                            const isMyOwnMessage = newMessage.sender_public_id === user?.public_id;
+            // Sort descending (latest first)
+            updatedMessages.sort((a, b) => {
+              const isTempA = String(a.id).startsWith("temp-");
+              const isTempB = String(b.id).startsWith("temp-");
+              if (isTempA && !isTempB) return -1;
+              if (!isTempA && isTempB) return 1;
+              if (isTempA && isTempB) {
+                const timeA = parseInt(String(a.id).substring(5)) || 0;
+                const timeB = parseInt(String(b.id).substring(5)) || 0;
+                return timeB - timeA;
+              }
+              return Number(b.id) - Number(a.id);
+            });
 
-                            if (!isMyOwnMessage) {
-                                if (isBeingViewed && isFocused) {
-                                    shouldIncrement = false;
-                                    fetch(`${hostName}/api/messages/conversations/${newMessage.conversation_id}/read`, {
-                                        method: "PATCH",
-                                        headers: { "Content-Type": "application/json" },
-                                        credentials: "include",
-                                    }).catch(err => console.error("Failed to mark read on global update", err));
-                                } else {
-                                    shouldIncrement = true;
-                                }
-                            }
+            return {
+              ...currentData,
+              messages: updatedMessages,
+            };
+          },
+          false,
+        );
+      }
 
-                            const updatedConv = {
-                                ...conversations[existingIndex],
-                                last_message_content: newMessage.content,
-                                last_message_at: newMessage.created_at,
-                                unread_count: (conversations[existingIndex].unread_count || 0) + (shouldIncrement ? 1 : 0)
-                            };
-                            
-                            const newConversations = [
-                                updatedConv,
-                                ...conversations.filter(c => Number(c.id) !== Number(newMessage.conversation_id))
-                            ];
-                            
-                            return { conversations: newConversations };
-                        } else {
-                            return currentData; 
-                        }
+      // 2. Update Conversation List (Global Update)
+      // ONLY execute this in the Global Listener (where conversationId is null)
+      // This prevents double updates (+2) when multiple hooks are mounted.
+      if (conversationId === null) {
+        mutateConversations(
+          `${hostName}/api/messages/conversations`,
+          (currentData: { conversations: Conversation[] } | undefined) => {
+            if (!currentData) return currentData;
+
+            const conversations = currentData.conversations;
+            const existingIndex = conversations.findIndex(
+              (c) => Number(c.id) === Number(newMessage.conversation_id),
+            );
+
+            if (existingIndex !== -1) {
+              const path = window.location.pathname;
+              const pathParts = path.split("/");
+              const activeConversationId =
+                pathParts[1] === "messages" && pathParts[2]
+                  ? Number(pathParts[2])
+                  : null;
+
+              const isBeingViewed =
+                activeConversationId === Number(newMessage.conversation_id);
+              const isFocused = document.hasFocus();
+
+              let shouldIncrement = false;
+              const isMyOwnMessage =
+                newMessage.sender_public_id === user?.public_id;
+
+              if (!isMyOwnMessage) {
+                if (isBeingViewed && isFocused) {
+                  shouldIncrement = false;
+                  fetch(
+                    `${hostName}/api/messages/conversations/${newMessage.conversation_id}/read`,
+                    {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
                     },
-                    false
-                );
-            }
-        };
-        const handleMessagesRead = (data: { conversation_id: number, reader_public_id: string }) => {
-            
-            // 1. Update Messages list if we are in that conversation
-            if (conversationId && Number(conversationId) === data.conversation_id) {
-                mutateMessages(
-                    `${hostName}/api/messages/conversations/${conversationId}`,
-                    (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
-                        if (!currentData) return currentData;
-                        return {
-                            ...currentData,
-                            messages: currentData.messages.map(m => {
-                                // If I am the sender of a message, and someone else (data.reader_id) read it
-                                // then I should mark MY message as read in my UI.
-                                if (m.sender_public_id === user?.public_id && data.reader_public_id !== user?.public_id) {
-                                    return { ...m, is_read: true };
-                                }
-                                // Also handle receiving my own read status from other device
-                                if (m.sender_public_id !== user?.public_id && data.reader_public_id === user?.public_id) {
-                                    return { ...m, is_read: true };
-                                }
-                                return m;
-                            })
-                        };
-                    },
-                    false
-                );
-            }
-
-            if (conversationId === null) {
-                // Determine if WE are the ones who read it (either on this device or another)
-                const iReadIt = data.reader_public_id === user?.public_id;
-
-                if (iReadIt) {
-                    mutateConversations(
-                        `${hostName}/api/messages/conversations`,
-                        (currentData: { conversations: Conversation[] } | undefined) => {
-                            if (!currentData) return currentData;
-                            const conversations = currentData.conversations;
-                            const existingIndex = conversations.findIndex(c => Number(c.id) === Number(data.conversation_id));
-                            if (existingIndex !== -1) {
-                                const newConversations = [...conversations];
-                                newConversations[existingIndex] = {
-                                    ...newConversations[existingIndex],
-                                    unread_count: 0
-                                };
-                                return { conversations: newConversations };
-                            }
-                            return currentData;
-                        },
-                        false
-                    );
+                  ).catch((err) =>
+                    console.error("Failed to mark read on global update", err),
+                  );
+                } else {
+                  shouldIncrement = true;
                 }
+              }
+
+              const updatedConv = {
+                ...conversations[existingIndex],
+                last_message_content: newMessage.content,
+                last_message_at: newMessage.created_at,
+                unread_count:
+                  (conversations[existingIndex].unread_count || 0) +
+                  (shouldIncrement ? 1 : 0),
+              };
+
+              const newConversations = [
+                updatedConv,
+                ...conversations.filter(
+                  (c) => Number(c.id) !== Number(newMessage.conversation_id),
+                ),
+              ];
+
+              return { conversations: newConversations };
+            } else {
+              return currentData;
             }
-        };
+          },
+          false,
+        );
+      }
+    };
+    const handleMessagesRead = (data: {
+      conversation_id: number;
+      reader_public_id: string;
+    }) => {
+      // 1. Update Messages list if we are in that conversation
+      if (conversationId && Number(conversationId) === data.conversation_id) {
+        mutateMessages(
+          `${hostName}/api/messages/conversations/${conversationId}`,
+          (
+            currentData: { messages: Message[]; hasMore: boolean } | undefined,
+          ) => {
+            if (!currentData) return currentData;
+            return {
+              ...currentData,
+              messages: currentData.messages.map((m) => {
+                // If I am the sender of a message, and someone else (data.reader_id) read it
+                // then I should mark MY message as read in my UI.
+                if (
+                  m.sender_public_id === user?.public_id &&
+                  data.reader_public_id !== user?.public_id
+                ) {
+                  return { ...m, is_read: true };
+                }
+                // Also handle receiving my own read status from other device
+                if (
+                  m.sender_public_id !== user?.public_id &&
+                  data.reader_public_id === user?.public_id
+                ) {
+                  return { ...m, is_read: true };
+                }
+                return m;
+              }),
+            };
+          },
+          false,
+        );
+      }
 
-        socket.on("new_message", handleNewMessage);
-        socket.on("messages_read", handleMessagesRead);
+      if (conversationId === null) {
+        // Determine if WE are the ones who read it (either on this device or another)
+        const iReadIt = data.reader_public_id === user?.public_id;
 
-        // Handle in-place updates to existing messages (e.g. system_start_weaving gaining a weave_id)
-        const handleUpdateMessage = (updatedMessage: Message) => {
-            if (!conversationId || Number(conversationId) !== updatedMessage.conversation_id) return;
-            mutateMessages(
-                `${hostName}/api/messages/conversations/${conversationId}`,
-                (currentData: { messages: Message[], hasMore: boolean } | undefined) => {
-                    if (!currentData) return currentData;
-                    return {
-                        ...currentData,
-                        messages: currentData.messages.map(m =>
-                            Number(m.id) === Number(updatedMessage.id) ? { ...m, ...updatedMessage } : m
-                        ),
-                    };
-                },
-                false
-            );
-        };
-        socket.on("update_message", handleUpdateMessage);
+        if (iReadIt) {
+          mutateConversations(
+            `${hostName}/api/messages/conversations`,
+            (currentData: { conversations: Conversation[] } | undefined) => {
+              if (!currentData) return currentData;
+              const conversations = currentData.conversations;
+              const existingIndex = conversations.findIndex(
+                (c) => Number(c.id) === Number(data.conversation_id),
+              );
+              if (existingIndex !== -1) {
+                const newConversations = [...conversations];
+                newConversations[existingIndex] = {
+                  ...newConversations[existingIndex],
+                  unread_count: 0,
+                };
+                return { conversations: newConversations };
+              }
+              return currentData;
+            },
+            false,
+          );
+        }
+      }
+    };
 
-        return () => {
-            socket.off("new_message", handleNewMessage);
-            socket.off("messages_read", handleMessagesRead);
-            socket.off("update_message", handleUpdateMessage);
-        };
-    }, [socket, conversationId, mutateMessages, mutateConversations, user?.public_id]);
+    socket.on("new_message", handleNewMessage);
+    socket.on("messages_read", handleMessagesRead);
 
-    // 2. Focus/Visibility listener: Clear unread count IMMEDIATELY when recipient focuses back to chat
-    useEffect(() => {
-        if (!conversationId) return;
+    // Handle in-place updates to existing messages (e.g. system_start_weaving gaining a weave_id)
+    const handleUpdateMessage = (updatedMessage: Message) => {
+      if (
+        !conversationId ||
+        Number(conversationId) !== updatedMessage.conversation_id
+      )
+        return;
+      mutateMessages(
+        `${hostName}/api/messages/conversations/${conversationId}`,
+        (
+          currentData: { messages: Message[]; hasMore: boolean } | undefined,
+        ) => {
+          if (!currentData) return currentData;
+          return {
+            ...currentData,
+            messages: currentData.messages.map((m) =>
+              Number(m.id) === Number(updatedMessage.id)
+                ? { ...m, ...updatedMessage }
+                : m,
+            ),
+          };
+        },
+        false,
+      );
+    };
+    socket.on("update_message", handleUpdateMessage);
 
-        const clearRead = () => {
-            if (!document.hasFocus()) return;
+    return () => {
+      socket.off("new_message", handleNewMessage);
+      socket.off("messages_read", handleMessagesRead);
+      socket.off("update_message", handleUpdateMessage);
+    };
+  }, [
+    socket,
+    conversationId,
+    mutateMessages,
+    mutateConversations,
+    user?.public_id,
+  ]);
 
-            // 1. Mark as read on server (this will emit messages_read to the sender)
-            fetch(`${hostName}/api/messages/conversations/${conversationId}/read`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            }).catch(err => console.error("Failed to mark read on focus", err));
+  // 2. Focus/Visibility listener: Clear unread count IMMEDIATELY when recipient focuses back to chat
+  useEffect(() => {
+    if (!conversationId) return;
 
-            // 2. Clear locally for THIS conversation in the global list
-            mutateConversations(
-                `${hostName}/api/messages/conversations`,
-                (currentData: { conversations: Conversation[] } | undefined) => {
-                    if (!currentData) return currentData;
-                    const conversations = currentData.conversations;
-                    const existingIndex = conversations.findIndex(c => c.id === Number(conversationId));
-                    if (existingIndex !== -1 && (conversations[existingIndex].unread_count || 0) > 0) {
-                        const newConversations = [...conversations];
-                        newConversations[existingIndex] = {
-                            ...newConversations[existingIndex],
-                            unread_count: 0
-                        };
-                        return { conversations: newConversations };
-                    }
-                    return currentData;
-                },
-                false
-            );
-        };
+    const clearRead = () => {
+      if (!document.hasFocus()) return;
 
-        // Only listen for focus events, do NOT fire on mount
-        // Initial markAsRead is handled by ChatWindow's own effect which waits for messages to load
-        window.addEventListener("focus", clearRead);
-        window.addEventListener("visibilitychange", clearRead);
+      // 1. Mark as read on server (this will emit messages_read to the sender)
+      fetch(`${hostName}/api/messages/conversations/${conversationId}/read`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      }).catch((err) => console.error("Failed to mark read on focus", err));
 
-        return () => {
-            window.removeEventListener("focus", clearRead);
-            window.removeEventListener("visibilitychange", clearRead);
-        };
-    }, [conversationId, mutateConversations, user?.public_id]);
+      // 2. Clear locally for THIS conversation in the global list
+      mutateConversations(
+        `${hostName}/api/messages/conversations`,
+        (currentData: { conversations: Conversation[] } | undefined) => {
+          if (!currentData) return currentData;
+          const conversations = currentData.conversations;
+          const existingIndex = conversations.findIndex(
+            (c) => c.id === Number(conversationId),
+          );
+          if (
+            existingIndex !== -1 &&
+            (conversations[existingIndex].unread_count || 0) > 0
+          ) {
+            const newConversations = [...conversations];
+            newConversations[existingIndex] = {
+              ...newConversations[existingIndex],
+              unread_count: 0,
+            };
+            return { conversations: newConversations };
+          }
+          return currentData;
+        },
+        false,
+      );
+    };
+
+    // Only listen for focus events, do NOT fire on mount
+    // Initial markAsRead is handled by ChatWindow's own effect which waits for messages to load
+    window.addEventListener("focus", clearRead);
+    window.addEventListener("visibilitychange", clearRead);
+
+    return () => {
+      window.removeEventListener("focus", clearRead);
+      window.removeEventListener("visibilitychange", clearRead);
+    };
+  }, [conversationId, mutateConversations, user?.public_id]);
 };

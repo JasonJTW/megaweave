@@ -113,7 +113,7 @@ const MemberInfoFieldRow = <T extends InfoFieldRowValues>({
 }: MemberInfoFieldRowProps<T>) => (
   <div className="py-3">
     <div className="flex items-center justify-between gap-4">
-      <FormLabel className="font-bold text-megaweave-forest-dark leading-tight">
+      <FormLabel className="font-bold leading-tight text-megaweave-forest-dark">
         {label}
       </FormLabel>
       <FormField
@@ -148,10 +148,10 @@ const MemberInfoFieldRow = <T extends InfoFieldRowValues>({
                 value={String(field.value ?? "")}
                 type={inputType}
                 placeholder={placeholder}
-                className="w-full rounded-lg border border-primary-30 px-3 py-1.5 text-sm font-normal text-megaweave-forest-dark bg-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                className="w-full rounded-lg border border-primary-30 bg-white px-3 py-1.5 text-sm font-normal text-megaweave-forest-dark focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20"
               />
             ) : linkify && field.value ? (
-              <div className="text-sm font-normal text-megaweave-forest-dark underline break-all">
+              <div className="break-all text-sm font-normal text-megaweave-forest-dark underline">
                 {renderTextWithUrls(String(field.value))}
               </div>
             ) : (
@@ -433,7 +433,7 @@ const UserPage = () => {
           errorMessage.errorMessage || "Failed to fetch user stats",
         );
       }
-       const statsData = await response.json();
+      const statsData = await response.json();
       console.log("Fetched User Stats: ", statsData);
 
       setStats({
@@ -1068,15 +1068,15 @@ const UserPage = () => {
   if (loading || redirecting) {
     return (
       <>
-        <div className="fixed inset-0 bg-megaweave-forest-dark -z-10"></div>
-        <div className="min-h-screen bg-megaweave-forest-dark flex items-center justify-center">
+        <div className="fixed inset-0 -z-10 bg-megaweave-forest-dark"></div>
+        <div className="flex min-h-screen items-center justify-center bg-megaweave-forest-dark">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             className="text-center"
           >
-            <div className="w-16 h-16 border-4 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin mx-auto mb-4"></div>
-            <h1 className="text-megaweave-cream text-2xl font-medium">
+            <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-megaweave-gold/30 border-t-megaweave-red-light"></div>
+            <h1 className="text-2xl font-medium text-megaweave-cream">
               Loading...
             </h1>
           </motion.div>
@@ -1091,16 +1091,16 @@ const UserPage = () => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-primary-5 -z-10"></div>
-      <div className="min-h-screen  px-0 sm:px-6 md:px-12 lg:px-16">
+      <div className="fixed inset-0 -z-10 bg-primary-5"></div>
+      <div className="min-h-screen px-0 sm:px-6 md:px-12 lg:px-16">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="  "
+          className=" "
         >
-          <div className="max-w-6xl mx-auto px-6 py-4 flex justify-center md:justify-between items-center mt-10">
-            <div className="flex items-center justify-center md:justify-start space-x-3">
+          <div className="mx-auto mt-10 flex max-w-6xl items-center justify-center px-6 py-4 md:justify-between">
+            <div className="flex items-center justify-center space-x-3 md:justify-start">
               {/*icons*/}
               <div className="flex items-center space-x-2 px-6">
                 <ReuseIcon className="h-[85px] w-auto text-megaweave-gold" />
@@ -1108,38 +1108,38 @@ const UserPage = () => {
                 <ElfIcon className="h-[85px] w-auto text-megaweave-red-dark" />
                 <CommonShareIcon className="h-[85px] w-auto text-megaweave-blue" />
               </div>
-              <span className="hidden md:inline type-h1 font-bold text-megaweave-forest-dark">
+              <span className="type-h1 hidden font-bold text-megaweave-forest-dark md:inline">
                 Profile
               </span>
             </div>
 
             <button
               onClick={handleSignOut}
-              className="hidden md:flex font-ddin font-bold items-center space-x-2 px-4 py-2 text-megaweave-forest-dark rounded-full transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
+              className="hidden items-center space-x-2 rounded-full px-4 py-2 font-ddin font-bold text-megaweave-forest-dark transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35 md:flex"
             >
               <span>Sign Out</span>
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </motion.header>
         {/* Main Content */}
-        <div className="max-w-6xl mx-auto px-6 py-5 font-ddin">
-          <div className="grid grid-cols-1 lg:grid-cols-[330px_1fr] gap-8 lg:items-stretch">
+        <div className="mx-auto max-w-6xl px-6 py-5 font-ddin">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[330px_1fr] lg:items-stretch">
             {/* Profile Card */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
-              className="w-full lg:w-[330px] h-full relative"
+              className="relative h-full w-full lg:w-[330px]"
             >
-              <div className="relative bg-white border-primary-30 border rounded-[30px] p-6 hover:border-gray-600/40 transition-all duration-300 h-full">
+              <div className="relative h-full rounded-[30px] border border-primary-30 bg-white p-6 transition-all duration-300 hover:border-gray-600/40">
                 <button
                   type="button"
                   onClick={() => setIsShareQrOpen(true)}
-                  className="absolute top-6 right-6 z-10 rounded-full p-1.5 transition-colors hover:bg-primary-15"
+                  className="absolute right-6 top-6 z-10 rounded-full p-1.5 transition-colors hover:bg-primary-15"
                   aria-label="Share profile QR code"
                 >
-                  <Share className="w-4 h-4 text-megaweave-forest-dark pointer-events-none" />
+                  <Share className="pointer-events-none h-4 w-4 text-megaweave-forest-dark" />
                 </button>
                 {/* Avatar */}
                 <div className="text-center">
@@ -1154,7 +1154,7 @@ const UserPage = () => {
                     {/* 固定尺寸容器：保持原本的大小/比例（max-w-72, h-80） */}
                     <div
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-full max-w-[220px] h-[222px] max-h-80 bg-secondary/50 rounded-2xl flex items-center justify-center text-2xl font-bold mb-2 mx-auto  hover:cursor-pointer relative overflow-hidden"
+                      className="relative mx-auto mb-2 flex h-[222px] max-h-80 w-full max-w-[220px] items-center justify-center overflow-hidden rounded-2xl bg-secondary/50 text-2xl font-bold hover:cursor-pointer"
                     >
                       {/* 如果有 preview，顯示 preview 圖片；否則若 user.avatarUrl 存在則顯示真實頭像，否則顯示字母色塊 */}
 
@@ -1165,7 +1165,7 @@ const UserPage = () => {
                           alt="Avatar preview"
                           width={220}
                           height={222}
-                          className="w-full h-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                       ) : user?.avatar_url ? (
                         // 使用 next/image 以獲得優化（父容器需為 relative）
@@ -1180,15 +1180,15 @@ const UserPage = () => {
                         </div>
                       ) : (
                         // fallback 色塊顯示使用者首字母
-                        <div className="w-full h-full flex items-center justify-center text-4xl">
+                        <div className="flex h-full w-full items-center justify-center text-4xl">
                           {username ? username.charAt(0) : "?"}
                         </div>
                       )}
 
                       {/* 如果是正在上傳，顯示 loading overlay */}
                       {uploadingAvatar && (
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
                         </div>
                       )}
                     </div>
@@ -1207,7 +1207,7 @@ const UserPage = () => {
                     {user.avatar_url && !previewSrc && (
                       <button
                         onClick={handleRemoveAvatar}
-                        className="px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600/20 transition-all duration-200 text-sm text-red-300"
+                        className="rounded-lg bg-red-600/10 px-3 py-1.5 text-sm text-red-300 transition-all duration-200 hover:bg-red-600/20"
                       >
                         Remove
                       </button>
@@ -1217,16 +1217,16 @@ const UserPage = () => {
                       <div className="flex space-x-2">
                         <button
                           onClick={uploadAvatar}
-                          className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
+                          className="flex items-center rounded-lg px-3 py-1 text-sm font-semibold text-primary"
                         >
-                          <Save className="w-4 h-4 mr-1" />
+                          <Save className="mr-1 h-4 w-4" />
                           <span>Upload</span>
                         </button>
                         <button
                           onClick={handleCancelAvatarPreview}
-                          className="px-3 py-1 rounded-lg font-semibold text-sm text-primary flex items-center"
+                          className="flex items-center rounded-lg px-3 py-1 text-sm font-semibold text-primary"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="h-4 w-4" />
                           <span>Cancel</span>
                         </button>
                       </div>
@@ -1244,10 +1244,10 @@ const UserPage = () => {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
                         transition={{ duration: 0.2 }}
-                        className="group flex items-center relative px-2"
+                        className="group relative flex items-center px-2"
                       >
                         <h2
-                          className="text-[#222] type-h5"
+                          className="type-h5 text-[#222]"
                           style={{
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -1261,9 +1261,9 @@ const UserPage = () => {
                         </h2>
                         <button
                           onClick={handleEditUsername}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity  duration-200 p-1 hover:bg-gray-600/30 rounded absolute left-full top-1/2 -translate-y-1/2"
+                          className="absolute left-full top-1/2 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity duration-200 hover:bg-gray-600/30 group-hover:opacity-100"
                         >
-                          <EditIcon className="w-4 h-4" />
+                          <EditIcon className="h-4 w-4" />
                         </button>
                       </motion.div>
                     ) : (
@@ -1273,25 +1273,25 @@ const UserPage = () => {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.2 }}
-                        className="flex flex-col items-center w-full"
+                        className="flex w-full flex-col items-center"
                       >
                         <motion.div
                           initial={{ opacity: 0, x: 20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.1, duration: 0.2 }}
-                          className="flex mb-1 justify-end w-full space-x-2"
+                          className="mb-1 flex w-full justify-end space-x-2"
                         >
                           <button
                             onClick={handleSaveUsername}
-                            className="p-1 hover:bg-green-600/30 rounded text-green-400 transition-colors duration-200"
+                            className="rounded p-1 text-green-400 transition-colors duration-200 hover:bg-green-600/30"
                           >
-                            <Save className="w-4 h-4" />
+                            <Save className="h-4 w-4" />
                           </button>
                           <button
                             onClick={handleCancelUsername}
-                            className="p-1 hover:bg-gray-600/30 rounded text-gray-400 transition-colors duration-200"
+                            className="rounded p-1 text-gray-400 transition-colors duration-200 hover:bg-gray-600/30"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="h-4 w-4" />
                           </button>
                         </motion.div>
                         <textarea
@@ -1304,7 +1304,7 @@ const UserPage = () => {
                           }}
                           maxLength={userNameMaxLength}
                           rows={tempUsername.length > 15 ? 2 : 1}
-                          className="text-xl font-bold bg-gray-700/30 border border-gray-600/30 rounded px-2 py-1 text-center w-full focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none overflow-hidden"
+                          className="w-full resize-none overflow-hidden rounded border border-gray-600/30 bg-gray-700/30 px-2 py-1 text-center text-xl font-bold transition-all duration-200 focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                           style={{
                             wordBreak: "break-word",
                             overflowWrap: "break-word",
@@ -1323,14 +1323,14 @@ const UserPage = () => {
                     )}
                   </div>
 
-                  <p className="text-gray-400 type-body-t5">{user.email}</p>
+                  <p className="type-body-t5 text-gray-400">{user.email}</p>
 
                   {/* <UserPageDecoLine className="pt-[18px] pb-[20px]" /> */}
 
                   {/* Role Badge */}
-                  <div className="flex justify-center mt-4">
+                  <div className="mt-4 flex justify-center">
                     <span
-                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 text-white`}
+                      className={`inline-flex items-center rounded-full border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 px-4 py-2 text-sm font-medium text-white`}
                     >
                       {user.role}
                     </span>
@@ -1341,7 +1341,7 @@ const UserPage = () => {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.2 }}
-                      className="mt-4 p-3 bg-gradient-to-r from-megaweave-blue/10 to-megaweave-blue-light/10 rounded-lg relative"
+                      className="relative mt-4 rounded-lg bg-gradient-to-r from-megaweave-blue/10 to-megaweave-blue-light/10 p-3"
                       style={{
                         border: "2px solid #3b82f6",
                         boxShadow: `
@@ -1362,7 +1362,7 @@ const UserPage = () => {
                           height={20}
                           unoptimized
                         />
-                        <p className="text-md text-megaweave-blue-light font-ddin font-bold tracking-widest">
+                        <p className="text-md font-ddin font-bold tracking-widest text-megaweave-blue-light">
                           Welcome, dear contributor!
                         </p>
                       </div>
@@ -1371,27 +1371,27 @@ const UserPage = () => {
                 </div>
                 {/* Stats */}
                 <div className="mt-8 grid grid-cols-3 gap-4 text-center">
-                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
-                    <div className="type-h3 text-[#222]  ">
+                  <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
+                    <div className="type-h3 text-[#222]">
                       {String(stats.postCount).padStart(2, "0")}
                     </div>
-                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
+                    <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
                       post
                     </div>
                   </div>
-                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
-                    <div className="type-h3 text-[#222] ">
+                  <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
+                    <div className="type-h3 text-[#222]">
                       {String(stats.weaveCount).padStart(2, "0")}
                     </div>
-                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
+                    <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
                       weaved
                     </div>
                   </div>
-                  <div className="flex  flex-col py-[14px] px-[18px] rounded-[15px] border-primary-30 border bg-white items-center justify-center">
-                    <div className="type-h3 text-[#222] ">
+                  <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
+                    <div className="type-h3 text-[#222]">
                       {String(stats.points).padStart(2, "0")}
                     </div>
-                    <div className="type-button-b2 font-semibold text-[#222] mt-[2px]">
+                    <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
                       point
                     </div>
                   </div>
@@ -1404,13 +1404,13 @@ const UserPage = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="space-y-6 lg:flex lg:flex-col lg:h-full min-w-0"
+              className="min-w-0 space-y-6 lg:flex lg:h-full lg:flex-col"
             >
               {/* Bio Section */}
-              <div className="min-h-[240px] flex-shrink-0 bg-white border border-primary-30 rounded-2xl p-6 hover:border-gray-600/40 transition-all duration-300">
+              <div className="min-h-[240px] flex-shrink-0 rounded-2xl border border-primary-30 bg-white p-6 transition-all duration-300 hover:border-gray-600/40">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-semibold flex items-center space-x-2">
-                    <UserIcon className="w-5 h-5 text-megaweave-forest-dark" />
+                  <h3 className="flex items-center space-x-2 text-xl font-semibold">
+                    <UserIcon className="h-5 w-5 text-megaweave-forest-dark" />
                     <div className="type-h4 text-megaweave-forest-dark">
                       About Me
                     </div>
@@ -1420,22 +1420,22 @@ const UserPage = () => {
                       onClick={handleEditBio}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
-                      <EditIcon className="w-4 h-4" />
+                      <EditIcon className="h-4 w-4" />
                     </button>
                   ) : (
                     <div className="flex space-x-2">
                       <button
                         onClick={handleSaveBio}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
+                        className="flex items-center space-x-1 rounded-lg bg-green-600/20 px-3 py-1.5 text-sm text-green-400 transition-all duration-200 hover:bg-green-600/30"
                       >
-                        <Save className="w-3 h-3" />
+                        <Save className="h-3 w-3" />
                         <span>Save</span>
                       </button>
                       <button
                         onClick={handleCancelBio}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
+                        className="flex items-center space-x-1 rounded-lg bg-gray-600/20 px-3 py-1.5 text-sm text-gray-400 transition-all duration-200 hover:bg-gray-600/30"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="h-3 w-3" />
                         <span>Cancel</span>
                       </button>
                     </div>
@@ -1446,7 +1446,7 @@ const UserPage = () => {
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="min-h-[140px] text-body-t3 text-primary leading-relaxed whitespace-pre-line break-all"
+                    className="text-body-t3 min-h-[140px] whitespace-pre-line break-all leading-relaxed text-primary"
                   >
                     {bio ? renderTextWithUrls(bio) : "description..."}
                   </motion.p>
@@ -1458,14 +1458,14 @@ const UserPage = () => {
                     <textarea
                       value={tempBio}
                       onChange={(e) => setTempBio(e.target.value)}
-                      className="w-full h-32 border type-body-t3 border-gray-600/30 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 resize-none"
+                      className="type-body-t3 h-32 w-full resize-none rounded-lg border border-gray-600/30 px-4 py-3 transition-all duration-200 focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                       placeholder="description"
                     />
                   </motion.div>
                 )}
-                <div className="flex justify-between items-center mt-2">
+                <div className="mt-2 flex items-center justify-between">
                   <div className="flex items-center space-x-3"></div>
-                  <button className="flex items-center space-x-2 text-primary-75 type-button-b2">
+                  <button className="type-button-b2 flex items-center space-x-2 text-primary-75">
                     <span>
                       Joined in{" "}
                       {user?.joined_at
@@ -1480,10 +1480,10 @@ const UserPage = () => {
               </div>
 
               {/* Contact Settings */}
-              <div className="bg-white border border-primary-30 rounded-2xl p-6 transition-all duration-300 lg:flex-1 lg:flex lg:flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="type-button-b1 text-megaweave-forest-dark flex items-center space-x-2">
-                    <ContactProfileIcon className="w-5 h-5" />
+              <div className="rounded-2xl border border-primary-30 bg-white p-6 transition-all duration-300 lg:flex lg:flex-1 lg:flex-col">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="type-button-b1 flex items-center space-x-2 text-megaweave-forest-dark">
+                    <ContactProfileIcon className="h-5 w-5" />
                     <span>Contact Setting</span>
                   </h3>
                   {!isEditingContact ? (
@@ -1492,24 +1492,24 @@ const UserPage = () => {
                       onClick={handleEditContact}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
-                      <EditIcon className="w-4 h-4" />
+                      <EditIcon className="h-4 w-4" />
                     </button>
                   ) : (
                     <div className="flex space-x-2">
                       <button
                         type="button"
                         onClick={handleSaveContact}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
+                        className="flex items-center space-x-1 rounded-lg bg-green-600/20 px-3 py-1.5 text-sm text-green-400 transition-all duration-200 hover:bg-green-600/30"
                       >
-                        <Save className="w-3 h-3" />
+                        <Save className="h-3 w-3" />
                         <span>Save</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleCancelContact}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
+                        className="flex items-center space-x-1 rounded-lg bg-gray-600/20 px-3 py-1.5 text-sm text-gray-400 transition-all duration-200 hover:bg-gray-600/30"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="h-3 w-3" />
                         <span>Cancel</span>
                       </button>
                     </div>
@@ -1519,7 +1519,7 @@ const UserPage = () => {
                 <Form {...contactForm}>
                   <form
                     onSubmit={contactForm.handleSubmit(onContactFormSubmit)}
-                    className="divide-y divide-primary-30 rounded-lg overflow-hidden lg:flex-1 lg:flex lg:flex-col"
+                    className="divide-y divide-primary-30 overflow-hidden rounded-lg lg:flex lg:flex-1 lg:flex-col"
                   >
                     <MemberInfoFieldRow
                       label="Email"
@@ -1554,10 +1554,10 @@ const UserPage = () => {
               transition={{ delay: 0.3 }}
               className="mt-8"
             >
-              <div className="bg-primary-15 border border-primary-30 rounded-2xl p-6 transition-all duration-300">
+              <div className="rounded-2xl border border-primary-30 bg-primary-15 p-6 transition-all duration-300">
                 <div className="flex items-center justify-between">
-                  <h3 className="type-button-b1 text-megaweave-forest-dark flex items-center space-x-2">
-                    <Users className="w-5 h-5" />
+                  <h3 className="type-button-b1 flex items-center space-x-2 text-megaweave-forest-dark">
+                    <Users className="h-5 w-5" />
                     <span>Team Member Info.</span>
                   </h3>
                   {!isEditingMember ? (
@@ -1565,48 +1565,48 @@ const UserPage = () => {
                       onClick={handleEditMember}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
-                      <EditIcon className="w-4 h-4" />
+                      <EditIcon className="h-4 w-4" />
                     </button>
                   ) : (
                     <div className="flex space-x-2">
                       <button
                         type="button"
                         onClick={handleSaveMember}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-all duration-200 text-sm text-green-400"
+                        className="flex items-center space-x-1 rounded-lg bg-green-600/20 px-3 py-1.5 text-sm text-green-400 transition-all duration-200 hover:bg-green-600/30"
                       >
-                        <Save className="w-3 h-3" />
+                        <Save className="h-3 w-3" />
                         <span>Save</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleCancelMember}
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-all duration-200 text-sm text-gray-400"
+                        className="flex items-center space-x-1 rounded-lg bg-gray-600/20 px-3 py-1.5 text-sm text-gray-400 transition-all duration-200 hover:bg-gray-600/30"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="h-3 w-3" />
                         <span>Cancel</span>
                       </button>
                     </div>
                   )}
                 </div>
-                <p className="type-body-t5 text-megaweave-forest-dark mt-1 mb-4">
+                <p className="type-body-t5 mb-4 mt-1 text-megaweave-forest-dark">
                   *megaweaveing Team Only
                 </p>
 
                 {memberLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="w-8 h-8 border-2 border-megaweave-gold/30 border-t-megaweave-red-light rounded-full animate-spin" />
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-megaweave-gold/30 border-t-megaweave-red-light" />
                   </div>
                 ) : (
                   <>
                     {memberError && (
-                      <Alert className="mb-4 bg-red-950/50 border-red-500/30">
+                      <Alert className="mb-4 border-red-500/30 bg-red-950/50">
                         <AlertDescription className="text-red-300">
                           {memberError}
                         </AlertDescription>
                       </Alert>
                     )}
                     <Form {...memberForm}>
-                      <form className="divide-y divide-primary-30 rounded-lg overflow-hidden">
+                      <form className="divide-y divide-primary-30 overflow-hidden rounded-lg">
                         <MemberInfoFieldRow
                           label="Title"
                           name="title"
@@ -1654,7 +1654,7 @@ const UserPage = () => {
             </motion.div>
           )}
         </div>
-        <div className="max-w-6xl mx-auto">
+        <div className="mx-auto max-w-6xl">
           <DrawerWrapper
             weaves={weaves}
             conditions={conditions}

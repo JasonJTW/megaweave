@@ -32,7 +32,7 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
       if (currentScrollY < 100) {
         setIsNavbarVisible(true);
       } else if (delta > 8 && currentScrollY > 100) {
-        // Only hide when scrolling DOWN by more than 8px 
+        // Only hide when scrolling DOWN by more than 8px
         // (filters out mobile viewport height changes from browser chrome)
         setIsNavbarVisible(false);
       } else if (delta < -8) {

@@ -47,7 +47,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
     try {
       await createComment({
         post_id: postId,
-        item_id: itemId === "all" ? null : itemId ?? null, // "all" 轉成 null
+        item_id: itemId === "all" ? null : (itemId ?? null), // "all" 轉成 null
         parent_id: parentId,
         user_id: Number(user!.userId),
         content: content.trim(),
@@ -82,7 +82,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
       toast("Please log in to comment");
       setTimeout(() => {
         router.push(
-          `/signin?returnTo=${encodeURIComponent(window.location.href)}`
+          `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
         );
       }, 1000);
     }
@@ -93,8 +93,8 @@ const CommentInput: React.FC<CommentInputProps> = ({
       <div className="flex gap-3">
         {/* 使用者頭像 */}
         <div
-          className={`flex-shrink-0 relative ${
-            parentId ? "w-7 h-7" : "w-9 h-9"
+          className={`relative flex-shrink-0 ${
+            parentId ? "h-7 w-7" : "h-9 w-9"
           }`}
         >
           {user?.avatar_url ? (
@@ -107,10 +107,10 @@ const CommentInput: React.FC<CommentInputProps> = ({
           ) : (
             <div
               className={`${
-                parentId ? "w-7 h-7" : "w-9 h-9"
-              } rounded-full bg-gray-300 flex items-center justify-center`}
+                parentId ? "h-7 w-7" : "h-9 w-9"
+              } flex items-center justify-center rounded-full bg-gray-300`}
             >
-              <span className="text-gray-600 text-sm">
+              <span className="text-sm text-gray-600">
                 {user?.username?.charAt(0) || "?"}
               </span>
             </div>
@@ -118,7 +118,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
         </div>
 
         {/* 輸入框 */}
-        <div className="flex-1 relative">
+        <div className="relative flex-1">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -129,17 +129,14 @@ const CommentInput: React.FC<CommentInputProps> = ({
             disabled={isSubmitting}
             maxLength={MAX_CHARACTER_LIMIT}
             rows={parentId ? 2 : 3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg 
-            focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
-            disabled:bg-gray-100 disabled:cursor-not-allowed
-            resize-none text-sm"
+            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-gray-100"
           />
           {/* ✅ 增加字數提示計數器 */}
           {user && (
             <div
-              className={`text-[10px] text-right mt-0.5 ${
+              className={`mt-0.5 text-right text-[10px] ${
                 content.length >= MAX_CHARACTER_LIMIT
-                  ? "text-red-500 font-bold"
+                  ? "font-bold text-red-500"
                   : "text-gray-400"
               }`}
             >
@@ -150,7 +147,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
       </div>
 
       {/* 錯誤訊息 */}
-      {error && <p className="mt-1 text-sm text-red-500 ml-12">{error}</p>}
+      {error && <p className="ml-12 mt-1 text-sm text-red-500">{error}</p>}
 
       {/* 按鈕 */}
       <div className="mt-2 flex justify-end gap-2">
@@ -158,8 +155,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
           <button
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-1.5 text-sm text-gray-600 hover:text-gray-800
-            disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Cancel
           </button>
@@ -167,9 +163,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
         <button
           onClick={handleSubmit}
           disabled={isSubmitting || !content.trim()}
-          className="px-4 py-1.5 text-sm text-white bg-primary rounded-lg
-          hover:bg-primary/90 transition-colors
-          disabled:opacity-50 disabled:cursor-not-allowed"
+          className="rounded-lg bg-primary px-4 py-1.5 text-sm text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {!user ? "Log in" : isSubmitting ? "Submitting" : "Submit"}
         </button>

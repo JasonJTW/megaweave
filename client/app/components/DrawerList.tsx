@@ -105,7 +105,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
     <div className="mb-4">
       <div
         onClick={handleExpand}
-        className="mx-4 my-5 flex items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin type-h3 text-megaweave-forest-dark cursor-pointer select-none"
+        className="type-h3 mx-4 my-5 flex cursor-pointer select-none items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin text-megaweave-forest-dark"
       >
         <div>{title}</div>
         <ChevronDown
@@ -169,8 +169,8 @@ const DrawerList: React.FC<DrawerListProps> = ({
 
           <div className="relative mx-4">
             {isRefreshing && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/40 dark:bg-black/40 backdrop-blur-[0.5px] rounded-[20px] transition-all duration-300">
-                <div className="flex items-center gap-2.5 rounded-full bg-white/95 dark:bg-zinc-900/95 px-4 py-2 shadow-md border border-gray-100/50 dark:border-zinc-800">
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[20px] bg-white/40 backdrop-blur-[0.5px] transition-all duration-300 dark:bg-black/40">
+                <div className="flex items-center gap-2.5 rounded-full border border-gray-100/50 bg-white/95 px-4 py-2 shadow-md dark:border-zinc-800 dark:bg-zinc-900/95">
                   <LucideLoader2 className="h-4 w-4 animate-spin text-megaweave-forest" />
                   <span className="text-xs font-semibold text-megaweave-forest-dark dark:text-zinc-200">
                     Syncing status...
@@ -183,7 +183,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
               <div
                 className={`flex flex-col gap-3 pb-2 transition-all duration-300 ${
                   isRefreshing
-                    ? "opacity-40 pointer-events-none select-none"
+                    ? "pointer-events-none select-none opacity-40"
                     : ""
                 } ${shouldScrollList ? "overflow-y-auto" : ""}`}
                 style={

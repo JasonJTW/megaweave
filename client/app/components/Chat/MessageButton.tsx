@@ -33,12 +33,14 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
       });
 
       if (!res.ok) {
-          if (res.status === 401) {
-              toast.error("Please sign in to message.");
-              router.push(`/signin?returnTo=${encodeURIComponent(window.location.href)}`);
-              return;
-          }
-          throw new Error("Failed to start conversation");
+        if (res.status === 401) {
+          toast.error("Please sign in to message.");
+          router.push(
+            `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+          );
+          return;
+        }
+        throw new Error("Failed to start conversation");
       }
 
       const data = await res.json();
@@ -52,14 +54,14 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
   };
 
   return (
-    <Button 
-        onClick={handleMessageClick} 
-        disabled={loading}
-        variant="outline"
-        size="sm"
-        className={className}
+    <Button
+      onClick={handleMessageClick}
+      disabled={loading}
+      variant="outline"
+      size="sm"
+      className={className}
     >
-      <MessageSquare className="w-4 h-4 mr-2" />
+      <MessageSquare className="mr-2 h-4 w-4" />
       {loading ? "Loading..." : "Message"}
     </Button>
   );

@@ -51,7 +51,7 @@ const Drawer: React.FC<DrawerProps> = ({
       const elapsedTime = Date.now() - startTime;
       if (elapsedTime < minSpinTime) {
         await new Promise((resolve) =>
-          setTimeout(resolve, minSpinTime - elapsedTime)
+          setTimeout(resolve, minSpinTime - elapsedTime),
         );
       }
       setIsRefreshing(false);
@@ -75,7 +75,7 @@ const Drawer: React.FC<DrawerProps> = ({
 
   return (
     <div className="mb-4">
-      <div className="flex justify-between mx-4 my-[20px] px-[16px] py-[8px] border-b border-primary-30 text-megaweave-forest-dark font-ddin type-button-b1">
+      <div className="type-button-b1 mx-4 my-[20px] flex justify-between border-b border-primary-30 px-[16px] py-[8px] font-ddin text-megaweave-forest-dark">
         <div>{title}</div>
         <button
           onClick={handleExpand}

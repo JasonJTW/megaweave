@@ -461,28 +461,28 @@ export default function PostsGrid() {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-gray-800">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+      <header className="sticky top-0 z-50 border-b border-gray-800 bg-black/80 backdrop-blur-md">
+        <div className="mx-auto max-w-6xl px-6 py-4">
+          <h1 className="bg-gradient-to-r from-white to-gray-300 bg-clip-text text-2xl font-bold text-transparent">
             MegaWeave
           </h1>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {allPosts.slice(0, visiblePosts).map((post) => (
             <article
               key={post.id}
-              className="bg-gray-900/50 rounded-2xl overflow-hidden border border-gray-800/50 hover:border-gray-700/50 transition-all duration-300 hover:transform hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10"
+              className="overflow-hidden rounded-2xl border border-gray-800/50 bg-gray-900/50 transition-all duration-300 hover:scale-[1.02] hover:transform hover:border-gray-700/50 hover:shadow-2xl hover:shadow-blue-500/10"
             >
               {/* Post Image */}
               <div className="relative overflow-hidden">
                 <img
                   src={post.image}
                   alt={post.title}
-                  className="w-full h-64 object-cover transition-transform duration-500 hover:scale-110"
+                  className="h-64 w-full object-cover transition-transform duration-500 hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
               </div>
@@ -490,44 +490,44 @@ export default function PostsGrid() {
               {/* Post Content */}
               <div className="p-6">
                 {/* Author Info */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img
                       src={post.avatar}
                       alt={post.author}
-                      className="w-10 h-10 rounded-full border-2 border-gray-700"
+                      className="h-10 w-10 rounded-full border-2 border-gray-700"
                     />
                     <div>
-                      <h3 className="font-semibold text-sm">{post.author}</h3>
-                      <p className="text-gray-400 text-xs">{post.time}</p>
+                      <h3 className="text-sm font-semibold">{post.author}</h3>
+                      <p className="text-xs text-gray-400">{post.time}</p>
                     </div>
                   </div>
-                  <button className="text-gray-400 hover:text-white transition-colors">
+                  <button className="text-gray-400 transition-colors hover:text-white">
                     <MoreHorizontal size={20} />
                   </button>
                 </div>
 
                 {/* Post Title & Content */}
                 <div className="flex justify-between">
-                  <h2 className="font-bold text-lg mb-3 line-clamp-2">
+                  <h2 className="mb-3 line-clamp-2 text-lg font-bold">
                     {post.title}
                   </h2>
                   <div
-                    className={`h-8 items-center justify-center rounded-full backdrop-blur-md border-[0.5px] text-opacity-65 font-semibold tracking-wider text-xs pt-2 pb-2 pl-4 pr-4 mt-2 ml-6 w-fit leading-none ${
+                    className={`ml-6 mt-2 h-8 w-fit items-center justify-center rounded-full border-[0.5px] pb-2 pl-4 pr-4 pt-2 text-xs font-semibold leading-none tracking-wider text-opacity-65 backdrop-blur-md ${
                       post.type === "WANTED"
-                        ? "bg-red-400 bg-opacity-[10%] border-gray-700 text-primary-300"
-                        : "bg-green-400 bg-opacity-[10%] border-gray-700 text-primary-300"
+                        ? "text-primary-300 border-gray-700 bg-red-400 bg-opacity-[10%]"
+                        : "text-primary-300 border-gray-700 bg-green-400 bg-opacity-[10%]"
                     }`}
                   >
                     {post.type}
                   </div>
                 </div>
-                <p className="text-gray-300 text-sm leading-relaxed mb-4 line-clamp-3">
+                <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-gray-300">
                   {post.content}
                 </p>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+                <div className="flex items-center justify-between border-t border-gray-800 pt-4">
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => handleLike(post.id)}
@@ -546,17 +546,17 @@ export default function PostsGrid() {
                       </span>
                     </button>
 
-                    <button className="flex items-center gap-2 text-gray-400 hover:text-blue-500 transition-colors">
+                    <button className="flex items-center gap-2 text-gray-400 transition-colors hover:text-blue-500">
                       <MessageCircle size={18} />
                       <span className="text-sm">{post.comments}</span>
                     </button>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <button className="text-gray-400 hover:text-green-500 transition-colors">
+                    <button className="text-gray-400 transition-colors hover:text-green-500">
                       <Share2 size={18} />
                     </button>
-                    <button className="text-gray-400 hover:text-yellow-500 transition-colors">
+                    <button className="text-gray-400 transition-colors hover:text-yellow-500">
                       <Bookmark size={18} />
                     </button>
                   </div>
@@ -568,8 +568,8 @@ export default function PostsGrid() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 mt-16">
-        <div className="max-w-6xl mx-auto px-6 py-8 text-center text-gray-400">
+      <footer className="mt-16 border-t border-gray-800">
+        <div className="mx-auto max-w-6xl px-6 py-8 text-center text-gray-400">
           <p>© 2025 Megaweave</p>
         </div>
       </footer>

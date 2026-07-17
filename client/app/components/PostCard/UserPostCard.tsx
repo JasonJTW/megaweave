@@ -87,7 +87,7 @@ function UserPostCardInner({
             )}
           </>
         ) : (
-          <div className="flex h-full w-full items-center justify-center type-body-t5 text-primary-75">
+          <div className="type-body-t5 flex h-full w-full items-center justify-center text-primary-75">
             No image
           </div>
         )}
@@ -111,14 +111,14 @@ function UserPostCardInner({
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent" />
           <div className="relative flex h-full flex-col px-4 pb-3 pt-4">
             <div className="space-y-2">
-              <div className="type-h5 font-semibold leading-[1.05] tracking-tight text-white drop-shadow-sm line-clamp-1">
+              <div className="type-h5 line-clamp-1 font-semibold leading-[1.05] tracking-tight text-white drop-shadow-sm">
                 {post.title}
               </div>
               <div className="text-[18px] font-semibold text-white/90 drop-shadow-sm">
                 {dateText}
               </div>
             </div>
-            <div className="mt-auto inline-flex w-fit items-center rounded-full bg-white/80 px-4 py-2 text-body-t5 text-megaweave-forest-dark backdrop-blur">
+            <div className="text-body-t5 mt-auto inline-flex w-fit items-center rounded-full bg-white/80 px-4 py-2 text-megaweave-forest-dark backdrop-blur">
               {typeText}
             </div>
           </div>

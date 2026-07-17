@@ -60,7 +60,7 @@ function PostCardInner({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
-      className={`font-ddin cursor-pointer rounded-[30px] ${isExpired ? "bg-secondary" : "bg-white"} transition-all duration-300 py-0 pb-4 mt-4 relative ${
+      className={`cursor-pointer rounded-[30px] font-ddin ${isExpired ? "bg-secondary" : "bg-white"} relative mt-4 py-0 pb-4 transition-all duration-300 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -70,7 +70,7 @@ function PostCardInner({
       }
     >
       {/*//* pt-3 for title margin */}
-      <div className="relative pt-3 min-h-[414px]">
+      <div className="relative min-h-[414px] pt-3">
         {post.type === "share" &&
           (isExpired ? (
             <ShareBadgeExpiredIcon className="absolute -top-1 right-5 z-20" />
@@ -95,9 +95,9 @@ function PostCardInner({
         >
           {imageSrc && (
             //* mx-3 for image margin
-            <div className=" relative mb-0 mx-4">
+            <div className="relative mx-4 mb-0">
               {/* Mobile: w-full + auto height; Desktop: fill column width (max 280px) + fixed 240px height */}
-              <div className="relative w-full sm:max-w-[280px] sm:h-[240px] sm:mx-auto rounded-[20px] overflow-hidden">
+              <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[240px] sm:max-w-[280px]">
                 {/* Mobile: responsive width/height */}
                 <Image
                   src={imageSrc}
@@ -105,7 +105,7 @@ function PostCardInner({
                   width={0}
                   height={0}
                   sizes="(min-width: 768px) 280px, 100vw"
-                  className={`w-full h-auto sm:!h-full sm:!w-full sm:absolute sm:inset-0 object-cover ${isExpired && "contrast-50 brightness-105 opacity-70"}`}
+                  className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
                   priority={!!isFirstVisible}
                 />
                 {isExpired && (
@@ -120,10 +120,10 @@ function PostCardInner({
                 )}
               </div>
 
-              <div className="absolute w-full flex flex-row bottom-0 justify-between px-3 py-3">
+              <div className="absolute bottom-0 flex w-full flex-row justify-between px-3 py-3">
                 {post.view_count > 0 && (
                   <div className="flex items-center">
-                    <Badge className="bg-[#7c7c7c] text-white font-ddin font-normal text-[14px] px-2">
+                    <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
                       <EyesIcon className="mr-[4px]" />
                       {post.view_count}
                     </Badge>
@@ -137,13 +137,13 @@ function PostCardInner({
               </div>
             </div>
           )}
-          <h2 className="font-semibold mx-4 font-ddin text-[36px] text-gray-800 truncate flex-1">
+          <h2 className="mx-4 flex-1 truncate font-ddin text-[36px] font-semibold text-gray-800">
             {post.title}
           </h2>
 
           {(category || post.category_name_en) && (
             <div
-              className="inline-flex mx-4 mt-[8px] leading-[34px] cursor-pointer"
+              className="mx-4 mt-[8px] inline-flex cursor-pointer leading-[34px]"
               onClick={(e) => {
                 e.stopPropagation();
                 if (onCategoryClick) {
@@ -157,8 +157,8 @@ function PostCardInner({
             </div>
           )}
 
-          <div className="bg-transparent flex flex-col px-4 pb-3 mx-0 rounded-[20px]">
-            <p className="text-black text-[18px] truncate sm:hidden">
+          <div className="mx-0 flex flex-col rounded-[20px] bg-transparent px-4 pb-3">
+            <p className="truncate text-[18px] text-black sm:hidden">
               {post.content}
             </p>
 
@@ -179,17 +179,17 @@ function PostCardInner({
               )}
             </div> */}
 
-            <div className="flex flex-col gap-[6px] mt-[12px] text-[16px] font-medium leading-[18px]">
+            <div className="mt-[12px] flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
               {(post.province ||
                 post.city ||
                 post.route ||
                 post.full_address) && (
-                <div className="flex items-start sm:items-center gap-2 w-full">
-                  <LocationIcon className="text-primary flex-shrink-0 mt-[2px] sm:mt-0" />
-                  <div className="text-[16px] text-gray-700 truncate min-w-0 flex-1 w-full">
+                <div className="flex w-full items-start gap-2 sm:items-center">
+                  <LocationIcon className="mt-[2px] flex-shrink-0 text-primary sm:mt-0" />
+                  <div className="w-full min-w-0 flex-1 truncate text-[16px] text-gray-700">
                     {post.province && (
                       <span
-                        className="cursor-pointer hover:underline hover:text-primary transition-colors"
+                        className="cursor-pointer transition-colors hover:text-primary hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onLocationClick)
@@ -202,7 +202,7 @@ function PostCardInner({
                     {post.province && (post.city || post.route) && ", "}
                     {post.city && (
                       <span
-                        className="cursor-pointer hover:underline hover:text-primary transition-colors"
+                        className="cursor-pointer transition-colors hover:text-primary hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onLocationClick)
@@ -215,7 +215,7 @@ function PostCardInner({
                     {post.city && post.route && ", "}
                     {post.route && (
                       <span
-                        className="cursor-pointer hover:underline hover:text-primary transition-colors"
+                        className="cursor-pointer transition-colors hover:text-primary hover:underline"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (onLocationClick)

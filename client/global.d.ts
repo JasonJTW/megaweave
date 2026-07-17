@@ -17,27 +17,25 @@ declare global {
       getPlace(): google.maps.places.PlaceResult;
       addEventListener(
         type: "gmp-placeselect",
-        listener: (event: PlaceResultEvent) => void
+        listener: (event: PlaceResultEvent) => void,
       ): void;
       addEventListener(
         type: string,
         listener: EventListenerOrEventListenerObject,
-        options?: boolean | AddEventListenerOptions
+        options?: boolean | AddEventListenerOptions,
       ): void;
       removeEventListener(
         type: "gmp-placeselect",
-        listener: (event: PlaceResultEvent) => void
+        listener: (event: PlaceResultEvent) => void,
       ): void;
       removeEventListener(
         type: string,
         listener: EventListenerOrEventListenerObject,
-        options?: boolean | EventListenerOptions
+        options?: boolean | EventListenerOptions,
       ): void;
     }
     interface PlaceResultEvent extends Event {
       place: google.maps.places.PlaceResult;
     }
   }
-
-
 }

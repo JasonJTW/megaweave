@@ -96,18 +96,18 @@ export const ChatPopup = () => {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed bottom-4 left-4 right-4 max-w-[500px] mx-auto rounded-[40px] shadow-2xl z-[101] flex flex-col h-[65vh] overflow-hidden border border-primary-30"
+            className="fixed bottom-4 left-4 right-4 z-[101] mx-auto flex h-[65vh] max-w-[500px] flex-col overflow-hidden rounded-[40px] border border-primary-30 shadow-2xl"
           >
             {/* Header */}
-            <div className="px-8 pt-4 pb-2 flex items-center justify-between bg-white z-10">
-              <h2 className="text-[20px] font-bold text-gray-800 font-ddin">
+            <div className="z-10 flex items-center justify-between bg-white px-8 pb-2 pt-4">
+              <h2 className="font-ddin text-[20px] font-bold text-gray-800">
                 {otherUser.username}
               </h2>
               <button
                 onClick={closeChat}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="rounded-full p-2 transition-colors hover:bg-gray-100"
               >
-                <X className="w-6 h-6 text-megaweave-forest-dark" />
+                <X className="h-6 w-6 text-megaweave-forest-dark" />
               </button>
             </div>
 

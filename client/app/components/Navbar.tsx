@@ -202,26 +202,26 @@ const Navbar = () => {
           bezelWidth: 20,
         }}
         className={cn(
-          "fixed top-0 left-0 right-0 transition-all duration-100 ease-in-out",
+          "fixed left-0 right-0 top-0 transition-all duration-100 ease-in-out",
           isMobileMenuOpen ? "z-[60]" : "z-50",
           isNavbarVisible ? "translate-y-0" : "-translate-y-full",
           isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg",
         )}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-[50px]">
-          <div className="flex justify-between items-center h-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-[50px]">
+          <div className="flex h-20 items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex-shrink-0">
-              <div className="flex items-center space-x-3 sm:space-x-5 ">
+              <div className="flex items-center space-x-3 sm:space-x-5">
                 <WeavingIcon
                   className={cn(
-                    "w-8 h-8 hidden xl:block align-middle transition-colors duration-200",
+                    "hidden h-8 w-8 align-middle transition-colors duration-200 xl:block",
                     isMobileMenuOpen ? "text-white" : "text-primary",
                   )}
                 />
                 <div
                   className={cn(
-                    "text-2xl sm:text-4xl font-bold font-ddin justify-self-center text-center transition-colors duration-200",
+                    "justify-self-center text-center font-ddin text-2xl font-bold transition-colors duration-200 sm:text-4xl",
                     isMobileMenuOpen ? "text-white" : "text-primary",
                   )}
                 >
@@ -233,14 +233,14 @@ const Navbar = () => {
             {/* //* Right Side Actions (Mobile icons, Desktop Nav, Hamburger) */}
             <div
               className={cn(
-                "flex items-center space-x-2 sm:space-x-4 font-ddin transition-all duration-300",
+                "flex items-center space-x-2 font-ddin transition-all duration-300 sm:space-x-4",
                 isMobileMenuOpen
-                  ? "opacity-20 brightness-50 pointer-events-none"
+                  ? "pointer-events-none opacity-20 brightness-50"
                   : "opacity-100",
               )}
             >
               {/* //* mobile nav bar top item (Visible only on mobile) */}
-              <div className="sm:hidden flex items-center space-x-2">
+              <div className="flex items-center space-x-2 sm:hidden">
                 {!user && (
                   <Link href="/user" className="">
                     <UserIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
@@ -250,20 +250,20 @@ const Navbar = () => {
 
                 {user && (
                   <>
-                    <Link href="/messages" className="relative group mr-2">
+                    <Link href="/messages" className="group relative mr-2">
                       <DirectMessageIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
                       <span className="sr-only">Messages</span>
                       {messageUnreadCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 animate-in items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm duration-200 zoom-in">
                           {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
                         </span>
                       )}
                     </Link>
-                    <Link href="/notifications" className="relative group">
+                    <Link href="/notifications" className="group relative">
                       <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
                       <span className="sr-only">Notifications</span>
                       {unreadCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-in zoom-in duration-200">
+                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 animate-in items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm duration-200 zoom-in">
                           {unreadCount > 99 ? "99+" : unreadCount}
                         </span>
                       )}
@@ -316,18 +316,18 @@ const Navbar = () => {
                           asChild
                           className={cn(
                             navigationMenuTriggerStyle(),
-                            "transition-all duration-200 bg-transparent hover:bg-primary-30 px-3",
+                            "bg-transparent px-3 transition-all duration-200 hover:bg-primary-30",
                           )}
                         >
                           <Link
                             href={item.href}
-                            className="font-semibold group text-[18px] flex items-center"
+                            className="group flex items-center text-[18px] font-semibold"
                           >
                             <div className="relative flex items-center">
-                              <item.icon className="w-[18px] h-[16px] text-megaweave-forest-dark" />
+                              <item.icon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
                               {showBadge && (
                                 <span
-                                  className={`absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ${badgeColor} text-[9px] font-bold text-white shadow-sm animate-in zoom-in duration-200 pointer-events-none`}
+                                  className={`absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full ${badgeColor} pointer-events-none animate-in text-[9px] font-bold text-white shadow-sm duration-200 zoom-in`}
                                 >
                                   {count > 99 ? "99+" : count}
                                 </span>
@@ -350,10 +350,8 @@ const Navbar = () => {
                     variant="ghost"
                     size="sm"
                     className={cn(
-                      "p-2 transition-all duration-200 w-6",
-                      isAtTop
-                        ? "text-megaweave-forest-dark "
-                        : "text-gray-900 ",
+                      "w-6 p-2 transition-all duration-200",
+                      isAtTop ? "text-megaweave-forest-dark" : "text-gray-900",
                     )}
                   >
                     <MenuIcon className="h-6 w-6" />
@@ -367,7 +365,7 @@ const Navbar = () => {
                       Browse through the navigation options
                     </SheetDescription>
                   </VisuallyHidden>
-                  <div className="space-y-2 flex flex-col justify-center sm:items-center h-full">
+                  <div className="flex h-full flex-col justify-center space-y-2 sm:items-center">
                     <div className="items-start">
                       {mobileNavItems.map((item, index) => {
                         const Icon = item.icon;
@@ -389,11 +387,11 @@ const Navbar = () => {
                               className={itemClassName}
                             >
                               <div className="flex-shrink-0">
-                                <Icon className="w-5 h-5 " />
+                                <Icon className="h-5 w-5" />
                               </div>
-                              <div className="flex-1 min-w-0 text-left">
+                              <div className="min-w-0 flex-1 text-left">
                                 <div className="font-medium">{item.title}</div>
-                                <div className="text-xs text-gray-500 mt-0.5">
+                                <div className="mt-0.5 text-xs text-gray-500">
                                   {item.description}
                                 </div>
                               </div>
@@ -409,11 +407,11 @@ const Navbar = () => {
                             className={itemClassName}
                           >
                             <div className="flex-shrink-0">
-                              <Icon className="w-5 h-5 " />
+                              <Icon className="h-5 w-5" />
                             </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="font-medium">{item.title}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">
+                              <div className="mt-0.5 text-xs text-gray-500">
                                 {item.description}
                               </div>
                             </div>
@@ -450,20 +448,20 @@ const ListItem = React.forwardRef<
           ref={ref}
           href={href}
           className={cn(
-            "block select-none space-y-1 rounded-lg p-4 leading-none no-underline outline-none transition-all duration-200 hover:bg-gray-50 hover:text-gray-900 focus:bg-gray-50 focus:text-gray-900 group",
+            "group block select-none space-y-1 rounded-lg p-4 leading-none no-underline outline-none transition-all duration-200 hover:bg-gray-50 hover:text-gray-900 focus:bg-gray-50 focus:text-gray-900",
             className,
           )}
           {...props}
         >
           <div className="flex items-center space-x-3">
             {Icon && (
-              <Icon className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+              <Icon className="h-5 w-5 text-gray-400 transition-colors group-hover:text-gray-600" />
             )}
             <div className="text-sm font-medium leading-none group-hover:text-gray-900">
               {title}
             </div>
           </div>
-          <p className="line-clamp-2 text-sm leading-snug text-gray-600 group-hover:text-gray-700 ml-8">
+          <p className="ml-8 line-clamp-2 text-sm leading-snug text-gray-600 group-hover:text-gray-700">
             {children}
           </p>
         </Link>

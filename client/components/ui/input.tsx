@@ -28,9 +28,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           onChange={onChange}
           ref={ref}
           className={cn(
-            "flex h-[34px] w-full rounded-full border font-ddin border-primary-30 bg-white px-3 py-1 text-primary-75 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm placeholder:text-megaweave-forest-dark type-body-t2 placeholder:leading-[34px]",
+            "type-body-t2 flex h-[34px] w-full rounded-full border border-primary-30 bg-white px-3 py-1 font-ddin text-primary-75 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:leading-[34px] placeholder:text-megaweave-forest-dark focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             clearable && value ? "pr-3" : "pr-3", // pr-8 為清除按鈕預留空間
-            className
+            className,
           )}
           {...props}
         />
@@ -46,7 +46,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 Input.displayName = "Input";

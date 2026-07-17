@@ -530,17 +530,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   return (
     <div
       className={cn(
-        "flex flex-col h-full bg-white",
+        "flex h-full flex-col bg-white",
         isPopup && "rounded-t-[40px]",
       )}
     >
       {/* Header - Hidden in popup because ChatPopup handles it */}
       {!isPopup && (
-        <div className="flex items-center p-4 border-b">
-          <Link href="/messages" className="md:hidden mr-3">
-            <ArrowLeft className="w-6 h-6" />
+        <div className="flex items-center border-b p-4">
+          <Link href="/messages" className="mr-3 md:hidden">
+            <ArrowLeft className="h-6 w-6" />
           </Link>
-          <Avatar className="w-10 h-10 mr-3 cursor-pointer" onClick={handleAvatarClick}>
+          <Avatar
+            className="mr-3 h-10 w-10 cursor-pointer"
+            onClick={handleAvatarClick}
+          >
             <AvatarImage src={otherUser?.avatar_url} />
             <AvatarFallback>
               {otherUser?.username?.substring(0, 2).toUpperCase()}
@@ -555,7 +558,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Messages */}
       <div
         className={cn(
-          "flex-1 min-w-0 overflow-y-auto p-4 gap-4 flex flex-col-reverse bg-slate-50",
+          "flex min-w-0 flex-1 flex-col-reverse gap-4 overflow-y-auto bg-slate-50 p-4",
         )}
       >
         {/* Anchor point for scrolling to bottom */}
@@ -583,24 +586,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
               : `Start weaving for ${pendingItem.title}`;
             return (
-              <div className="flex items-center justify-center gap-4 py-4 w-full my-2 min-w-0">
-                <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-                <p className="text-[16px] font-bold text-[#9EB098] font-ddin max-w-[70%] min-w-0">
+              <div className="my-2 flex w-full min-w-0 items-center justify-center gap-4 py-4">
+                <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
+                <p className="min-w-0 max-w-[70%] font-ddin text-[16px] font-bold text-[#9EB098]">
                   {optimisticBannerText}
                 </p>
-                <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
               </div>
             );
           })()}
 
         {isLoading ? (
-          <div className="text-center text-gray-400 mt-10">
+          <div className="mt-10 text-center text-gray-400">
             Loading messages...
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2 mb-10 w-full">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-              <Avatar className="w-12 h-12 cursor-pointer" onClick={handleAvatarClick}>
+          <div className="mb-10 flex h-full w-full flex-col items-center justify-center gap-2 text-gray-500">
+            <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+              <Avatar
+                className="h-12 w-12 cursor-pointer"
+                onClick={handleAvatarClick}
+              >
                 <AvatarImage src={otherUser?.avatar_url} />
                 <AvatarFallback>
                   {otherUser?.username?.substring(0, 2).toUpperCase()}
@@ -644,9 +650,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               const dateHeader = showDateHeader ? (
                 <div
                   key={`date-${msg.created_at}`}
-                  className="flex justify-center my-4"
+                  className="my-4 flex justify-center"
                 >
-                  <span className="bg-gray-200 text-gray-500 text-xs px-2 py-1 rounded-full uppercase">
+                  <span className="rounded-full bg-gray-200 px-2 py-1 text-xs uppercase text-gray-500">
                     {isToday(msgDate)
                       ? "Today"
                       : isYesterday(msgDate)
@@ -724,14 +730,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                 return (
                   <React.Fragment key={msg.id}>
-                    <div className="w-full min-w-0 flex flex-col items-center">
+                    <div className="flex w-full min-w-0 flex-col items-center">
                       {shouldShowBanner && (
-                        <div className="flex items-center justify-center gap-4 py-4 w-full my-2 min-w-0">
-                          <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
-                          <p className="text-[16px] font-bold text-[#9EB098] font-ddin  max-w-[70%] min-w-0">
+                        <div className="my-2 flex w-full min-w-0 items-center justify-center gap-4 py-4">
+                          <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
+                          <p className="min-w-0 max-w-[70%] font-ddin text-[16px] font-bold text-[#9EB098]">
                             {bannerText}
                           </p>
-                          <div className="flex-1 h-[1px] border-t border-dashed border-gray-300" />
+                          <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
                         </div>
                       )}
                       {shouldShowCard && (
@@ -755,12 +761,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 <React.Fragment key={msg.id}>
                   <div
                     className={cn(
-                      "flex w-full mb-4",
+                      "mb-4 flex w-full",
                       isMe ? "justify-end" : "justify-start",
                     )}
                   >
                     {!isMe && (
-                      <Avatar className="w-8 h-8 mr-2 mt-1 cursor-pointer" onClick={handleAvatarClick}>
+                      <Avatar
+                        className="mr-2 mt-1 h-8 w-8 cursor-pointer"
+                        onClick={handleAvatarClick}
+                      >
                         <AvatarImage src={otherUser?.avatar_url} />
                         <AvatarFallback>
                           {otherUser?.username?.substring(0, 1).toUpperCase()}
@@ -778,7 +787,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                           {msg.attachments.length === 1 ? (
                             /* Single image - large, standalone */
                             <div
-                              className="relative w-[280px] h-[210px] sm:w-[340px] sm:h-[255px] rounded-xl overflow-hidden bg-gray-100 shadow-sm cursor-pointer active:opacity-80 transition-opacity"
+                              className="relative h-[210px] w-[280px] cursor-pointer overflow-hidden rounded-xl bg-gray-100 shadow-sm transition-opacity active:opacity-80 sm:h-[255px] sm:w-[340px]"
                               onClick={() =>
                                 openLightbox(msg.attachments![0].file_url)
                               }
@@ -800,17 +809,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                               className={cn(
                                 "grid gap-1.5",
                                 msg.attachments.length === 2
-                                  ? "grid-cols-2 w-[280px] sm:w-[340px]"
+                                  ? "w-[280px] grid-cols-2 sm:w-[340px]"
                                   : msg.attachments.length === 3
-                                    ? "grid-cols-2 w-[280px] sm:w-[340px]"
-                                    : "grid-cols-2 w-[280px] sm:w-[340px]",
+                                    ? "w-[280px] grid-cols-2 sm:w-[340px]"
+                                    : "w-[280px] grid-cols-2 sm:w-[340px]",
                               )}
                             >
                               {msg.attachments.map((att, attIdx) => (
                                 <div
                                   key={att.id}
                                   className={cn(
-                                    "relative rounded-xl overflow-hidden bg-gray-100 shadow-sm aspect-square cursor-pointer active:opacity-80 transition-opacity",
+                                    "relative aspect-square cursor-pointer overflow-hidden rounded-xl bg-gray-100 shadow-sm transition-opacity active:opacity-80",
                                     msg.attachments!.length === 3 &&
                                       attIdx === 0 &&
                                       "col-span-2 aspect-[2/1]",
@@ -837,15 +846,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       {msg.content && (
                         <div
                           className={cn(
-                            "px-4 py-2 rounded-2xl break-words shadow-sm max-w-[280px] sm:max-w-[340px]",
+                            "max-w-[280px] break-words rounded-2xl px-4 py-2 shadow-sm sm:max-w-[340px]",
                             isMe
-                              ? "bg-[#F2F2F2] text-[#4A4A4A] rounded-br-[4px]"
-                              : "bg-[#7C8F76] text-white rounded-bl-[4px]",
+                              ? "rounded-br-[4px] bg-[#F2F2F2] text-[#4A4A4A]"
+                              : "rounded-bl-[4px] bg-[#7C8F76] text-white",
                           )}
                         >
                           <p
                             className={cn(
-                              "text-[14px] sm:text-base leading-relaxed",
+                              "text-[14px] leading-relaxed sm:text-base",
                               isPopup && "font-medium",
                             )}
                           >
@@ -856,7 +865,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
                       <div
                         className={cn(
-                          "flex items-center mt-1 text-[10px]",
+                          "mt-1 flex items-center text-[10px]",
                           isMe
                             ? "justify-end text-blue-400"
                             : "justify-start text-gray-400",
@@ -866,17 +875,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                           {format(parseDate(msg.created_at), "HH:mm")}
                         </span>
                         {isMe && (
-                          <span className="ml-1 flex items-center h-3">
+                          <span className="ml-1 flex h-3 items-center">
                             {isLastReadMessage ? (
                               <>
                                 <span className="mr-0.5">read</span>
-                                <CheckCheck className="w-3 h-3" />
+                                <CheckCheck className="h-3 w-3" />
                               </>
                             ) : // 如果不是最後一則已讀，則根據 is_read 顯示雙勾或單勾
                             msg.is_read ? (
-                              <CheckCheck className="w-3 h-3" />
+                              <CheckCheck className="h-3 w-3" />
                             ) : (
-                              <Check className="w-3 h-3" />
+                              <Check className="h-3 w-3" />
                             )}
                           </span>
                         )}
@@ -892,7 +901,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         {hasMore && (
           <div
             ref={loadMoreRef}
-            className="h-10 flex items-center justify-center py-4"
+            className="flex h-10 items-center justify-center py-4"
           >
             {isFetchingMore && (
               <span className="text-xs text-gray-400">
@@ -907,27 +916,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       <div className="border-t bg-white">
         {/* Previews */}
         {previews.length > 0 && (
-          <div className="flex gap-2 p-2 overflow-x-auto bg-gray-50 border-b">
+          <div className="flex gap-2 overflow-x-auto border-b bg-gray-50 p-2">
             {previews.map((url, i) => (
-              <div key={url} className="relative w-20 h-20 flex-shrink-0 group">
+              <div key={url} className="group relative h-20 w-20 flex-shrink-0">
                 <Image
                   src={url}
                   alt="Preview"
                   fill
-                  className="object-cover rounded-md border"
+                  className="rounded-md border object-cover"
                 />
                 <button
                   onClick={() => removeSelectedImage(i)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute -right-2 -top-2 rounded-full bg-red-500 p-0.5 text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
           </div>
         )}
 
-        <form onSubmit={handleSend} className="p-4 flex items-center gap-2">
+        <form onSubmit={handleSend} className="flex items-center gap-2 p-4">
           <input
             type="file"
             ref={fileInputRef}
@@ -944,7 +953,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             disabled={isSending}
             className="text-gray-400 hover:text-blue-500"
           >
-            <ImageIcon className="w-6 h-6" />
+            <ImageIcon className="h-6 w-6" />
           </Button>
           <Input
             value={inputValue}
@@ -956,7 +965,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             }
             className={cn(
               "flex-1",
-              isPopup && "bg-[#F2F2F2] border-none rounded-full px-6",
+              isPopup && "rounded-full border-none bg-[#F2F2F2] px-6",
             )}
             disabled={isSending}
           />
@@ -968,15 +977,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             }
             className={cn(
               isPopup &&
-                "bg-[#7C8F76] hover:bg-[#6A7B65] rounded-full w-10 h-10",
+                "h-10 w-10 rounded-full bg-[#7C8F76] hover:bg-[#6A7B65]",
             )}
           >
             {isSending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : isPopup ? (
-              <ArrowUp className="w-5 h-5" />
+              <ArrowUp className="h-5 w-5" />
             ) : (
-              <SendIcon className="w-4 h-4" />
+              <SendIcon className="h-4 w-4" />
             )}
           </Button>
         </form>
@@ -985,7 +994,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Lightbox Modal */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center overflow-hidden"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-black/90"
           onClick={handleLightboxTap}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -993,55 +1002,55 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         >
           {/* Top bar */}
           <div
-            className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 z-10"
+            className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={closeLightbox}
-              className="text-white/80 hover:text-white p-2"
+              className="p-2 text-white/80 hover:text-white"
             >
-              <X className="w-6 h-6" />
+              <X className="h-6 w-6" />
             </button>
-            <span className="text-white/60 text-sm">
+            <span className="text-sm text-white/60">
               {lightboxIndex + 1} / {lightboxUrls.length}
             </span>
             <button
               onClick={handleDownload}
-              className="text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+              className="rounded-full p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
             >
-              <Download className="w-6 h-6" />
+              <Download className="h-6 w-6" />
             </button>
           </div>
 
           {/* Left arrow */}
           {lightboxIndex > 0 && (
             <button
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors hidden sm:block"
+              className="absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 rounded-full p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white sm:block"
               onClick={(e) => {
                 e.stopPropagation();
                 navigateLightbox("prev");
               }}
             >
-              <ChevronLeft className="w-8 h-8" />
+              <ChevronLeft className="h-8 w-8" />
             </button>
           )}
 
           {/* Right arrow */}
           {lightboxIndex < lightboxUrls.length - 1 && (
             <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors hidden sm:block"
+              className="absolute right-2 top-1/2 z-10 hidden -translate-y-1/2 rounded-full p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white sm:block"
               onClick={(e) => {
                 e.stopPropagation();
                 navigateLightbox("next");
               }}
             >
-              <ChevronRight className="w-8 h-8" />
+              <ChevronRight className="h-8 w-8" />
             </button>
           )}
 
           {/* 3-image carousel strip */}
           <div
-            className="relative w-full h-full max-h-[80vh] overflow-hidden"
+            className="relative h-full max-h-[80vh] w-full overflow-hidden"
             style={{ maxWidth: "90vw" }}
           >
             <div
@@ -1060,7 +1069,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     src={lightboxUrls[lightboxIndex - 1]}
                     alt="Previous"
                     fill
-                    className="object-contain pointer-events-none select-none"
+                    className="pointer-events-none select-none object-contain"
                     sizes="90vw"
                     unoptimized={lightboxUrls[lightboxIndex - 1].startsWith(
                       "blob:",
@@ -1083,7 +1092,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   src={lightboxUrls[lightboxIndex]}
                   alt="Full size"
                   fill
-                  className="object-contain pointer-events-none select-none"
+                  className="pointer-events-none select-none object-contain"
                   sizes="90vw"
                   unoptimized={lightboxUrls[lightboxIndex].startsWith("blob:")}
                   priority
@@ -1097,7 +1106,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     src={lightboxUrls[lightboxIndex + 1]}
                     alt="Next"
                     fill
-                    className="object-contain pointer-events-none select-none"
+                    className="pointer-events-none select-none object-contain"
                     sizes="90vw"
                     unoptimized={lightboxUrls[lightboxIndex + 1].startsWith(
                       "blob:",

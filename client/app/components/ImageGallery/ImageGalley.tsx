@@ -37,7 +37,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
       <div className="relative">
         {/* 主圖片 */}
         <div
-          className="relative h-60 bg-gray-200 overflow-hidden cursor-pointer"
+          className="relative h-60 cursor-pointer overflow-hidden bg-gray-200"
           onClick={openModal}
         >
           <Image
@@ -49,7 +49,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
 
           {/* 圖片數量指示器 */}
           {images.length > 1 && (
-            <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+            <div className="absolute right-4 top-4 rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
               {currentIndex + 1} / {images.length}
             </div>
           )}
@@ -63,36 +63,36 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
                 e.stopPropagation();
                 prevImage();
               }}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity"
+              className="absolute left-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-2 text-white transition-opacity hover:bg-opacity-75"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="h-5 w-5" />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 nextImage();
               }}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-75 transition-opacity"
+              className="absolute right-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-2 text-white transition-opacity hover:bg-opacity-75"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="h-5 w-5" />
             </button>
           </>
         )}
 
         {/* 縮圖導航 */}
         {images.length > 1 && (
-          <div className="flex space-x-2 mt-4 overflow-x-auto pb-2">
+          <div className="mt-4 flex space-x-2 overflow-x-auto pb-2">
             {images.map((image, index) => (
               <button
                 key={index}
                 onClick={() => goToImage(index)}
-                className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 ${
+                className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 ${
                   index === currentIndex
                     ? "border-blue-500"
                     : "border-gray-200 hover:border-gray-300"
                 }`}
               >
-                <div className="relative w-full h-full">
+                <div className="relative h-full w-full">
                   <Image
                     src={image}
                     alt={`縮圖 ${index + 1}`}
@@ -108,25 +108,25 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
 
       {/* 全螢幕模態框 */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
-          <div className="relative max-w-4xl max-h-4xl w-full h-full flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
+          <div className="max-h-4xl relative flex h-full w-full max-w-4xl items-center justify-center">
             {/* 關閉按鈕 */}
             <button
               onClick={closeModal}
-              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+              className="absolute right-4 top-4 z-10 text-white hover:text-gray-300"
             >
-              <X className="w-8 h-8" />
+              <X className="h-8 w-8" />
             </button>
 
             {/* 圖片 */}
-            <div className="relative w-full h-full flex items-center justify-center">
-              <div className="relative max-w-full max-h-full">
+            <div className="relative flex h-full w-full items-center justify-center">
+              <div className="relative max-h-full max-w-full">
                 <Image
                   src={images[currentIndex]}
                   alt={`圖片 ${currentIndex + 1}`}
                   width={1200}
                   height={800}
-                  className="object-contain max-w-full max-h-full"
+                  className="max-h-full max-w-full object-contain"
                 />
               </div>
             </div>
@@ -136,22 +136,22 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
               <>
                 <button
                   onClick={prevImage}
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-75 transition-opacity"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-3 text-white transition-opacity hover:bg-opacity-75"
                 >
-                  <ChevronLeft className="w-6 h-6" />
+                  <ChevronLeft className="h-6 w-6" />
                 </button>
                 <button
                   onClick={nextImage}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-75 transition-opacity"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-3 text-white transition-opacity hover:bg-opacity-75"
                 >
-                  <ChevronRight className="w-6 h-6" />
+                  <ChevronRight className="h-6 w-6" />
                 </button>
               </>
             )}
 
             {/* 圖片數量指示器 */}
             {images.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-4 py-2 rounded text-sm">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 transform rounded bg-black bg-opacity-50 px-4 py-2 text-sm text-white">
                 {currentIndex + 1} / {images.length}
               </div>
             )}

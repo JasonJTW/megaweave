@@ -1,1 +1,18 @@
+# dependencies & builds
 node_modules
+.next
+out
+tsconfig.tsbuildinfo
+.tsbuildinfo
+
+# static assets
+public/
+
+# certificates & sensitive files
+certificates/
+*.pem
+*.key
+
+# configuration & lockfiles
+package-lock.json
+.env*

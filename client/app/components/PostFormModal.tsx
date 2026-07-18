@@ -83,7 +83,7 @@ export default function PostFormModal({
     categoryId: null as number | null,
     conditionLevel: null as number | null,
     expires_at: undefined as Date | undefined,
-    items: [{ title: "", quantity: 1 }] as {
+    items: [{ title: "", quantity: "" }] as {
       title: string;
       quantity: number | "";
     }[],
@@ -134,7 +134,7 @@ export default function PostFormModal({
                 title: it.title,
                 quantity: it.quantity,
               }))
-            : [{ title: "", quantity: 1 }],
+            : [{ title: "", quantity: "" }],
         place_id: initialData?.place_id || undefined,
         province: initialData?.province || undefined,
         city: initialData?.city || undefined,
@@ -268,14 +268,24 @@ export default function PostFormModal({
 
   const validateForm = () => {
     const itemErrors =
-      formData.items.map((item) => ({
-        title: !item.title.trim(),
-        quantity:
-          item.quantity === "" ||
-          item.quantity === null ||
-          item.quantity === undefined ||
-          Number(item.quantity) < 1,
-      })) ?? [];
+      formData.items.map((item) => {
+        const hasTitle = !!item.title.trim();
+        const hasQuantity =
+          item.quantity !== "" &&
+          item.quantity !== null &&
+          item.quantity !== undefined;
+
+        // If both are empty, it is considered a valid empty row (skip validation)
+        if (!hasTitle && !hasQuantity) {
+          return { title: false, quantity: false };
+        }
+
+        // If either is filled, both become required and quantity must be >= 1
+        return {
+          title: !hasTitle,
+          quantity: !hasQuantity || Number(item.quantity) < 1,
+        };
+      }) ?? [];
 
     const activeImageCount =
       existingImages.filter((img) => !deletedImageIds.includes(img.id)).length +
@@ -373,6 +383,19 @@ export default function PostFormModal({
       return;
     }
 
+    const filteredItems = formData.items
+      .filter(
+        (item) =>
+          item.title.trim() !== "" ||
+          (item.quantity !== "" &&
+            item.quantity !== null &&
+            item.quantity !== undefined),
+      )
+      .map((item) => ({
+        title: item.title.trim(),
+        quantity: item.quantity === "" ? "" : Number(item.quantity),
+      })) as ItemInput[];
+
     onSubmit({
       title: formData.title,
       content: formData.content,
@@ -381,7 +404,7 @@ export default function PostFormModal({
       categoryId: formData.categoryId!,
       conditionLevel: formData.conditionLevel!,
       expires_at: formData.expires_at,
-      items: formData.items,
+      items: filteredItems,
       place_id: formData.place_id,
       province: formData.province,
       city: formData.city,
@@ -742,8 +765,7 @@ export default function PostFormModal({
                   >
                     <Input
                       type="text"
-                      required
-                      placeholder={`Item ${String(i + 1).padStart(2, "0")}`}
+                      placeholder={`Item (Optional)`}
                       value={item.title}
                       onChange={(e) => {
                         const items = [...formData.items];
@@ -768,7 +790,6 @@ export default function PostFormModal({
                   >
                     <Input
                       type="number"
-                      required
                       className="!flex-[1] text-center text-[12px] placeholder:text-center"
                       placeholder="Quantity"
                       value={item.quantity ?? ""}

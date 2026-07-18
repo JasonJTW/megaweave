@@ -95,6 +95,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       formData.append("title", data.title);
       formData.append("content", data.content);
       formData.append("location", data.location);
+      if (post?.status) {
+        formData.append("status", post.status);
+      }
       if (data.place_id) formData.append("place_id", data.place_id);
       if (data.location) formData.append("full_address", data.location);
       if (data.province) formData.append("province", data.province);

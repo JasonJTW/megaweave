@@ -767,6 +767,28 @@ export default function PostFormModal({
                       type="text"
                       placeholder={`Item (Optional)`}
                       value={item.title}
+                      forceShowClear={true}
+                      onClear={() => {
+                        const hasValue = item.title && String(item.title).trim().length > 0;
+                        if (hasValue) {
+                          const items = [...formData.items];
+                          items[i].title = "";
+                          setFormData({
+                            ...formData,
+                            items,
+                          });
+                        } else {
+                          const items = formData.items.filter((_, idx) => idx !== i);
+                          setFormErrors((prev) => {
+                            const nextItems = [...(prev.items ?? [])].filter((_, idx) => idx !== i);
+                            return { ...prev, items: nextItems };
+                          });
+                          setFormData({
+                            ...formData,
+                            items,
+                          });
+                        }
+                      }}
                       onChange={(e) => {
                         const items = [...formData.items];
                         items[i].title = e.target.value;

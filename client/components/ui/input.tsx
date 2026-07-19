@@ -9,7 +9,19 @@ interface InputProps extends React.ComponentProps<"input"> {
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, value, onChange, clearable = true, forceShowClear = false, onClear, ...props }, ref) => {
+  (
+    {
+      className,
+      type,
+      value,
+      onChange,
+      clearable = true,
+      forceShowClear = false,
+      onClear,
+      ...props
+    },
+    ref,
+  ) => {
     const handleClear = (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
       if (onClear) {
@@ -23,7 +35,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       }
     };
 
-    const hasValue = value !== undefined && value !== null && String(value).length > 0;
+    const hasValue =
+      value !== undefined && value !== null && String(value).length > 0;
     const showClear = clearable && (forceShowClear || hasValue);
 
     return (
@@ -34,7 +47,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           onChange={onChange}
           ref={ref}
           className={cn(
-            "type-body-t2 flex h-[34px] w-full rounded-full border border-primary-30 bg-white px-3 py-1 font-ddin text-primary-75 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:leading-[34px] placeholder:text-megaweave-forest-dark focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+            "type-body-t2 flex h-[34px] w-full rounded-full border border-primary-30 bg-white px-3 py-1 font-ddin text-lg text-primary-75 transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:leading-[34px] placeholder:text-primary-75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             showClear ? "pr-8" : "pr-3",
             className,
           )}

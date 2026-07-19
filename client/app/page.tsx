@@ -1293,7 +1293,7 @@ const PostsApp = () => {
           isOpen={showCreateForm}
           onClose={() => setShowCreateForm(false)}
           title={postType}
-          submitButtonText="Create Post"
+          submitButtonText="Post"
           isSubmitting={isCreating}
           onSubmit={handleCreatePost}
         />

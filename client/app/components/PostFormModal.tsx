@@ -25,6 +25,7 @@ import AddIcon from "./icons/AddIcon";
 import DeleteIcon from "./icons/DeleteIcon";
 import TagIcon from "./icons/TagIcon";
 import LocationIcon from "./icons/LocationIcon";
+import ClockIcon from "./icons/ClockIcon";
 
 export interface PostFormSubmitData {
   title: string;
@@ -420,8 +421,8 @@ export default function PostFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex justify-center overflow-y-auto bg-secondary font-ddin">
-      <div className="min-h-screen w-full max-w-2xl rounded-lg bg-secondary md:max-w-5xl">
+    <div className="pointer-events-auto fixed inset-0 z-50 flex justify-center overflow-y-auto bg-primary-5 font-ddin">
+      <div className="min-h-screen w-full max-w-2xl rounded-lg bg-primary-5 md:max-w-5xl">
         <div className="p-6">
           <div className="relative flex items-center justify-center border-b pb-2">
             <h2 className="text-2xl font-bold capitalize text-gray-900">
@@ -438,7 +439,7 @@ export default function PostFormModal({
           <div className="mt-4 flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
             {/* 圖片上傳區域 */}
             <div className="w-full md:w-1/2 md:shrink-0">
-              <div className="mb-4">
+              <div className="">
                 <input
                   type="file"
                   multiple
@@ -457,7 +458,7 @@ export default function PostFormModal({
               </div>
 
               {/* 圖片預覽區域 (既存圖片與新圖片) */}
-              <div className="mb-4 grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 {/* 既存圖片 */}
                 {existingImages.map((img, index) => {
                   const isDeleted = deletedImageIds.includes(img.id);
@@ -537,7 +538,7 @@ export default function PostFormModal({
                       : ""
                   }`}
                 >
-                  <AddIcon />
+                  <AddIcon className="text-white" />
                 </label>
               </div>
             </div>
@@ -688,7 +689,7 @@ export default function PostFormModal({
 
               {/* Expiry Date */}
               <div className="flex items-center gap-[5px]">
-                <CalendarIcon className="h-[24px] w-[24px] text-primary" />
+                <ClockIcon className="h-[24px] w-[24px] text-primary" />
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -701,8 +702,8 @@ export default function PostFormModal({
                       {formData.expires_at ? (
                         format(formData.expires_at, "PPP")
                       ) : (
-                        <span className="font-ddin text-[14px] font-medium tracking-normal">
-                          Pick a expiry date
+                        <span className="text-[18px] font-medium tracking-normal text-primary-75">
+                          Expiry date
                         </span>
                       )}
                       <CalendarIcon className="h-4 w-4 opacity-50" />
@@ -740,7 +741,7 @@ export default function PostFormModal({
                   required
                   rows={4}
                   placeholder="description..."
-                  className={`w-full rounded-[20px] border px-3 py-2 ${
+                  className={`w-full rounded-[20px] border px-3 py-2 placeholder:text-lg placeholder:font-semibold placeholder:text-primary-75 ${
                     formErrors.content ? "border-red-500" : "border-gray-300"
                   }`}
                   value={formData.content}
@@ -769,7 +770,8 @@ export default function PostFormModal({
                       value={item.title}
                       forceShowClear={true}
                       onClear={() => {
-                        const hasValue = item.title && String(item.title).trim().length > 0;
+                        const hasValue =
+                          item.title && String(item.title).trim().length > 0;
                         if (hasValue) {
                           const items = [...formData.items];
                           items[i].title = "";
@@ -778,9 +780,13 @@ export default function PostFormModal({
                             items,
                           });
                         } else {
-                          const items = formData.items.filter((_, idx) => idx !== i);
+                          const items = formData.items.filter(
+                            (_, idx) => idx !== i,
+                          );
                           setFormErrors((prev) => {
-                            const nextItems = [...(prev.items ?? [])].filter((_, idx) => idx !== i);
+                            const nextItems = [...(prev.items ?? [])].filter(
+                              (_, idx) => idx !== i,
+                            );
                             return { ...prev, items: nextItems };
                           });
                           setFormData({
@@ -812,7 +818,7 @@ export default function PostFormModal({
                   >
                     <Input
                       type="number"
-                      className="!flex-[1] text-center text-[12px] placeholder:text-center"
+                      className="!flex-[1] text-center text-[18px] placeholder:text-center placeholder:text-[14px]"
                       placeholder="Quantity"
                       value={item.quantity ?? ""}
                       onChange={(e) => {
@@ -858,7 +864,7 @@ export default function PostFormModal({
                   type="button"
                   onClick={handleSubmitClick}
                   disabled={isSubmitting}
-                  className="disabled:opacity-50"
+                  className="py-5 disabled:opacity-50"
                 >
                   {isSubmitting ? "Processing..." : submitButtonText}
                 </Button>

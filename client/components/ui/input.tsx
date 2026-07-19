@@ -11,7 +11,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const handleClear = (e: React.MouseEvent<HTMLButtonElement>) => {
       e.preventDefault();
       if (!onChange) return;
-      const clearedValue = type === "number" ? 1 : "";
+      const clearedValue = "";
       if (onChange) {
         const event = {
           target: { value: clearedValue },

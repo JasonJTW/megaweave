@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useInView } from "react-intersection-observer";
 import PostCard from "./PostCard";
 import { usePost } from "../../contexts/PostContext";
@@ -84,16 +84,14 @@ export default function Feed({
     cardRefs.current = cardRefs.current.slice(0, posts.length);
   }, [posts.length]);
 
-  const postIdToWeaveMap = useCallback(() => {
-    if (!weaves) return new Map();
+  const weaveMap = useMemo(() => {
+    if (!weaves) return new Map<number, Weave>();
     const map = new Map<number, Weave>();
     weaves.forEach((weave) => {
       map.set(weave.post.id, weave);
     });
     return map;
   }, [weaves]);
-
-  const weaveMap = postIdToWeaveMap();
 
   // parameters you can tune
   const HYSTERESIS_PX = 80; // 當新卡片只比舊卡片接近不到這距離（px）就忽略

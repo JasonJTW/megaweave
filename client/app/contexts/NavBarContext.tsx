@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 
 interface NavbarContextType {
   isNavbarVisible: boolean;
@@ -20,12 +20,15 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [isNavbarVisible, setIsNavbarVisible] = useState(true);
   const [isAtTop, setIsAtTop] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  // Use a ref instead of state so writing scroll position never triggers a rerender
+  // and the effect does NOT need it as a dependency — listener is mounted only once.
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     const controlNavbar = () => {
       const currentScrollY = window.scrollY;
-      const delta = currentScrollY - lastScrollY;
+      const delta = currentScrollY - lastScrollYRef.current;
+      lastScrollYRef.current = currentScrollY; // write to ref, no rerender
 
       setIsAtTop(currentScrollY < 10);
 
@@ -39,13 +42,11 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
         // Show navbar when scrolling UP by more than 8px
         setIsNavbarVisible(true);
       }
-
-      setLastScrollY(currentScrollY);
     };
 
     window.addEventListener("scroll", controlNavbar, { passive: true });
     return () => window.removeEventListener("scroll", controlNavbar);
-  }, [lastScrollY]);
+  }, []); // empty deps — listener is registered once and never re-subscribed
 
   const showNavbar = () => {
     setIsNavbarVisible(true);

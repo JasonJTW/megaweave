@@ -322,7 +322,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
             title: item.title,
             quantity: item.quantity,
           }))
-        : [{ title: "", quantity: 1 }],
+        : [{ title: "", quantity: "" as const }],
     place_id: post.place_id,
     province: post.province,
     city: post.city,

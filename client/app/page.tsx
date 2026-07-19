@@ -451,15 +451,53 @@ const PostsApp = () => {
     //     ? window.innerWidth >= 768 || showCreateForm
   });
 
-  const handleCreatePostButtonClick = (postType: Post["type"]) => {
-    if (!user) {
-      const currentUrl = window.location.pathname + window.location.search;
-      router.push(`/signin?returnTo=${encodeURIComponent(currentUrl)}`);
-      return;
-    }
-    setPostType(postType);
-    setShowCreateForm(true);
-  };
+  const handleCreatePostButtonClick = useCallback(
+    (postType: Post["type"]) => {
+      if (!user) {
+        const currentUrl = window.location.pathname + window.location.search;
+        router.push(`/signin?returnTo=${encodeURIComponent(currentUrl)}`);
+        return;
+      }
+      setPostType(postType);
+      setShowCreateForm(true);
+    },
+    [user, router],
+  );
+
+  // Stable callbacks passed to <Feed> — wrapped in useCallback so Feed's props
+  // reference stays the same across re-renders, preventing unnecessary re-renders.
+  const handleFeedPostClick = useCallback(
+    (post: Post) => {
+      if (categoryInteractionLockRef.current) return;
+      router.push(`/item/${post.id}`);
+    },
+    [router],
+  );
+
+  const handleFeedCategoryClick = useCallback((categoryId: number) => {
+    setSelectedCategory(categoryId.toString());
+    window.scrollTo({ top: 300, behavior: "smooth" });
+  }, []);
+
+  const handleFeedLocationClick = useCallback(
+    (type: "province" | "city" | "route", value: string) => {
+      console.log("Location clicked:", type, value);
+      if (type === "province") {
+        setSearchProvince(value);
+        setSearchCity("");
+        setSelectedLocation("");
+        setLocationInput(value);
+      } else if (type === "city") {
+        setSearchCity(value);
+        setSelectedLocation("");
+        setLocationInput(value);
+      } else if (type === "route") {
+        setSelectedLocation(value);
+        setLocationInput(value);
+      }
+    },
+    [],
+  );
 
   //! 創建貼文
   const handleCreatePost = async (data: PostFormSubmitData) => {
@@ -1236,32 +1274,10 @@ const PostsApp = () => {
               <Feed
                 posts={posts}
                 conditions={conditions}
-                onPostClick={(post) => {
-                  if (categoryInteractionLockRef.current) return;
-                  router.push(`/item/${post.id}`);
-                }}
+                onPostClick={handleFeedPostClick}
                 weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
-                onCategoryClick={(categoryId) => {
-                  setSelectedCategory(categoryId.toString());
-                  window.scrollTo({ top: 300, behavior: "smooth" });
-                }}
-                onLocationClick={(type, value) => {
-                  // Handle clickable location parts
-                  console.log("Location clicked:", type, value);
-                  if (type === "province") {
-                    setSearchProvince(value);
-                    setSearchCity("");
-                    setSelectedLocation("");
-                    setLocationInput(value);
-                  } else if (type === "city") {
-                    setSearchCity(value);
-                    setSelectedLocation("");
-                    setLocationInput(value);
-                  } else if (type === "route") {
-                    setSelectedLocation(value);
-                    setLocationInput(value);
-                  }
-                }}
+                onCategoryClick={handleFeedCategoryClick}
+                onLocationClick={handleFeedLocationClick}
                 hasMore={hasMore}
                 onLoadMore={() => {
                   if (!isValidating && hasMore) {

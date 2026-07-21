@@ -2,11 +2,11 @@
 "use client";
 import { MessageButton } from "@/app/components/Chat/MessageButton";
 import ClockIcon from "@/app/components/icons/ClockIcon";
+import EditIcon from "@/app/components/icons/EditIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import MessageIcon from "@/app/components/icons/MessageIcon";
 import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
-import EditIcon from "@/app/components/icons/EditIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/imageProcessor";
@@ -14,17 +14,24 @@ import { ArrowLeft, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
-import PostFormModal, {
-  PostFormSubmitData,
-} from "../../components/PostFormModal";
 import toast from "react-hot-toast";
 import CommentSection from "../../components/Comment/CommentSection";
 import EyesIcon from "../../components/icons/EyesIcon";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
+import PostFormModal, {
+  PostFormSubmitData,
+} from "../../components/PostFormModal";
+import PostOwnerSidebar from "../../components/PostOwnerSidebar";
 import PostShareModal from "../../components/PostShareModal";
-import { useUser } from "../../contexts/UserContext";
 import { useNavbar } from "../../contexts/NavBarContext";
+import { useUser } from "../../contexts/UserContext";
 import { Post } from "../../types/schema";
+
+interface OwnerProfile {
+  username: string;
+  avatar_url?: string;
+  contact_email?: string | null;
+}
 
 type PostDetailProps = {
   postId: string;
@@ -47,8 +54,42 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // 桌機右側：貼文擁有者資訊與貼文列表
+  const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
+  const [ownerPosts, setOwnerPosts] = useState<Post[]>([]);
+
   // back and share bar — sync with Navbar visibility
   const { isNavbarVisible } = useNavbar();
+
+  const fetchOwnerSidebar = useCallback(
+    async (authorPublicId: string) => {
+      try {
+        const [profileRes, statsRes] = await Promise.all([
+          fetch(`${hostName}/api/userprofile/public/${authorPublicId}`, {
+            method: "GET",
+            cache: "no-store",
+          }),
+          fetch(`${hostName}/api/user/stats/public/${authorPublicId}`, {
+            method: "GET",
+            cache: "no-store",
+          }),
+        ]);
+
+        if (profileRes.ok) {
+          const profileData: OwnerProfile = await profileRes.json();
+          setOwnerProfile(profileData);
+        }
+
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setOwnerPosts(statsData.posts || []);
+        }
+      } catch (error) {
+        console.error("Error fetching owner sidebar:", error);
+      }
+    },
+    [hostName],
+  );
 
   // 獲取貼文詳情
   const fetchPost = useCallback(async () => {
@@ -64,6 +105,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       if (response.ok) {
         setPost(data.post);
         setLikeCount(data.post.likes_count);
+
+        if (data.post.author_public_id) {
+          fetchOwnerSidebar(data.post.author_public_id);
+        }
 
         // 檢查用戶是否已按讚
         if (user) {
@@ -85,7 +130,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     } finally {
       setLoading(false);
     }
-  }, [hostName, postId, user]);
+  }, [hostName, postId, user, fetchOwnerSidebar]);
 
   // 處理更新貼文
   const handleUpdatePost = async (data: PostFormSubmitData) => {
@@ -372,10 +417,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
           </div>
         </div>
 
-        <div className="mx-8 my-[70px] max-w-4xl rounded-[30px] bg-white px-5 py-5 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* 左側：圖片和主要內容 */}
-            <div className="space-y-[15px] lg:col-span-2">
+        <div className="mx-auto my-[70px] flex max-w-6xl items-start gap-6 px-4 sm:px-6 lg:px-8">
+          {/* 左側：貼文主要內容 */}
+          <div className="min-w-0 flex-1 rounded-[30px] bg-white px-5 py-5 sm:px-6 lg:max-w-4xl lg:px-8">
+            <div className="space-y-[15px]">
               {/* 圖片輪播 */}
 
               {images.length > 0 && (
@@ -549,6 +594,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
               </div>
             </div>
           </div>
+
+          {/* 右側：桌機版擁有者側欄 */}
+          <PostOwnerSidebar
+            username={ownerProfile?.username || post.username}
+            avatarUrl={ownerProfile?.avatar_url || post.avatar_url}
+            contactEmail={ownerProfile?.contact_email}
+            authorPublicId={post.author_public_id}
+            posts={ownerPosts}
+            currentPostId={post.id}
+          />
         </div>
       </div>
       <PostShareModal

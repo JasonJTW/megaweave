@@ -389,7 +389,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <div className="min-h-screen bg-[#f5f5f3] font-ddin">
         {/* 標題列 */}
         <div
-          className={`fixed left-0 right-0 top-20 z-[21] bg-[#f5f4f3] transition-transform duration-100 ${
+          className={`fixed left-0 right-0 top-20 z-[21] bg-[#f5f4f3] transition-transform duration-100 lg:hidden ${
             isNavbarVisible ? "translate-y-[0]" : "-translate-y-[250%]"
           }`}
         >

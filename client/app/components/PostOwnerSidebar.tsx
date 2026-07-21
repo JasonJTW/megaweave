@@ -48,7 +48,7 @@ export default function PostOwnerSidebar({
       {/* Logo */}
       <Link
         href="/"
-        className="mb-8 grid w-[120px] grid-cols-2 grid-rows-2 gap-1"
+        className="mb-8 grid w-full max-w-[220px] grid-cols-2 grid-rows-2 gap-1"
         aria-label="Megaweave home"
       >
         <ReuseIcon className="h-full w-full text-megaweave-gold" />

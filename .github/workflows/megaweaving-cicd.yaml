@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
 jobs:
   detect-changes:
     name: Detect Changes
@@ -23,46 +24,54 @@ jobs:
           filters: |
             server:
               - 'server/**'
+              - 'docker-compose.yml'
             client:
               - 'client/**'
+              - 'docker-compose.yml'
 
-    # 新增：部署前清理空間
   pre-deploy-cleanup:
     name: Pre-Deploy Cleanup
     needs: detect-changes
     if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.any-changed == 'true')
     runs-on: self-hosted
     steps:
-      - name: Check disk space
+      - name: Check disk space & Prune Docker
         run: |
           echo "📊 當前磁碟使用："
           df -h /
           USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
           echo "磁碟使用率: ${USAGE}%"
 
+          # 清理懸空及未使用的 Docker 鏡像與層
+          echo "🧹 清理 Docker 快取鏡像..."
+          docker image prune -af --filter "until=24h" || true
+
           if [ $USAGE -gt 85 ]; then
-            echo "⚠️  磁碟使用率超過 85%，開始清理..."
+            echo "⚠️  磁碟使用率超過 85%，開始深度清理..."
+            
+            # 清理 Docker 系統
+            docker system prune -af --volumes || true
             
             # 清理 npm 快取
-            npm cache clean --force
+            npm cache clean --force 2>/dev/null || true
             
             # 清理系統日誌
-            sudo journalctl --vacuum-time=3d
+            sudo journalctl --vacuum-time=3d 2>/dev/null || true
             
             # 清理 APT
-            sudo apt-get clean
+            sudo apt-get clean 2>/dev/null || true
             
             # 清理舊備份（只保留最新 1 個）
             cd ~
             ls -dt megaweave.backup.* 2>/dev/null | tail -n +2 | xargs -r rm -rf
             
             # 清理 GitHub Actions 工作目錄
-            find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \;
+            find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \; 2>/dev/null || true
             
             # 清理臨時文件
             sudo rm -rf /tmp/npm-* 2>/dev/null || true
             
-            echo "✅ 清理完成"
+            echo "✅ 深度清理完成"
             df -h /
           else
             echo "✅ 磁碟空間充足"
@@ -116,7 +125,7 @@ jobs:
           echo "🧹 Cleaned up old backups (keeping last 2)"
 
   deploy-server:
-    name: Deploy Backend
+    name: Deploy Backend (Docker)
     needs: [detect-changes, create-backup]
     if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.server-changed == 'true')
     runs-on: self-hosted
@@ -125,96 +134,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install server dependencies
+      - name: Stop old systemd backend service if exists
         run: |
-          cd server
-          npm ci
-
-      - name: Run server tests
-        run: |
-          cd server
-          if npm run test --if-present; then
-            echo "✅ Server tests passed or not configured"
-          else
-            echo "⚠️ Server tests failed"
-            exit 1
+          if sudo systemctl is-active --quiet megaweave-be.service 2>/dev/null; then
+            echo "🛑 Stopping legacy systemd backend service..."
+            sudo systemctl stop megaweave-be.service
+            sudo systemctl disable megaweave-be.service || true
           fi
 
-      - name: Stop backend service
+      - name: Deploy server container via Docker Compose
         run: |
-          sudo systemctl stop megaweave-be.service
-          echo "🛑 Backend service stopped"
-
-      - name: Deploy server to production
-        run: |
-          # 創建生產目錄
-          mkdir -p ~/megaweave/server
-
-          # 同步代碼到生產環境
-          rsync -av --delete \
-            --exclude=node_modules \
-            --exclude=.git \
-            --exclude=.github \
-            --exclude=*.log \
-            --exclude=.env.example \
-            --exclude=.env.production \
-            --exclude=coverage \
-            ./server/ ~/megaweave/server/
-
-          echo "📦 Server code deployed"
-
-      - name: Install all dependencies for build
-        run: |
-          cd ~/megaweave/server
-          npm ci
-
-          # Make sure .env file exists
-          if [ -f .env.production ]; then
-            echo "✅ .env.production found for server"
+          # Ensure .env.production exists
+          if [ -f server/.env.production ]; then
+            echo "✅ server/.env.production found"
+          elif [ -f ~/megaweave/server/.env.production ]; then
+            cp ~/megaweave/server/.env.production server/.env.production
+            echo "✅ Copied .env.production from ~/megaweave/server/"
           else
-            echo "❌ .env.production not found!"
-            exit 1
+            echo "⚠️ .env.production not found in repository, checking system env"
+            touch server/.env.production
           fi
-          echo "📥 All dependencies installed for build"
 
-      - name: Build server in production
-        run: |
-          cd ~/megaweave/server
-          npm run build
-          echo "📦 Server built successfully in production"
+          echo "🚀 Building and starting Backend container..."
+          docker compose up -d --build backend
 
-      - name: Install production dependencies only
-        run: |
-          cd ~/megaweave/server
-          # Build 完成後，重新安裝只包含 production 依賴
-          npm ci --omit=dev
-          echo "🧹 Cleaned up dev dependencies for production runtime"
-
-      - name: Start backend service
-        run: |
-          sudo systemctl start megaweave-be.service
-          echo "🚀 Backend service started"
-
-      - name: Verify backend service
+      - name: Verify backend container
         run: |
           sleep 5
-          if sudo systemctl is-active --quiet megaweave-be.service; then
-            echo "✅ Backend service is running successfully"
+          if [ "$(docker inspect -f '{{.State.Running}}' megaweave-backend 2>/dev/null)" = "true" ]; then
+            echo "✅ Backend container is running successfully"
+            docker compose ps backend
           else
-            echo "❌ Backend service failed to start"
-            # 顯示服務狀態和日誌
-            sudo systemctl status megaweave-be.service
-            sudo journalctl -u megaweave-be.service --lines=20 --no-pager
+            echo "❌ Backend container failed to start"
+            docker logs megaweave-backend --tail 50
             exit 1
           fi
 
   deploy-client:
-    name: Deploy Frontend
+    name: Deploy Frontend (Docker)
     needs: [detect-changes, create-backup]
     if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.client-changed == 'true')
     runs-on: self-hosted
@@ -223,104 +180,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install client dependencies
+      - name: Stop old systemd frontend service if exists
         run: |
-          cd client
-          npm ci --prefer-offline --no-audit
-
-      - name: Run client tests
-        run: |
-          cd client
-          echo "⏭️ Tests skipped (temporarily disabled)"
-
-      - name: Stop frontend service
-        run: |
-          sudo systemctl stop megaweave-fe.service
-          echo "🛑 Frontend service stopped"
-
-      - name: Deploy client to production
-        run: |
-          # 創建生產目錄
-          mkdir -p ~/megaweave/client
-
-          # 同步代碼到生產環境
-          rsync -av --delete \
-            --exclude=node_modules \
-            --exclude=.git \
-            --exclude=.github \
-            --exclude=.next \
-            --exclude=*.log \
-            --exclude=.env.local \
-            --exclude=.env.example \
-            --exclude=.env.production \
-            --exclude=coverage \
-            ./client/ ~/megaweave/client/
-
-          echo "📦 Client code deployed"
-
-      - name: Install all dependencies for build
-        run: |
-          cd ~/megaweave/client
-          npm ci
-
-          # Make sure .env file exists
-          if [ -f .env.production ]; then
-            echo "✅ .env.production found"
-          else
-            echo "❌ .env.production not found!"
-            exit 1
+          if sudo systemctl is-active --quiet megaweave-fe.service 2>/dev/null; then
+            echo "🛑 Stopping legacy systemd frontend service..."
+            sudo systemctl stop megaweave-fe.service
+            sudo systemctl disable megaweave-fe.service || true
           fi
-          echo "📥 Production dependencies installed"
 
-      - name: Build client
+      - name: Deploy client container via Docker Compose
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }} # 👈 將 Token 從 Secrets 傳入
-          SENTRY_ORG: megaweaving
-          SENTRY_PROJECT: javascript-nextjs
-          # 限制 Node.js 記憶體使用
-          NODE_OPTIONS: "--max-old-space-size=1536"
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
-          cd ~/megaweave/client
+          # Ensure .env.production exists
+          if [ -f client/.env.production ]; then
+            echo "✅ client/.env.production found"
+          elif [ -f ~/megaweave/client/.env.production ]; then
+            cp ~/megaweave/client/.env.production client/.env.production
+            echo "✅ Copied .env.production from ~/megaweave/client/"
+          else
+            echo "⚠️ .env.production not found in repository, checking system env"
+            touch client/.env.production
+          fi
 
-          # 清理舊的 .next
-          rm -rf .next
+          echo "🚀 Building and starting Frontend container..."
+          docker compose up -d --build frontend
 
-          # 安裝依賴
-          npm ci
-
-          echo "🔨 Starting build..."
-          free -h
-          npm run build
-          echo "📦 Client built successfully"
-          free -h
-
-      - name: Clean up dev dependencies
-        run: |
-          cd ~/megaweave/client
-          # Build 完成後移除開發依賴
-          npm ci --omit=dev
-          echo "🧹 Cleaned up dev dependencies for production runtime"
-
-      - name: Start frontend service
-        run: |
-          sudo systemctl start megaweave-fe.service
-          echo "🚀 Frontend service started"
-
-      - name: Verify frontend service
+      - name: Verify frontend container
         run: |
           sleep 5
-          if sudo systemctl is-active --quiet megaweave-fe.service; then
-            echo "✅ Frontend service is running successfully"
+          if [ "$(docker inspect -f '{{.State.Running}}' megaweave-frontend 2>/dev/null)" = "true" ]; then
+            echo "✅ Frontend container is running successfully"
+            docker compose ps frontend
           else
-            echo "❌ Frontend service failed to start"
-            # 顯示服務狀態和日誌
-            sudo systemctl status megaweave-fe.service
-            sudo journalctl -u megaweave-fe.service --lines=20 --no-pager
+            echo "❌ Frontend container failed to start"
+            docker logs megaweave-frontend --tail 50
             exit 1
           fi
 
@@ -329,42 +223,23 @@ jobs:
     needs: [detect-changes, deploy-server, deploy-client]
     if: always() && needs.detect-changes.outputs.any-changed == 'true'
     runs-on: self-hosted
-    defaults:
-      run:
-        working-directory: /home/ubuntu
     steps:
-      - name: Clean up workspace
+      - name: Clean up workspace & dangling docker images
         run: |
-          cd ~
-          echo "🧹 清理 Actions 工作空間..."
-
-          # 等待一下確保所有服務都已啟動
-          sleep 3
-
-          # 只清理當前 repository 的工作目錄（更精確的路徑）
+          echo "🧹 清理中間 Docker 鏡像與臨時檔案..."
+          docker image prune -f || true
+          
           WORK_DIR="${GITHUB_WORKSPACE}"
           if [ -d "$WORK_DIR" ]; then
-            echo "清理當前工作目錄: $WORK_DIR"
             rm -rf "$WORK_DIR/server/node_modules" 2>/dev/null || true
             rm -rf "$WORK_DIR/client/node_modules" 2>/dev/null || true
             rm -rf "$WORK_DIR/client/.next" 2>/dev/null || true
           fi
 
-          # 清理 npm 快取
-          npm cache clean --force
-
-          # 清理臨時文件
-          sudo rm -rf /tmp/npm-* 2>/dev/null || true
-          sudo rm -rf /tmp/v8-* 2>/dev/null || true
-
-          # 清理 3 天前的工作目錄（更激進）
-          find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \; 2>/dev/null || true
-
           echo "✅ 清理完成"
 
       - name: Final disk check
         run: |
-          cd ~
           echo "📊 最終磁碟狀態："
           df -h /
           echo ""
@@ -402,12 +277,12 @@ jobs:
           echo ""
           echo "🚀 Deployment results:"
           if [ "${{ needs.deploy-server.result }}" != "" ]; then
-            echo "  - Backend: ${{ needs.deploy-server.result }}"
+            echo "  - Backend Container: ${{ needs.deploy-server.result }}"
           else
             echo "  - Backend: skipped (no changes)"
           fi
           if [ "${{ needs.deploy-client.result }}" != "" ]; then
-            echo "  - Frontend: ${{ needs.deploy-client.result }}"
+            echo "  - Frontend Container: ${{ needs.deploy-client.result }}"
           else
             echo "  - Frontend: skipped (no changes)"
           fi
@@ -434,14 +309,14 @@ jobs:
           echo ""
           echo "💥 Failed jobs:"
           if [ "${{ needs.deploy-server.result }}" == "failure" ]; then
-            echo "  - ❌ Backend deployment failed"
+            echo "  - ❌ Backend container deployment failed"
           fi
           if [ "${{ needs.deploy-client.result }}" == "failure" ]; then
-            echo "  - ❌ Frontend deployment failed"
+            echo "  - ❌ Frontend container deployment failed"
           fi
           echo ""
           echo "📊 Current system status:"
           df -h /
           free -h
           echo ""
-          echo "🔧 Please check the job logs above for details"
+          echo "🔧 Please check the job logs above or run 'docker logs <container_name>' for details"

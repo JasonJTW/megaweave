@@ -1,20 +1,46 @@
-FROM node:22
+FROM node:22-alpine AS base
 
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-#Install app dependencies
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm ci
 
-# Bundle app source
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Compile typescript to javascript
+ARG SENTRY_AUTH_TOKEN
+ARG NEXT_PUBLIC_API_URL
+ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-#Set the port via env var
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=8282
+ENV HOSTNAME="0.0.0.0"
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 8282
-CMD [ "npm", "run", "start"]
 
+CMD ["node", "server.js"]

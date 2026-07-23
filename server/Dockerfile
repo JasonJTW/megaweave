@@ -24,7 +24,7 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=8181
+ENV PORT=8443
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 expressjs
@@ -35,6 +35,6 @@ COPY package.json ./
 
 USER expressjs
 
-EXPOSE 8181
+EXPOSE 8443
 
 CMD ["node", "dist/server.js"]

@@ -18,6 +18,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1);
 const CORS_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
   : ["https://localhost:3000"];

@@ -6,13 +6,15 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ─────────────────────────────────────────────────────────
+  # 1. Detect Changes（GitHub Cloud Runner — 輕量、不消耗 EC2）
+  # ─────────────────────────────────────────────────────────
   detect-changes:
     name: Detect Changes
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       server-changed: ${{ steps.changes.outputs.server }}
       client-changed: ${{ steps.changes.outputs.client }}
-      any-changed: ${{ steps.changes.outputs.server == 'true' || steps.changes.outputs.client == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,10 +31,18 @@ jobs:
               - 'client/**'
               - 'docker-compose.yml'
 
+  # ─────────────────────────────────────────────────────────
+  # 2. EC2 Pre-Deploy Cleanup（與 Build 平行執行，節省總時間）
+  # ─────────────────────────────────────────────────────────
   pre-deploy-cleanup:
-    name: Pre-Deploy Cleanup
+    name: Pre-Deploy Cleanup (EC2)
     needs: detect-changes
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.any-changed == 'true')
+    if: >
+      always() && (
+        github.event_name == 'workflow_dispatch' ||
+        needs.detect-changes.outputs.server-changed == 'true' ||
+        needs.detect-changes.outputs.client-changed == 'true'
+      )
     runs-on: self-hosted
     steps:
       - name: Check disk space & Prune Docker
@@ -42,35 +52,14 @@ jobs:
           USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
           echo "磁碟使用率: ${USAGE}%"
 
-          # 清理懸空及未使用的 Docker 鏡像與層
-          echo "🧹 清理 Docker 快取鏡像..."
+          echo "🧹 清理 24 小時前的 Docker 鏡像..."
           docker image prune -af --filter "until=24h" || true
 
           if [ $USAGE -gt 85 ]; then
             echo "⚠️  磁碟使用率超過 85%，開始深度清理..."
-            
-            # 清理 Docker 系統
             docker system prune -af --volumes || true
-            
-            # 清理 npm 快取
-            npm cache clean --force 2>/dev/null || true
-            
-            # 清理系統日誌
             sudo journalctl --vacuum-time=3d 2>/dev/null || true
-            
-            # 清理 APT
             sudo apt-get clean 2>/dev/null || true
-            
-            # 清理舊備份（只保留最新 1 個）
-            cd ~
-            ls -dt megaweave.backup.* 2>/dev/null | tail -n +2 | xargs -r rm -rf
-            
-            # 清理 GitHub Actions 工作目錄
-            find ~/github-runner/actions-runner/_work -mindepth 1 -maxdepth 1 -type d -mtime +3 -exec rm -rf {} \; 2>/dev/null || true
-            
-            # 清理臨時文件
-            sudo rm -rf /tmp/npm-* 2>/dev/null || true
-            
             echo "✅ 深度清理完成"
             df -h /
           else
@@ -94,45 +83,106 @@ jobs:
             fi
           fi
 
-  create-backup:
-    name: Create Backup
-    needs: [detect-changes, pre-deploy-cleanup]
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.any-changed == 'true')
-    runs-on: self-hosted
-    outputs:
-      backup-created: ${{ steps.backup.outputs.backup-created }}
-      backup-path: ${{ steps.backup.outputs.backup-path }}
-    steps:
-      - name: Create production backup
-        id: backup
-        run: |
-          if [ -d ~/megaweave ]; then
-            BACKUP_DIR=~/megaweave.backup.$(date +%Y%m%d_%H%M%S)
-            cp -r ~/megaweave $BACKUP_DIR
-            echo "backup-created=true" >> $GITHUB_OUTPUT
-            echo "backup-path=$BACKUP_DIR" >> $GITHUB_OUTPUT
-            echo "✅ Backup created at: $BACKUP_DIR"
-          else
-            echo "backup-created=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No existing production directory to backup"
-          fi
-
-      - name: Cleanup old backups
-        run: |
-          cd ~
-          # 保留最近 2 個備份，刪除更舊的
-          ls -dt megaweave.backup.* 2>/dev/null | tail -n +3 | xargs -r rm -rf
-          echo "🧹 Cleaned up old backups (keeping last 2)"
-
-  deploy-server:
-    name: Deploy Backend (Docker)
-    needs: [detect-changes, create-backup]
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.server-changed == 'true')
-    runs-on: self-hosted
-
+  # ─────────────────────────────────────────────────────────
+  # 3a. Build Backend（GitHub Cloud Runner — 高效能機器 Build）
+  # ─────────────────────────────────────────────────────────
+  build-backend:
+    name: Build & Push Backend Image
+    needs: detect-changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.server-changed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          dockerfile: ./server/Dockerfile
+          push: true
+          tags: ghcr.io/jasonjtw/megaweaving-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────
+  # 3b. Build Frontend（GitHub Cloud Runner — 高效能機器 Build）
+  # ─────────────────────────────────────────────────────────
+  build-frontend:
+    name: Build & Push Frontend Image
+    needs: detect-changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.client-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          dockerfile: ./client/Dockerfile
+          push: true
+          tags: ghcr.io/jasonjtw/megaweaving-frontend:latest
+          build-args: |
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────────────────
+  # 4a. Deploy Backend（EC2 — 只做 pull + up，幾秒完成）
+  # ─────────────────────────────────────────────────────────
+  deploy-server:
+    name: Deploy Backend (Docker)
+    needs: [detect-changes, pre-deploy-cleanup, build-backend]
+    if: needs.build-backend.result == 'success'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare server .env.production
+        run: |
+          mkdir -p server
+          if [ -f ~/megaweave/server/.env.production ]; then
+            cp ~/megaweave/server/.env.production server/.env.production
+            echo "✅ server/.env.production copied from ~/megaweave/server/"
+          else
+            echo "❌ server/.env.production not found at ~/megaweave/server/"
+            echo "請手動放置此檔案到 ~/megaweave/server/.env.production"
+            exit 1
+          fi
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Stop old systemd backend service if exists
         run: |
@@ -140,23 +190,16 @@ jobs:
             echo "🛑 Stopping legacy systemd backend service..."
             sudo systemctl stop megaweave-be.service
             sudo systemctl disable megaweave-be.service || true
-          fi
-
-      - name: Deploy server container via Docker Compose
-        run: |
-          # Ensure .env.production exists
-          if [ -f server/.env.production ]; then
-            echo "✅ server/.env.production found"
-          elif [ -f ~/megaweave/server/.env.production ]; then
-            cp ~/megaweave/server/.env.production server/.env.production
-            echo "✅ Copied .env.production from ~/megaweave/server/"
           else
-            echo "⚠️ .env.production not found in repository, checking system env"
-            touch server/.env.production
+            echo "✅ No legacy systemd backend service running"
           fi
 
-          echo "🚀 Building and starting Backend container..."
-          docker compose up -d --build backend
+      - name: Pull and deploy backend container
+        run: |
+          echo "⬇️ Pulling latest backend image from GHCR..."
+          docker compose pull backend
+          echo "🚀 Starting backend container..."
+          docker compose up -d backend
 
       - name: Verify backend container
         run: |
@@ -170,15 +213,36 @@ jobs:
             exit 1
           fi
 
+  # ─────────────────────────────────────────────────────────
+  # 4b. Deploy Frontend（EC2 — 只做 pull + up，幾秒完成）
+  # ─────────────────────────────────────────────────────────
   deploy-client:
     name: Deploy Frontend (Docker)
-    needs: [detect-changes, create-backup]
-    if: always() && (github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.client-changed == 'true')
+    needs: [detect-changes, pre-deploy-cleanup, build-frontend]
+    if: needs.build-frontend.result == 'success'
     runs-on: self-hosted
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Prepare client .env.production
+        run: |
+          mkdir -p client
+          if [ -f ~/megaweave/client/.env.production ]; then
+            cp ~/megaweave/client/.env.production client/.env.production
+            echo "✅ client/.env.production copied from ~/megaweave/client/"
+          else
+            echo "❌ client/.env.production not found at ~/megaweave/client/"
+            echo "請手動放置此檔案到 ~/megaweave/client/.env.production"
+            exit 1
+          fi
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Stop old systemd frontend service if exists
         run: |
@@ -186,25 +250,16 @@ jobs:
             echo "🛑 Stopping legacy systemd frontend service..."
             sudo systemctl stop megaweave-fe.service
             sudo systemctl disable megaweave-fe.service || true
-          fi
-
-      - name: Deploy client container via Docker Compose
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          # Ensure .env.production exists
-          if [ -f client/.env.production ]; then
-            echo "✅ client/.env.production found"
-          elif [ -f ~/megaweave/client/.env.production ]; then
-            cp ~/megaweave/client/.env.production client/.env.production
-            echo "✅ Copied .env.production from ~/megaweave/client/"
           else
-            echo "⚠️ .env.production not found in repository, checking system env"
-            touch client/.env.production
+            echo "✅ No legacy systemd frontend service running"
           fi
 
-          echo "🚀 Building and starting Frontend container..."
-          docker compose up -d --build frontend
+      - name: Pull and deploy frontend container
+        run: |
+          echo "⬇️ Pulling latest frontend image from GHCR..."
+          docker compose pull frontend
+          echo "🚀 Starting frontend container..."
+          docker compose up -d frontend
 
       - name: Verify frontend container
         run: |
@@ -218,24 +273,23 @@ jobs:
             exit 1
           fi
 
+  # ─────────────────────────────────────────────────────────
+  # 5. Post-Deploy Cleanup
+  # ─────────────────────────────────────────────────────────
   post-deploy-cleanup:
     name: Post-Deploy Cleanup
-    needs: [detect-changes, deploy-server, deploy-client]
-    if: always() && needs.detect-changes.outputs.any-changed == 'true'
+    needs: [deploy-server, deploy-client]
+    if: >
+      always() && (
+        needs.deploy-server.result != 'skipped' ||
+        needs.deploy-client.result != 'skipped'
+      )
     runs-on: self-hosted
     steps:
-      - name: Clean up workspace & dangling docker images
+      - name: Clean up dangling docker images
         run: |
-          echo "🧹 清理中間 Docker 鏡像與臨時檔案..."
+          echo "🧹 清理 dangling Docker 鏡像..."
           docker image prune -f || true
-          
-          WORK_DIR="${GITHUB_WORKSPACE}"
-          if [ -d "$WORK_DIR" ]; then
-            rm -rf "$WORK_DIR/server/node_modules" 2>/dev/null || true
-            rm -rf "$WORK_DIR/client/node_modules" 2>/dev/null || true
-            rm -rf "$WORK_DIR/client/.next" 2>/dev/null || true
-          fi
-
           echo "✅ 清理完成"
 
       - name: Final disk check
@@ -246,19 +300,18 @@ jobs:
           echo "💾 記憶體狀態："
           free -h
 
+  # ─────────────────────────────────────────────────────────
+  # 6. Summary / Failure Report
+  # ─────────────────────────────────────────────────────────
   deployment-summary:
     name: Deployment Summary
-    needs:
-      [
-        detect-changes,
-        create-backup,
-        deploy-server,
-        deploy-client,
-        post-deploy-cleanup,
-      ]
-    if: always() && needs.detect-changes.outputs.any-changed == 'true' && !contains(needs.*.result, 'failure')
+    needs: [detect-changes, deploy-server, deploy-client, post-deploy-cleanup]
+    if: >
+      always() && (
+        needs.deploy-server.result == 'success' ||
+        needs.deploy-client.result == 'success'
+      )
     runs-on: self-hosted
-
     steps:
       - name: Print deployment summary
         run: |
@@ -268,21 +321,14 @@ jobs:
           echo "  - Server: ${{ needs.detect-changes.outputs.server-changed }}"
           echo "  - Client: ${{ needs.detect-changes.outputs.client-changed }}"
           echo ""
-          echo "📦 Backup:"
-          if [ "${{ needs.create-backup.outputs.backup-created }}" == "true" ]; then
-            echo "  - ✅ Created: ${{ needs.create-backup.outputs.backup-path }}"
-          else
-            echo "  - ⚠️ No backup needed (fresh deployment)"
-          fi
-          echo ""
           echo "🚀 Deployment results:"
-          if [ "${{ needs.deploy-server.result }}" != "" ]; then
-            echo "  - Backend Container: ${{ needs.deploy-server.result }}"
+          if [ "${{ needs.deploy-server.result }}" == "success" ]; then
+            echo "  - ✅ Backend Container: deployed"
           else
             echo "  - Backend: skipped (no changes)"
           fi
-          if [ "${{ needs.deploy-client.result }}" != "" ]; then
-            echo "  - Frontend Container: ${{ needs.deploy-client.result }}"
+          if [ "${{ needs.deploy-client.result }}" == "success" ]; then
+            echo "  - ✅ Frontend Container: deployed"
           else
             echo "  - Frontend: skipped (no changes)"
           fi
@@ -294,10 +340,13 @@ jobs:
 
   deployment-failure:
     name: Deployment Failed
-    needs: [detect-changes, create-backup, deploy-server, deploy-client, post-deploy-cleanup]
-    if: always() && needs.detect-changes.outputs.any-changed == 'true' && contains(needs.*.result, 'failure')
+    needs: [detect-changes, deploy-server, deploy-client, post-deploy-cleanup]
+    if: >
+      always() && (
+        needs.deploy-server.result == 'failure' ||
+        needs.deploy-client.result == 'failure'
+      )
     runs-on: self-hosted
-
     steps:
       - name: Print failure summary
         run: |
@@ -319,4 +368,4 @@ jobs:
           df -h /
           free -h
           echo ""
-          echo "🔧 Please check the job logs above or run 'docker logs <container_name>' for details"
+          echo "🔧 Check the job logs above or run: docker logs <container_name> --tail 100"

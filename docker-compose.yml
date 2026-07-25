@@ -1,11 +1,7 @@
-version: '3.8'
-
 services:
   backend:
     container_name: megaweave-backend
-    build:
-      context: ./server
-      dockerfile: Dockerfile
+    image: ghcr.io/jasonjtw/megaweaving-backend:latest
     ports:
       - "8443:8443"
     env_file:
@@ -18,11 +14,7 @@ services:
 
   frontend:
     container_name: megaweave-frontend
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-      args:
-        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN}
+    image: ghcr.io/jasonjtw/megaweaving-frontend:latest
     ports:
       - "3000:3000"
     env_file:

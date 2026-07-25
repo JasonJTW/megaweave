@@ -165,15 +165,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare server .env.production
+      - name: Prepare .env.production files
         run: |
-          mkdir -p server
+          # docker compose 解析整個 config 時，會讀取所有服務的 env_file
+          # 即使只啟動 backend，也需要 client/.env.production 存在，反之亦然
+          mkdir -p server client
+
           if [ -f ~/megaweave/server/.env.production ]; then
             cp ~/megaweave/server/.env.production server/.env.production
-            echo "✅ server/.env.production copied from ~/megaweave/server/"
+            echo "✅ server/.env.production copied"
           else
             echo "❌ server/.env.production not found at ~/megaweave/server/"
-            echo "請手動放置此檔案到 ~/megaweave/server/.env.production"
+            exit 1
+          fi
+
+          if [ -f ~/megaweave/client/.env.production ]; then
+            cp ~/megaweave/client/.env.production client/.env.production
+            echo "✅ client/.env.production copied"
+          else
+            echo "❌ client/.env.production not found at ~/megaweave/client/"
             exit 1
           fi
 
@@ -225,15 +235,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare client .env.production
+      - name: Prepare .env.production files
         run: |
-          mkdir -p client
+          # docker compose 解析整個 config 時，會讀取所有服務的 env_file
+          # 即使只啟動 frontend，也需要 server/.env.production 存在，反之亦然
+          mkdir -p server client
+
+          if [ -f ~/megaweave/server/.env.production ]; then
+            cp ~/megaweave/server/.env.production server/.env.production
+            echo "✅ server/.env.production copied"
+          else
+            echo "❌ server/.env.production not found at ~/megaweave/server/"
+            exit 1
+          fi
+
           if [ -f ~/megaweave/client/.env.production ]; then
             cp ~/megaweave/client/.env.production client/.env.production
-            echo "✅ client/.env.production copied from ~/megaweave/client/"
+            echo "✅ client/.env.production copied"
           else
             echo "❌ client/.env.production not found at ~/megaweave/client/"
-            echo "請手動放置此檔案到 ~/megaweave/client/.env.production"
             exit 1
           fi
 

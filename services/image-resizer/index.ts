@@ -28,8 +28,8 @@ interface ThumbnailSize {
 //   posts/abc/hero.png    →  posts/thumb/abc/hero.webp
 //                         →  posts/medium/abc/hero.webp
 const THUMBNAIL_SIZES: ThumbnailSize[] = [
-  { size: "thumb",  width: 300, fit: "inside" },  // 清單、頭貼、小預覽
-  { size: "medium", width: 800, fit: "inside" },  // 文章內嵌、大預覽
+  { size: "thumb", width: 300, fit: "inside" }, // 清單、頭貼、小預覽
+  { size: "medium", width: 800, fit: "inside" }, // 文章內嵌、大預覽
 ];
 
 /** 用 Set 快速判斷某 key 是否已是縮圖（防止 Lambda 在同 bucket 時無限觸發） */
@@ -85,12 +85,14 @@ async function processRecord(record: S3EventRecord): Promise<void> {
   }
 
   // 2. 從 S3 取得原圖
+  console.log(`[Step 1] Fetching original object from bucket: ${bucket}, key: ${key}`);
   const getObjRes = await s3.send(
     new GetObjectCommand({
       Bucket: bucket,
       Key: key,
     }),
   );
+  console.log(`[Step 1] Successfully fetched original object. ContentType: ${getObjRes.ContentType}`);
 
   if (!getObjRes.Body) {
     console.log(`Object body is empty for ${key}`);
@@ -109,11 +111,12 @@ async function processRecord(record: S3EventRecord): Promise<void> {
   const inputBuffer = Buffer.from(byteArray);
 
   // 4. 針對每一種設定的縮圖規格處理
-  // 先並行確認所有縮圖是否已存在，避免串行等待多個 HEAD 請求
   const destBucket = CONFIG.destinationBucket!;
+  console.log(`[Step 2] Destination bucket is: ${destBucket}`);
   const targetKeys = THUMBNAIL_SIZES.map((size) =>
     buildThumbnailKey(key, size.size),
   );
+  console.log(`[Step 2] Checking existence for target keys:`, targetKeys);
   const existsResults = await Promise.all(
     targetKeys.map((targetKey) => thumbnailExists(destBucket, targetKey)),
   );
@@ -139,11 +142,14 @@ async function processRecord(record: S3EventRecord): Promise<void> {
       .toBuffer();
 
     // 5. 寫入目標 Bucket（DESTINATION_BUCKET env var；未設定則退回來源 Bucket）
+    // 將 Sharp 的 SharedArrayBuffer 轉換為標準的 Uint8Array，相容 Node 24 加密 Hash 規範
+    const bodyUint8Array = new Uint8Array(thumbnailBuffer);
+
     await s3.send(
       new PutObjectCommand({
         Bucket: destBucket,
         Key: targetKey,
-        Body: thumbnailBuffer,
+        Body: bodyUint8Array,
         ContentType: "image/webp",
         CacheControl: CONFIG.cacheControl,
         Metadata: {
@@ -170,10 +176,10 @@ async function processRecord(record: S3EventRecord): Promise<void> {
  */
 function buildThumbnailKey(srcKey: string, sizeName: string): string {
   const segments = srcKey.split("/");
-  const category = segments[0];              // e.g. "avatars"
-  const rest = segments.slice(1);            // e.g. ["user-123.jpg"] or ["abc", "hero.png"]
+  const category = segments[0]; // e.g. "avatars"
+  const rest = segments.slice(1); // e.g. ["user-123.jpg"] or ["abc", "hero.png"]
   const filename = (rest.at(-1) ?? srcKey).replace(/\.[^.]+$/, ".webp");
-  const subDirs = rest.slice(0, -1);         // 中間子目錄（若有）
+  const subDirs = rest.slice(0, -1); // 中間子目錄（若有）
 
   return [category, sizeName, ...subDirs, filename].join("/");
 }
@@ -183,19 +189,27 @@ function buildThumbnailKey(srcKey: string, sizeName: string): string {
  */
 async function thumbnailExists(bucket: string, key: string): Promise<boolean> {
   try {
+    console.log(`[HeadObject] Checking if exists: bucket=${bucket}, key=${key}`);
     await s3.send(
       new HeadObjectCommand({
         Bucket: bucket,
         Key: key,
       }),
     );
+    console.log(`[HeadObject] File exists: ${key}`);
     return true;
-  } catch (err) {
-    // 只有 404 才代表「不存在」；其他錯誤（權限不足、網路問題等）應往上拋
+  } catch (err: any) {
+    console.log(`[HeadObject] Error for key ${key}: name=${err?.name}, code=${err?.$metadata?.httpStatusCode}`, err);
     if (
-      err instanceof S3ServiceException &&
-      err.$metadata.httpStatusCode === 404
+      err?.$metadata?.httpStatusCode === 404 || 
+      err?.name === "NotFound" || 
+      err?.name === "NoSuchKey"
     ) {
+      return false;
+    }
+    // 如果是 403 AccessDenied，印出明確 warning 並當作不存在繼續嘗試，避免死鎖
+    if (err?.$metadata?.httpStatusCode === 403) {
+      console.warn(`[HeadObject] Received 403 AccessDenied when checking ${key}. Treating as not exists.`);
       return false;
     }
     throw err;

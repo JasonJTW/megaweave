@@ -3,7 +3,6 @@ import { requireAuth } from "./middleware/auth";
 import { messageService } from "./utils/messageService";
 import { Server } from "socket.io";
 import { memoryUpload, uploadToS3 } from "./upload";
-import { imageProcessor } from "./utils/imageProcessor";
 import { randomUUID } from "crypto";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
@@ -117,12 +116,8 @@ router.post(
       if (req.files && Array.isArray(req.files)) {
         const files = req.files as Express.Multer.File[];
         for (const file of files) {
-          // Re-use processPostImage for chat images (max 1200px)
-          const processedBuffer = await imageProcessor.processPostImage(
-            file.buffer,
-          );
           const { url } = await uploadToS3(
-            processedBuffer,
+            file.buffer,
             "messages",
             `${Date.now()}-${randomUUID()}.webp`,
           );

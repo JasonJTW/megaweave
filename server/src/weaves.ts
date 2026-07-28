@@ -325,18 +325,18 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         }
       }
 
-      // 取得貼文的第一張圖片
-      let imageUrl = null;
+      // 取得貼文的第一張圖片（只存 S3 key，避免寫死 CDN 網域）
+      let imageS3Key: string | null = null;
       const [imgRows] = await dbPool.execute<RowDataPacket[]>(
-        `SELECT image_url FROM images WHERE post_id = ? ORDER BY id ASC LIMIT 1`,
+        `SELECT s3_key FROM images WHERE post_id = ? ORDER BY id ASC LIMIT 1`,
         [postId]
       );
       if (imgRows.length > 0) {
-        imageUrl = imgRows[0].image_url;
+        imageS3Key = imgRows[0].s3_key;
       }
 
       const postAuthorPublicId = await messageService.getPublicIdByUserId(postOwnerId);
-      const newMetadata = { item_id: itemId, item_title: itemTitle, quantity, weave_id: result.insertId, post_id: postId, image_url: imageUrl, post_type: postType, post_author_public_id: postAuthorPublicId };
+      const newMetadata = { item_id: itemId, item_title: itemTitle, quantity, weave_id: result.insertId, post_id: postId, image_s3_key: imageS3Key, post_type: postType, post_author_public_id: postAuthorPublicId };
 
       const io = res.locals.io;
       const senderPublicId = req.user!.public_id;

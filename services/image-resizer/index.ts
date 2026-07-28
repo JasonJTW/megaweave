@@ -85,21 +85,26 @@ async function processRecord(record: S3EventRecord): Promise<void> {
   }
 
   // 2. 從 S3 取得原圖
-  console.log(`[Step 1] Fetching original object from bucket: ${bucket}, key: ${key}`);
+  console.log(
+    `[Step 1] Fetching original object from bucket: ${bucket}, key: ${key}`,
+  );
   const getObjRes = await s3.send(
     new GetObjectCommand({
       Bucket: bucket,
       Key: key,
     }),
   );
-  console.log(`[Step 1] Successfully fetched original object. ContentType: ${getObjRes.ContentType}`);
+  console.log(
+    `[Step 1] Successfully fetched original object. ContentType: ${getObjRes.ContentType}`,
+  );
 
   if (!getObjRes.Body) {
     console.log(`Object body is empty for ${key}`);
     return;
   }
 
-  if (!getObjRes.ContentType?.startsWith("image/")) {
+  const isImageByExt = /\.(jpe?g|png|webp|gif|avif|tiff?|svg)$/i.test(key);
+  if (!getObjRes.ContentType?.startsWith("image/") && !isImageByExt) {
     console.log(
       `Skip non-image object (ContentType: ${getObjRes.ContentType}): ${key}`,
     );
@@ -175,13 +180,16 @@ async function processRecord(record: S3EventRecord): Promise<void> {
  * @param sizeName 語意化尺寸名稱 ("thumb" | "medium")
  */
 function buildThumbnailKey(srcKey: string, sizeName: string): string {
+  const thumbnailFolderName = "thumbnails";
   const segments = srcKey.split("/");
   const category = segments[0]; // e.g. "avatars"
   const rest = segments.slice(1); // e.g. ["user-123.jpg"] or ["abc", "hero.png"]
   const filename = (rest.at(-1) ?? srcKey).replace(/\.[^.]+$/, ".webp");
   const subDirs = rest.slice(0, -1); // 中間子目錄（若有）
 
-  return [category, sizeName, ...subDirs, filename].join("/");
+  return [thumbnailFolderName, category, sizeName, ...subDirs, filename].join(
+    "/",
+  );
 }
 
 /**
@@ -189,7 +197,9 @@ function buildThumbnailKey(srcKey: string, sizeName: string): string {
  */
 async function thumbnailExists(bucket: string, key: string): Promise<boolean> {
   try {
-    console.log(`[HeadObject] Checking if exists: bucket=${bucket}, key=${key}`);
+    console.log(
+      `[HeadObject] Checking if exists: bucket=${bucket}, key=${key}`,
+    );
     await s3.send(
       new HeadObjectCommand({
         Bucket: bucket,
@@ -199,17 +209,22 @@ async function thumbnailExists(bucket: string, key: string): Promise<boolean> {
     console.log(`[HeadObject] File exists: ${key}`);
     return true;
   } catch (err: any) {
-    console.log(`[HeadObject] Error for key ${key}: name=${err?.name}, code=${err?.$metadata?.httpStatusCode}`, err);
+    console.log(
+      `[HeadObject] Error for key ${key}: name=${err?.name}, code=${err?.$metadata?.httpStatusCode}`,
+      err,
+    );
     if (
-      err?.$metadata?.httpStatusCode === 404 || 
-      err?.name === "NotFound" || 
+      err?.$metadata?.httpStatusCode === 404 ||
+      err?.name === "NotFound" ||
       err?.name === "NoSuchKey"
     ) {
       return false;
     }
     // 如果是 403 AccessDenied，印出明確 warning 並當作不存在繼續嘗試，避免死鎖
     if (err?.$metadata?.httpStatusCode === 403) {
-      console.warn(`[HeadObject] Received 403 AccessDenied when checking ${key}. Treating as not exists.`);
+      console.warn(
+        `[HeadObject] Received 403 AccessDenied when checking ${key}. Treating as not exists.`,
+      );
       return false;
     }
     throw err;

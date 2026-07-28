@@ -80,18 +80,19 @@ export async function uploadToS3(
 export async function insertImages(
   connection: PoolConnection,
   postId: number,
-  images: Array<{ url: string; thumbnailUrl: string }>
+  images: Array<{ url: string; thumbnailUrl: string; key?: string }>
 ): Promise<void> {
   if (!images || images.length === 0) return;
 
   const imageInsertQuery = `
-    INSERT INTO images (post_id, image_url, thumbnail_url, alt_text, created_at) 
+    INSERT INTO images (post_id, image_url, s3_key, thumbnail_url, alt_text, created_at) 
     VALUES ?
   `;
 
   const imageValues = images.map((img) => [
     postId,
     img.url,
+    img.key || null,
     img.thumbnailUrl,
     `Image for post ${postId}`,
     new Date(),
@@ -103,6 +104,7 @@ export async function insertImages(
 // 從 S3 刪除文件的輔助函數
 export async function deleteS3Files(fileKeys: string[]): Promise<void> {
   const BUCKET_NAME = process.env.BUCKET_NAME;
+  const DESTINATION_BUCKET = process.env.DESTINATION_BUCKET || "megaweave-thumbnails";
   if (!BUCKET_NAME) {
     console.error("deleteS3Files: BUCKET_NAME not set");
     return;
@@ -111,12 +113,15 @@ export async function deleteS3Files(fileKeys: string[]): Promise<void> {
 
   const deletePromises = fileKeys.map(async (key) => {
     try {
+      const targetBucket = key.startsWith("thumbnails/")
+        ? DESTINATION_BUCKET
+        : BUCKET_NAME;
       const deleteCommand = new DeleteObjectCommand({
-        Bucket: BUCKET_NAME,
+        Bucket: targetBucket,
         Key: key,
       });
       await s3Client.send(deleteCommand);
-      console.log(`Successfully deleted: ${key}`);
+      console.log(`Successfully deleted from ${targetBucket}: ${key}`);
     } catch (error) {
       console.error(`Failed to delete ${key}:`, error);
     }

@@ -296,8 +296,8 @@ router.post(
             fileName,
           );
 
-          // Derived thumbnail path matching Lambda's folder structure (posts/thumb/{filename}.webp)
-          const thumbKey = `posts/thumb/${fileName}`;
+          // Derived thumbnail path matching Lambda's folder structure (thumbnails/posts/thumb/{filename}.webp)
+          const thumbKey = `thumbnails/posts/thumb/${fileName}`;
           const thumbUrl = `${cloudfrontUrl}/${thumbKey}`;
 
           uploadedImages.push({
@@ -774,7 +774,7 @@ router.put(
             const fileName = `${timestamp}-${fileId}.webp`;
 
             const { key, url } = await uploadToS3(file.buffer, "posts", fileName);
-            const thumbKey = `posts/thumb/${fileName}`;
+            const thumbKey = `thumbnails/posts/thumb/${fileName}`;
             const thumbnailUrl = `${cloudfrontUrl}/${thumbKey}`;
 
             return { url, thumbnailUrl, key, thumbKey };

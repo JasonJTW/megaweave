@@ -683,7 +683,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       : msg.metadata;
                   itemTitle = metadata?.item_title || "";
                   quantity = metadata?.quantity || 1;
-                  imageUrl = metadata?.image_url || "";
+                  const cloudfrontCDN =
+                    process.env.NEXT_PUBLIC_CLOUDFRONT_CDN || "";
+                  imageUrl = metadata?.image_s3_key
+                    ? `${cloudfrontCDN}/${metadata.image_s3_key}`
+                    : "";
                   weaveId = metadata?.weave_id || null;
                   currentItemId = metadata?.item_id || null;
                   postType = metadata?.post_type || null;

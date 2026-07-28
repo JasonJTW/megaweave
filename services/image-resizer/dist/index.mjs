@@ -51,19 +51,24 @@ async function processRecord(record) {
     console.log(`Skipping already-processed thumbnail: ${key}`);
     return;
   }
-  console.log(`[Step 1] Fetching original object from bucket: ${bucket}, key: ${key}`);
+  console.log(
+    `[Step 1] Fetching original object from bucket: ${bucket}, key: ${key}`
+  );
   const getObjRes = await s3.send(
     new GetObjectCommand({
       Bucket: bucket,
       Key: key
     })
   );
-  console.log(`[Step 1] Successfully fetched original object. ContentType: ${getObjRes.ContentType}`);
+  console.log(
+    `[Step 1] Successfully fetched original object. ContentType: ${getObjRes.ContentType}`
+  );
   if (!getObjRes.Body) {
     console.log(`Object body is empty for ${key}`);
     return;
   }
-  if (!getObjRes.ContentType?.startsWith("image/")) {
+  const isImageByExt = /\.(jpe?g|png|webp|gif|avif|tiff?|svg)$/i.test(key);
+  if (!getObjRes.ContentType?.startsWith("image/") && !isImageByExt) {
     console.log(
       `Skip non-image object (ContentType: ${getObjRes.ContentType}): ${key}`
     );
@@ -112,16 +117,21 @@ async function processRecord(record) {
   }
 }
 function buildThumbnailKey(srcKey, sizeName) {
+  const thumbnailFolderName = "thumbnails";
   const segments = srcKey.split("/");
   const category = segments[0];
   const rest = segments.slice(1);
   const filename = (rest.at(-1) ?? srcKey).replace(/\.[^.]+$/, ".webp");
   const subDirs = rest.slice(0, -1);
-  return [category, sizeName, ...subDirs, filename].join("/");
+  return [thumbnailFolderName, category, sizeName, ...subDirs, filename].join(
+    "/"
+  );
 }
 async function thumbnailExists(bucket, key) {
   try {
-    console.log(`[HeadObject] Checking if exists: bucket=${bucket}, key=${key}`);
+    console.log(
+      `[HeadObject] Checking if exists: bucket=${bucket}, key=${key}`
+    );
     await s3.send(
       new HeadObjectCommand({
         Bucket: bucket,
@@ -131,12 +141,17 @@ async function thumbnailExists(bucket, key) {
     console.log(`[HeadObject] File exists: ${key}`);
     return true;
   } catch (err) {
-    console.log(`[HeadObject] Error for key ${key}: name=${err?.name}, code=${err?.$metadata?.httpStatusCode}`, err);
+    console.log(
+      `[HeadObject] Error for key ${key}: name=${err?.name}, code=${err?.$metadata?.httpStatusCode}`,
+      err
+    );
     if (err?.$metadata?.httpStatusCode === 404 || err?.name === "NotFound" || err?.name === "NoSuchKey") {
       return false;
     }
     if (err?.$metadata?.httpStatusCode === 403) {
-      console.warn(`[HeadObject] Received 403 AccessDenied when checking ${key}. Treating as not exists.`);
+      console.warn(
+        `[HeadObject] Received 403 AccessDenied when checking ${key}. Treating as not exists.`
+      );
       return false;
     }
     throw err;

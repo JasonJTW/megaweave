@@ -14,7 +14,6 @@ import dotenv from "dotenv";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { memoryUpload, insertImages, uploadToS3 } from "./upload";
 import { deleteS3Files } from "./upload";
-import { imageProcessor } from "./utils/imageProcessor";
 import likeRouter from "./like";
 import { shouldIncrementView } from "./utils/viewCounter";
 import { getUserFromCookie } from "./session";
@@ -284,25 +283,22 @@ router.post(
       }> = [];
 
       if (files && files.length > 0) {
+        const cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
         for (const file of files) {
           const fileId = randomUUID();
           const timestamp = Date.now();
+          const fileName = `${timestamp}-${fileId}.webp`;
 
-          // Process main image
-          const mainBuffer = await imageProcessor.processPostImage(file.buffer);
+          // Upload raw image to S3 (S3 Event triggers Lambda resizer asynchronously)
           const { key: mainKey, url: mainUrl } = await uploadToS3(
-            mainBuffer,
+            file.buffer,
             "posts",
-            `${timestamp}-${fileId}.webp`,
+            fileName,
           );
 
-          // Process thumbnail
-          const thumbBuffer = await imageProcessor.createThumbnail(file.buffer);
-          const { key: thumbKey, url: thumbUrl } = await uploadToS3(
-            thumbBuffer,
-            "posts",
-            `${timestamp}-${fileId}-thumb.webp`,
-          );
+          // Derived thumbnail path matching Lambda's folder structure (posts/thumb/{filename}.webp)
+          const thumbKey = `posts/thumb/${fileName}`;
+          const thumbUrl = `${cloudfrontUrl}/${thumbKey}`;
 
           uploadedImages.push({
             url: mainUrl,
@@ -770,18 +766,17 @@ router.put(
 
       // 8. 上傳新圖片
       if (files?.length) {
+        const cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
         const uploadedImages = await Promise.all(
           files.map(async (file) => {
             const fileId = randomUUID();
             const timestamp = Date.now();
-            const [mainBuffer, thumbBuffer] = await Promise.all([
-              imageProcessor.processPostImage(file.buffer),
-              imageProcessor.createThumbnail(file.buffer),
-            ]);
-            const [{ key, url }, { key: thumbKey, url: thumbnailUrl }] = await Promise.all([
-              uploadToS3(mainBuffer, "posts", `${timestamp}-${fileId}.webp`),
-              uploadToS3(thumbBuffer, "posts", `${timestamp}-${fileId}-thumb.webp`),
-            ]);
+            const fileName = `${timestamp}-${fileId}.webp`;
+
+            const { key, url } = await uploadToS3(file.buffer, "posts", fileName);
+            const thumbKey = `posts/thumb/${fileName}`;
+            const thumbnailUrl = `${cloudfrontUrl}/${thumbKey}`;
+
             return { url, thumbnailUrl, key, thumbKey };
           }),
         );

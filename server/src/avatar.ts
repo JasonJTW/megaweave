@@ -5,7 +5,6 @@ import {
   deleteS3Files,
   uploadToS3,
 } from "./upload";
-import { imageProcessor } from "./utils/imageProcessor";
 import { Request, Response, Router } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { randomUUID } from "crypto";
@@ -34,12 +33,9 @@ router.post(
       const userId = req.user!.userId;
       const userRole = req.user!.role;
       
-      // Process image
-      const processedBuffer = await imageProcessor.processAvatar(req.file.buffer);
-      
-      // Upload to S3
+      // Upload directly to S3 (Lambda resizer handles thumbnailing asynchronously)
       const { key: avatarKey, url: avatarUrl } = await uploadToS3(
-        processedBuffer,
+        req.file.buffer,
         S3_BUCKET_AVATAR_FOLDER,
         `${Date.now()}-${randomUUID()}.webp`
       );

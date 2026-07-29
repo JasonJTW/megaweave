@@ -117,32 +117,32 @@ router.get("/:level", async (req: Request, res: Response) => {
         {
           id: 1,
           level: 1,
-          name: "全新",
-          description: "商品全新未使用，包裝完整",
+          name: "Brand New",
+          description: "Unused, sealed in original packaging",
         },
         {
           id: 2,
           level: 2,
-          name: "近全新",
-          description: "使用次數極少，幾乎全新狀態",
+          name: "Like New",
+          description: "Minimal signs of use",
         },
         {
           id: 3,
           level: 3,
-          name: "良好",
-          description: "使用正常，功能完好，外觀良好",
+          name: "Good",
+          description: "Normal wear, fully functional",
         },
         {
           id: 4,
           level: 4,
-          name: "普通",
-          description: "有使用痕跡，但功能正常",
+          name: "Fair",
+          description: "Noticeable wear, fully functional",
         },
         {
           id: 5,
           level: 5,
-          name: "需要維修",
-          description: "有明顯瑕疵或需要修理",
+          name: "For Parts or Repair",
+          description: "Damaged or not fully functional",
         },
       ];
 

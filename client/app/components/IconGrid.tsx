@@ -40,7 +40,12 @@ export default function IconGrid() {
   ];
 
   return (
-    <div className="bg-megaweave-secondary">
+    <div
+      className="bg-megaweave-secondary"
+      style={{
+        overflowAnchor: "none",
+      }}
+    >
       <div
         className="flex items-center justify-center overflow-hidden p-2"
         style={{ contain: "layout paint" }}

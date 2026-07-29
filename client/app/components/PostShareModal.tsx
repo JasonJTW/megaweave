@@ -3,6 +3,7 @@
 import EyesIcon from "@/app/components/icons/EyesIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import type { Post } from "@/app/types/schema";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { Badge } from "@/components/ui/badge";
 import * as Dialog from "@radix-ui/react-dialog";
 import Image from "next/image";
@@ -26,13 +27,11 @@ const PostShareModal = ({
   post,
   onInstagramShare,
 }: PostShareModalProps) => {
-  const imageUrls = post.image_urls
-    ? post.image_urls.split(",").filter(Boolean)
-    : [];
-  const thumbnailUrls = post.thumbnail_urls
-    ? post.thumbnail_urls.split(",").filter(Boolean)
-    : [];
-  const imageSrc = thumbnailUrls[0] || imageUrls[0];
+  const s3Keys = parseS3Keys(post);
+
+  const imageSrc = s3Keys[0]?.startsWith("http")
+    ? s3Keys[0]
+    : getImageUrl(s3Keys[0], "medium");
   const headerSrc = SHARE_HEADER_SRC[post.type] ?? SHARE_HEADER_SRC.share;
 
   const locationText =

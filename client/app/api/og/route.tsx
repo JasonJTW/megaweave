@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import fs from "fs/promises";
 import path from "path";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -54,14 +55,14 @@ export async function GET(req: Request) {
     const data = await response.json();
     const post = data.post;
 
-    // Image logic matching PostShareModal
-    const imageUrls = post.image_urls
-      ? post.image_urls.split(",").filter(Boolean)
-      : [];
-    const thumbnailUrls = post.thumbnail_urls
-      ? post.thumbnail_urls.split(",").filter(Boolean)
-      : [];
-    const imageSrc = thumbnailUrls[0] || imageUrls[0];
+    const s3Keys = parseS3Keys(post);
+
+    const firstKey = s3Keys[0];
+    const imageSrc = firstKey
+      ? firstKey.startsWith("http")
+        ? firstKey
+        : getImageUrl(firstKey, "medium")
+      : "";
 
     // Fetch and convert WebP to PNG using sharp directly to bypass Satori's WebP limitations
     let finalImageSrc = "";

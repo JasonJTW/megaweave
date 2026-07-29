@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { Post } from "@/app/types/schema";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { PendingItem } from "@/app/contexts/ChatPopupContext";
 import User from "@/app/types/user";
 import { Button } from "@/components/ui/button";
@@ -30,10 +31,14 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
 }) => {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
 
-  // 解析貼文圖片
-  const images = post.image_urls ? post.image_urls.split(",") : [];
-  const firstImg =
-    images.length > 0 && images[0].trim() !== "" ? images[0] : null;
+  const s3Keys = parseS3Keys(post);
+
+  const firstKey = s3Keys[0];
+  const firstImg = firstKey
+    ? firstKey.startsWith("http")
+      ? firstKey
+      : getImageUrl(firstKey, "thumb")
+    : null;
 
   // 顯示標題
   const displayTitle =

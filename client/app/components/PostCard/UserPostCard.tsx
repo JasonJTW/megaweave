@@ -3,6 +3,7 @@ import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import type { Category, Condition, Post } from "../../types/schema";
 import SeekBadgeExpiredIcon from "../icons/SeekBadgeExpiredIcon";
 import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
@@ -31,19 +32,11 @@ function UserPostCardInner({
   onPostClick,
   isFirstVisible,
 }: UserPostCardProps) {
-  const imageUrls = Array.isArray(post.image_urls)
-    ? post.image_urls
-    : typeof post.image_urls === "string"
-      ? post.image_urls.split(",").filter(Boolean)
-      : [];
+  const s3Keys = parseS3Keys(post);
 
-  const thumbnailUrls = Array.isArray(post.thumbnail_urls)
-    ? post.thumbnail_urls
-    : typeof post.thumbnail_urls === "string"
-      ? post.thumbnail_urls.split(",").filter(Boolean)
-      : [];
-
-  const imageSrc = thumbnailUrls[0] || imageUrls[0];
+  const imageSrc = s3Keys[0]?.startsWith("http")
+    ? s3Keys[0]
+    : getImageUrl(s3Keys[0], "thumb");
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()

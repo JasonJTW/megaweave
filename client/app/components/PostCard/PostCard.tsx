@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import type { Category, Condition, Post } from "../../types/schema";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
@@ -42,13 +43,11 @@ function PostCardInner({
 
   const category = categories.find((c) => c.id === post.category_id);
 
-  const imageUrls = Array.isArray(post.image_urls)
-    ? post.image_urls
-    : typeof post.image_urls === "string"
-      ? post.image_urls.split(",")
-      : [];
+  const s3Keys = parseS3Keys(post);
 
-  const imageSrc = imageUrls[0];
+  const imageSrc = s3Keys[0]?.startsWith("http")
+    ? s3Keys[0]
+    : getImageUrl(s3Keys[0], "medium");
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()

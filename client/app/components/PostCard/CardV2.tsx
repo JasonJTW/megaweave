@@ -1,9 +1,10 @@
 "use client";
 import React, { useRef } from "react";
 import { Post, Condition, Category } from "@/app/types/schema";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { User as UserIcon } from "lucide-react";
 import Image from "next/image";
-import { motion, MotionValue } from "framer-motion";
+import { motion, MotionValue, useTransform } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import TagIcon from "../icons/TagIcon";
 import LocationIcon from "../icons/LocationIcon";
@@ -22,19 +23,28 @@ interface PostCardProps {
 }
 
 const CardV2 = ({
-  // i,
+  i,
   post,
   onPostClick,
   categories,
-}: // progress,
-// range,
-// targetScale,
-PostCardProps) => {
+  progress,
+  range,
+  targetScale,
+}: PostCardProps) => {
   const container = useRef(null);
 
-  // const scale = useTransform(progress, range, [1, targetScale]);
+  const scale = useTransform(progress, range, [1, targetScale]);
 
   const category = categories.find((c) => c.id === post.category_id);
+
+  const s3Keys = parseS3Keys(post);
+
+  const firstKey = s3Keys[0];
+  const imageSrc = firstKey
+    ? firstKey.startsWith("http")
+      ? firstKey
+      : getImageUrl(firstKey, "medium")
+    : null;
 
   return (
     // Card Container
@@ -46,7 +56,7 @@ PostCardProps) => {
       {/* Card */}
       <motion.div
         className="relative mx-7 flex w-full cursor-pointer flex-col overflow-hidden rounded-[30px] border border-red-300 bg-megaweave-blue-light py-0 pb-[17px] transition-all duration-300"
-        // style={{ top: `calc(-10% + ${i * 68}px)` }}
+        style={{ scale, top: `calc(-10% + ${i * 68}px)` }}
       >
         <div className="flex items-center justify-between px-4 py-3">
           <h2 className="truncate font-ddin text-[36px] font-semibold text-gray-800">
@@ -58,14 +68,14 @@ PostCardProps) => {
           </div>
         </div>
 
-        {post.image_urls && post.image_urls.length > 0 && (
+        {imageSrc && (
           // imageContainer
           <div className="mx-4 mb-0 flex justify-center overflow-hidden rounded-[20px]">
             {/* inner */}
             <div className="relative h-64 w-full md:h-80">
               <motion.div className="relative h-64 w-full md:h-80">
                 <Image
-                  src={post.image_urls.split(",")[0]}
+                  src={imageSrc}
                   alt={post.title}
                   fill
                   className="object-cover"

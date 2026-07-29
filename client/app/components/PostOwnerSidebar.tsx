@@ -1,6 +1,7 @@
 "use client";
 
 import type { Post } from "@/app/types/schema";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { Heart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -20,17 +21,9 @@ interface PostOwnerSidebarProps {
 }
 
 function getPostImageSrc(post: Post): string | null {
-  const thumbnails =
-    typeof post.thumbnail_urls === "string"
-      ? post.thumbnail_urls.split(",").filter(Boolean)
-      : [];
-  if (thumbnails[0]) return thumbnails[0];
-
-  const images =
-    typeof post.image_urls === "string"
-      ? post.image_urls.split(",").filter(Boolean)
-      : [];
-  return images[0] || null;
+  const keys = parseS3Keys(post);
+  if (!keys[0]) return null;
+  return keys[0].startsWith("http") ? keys[0] : getImageUrl(keys[0], "thumb");
 }
 
 export default function PostOwnerSidebar({

@@ -322,7 +322,7 @@ router.post(
         c.name_en as category_name_en,
         cond.name as condition_name,
         l.place_id, l.full_address, l.province, l.city, l.lat, l.lng,
-        GROUP_CONCAT(i.image_url) as image_urls
+        GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -431,8 +431,7 @@ router.get("/", async (req: Request, res: Response) => {
         c.name_en as category_name_en,
         cond.name as condition_name,
         l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
-        GROUP_CONCAT(i.image_url) as image_urls,
-        GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+        GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -499,8 +498,7 @@ router.get("/user", requireAuth, async (req: Request, res: Response) => {
         c.name_en as category_name_en,
         cond.name as condition_name,
         l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
-        GROUP_CONCAT(i.image_url) as image_urls,
-        GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+        GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN categories c ON p.category_id = c.id
@@ -608,15 +606,15 @@ router.get("/:id", async (req: Request, res: Response) => {
       postId,
     ]);
 
-    // 將圖片 URL 轉換為逗號分隔的字符串格式
-    const imageUrls = images.map((img: any) => img.image_url).join(",");
+    // 將圖片 S3 key 轉換為逗號分隔的字串格式
+    const s3Keys = images.map((img: any) => img.s3_key).filter(Boolean).join(",");
     const [items] = await dbPool.execute(
       `SELECT * FROM items WHERE post_id = ?`,
       [postId],
     );
     const post = {
       ...rows[0],
-      image_urls: imageUrls,
+      s3_keys: s3Keys,
       images,
       items,
     };
@@ -789,8 +787,7 @@ router.put(
         `SELECT p.*, u.username, u.public_id as author_public_id, u.id as author_user_id,
                 u.avatar_url, c.name_en as category_name_en, cond.name as condition_name,
                 l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code,
-                GROUP_CONCAT(i.image_url) as image_urls,
-                GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+                GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
          FROM posts p
          LEFT JOIN users u ON p.user_id = u.id
          LEFT JOIN categories c ON p.category_id = c.id

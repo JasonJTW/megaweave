@@ -60,7 +60,7 @@ interface WeaveOutput extends RowDataPacket {
   giver_avatar: string;
   receiver_name: string;
   receiver_avatar: string;
-  image_urls: string;
+  s3_keys: string;
 }
 
 interface ItemRow extends RowDataPacket {
@@ -89,7 +89,7 @@ function processWeaveRows(weaveRows: WeaveOutput[]) {
       created_at: row.post_created_at,
       updated_at: row.post_updated_at,
       comment_count: row.post_comment_count,
-      image_urls: row.image_urls ? row.image_urls.split(",") : [],
+      s3_keys: row.s3_keys ?? "",
     };
 
     return {
@@ -140,7 +140,7 @@ const WEAVE_QUERY_BASE = `
       giver.avatar_url AS giver_avatar,
       receiver.username AS receiver_name,
       receiver.avatar_url AS receiver_avatar,
-      GROUP_CONCAT(img.image_url) AS image_urls
+      GROUP_CONCAT(img.s3_key ORDER BY img.id ASC) AS s3_keys
   FROM weaves w
   JOIN posts p ON w.post_id = p.id
   LEFT JOIN locations l ON p.location_id = l.id

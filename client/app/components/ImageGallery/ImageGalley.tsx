@@ -3,10 +3,11 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
 interface ImageGalleryProps {
-  images: string[];
+  images: string[];      // medium thumbnails — for gallery & nav strip
+  fullImages?: string[]; // originals — lazy-loaded only when modal opens
 }
 
-const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
+const ImageGallery: React.FC<ImageGalleryProps> = ({ images, fullImages }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -122,7 +123,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
             <div className="relative flex h-full w-full items-center justify-center">
               <div className="relative max-h-full max-w-full">
                 <Image
-                  src={images[currentIndex]}
+                  src={fullImages?.[currentIndex] ?? images[currentIndex]}
                   alt={`圖片 ${currentIndex + 1}`}
                   width={1200}
                   height={800}

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { User as UserIcon } from "lucide-react";
 import React from "react";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import type { Post } from "../types/schema";
 import AcceptIcon from "./icons/AcceptIcon";
 import CancelIcon from "./icons/CancelIcon";
@@ -31,17 +32,9 @@ interface WeavesCardProps {
 }
 
 function getThumbnail(post: Post): string | undefined {
-  if (post.thumbnail_urls) {
-    if (Array.isArray(post.thumbnail_urls)) return post.thumbnail_urls[0];
-    const urls = post.thumbnail_urls.split(",").filter(Boolean);
-    if (urls[0]) return urls[0];
-  }
-  if (post.image_urls) {
-    if (Array.isArray(post.image_urls)) return post.image_urls[0];
-    const urls = post.image_urls.split(",").filter(Boolean);
-    if (urls[0]) return urls[0];
-  }
-  return undefined;
+  const keys = parseS3Keys(post);
+  if (!keys[0]) return undefined;
+  return keys[0].startsWith("http") ? keys[0] : getImageUrl(keys[0], "thumb");
 }
 
 function getDisplayUsername(

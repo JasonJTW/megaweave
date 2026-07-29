@@ -10,6 +10,7 @@ import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { compressImage } from "@/utils/imageProcessor";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -348,7 +349,15 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     );
   }
 
-  const images = post.image_urls ? post.image_urls.split(",") : [];
+  const s3Keys = parseS3Keys(post);
+
+  const images = s3Keys.map((key) =>
+    key.startsWith("http") ? key : getImageUrl(key, "medium"),
+  );
+
+  const fullImages = s3Keys.map((key) =>
+    key.startsWith("http") ? key : getImageUrl(key, "original"),
+  );
 
   const initialFormData = {
     title: post.title,
@@ -380,7 +389,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const existingImages =
     post.images?.map((img) => ({
       id: img.id,
-      image_url: img.image_url,
+      image_url: img.s3_key ? getImageUrl(img.s3_key, "medium") : img.image_url || "",
     })) || [];
 
   return (
@@ -433,7 +442,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       <WishBadgeIcon className="absolute -top-1 right-5 z-20" />
                     )}
                     <div className="relative overflow-hidden rounded-[20px] bg-white shadow-sm">
-                      <ImageGallery images={images} />
+                      <ImageGallery images={images} fullImages={fullImages} />
 
                       {/* tags */}
                       <div className="absolute bottom-0 flex w-full flex-row justify-between px-5 py-5">

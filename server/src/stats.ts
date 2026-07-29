@@ -49,19 +49,18 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const postsQuery = `
       SELECT 
         p.*, 
-        GROUP_CONCAT(i.image_url) as image_urls,
-        GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+        GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN images i ON p.id = i.post_id
       WHERE p.user_id = ? AND p.deleted_at IS NULL
-      GROUP BY p.id -- 必須根據 posts 的主鍵分組
+      GROUP BY p.id
       ORDER BY p.created_at DESC
     `;
 
     const [posts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [userId]);
 
     // **修正: 移除原有的 postsWithImages 映射和 JSON.parse 邏輯**
-    // 直接使用 posts 變數，它包含 image_urls 和 thumbnail_urls 欄位。
+    // 直接使用 posts 變數，它包含 s3_keys 欄位。
 
     // 如果沒有統計記錄，返回初始值
     if (statsRows.length === 0) {
@@ -170,12 +169,11 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     const postsQuery = `
       SELECT 
         p.*, 
-        GROUP_CONCAT(i.image_url) as image_urls,
-        GROUP_CONCAT(i.thumbnail_url) as thumbnail_urls
+        GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN images i ON p.id = i.post_id
       WHERE p.user_id = ?
-      GROUP BY p.id -- 必須根據 posts 的主鍵分組
+      GROUP BY p.id
       ORDER BY p.created_at DESC
     `;
 

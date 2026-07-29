@@ -13,7 +13,6 @@ export interface Weave {
   post_id: number;
   post_title: string;
   item_title?: string;
-  thumbnail_urls: string[];
   status: "pending" | "completed" | "cancelled";
   giver_confirmed: boolean;
   receiver_confirmed: boolean;
@@ -28,7 +27,7 @@ export interface Weave {
   created_at: string;
   updated_at: string;
   completed_at?: string;
-  post: Post & { thumbnail_urls: string[] };
+  post: Post;
 }
 
 export const createWeave = async ({

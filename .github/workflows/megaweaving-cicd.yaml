@@ -198,16 +198,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Stop old systemd backend service if exists
-        run: |
-          if sudo systemctl is-active --quiet megaweave-be.service 2>/dev/null; then
-            echo "🛑 Stopping legacy systemd backend service..."
-            sudo systemctl stop megaweave-be.service
-            sudo systemctl disable megaweave-be.service || true
-          else
-            echo "✅ No legacy systemd backend service running"
-          fi
-
       - name: Pull and deploy backend container
         run: |
           echo "⬇️ Pulling latest backend image from GHCR..."
@@ -267,16 +257,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Stop old systemd frontend service if exists
-        run: |
-          if sudo systemctl is-active --quiet megaweave-fe.service 2>/dev/null; then
-            echo "🛑 Stopping legacy systemd frontend service..."
-            sudo systemctl stop megaweave-fe.service
-            sudo systemctl disable megaweave-fe.service || true
-          else
-            echo "✅ No legacy systemd frontend service running"
-          fi
 
       - name: Pull and deploy frontend container
         run: |

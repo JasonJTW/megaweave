@@ -27,7 +27,7 @@ interface UpdateResult {
     receiveMultiplier: string;
     balanceLevel: string;
   };
-  error?: any;
+  error?: unknown;
   errorCode?: string;
 }
 
@@ -260,12 +260,12 @@ export async function updateUserStats(userId: string): Promise<UpdateResult> {
         balanceLevel,
       },
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating user stats:", error);
     return {
       success: false,
-      error: error.message,
-      errorCode: error.code,
+      error: error instanceof Error ? error.message : String(error),
+      errorCode: (error as { code?: string })?.code,
     };
   } finally {
     if (connection) {
@@ -282,11 +282,11 @@ export async function updateUserStats(userId: string): Promise<UpdateResult> {
 export async function batchUpdateUserStats(userIds: string[]): Promise<{
   success: number;
   failed: number;
-  errors: Array<{ userId: string; error: any }>;
+  errors: Array<{ userId: string; error: unknown }>;
 }> {
   let successCount = 0;
   let failedCount = 0;
-  const errors: Array<{ userId: string; error: any }> = [];
+  const errors: Array<{ userId: string; error: unknown }> = [];
 
   for (const userId of userIds) {
     try {

@@ -35,7 +35,7 @@ export interface Message {
   content: string;
   is_read: boolean;
   message_type?: string;
-  metadata?: any;
+  metadata?: unknown;
   created_at: Date;
   sender_name?: string;
   sender_avatar?: string;
@@ -95,7 +95,7 @@ export const messageService = {
     content: string,
     attachments?: Array<{ url: string; type: 'image' | 'video' | 'file' }>,
     messageType: string = 'text',
-    metadata: any = null
+    metadata: unknown = null
   ): Promise<Message> => {
     const connection = await dbPool.getConnection();
     try {
@@ -213,7 +213,7 @@ export const messageService = {
         AND cu.user_id != m.sender_id
       WHERE m.conversation_id = ?
     `;
-    const params: any[] = [conversationId];
+    const params: (number | string)[] = [conversationId];
 
     if (beforeId) {
       query += ` AND m.id < ?`;
@@ -309,12 +309,12 @@ export const messageService = {
 
   // 10. DTO Mappers
   toConversationDTO: (conv: Conversation): ConversationDTO => {
-    const { user1_id, user2_id, other_user_id, ...dto } = conv;
+    const { user1_id: _u1, user2_id: _u2, other_user_id: _ou, ...dto } = conv;
     return dto as ConversationDTO;
   },
 
   toMessageDTO: (msg: Message, fallbackSenderPublicId?: string): MessageDTO => {
-    const { sender_id, ...dto } = msg;
+    const { sender_id: _s, ...dto } = msg;
     if (!dto.sender_public_id && fallbackSenderPublicId) {
         dto.sender_public_id = fallbackSenderPublicId;
     }

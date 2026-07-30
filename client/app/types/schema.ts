@@ -23,7 +23,7 @@ export interface Post {
   s3_keys?: string[] | string;
   avatar_url?: string;
   items?: Item[];
-  images?: { id: number; s3_key?: string; image_url?: string; thumbnail_url?: string }[];
+  images?: { id: number; s3_key?: string; alt_text?: string }[];
   author_public_id: string;
   author_user_id: number;
   place_id?: string;

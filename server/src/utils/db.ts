@@ -52,11 +52,22 @@ dbPool.on("enqueue", () => {
   console.log("Waiting for available connection slot");
 });
 
+interface InternalPool {
+  _allConnections?: unknown[];
+  _freeConnections?: unknown[];
+  _connectionQueue?: unknown[];
+}
+
 // 錯誤處理
 const poolConnection = dbPool.pool;
-poolConnection.on("error", (err: any) => {
+poolConnection.on("error", (err: unknown) => {
   console.error("Database pool error:", err);
-  if (err.code === "PROTOCOL_CONNECTION_LOST") {
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: string }).code === "PROTOCOL_CONNECTION_LOST"
+  ) {
     console.log("Database connection lost, attempting to reconnect...");
   }
 });
@@ -64,25 +75,25 @@ poolConnection.on("error", (err: any) => {
 // ✅ 新增：監控連接池狀態
 const monitorInterval = setInterval(() => {
   try {
-    const pool = dbPool.pool as any; // 需要訪問內部屬性
+    const pool = dbPool.pool as unknown as InternalPool; // 需要訪問內部屬性
     const allConnections = pool._allConnections?.length || 0;
     const freeConnections = pool._freeConnections?.length || 0;
     const queueLength = pool._connectionQueue?.length || 0;
     const inUse = allConnections - freeConnections;
 
-    const status = {
-      timestamp: new Date().toISOString(),
-      total: allConnections,
-      free: freeConnections,
-      inUse: inUse,
-      queued: queueLength,
-      utilizationRate:
-        allConnections > 0
-          ? ((inUse / allConnections) * 100).toFixed(1) + "%"
-          : "0%",
-    };
+    // const status = {
+    //   timestamp: new Date().toISOString(),
+    //   total: allConnections,
+    //   free: freeConnections,
+    //   inUse: inUse,
+    //   queued: queueLength,
+    //   utilizationRate:
+    //     allConnections > 0
+    //       ? ((inUse / allConnections) * 100).toFixed(1) + "%"
+    //       : "0%",
+    // };
 
-    console.log("📊 Pool Status:", status);
+    // console.log("📊 Pool Status:", status);
 
     // ⚠️ 警告：如果使用率過高或有排隊，發出警告
     if (inUse >= 18 || queueLength > 0) {
@@ -106,7 +117,7 @@ export async function closeDatabase(): Promise<void> {
 
   try {
     // 最後一次報告狀態
-    const pool = dbPool.pool as any;
+    const pool = dbPool.pool as unknown as InternalPool;
     console.log("Final pool status:", {
       total: pool._allConnections?.length || 0,
       free: pool._freeConnections?.length || 0,

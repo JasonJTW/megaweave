@@ -6,7 +6,7 @@ import dbPool from "./utils/db";
 const router = Router();
 
 // 獲取所有狀況等級
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response) => {
   try {
     // 嘗試從數據庫讀取
     const conditionsQuery = `
@@ -29,7 +29,7 @@ router.get("/", async (req: Request, res: Response) => {
         message: "Conditions retrieved successfully",
         conditions,
       });
-    } catch (dbError) {
+    } catch {
       // 如果沒有 conditions 表，返回固定的選項
       console.warn("Conditions table not found, returning static options");
       const staticConditions = [
@@ -111,7 +111,7 @@ router.get("/:level", async (req: Request, res: Response) => {
         message: "Condition retrieved successfully",
         condition: conditions[0],
       });
-    } catch (dbError) {
+    } catch {
       // 如果沒有 conditions 表，返回對應的靜態選項
       const staticConditions = [
         {

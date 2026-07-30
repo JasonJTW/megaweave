@@ -7,6 +7,7 @@ dotenv.config();
 
 // 擴展 Express Request 類型以包含 user 屬性
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       user?: UserSession;

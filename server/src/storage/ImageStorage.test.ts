@@ -17,13 +17,13 @@ describe("ImageStorage Module Tests", () => {
       const key = "posts/sub/photo.jpg";
 
       expect(storage.getUrl(key, "original")).toBe(
-        "https://cdn.megaweaving.net/posts/sub/photo.jpg"
+        "https://cdn.megaweaving.net/posts/sub/photo.jpg",
       );
       expect(storage.getUrl(key, "thumb")).toBe(
-        "https://cdn.megaweaving.net/thumbnails/posts/thumb/sub/photo.webp"
+        "https://cdn.megaweaving.net/thumbnails/posts/thumb/sub/photo.webp",
       );
       expect(storage.getUrl(key, "medium")).toBe(
-        "https://cdn.megaweaving.net/thumbnails/posts/medium/sub/photo.webp"
+        "https://cdn.megaweaving.net/thumbnails/posts/medium/sub/photo.webp",
       );
     });
 

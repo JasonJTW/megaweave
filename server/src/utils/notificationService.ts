@@ -1,4 +1,5 @@
 import dbPool from "./db";
+import { ResultSetHeader } from "mysql2";
 import { Server } from "socket.io";
 import z from "zod";
 
@@ -31,7 +32,7 @@ export const createNotification = async (
 ) => {
   try {
     // 1. 存入 MySQL
-    const [result]: any = await dbPool.query(
+    const [result] = await dbPool.query<ResultSetHeader>(
       `INSERT INTO notifications (recipient_id, sender_id, type, title, content, link) 
        VALUES (?, ?, ?, ?, ?, ?)`,
       [

@@ -1,6 +1,7 @@
+import { RowDataPacket } from "mysql2";
 import { memoryUpload, updateAvatar } from "./upload";
 import { defaultImageStorage } from "./storage/ImageStorage";
-import { Request, Response, Router } from "express";
+import { Response, Router } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { randomUUID } from "crypto";
 import dotenv from "dotenv";
@@ -8,8 +9,9 @@ import dbPool from "./utils/db";
 import { updateUserSession } from "./session";
 dotenv.config();
 
-const S3_BUCKET_AVATAR_FOLDER = process.env.S3_BUCKET_AVATAR_FOLDER || "avatars";
-  
+const S3_BUCKET_AVATAR_FOLDER =
+  process.env.S3_BUCKET_AVATAR_FOLDER || "avatars";
+
 const router = Router();
 router.post(
   "/",
@@ -27,28 +29,36 @@ router.post(
 
       const userId = req.user!.userId;
       const userRole = req.user!.role;
-      
+
       // Upload directly to S3 (Lambda resizer handles thumbnailing asynchronously)
-      const { key: avatarKey, url: avatarUrl } = await defaultImageStorage.upload(
-        req.file.buffer,
-        S3_BUCKET_AVATAR_FOLDER,
-        `${Date.now()}-${randomUUID()}.webp`
-      );
+      const { key: avatarKey, url: avatarUrl } =
+        await defaultImageStorage.upload(
+          req.file.buffer,
+          S3_BUCKET_AVATAR_FOLDER,
+          `${Date.now()}-${randomUUID()}.webp`,
+        );
 
       connection = await dbPool.getConnection();
       await connection.beginTransaction();
-      
-      const result = await updateAvatar(connection, userId, userRole, avatarUrl, avatarKey);
+
+      const result = await updateAvatar(
+        connection,
+        userId,
+        userRole,
+        avatarUrl,
+        avatarKey,
+      );
       await connection.commit();
 
       //! async delete old avatar (file-and-forget)
       const oldAvatarKey = result.oldAvatarKey;
       const newAvatarKey = avatarKey;
       if (oldAvatarKey && oldAvatarKey !== newAvatarKey) {
-        void defaultImageStorage.delete([oldAvatarKey])
+        void defaultImageStorage
+          .delete([oldAvatarKey])
           .then(() => console.log(`Delete old Avatar ${oldAvatarKey}`))
           .catch((e) =>
-            console.error("Failed to delete old avatar (async):", e)
+            console.error("Failed to delete old avatar (async):", e),
           );
       }
       return res.status(200).json({
@@ -77,7 +87,7 @@ router.post(
         connection.release();
       }
     }
-  }
+  },
 );
 
 router.delete(
@@ -87,7 +97,6 @@ router.delete(
     let connection;
     try {
       const userId = req.user!.userId;
-      const userRole = req.user!.role;
 
       connection = await dbPool.getConnection();
       await connection.beginTransaction();
@@ -95,19 +104,19 @@ router.delete(
       // Get current avatar key before deleting
       let oldAvatarKey: string | null = null;
 
-      const [rows] = await connection.execute(
+      const [rows] = await connection.execute<RowDataPacket[]>(
         `SELECT avatar_key FROM users WHERE id = ?`,
-        [userId]
+        [userId],
       );
 
       if (Array.isArray(rows) && rows.length > 0) {
-        oldAvatarKey = (rows[0] as any).avatar_key;
+        oldAvatarKey = (rows[0] as RowDataPacket).avatar_key;
       }
 
       // Update database to remove avatar
       await connection.execute(
         `UPDATE users SET avatar_url = NULL, avatar_key = NULL WHERE id = ?`,
-        [userId]
+        [userId],
       );
 
       await connection.commit();
@@ -115,10 +124,11 @@ router.delete(
       //! async delete avatar from S3 (fire-and-forget)
       // todo:
       if (oldAvatarKey) {
-        void defaultImageStorage.delete([oldAvatarKey])
+        void defaultImageStorage
+          .delete([oldAvatarKey])
           .then(() => console.log(`Deleted avatar ${oldAvatarKey}`))
           .catch((e) =>
-            console.error("Failed to delete avatar from S3 (async):", e)
+            console.error("Failed to delete avatar from S3 (async):", e),
           );
       }
 
@@ -143,7 +153,7 @@ router.delete(
         connection.release();
       }
     }
-  }
+  },
 );
 
 export default router;

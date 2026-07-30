@@ -217,7 +217,7 @@ router.post("/", async (req: Request, res: Response) => {
       message: "Comment created",
       comment: newComment,
     });
-  } catch (err: any) {
+  } catch (err) {
     await connection.rollback();
     console.error("Error creating comment:", err);
     res.status(500).json({ message: "Failed to create comment" });
@@ -252,7 +252,7 @@ router.get("/", async (req: Request, res: Response) => {
       LEFT JOIN users u ON c.user_id = u.id
       WHERE c.post_id = ? AND c.is_deleted = 0
     `;
-    const params: any[] = [postId];
+    const params: (number | string)[] = [postId];
 
     // 篩選特定 item 或 all
     if (itemIdParam === "all") {
@@ -304,7 +304,7 @@ router.get("/", async (req: Request, res: Response) => {
       total: rows.length,
       comments: grouped,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error fetching comments:", err);
     res.status(500).json({ message: "Failed to fetch comments" });
   }
@@ -340,7 +340,7 @@ router.get("/counts", async (req: Request, res: Response) => {
     });
 
     res.json({ post_id: postId, counts });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Error fetching comment counts:", err);
     res.status(500).json({ message: "Failed to fetch counts" });
   }

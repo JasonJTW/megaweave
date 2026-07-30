@@ -63,12 +63,6 @@ interface WeaveOutput extends RowDataPacket {
   s3_keys: string;
 }
 
-interface ItemRow extends RowDataPacket {
-  id: number;
-  quantity: number;
-  title: string;
-}
-
 // 2. 共用函數與 SQL
 function processWeaveRows(weaveRows: WeaveOutput[]) {
   return weaveRows.map((row) => {
@@ -491,7 +485,6 @@ router.patch(
 
           if (details.length > 0) {
             const postTitle = details[0].title;
-            const postId = details[0].post_id;
             const actorName = req.user?.username || "Someone"; // The one who triggered this action
 
             // Determine recipient (the other party)
@@ -557,7 +550,7 @@ router.patch(
         newStatus: status,
         fullyCompleted: status === "completed",
       });
-    } catch (error) {
+    } catch {
       if (connection) await connection.rollback();
       res.status(500).json({ errorMessage: "Server error" });
     } finally {
@@ -584,7 +577,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
       userId,
     ]);
     return res.status(200).json({ weaves: processWeaveRows(weaveRows) });
-  } catch (error) {
+  } catch {
     res.status(500).json({ errorMessage: "Failed" });
   }
 });

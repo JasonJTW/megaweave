@@ -14,7 +14,7 @@ export function handleError(error: unknown, res: Response) {
 
   //* internal server error
   let errorMessage = "Internal server error";
-  let errorDetails = "An unexpected error occurred";
+  let errorDetails: string;
   let statusCode = 500;
 
   if (error instanceof Error) {

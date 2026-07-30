@@ -111,8 +111,7 @@ export class InMemoryImageStorage implements ImageStorage {
   async upload(
     buffer: Buffer,
     folder: string,
-    fileName: string,
-    _contentType?: string
+    fileName: string
   ): Promise<{ key: string; url: string }> {
     const key = `${folder}/${fileName}`;
     this.storage.set(key, buffer);

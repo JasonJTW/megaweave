@@ -243,7 +243,7 @@ export async function updateUserSession(
 
     //* Merge existing session data with updates
     const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined),
+      Object.entries(updates).filter(([, v]) => v !== undefined),
     );
     const updated = { ...parsed, ...filteredUpdates };
 

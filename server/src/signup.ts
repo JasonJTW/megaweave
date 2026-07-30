@@ -39,7 +39,7 @@ router.post("/", async (req: Request, res: Response) => {
   }
 
   //* 2. Check if the user already exists
-  let userExisted: Boolean;
+  let userExisted: boolean;
   let result: RowDataPacket | RowDataPacket[] | undefined;
   try {
     const [rows] = await dbPool.query<RowDataPacket[]>(
@@ -119,7 +119,7 @@ router.post("/", async (req: Request, res: Response) => {
     console.log("User session created:", userSession);
     console.log("---------");
     /// remove sensitive data before sending response
-    const { password, salt, ...safeUser } = user;
+    const { password: _password, salt: _salt, ...safeUser } = user;
     res.status(200).json({
       message: "Signup successful!",
       user: safeUser,

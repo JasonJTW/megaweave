@@ -4,8 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import dbPool from "./utils/db";
-import { requireAuth, requireRole } from "./middleware/auth";
-import { UserRole, userRoles } from "./schema";
+import { requireAuth } from "./middleware/auth";
 const router = Router();
 
 //* public get profile api

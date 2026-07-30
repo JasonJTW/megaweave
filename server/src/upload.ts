@@ -49,24 +49,22 @@ export async function uploadToS3(
   return defaultImageStorage.upload(buffer, folder, fileName, contentType);
 }
 
-//* Insert images url into db
+//* Insert images into db
 export async function insertImages(
   connection: PoolConnection,
   postId: number,
-  images: Array<{ url: string; thumbnailUrl: string; key?: string }>,
+  images: Array<{ key: string }>,
 ): Promise<void> {
   if (!images || images.length === 0) return;
 
   const imageInsertQuery = `
-    INSERT INTO images (post_id, image_url, s3_key, thumbnail_url, alt_text, created_at) 
+    INSERT INTO images (post_id, s3_key, alt_text, created_at) 
     VALUES ?
   `;
 
   const imageValues = images.map((img) => [
     postId,
-    img.url,
-    img.key || null,
-    img.thumbnailUrl,
+    img.key,
     `Image for post ${postId}`,
     new Date(),
   ]);

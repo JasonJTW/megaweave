@@ -2,6 +2,7 @@
 
 import { Request, Response, Router } from "express";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
+import { PoolConnection } from "mysql2/promise";
 import dbPool from "./utils/db";
 import { handleError } from "./utils/errorHandler";
 
@@ -65,7 +66,7 @@ async function validateCategory(categoryId: number): Promise<boolean> {
 
 // 查找或創建地點
 async function findOrCreateLocation(
-  connection: any,
+  connection: PoolConnection,
   locationData: {
     place_id: string;
     full_address: string;
@@ -79,10 +80,10 @@ async function findOrCreateLocation(
 ): Promise<number> {
   // 1. 檢查地點是否存在
   const checkQuery = "SELECT id FROM locations WHERE place_id = ?";
-  const [rows] = await connection.execute(checkQuery, [locationData.place_id]);
+  const [rows] = await connection.execute<RowDataPacket[]>(checkQuery, [locationData.place_id]);
 
-  if ((rows as any[]).length > 0) {
-    return (rows as any[])[0].id;
+  if (rows.length > 0) {
+    return rows[0].id as number;
   }
 
   // 2. 插入新地點
@@ -93,7 +94,7 @@ async function findOrCreateLocation(
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  const [result] = await connection.execute(insertQuery, [
+  const [result] = await connection.execute<ResultSetHeader>(insertQuery, [
     locationData.place_id,
     locationData.full_address,
     locationData.province || null,
@@ -104,7 +105,7 @@ async function findOrCreateLocation(
     locationData.lng,
   ]);
 
-  return (result as any).insertId;
+  return result.insertId;
 }
 
 //* Create post API
@@ -223,7 +224,7 @@ router.post(
     INSERT INTO items (post_id, title, quantity, created_at, updated_at) VALUES ${valuePlaceholders}
   `;
 
-        const bulkValues: any[] = [];
+        const bulkValues: (string | number)[] = [];
         for (const item of validationResult.items) {
           bulkValues.push(postId, item.title, item.quantity);
         }
@@ -231,37 +232,22 @@ router.post(
       }
 
       // 5. Process and upload images
-      const uploadedImages: Array<{
-        url: string;
-        thumbnailUrl: string;
-        key: string;
-        thumbKey: string;
-      }> = [];
+      const uploadedImages: Array<{ key: string }> = [];
 
       if (files && files.length > 0) {
-        const cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
         for (const file of files) {
           const fileId = randomUUID();
           const timestamp = Date.now();
           const fileName = `${timestamp}-${fileId}.webp`;
 
           // Upload raw image to S3 (S3 Event triggers Lambda resizer asynchronously)
-          const { key: mainKey, url: mainUrl } = await uploadToS3(
+          const { key: mainKey } = await uploadToS3(
             file.buffer,
             "posts",
             fileName,
           );
 
-          // Derived thumbnail path matching Lambda's folder structure (thumbnails/posts/thumb/{filename}.webp)
-          const thumbKey = `thumbnails/posts/thumb/${fileName}`;
-          const thumbUrl = `${cloudfrontUrl}/${thumbKey}`;
-
-          uploadedImages.push({
-            url: mainUrl,
-            thumbnailUrl: thumbUrl,
-            key: mainKey,
-            thumbKey,
-          });
+          uploadedImages.push({ key: mainKey });
         }
       }
 
@@ -334,8 +320,8 @@ router.get("/", async (req: Request, res: Response) => {
     const search = req.query.search as string;
     const type = req.query.type as string;
 
-    let whereConditions = ["p.status = ?", "p.deleted_at IS NULL"];
-    let queryParams: any[] = [status];
+    const whereConditions = ["p.status = ?", "p.deleted_at IS NULL"];
+    const queryParams: (string | number)[] = [status];
 
     if (category_id) {
       whereConditions.push("c.id = ?");
@@ -514,7 +500,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     }
 
     // 暫存貼文資料
-    let postData = rows[0];
+    const postData = rows[0];
 
     // 2. 瀏覽計數邏輯處理
     try {
@@ -565,7 +551,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     // 將圖片 S3 key 轉換為逗號分隔的字串格式
     const s3Keys = images
-      .map((img: any) => img.s3_key)
+      .map((img: RowDataPacket) => img.s3_key as string)
       .filter(Boolean)
       .join(",");
     const [items] = await dbPool.execute(
@@ -636,7 +622,7 @@ router.put(
       return handleError(error, res);
     }
 
-    let connection: any;
+    let connection: PoolConnection | undefined;
     try {
       // 2. 撈現有資料（同時確認存在 & 所有權）
       const [rows] = await dbPool.execute<RowDataPacket[]>(
@@ -742,42 +728,38 @@ router.put(
       if (incoming.deleteImageIds?.length) {
         const ph = incoming.deleteImageIds.map(() => "?").join(", ");
         const args = [...incoming.deleteImageIds, postId];
-        const [imgRows] = (await connection.execute(
-          `SELECT s3_key, thumbnail_s3_key FROM images WHERE id IN (${ph}) AND post_id = ?`,
+        const [imgRows] = await connection.execute<RowDataPacket[]>(
+          `SELECT s3_key FROM images WHERE id IN (${ph}) AND post_id = ?`,
           args,
-        )) as [RowDataPacket[], any];
+        );
 
         await connection.execute(
           `DELETE FROM images WHERE id IN (${ph}) AND post_id = ?`,
           args,
         );
 
-        const keysToDelete = imgRows.flatMap((img: any) =>
-          [img.s3_key, img.thumbnail_s3_key].filter(Boolean),
-        );
+        const keysToDelete = imgRows
+          .map((img: RowDataPacket) => img.s3_key as string)
+          .filter(Boolean);
         if (keysToDelete.length > 0) await deleteS3Files(keysToDelete);
       }
 
       // 8. 上傳新圖片
       if (files && files.length > 0) {
-        const cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
-        const uploadedImages: Array<{ url: string; thumbnailUrl: string; key: string }> = [];
+        const uploadedImages: Array<{ key: string }> = [];
 
         for (const file of files) {
           const fileId = randomUUID();
           const timestamp = Date.now();
           const fileName = `${timestamp}-${fileId}.webp`;
 
-          const { key: mainKey, url: mainUrl } = await uploadToS3(
+          const { key: mainKey } = await uploadToS3(
             file.buffer,
             "posts",
             fileName,
           );
 
-          const thumbKey = `thumbnails/posts/thumb/${fileName}`;
-          const thumbUrl = `${cloudfrontUrl}/${thumbKey}`;
-
-          uploadedImages.push({ url: mainUrl, thumbnailUrl: thumbUrl, key: mainKey });
+          uploadedImages.push({ key: mainKey });
         }
 
         await insertImages(connection, postId, uploadedImages);

@@ -21,7 +21,7 @@ if (!GOOGLE_CLIENT_ID) {
   throw new Error("Missing required environment variable: GOOGLE_CLIENT_ID");
 }
 
-function parseProviders(providersData: any): string[] {
+function parseProviders(providersData: unknown): string[] {
   // 如果是 null 或 undefined，返回空陣列
   if (!providersData) {
     return [];
@@ -86,7 +86,7 @@ async function findOrCreateUser(
       ]);
     }
     // 2. 用戶已存在，更新 provider 信息
-    let providers: string[] = parseProviders(existingUser.providers);
+    const providers: string[] = parseProviders(existingUser.providers);
 
     // 添加新的 provider（如果還沒有）
     if (!providers.includes(provider)) {
@@ -95,7 +95,7 @@ async function findOrCreateUser(
 
     // 3. 更新用戶資料
     let updateQuery = "UPDATE users SET providers = ?";
-    let updateValues: any[] = [JSON.stringify(providers)];
+    const updateValues: (string | null)[] = [JSON.stringify(providers)];
 
     // 根據 provider 類型更新相應字段
     if (
@@ -118,7 +118,7 @@ async function findOrCreateUser(
       !existingUser.password
     ) {
       updateQuery += ", password = ?, salt = ?";
-      updateValues.push(providerData.password, providerData.salt);
+      updateValues.push(providerData.password, providerData.salt ?? null);
     }
 
     updateQuery += " WHERE email = ?";
@@ -285,7 +285,9 @@ async function verifyGoogleCredential(credential: string) {
     return ticket.getPayload();
   } catch (error) {
     console.error("Google credential verification failed:", error);
-    throw new Error("Invalid Google credential");
+    const wrappedError = new Error("Invalid Google credential");
+    (wrappedError as Error & { cause?: unknown }).cause = error;
+    throw wrappedError;
   }
 }
 

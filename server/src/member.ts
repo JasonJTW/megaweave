@@ -41,17 +41,17 @@ router.get(`/all`, async (req: Request, res: Response) => {
   const { userId } = req.query;
 
   let query: string;
-  let queryParams: any[] = [];
+  let queryParams: (string | number)[] = [];
 
   if (userId) {
     query = `SELECT * FROM members WHERE user_id = ?`;
-    queryParams = [userId];
+    queryParams = [userId as string];
   } else {
     query = `SELECT * FROM members`;
   }
 
   try {
-    const [row] = await dbPool.query(query, queryParams);
+    const [row] = await dbPool.query<RowDataPacket[]>(query, queryParams);
     // console.log(
     //   userId ? `Member data for userId ${userId}: ` : "All members data: ",
     //   row

@@ -42,12 +42,12 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     await connection.beginTransaction();
 
     // check if user liked already
-    const [rows] = await connection.execute(
+    const [rows] = await connection.execute<RowDataPacket[]>(
       "SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?",
       [userId, postId]
     );
 
-    if ((rows as any[]).length > 0) {
+    if (rows.length > 0) {
       // liked already -> unlike
       await connection.execute(
         "DELETE FROM post_likes WHERE user_id = ? AND post_id = ?",

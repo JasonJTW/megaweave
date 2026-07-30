@@ -6,7 +6,7 @@ import EmailTemplate, { EmailTemplateProps } from "./emails/EmailTemplate";
 const router = Router();
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response) => {
   const props: EmailTemplateProps = {
     username: "Jason",
     title: "Your order has been confirmed ✓",

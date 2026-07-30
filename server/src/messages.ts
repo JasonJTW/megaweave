@@ -2,7 +2,8 @@ import Router, { Request, Response } from "express";
 import { requireAuth } from "./middleware/auth";
 import { messageService } from "./utils/messageService";
 import { Server } from "socket.io";
-import { memoryUpload, uploadToS3 } from "./upload";
+import { memoryUpload } from "./upload";
+import { defaultImageStorage } from "./storage/ImageStorage";
 import { randomUUID } from "crypto";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
@@ -116,7 +117,7 @@ router.post(
       if (req.files && Array.isArray(req.files)) {
         const files = req.files as Express.Multer.File[];
         for (const file of files) {
-          const { url } = await uploadToS3(
+          const { url } = await defaultImageStorage.upload(
             file.buffer,
             "messages",
             `${Date.now()}-${randomUUID()}.webp`,

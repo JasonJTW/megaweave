@@ -1,8 +1,7 @@
 //* signin.ts
 
-import express from "express";
 import { Request, Response, Router } from "express";
-import mysql, { ResultSetHeader, RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { SigninUserSchema, SigninUserSchemaType } from "./validations";
 import { handleError } from "./utils/errorHandler";
@@ -12,9 +11,6 @@ import { UserSession } from "./schema";
 import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
 import { userRoles } from "./schema";
-import { connect } from "http2";
-import { th } from "zod/locales";
-import { uuid } from "zod";
 import { randomUUID } from "crypto";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -62,7 +58,7 @@ async function findOrCreateUser(
     facebookId?: string;
     password?: string;
     salt?: string;
-  }
+  },
 ): Promise<RowDataPacket> {
   // 1. 先查找是否已存在相同 email 的用戶
   const findQuery = "SELECT * FROM users WHERE email = ?";
@@ -74,7 +70,7 @@ async function findOrCreateUser(
     const existingUser = existingUsers[0];
     const [existingProfiles] = await dbPool.execute<RowDataPacket[]>(
       "SELECT * FROM user_profiles WHERE user_id = ?",
-      [existingUser.id]
+      [existingUser.id],
     );
 
     // 如果沒有 profile，創建一個
@@ -165,7 +161,7 @@ async function findOrCreateUser(
       await connection.beginTransaction();
       const userResult = await connection.execute<ResultSetHeader>(
         insertUsersQuery,
-        insertUsersValues
+        insertUsersValues,
       );
       const userId = (userResult[0] as ResultSetHeader).insertId;
       const insertProfileValues = [
@@ -175,12 +171,12 @@ async function findOrCreateUser(
       ];
       await connection.execute<ResultSetHeader>(
         insertProfileQuery,
-        insertProfileValues
+        insertProfileValues,
       );
       // 返回新創建的用戶
       const [newUsers] = await connection.execute<RowDataPacket[]>(
         "SELECT * FROM users WHERE id = ?",
-        [userId]
+        [userId],
       );
       await connection.commit();
       return newUsers[0];
@@ -248,7 +244,7 @@ router.post("/", async (req: Request, res: Response) => {
     const isCorrectPassword = await verifyPassword(
       user.password,
       foundUser.salt,
-      foundUser.password
+      foundUser.password,
     );
 
     if (!isCorrectPassword) {
@@ -352,11 +348,11 @@ interface FacebookUser {
 }
 
 async function verifyFacebookToken(
-  accessToken: string
+  accessToken: string,
 ): Promise<FacebookUser | null> {
   try {
     const response = await fetch(
-      `https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture.width(800).height(800)`
+      `https://graph.facebook.com/me?access_token=${accessToken}&fields=id,name,email,picture.width(800).height(800)`,
     );
 
     if (!response.ok) {

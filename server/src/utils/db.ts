@@ -2,7 +2,7 @@
 
 import dotenv from "dotenv";
 dotenv.config();
-import mysql, { RowDataPacket } from "mysql2";
+import mysql from "mysql2";
 
 const DB_HOST = process.env.DB_HOST;
 const DB_USER = process.env.DB_USER;
@@ -82,7 +82,7 @@ const monitorInterval = setInterval(() => {
           : "0%",
     };
 
-    // console.log("📊 Pool Status:", status);
+    console.log("📊 Pool Status:", status);
 
     // ⚠️ 警告：如果使用率過高或有排隊，發出警告
     if (inUse >= 18 || queueLength > 0) {

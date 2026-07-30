@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { User } from "./types/user";
 
 export const UserSchema = z.object({
   id: z.number().int().positive(),

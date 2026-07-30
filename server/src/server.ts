@@ -53,7 +53,7 @@ if (NODE_ENV !== "development") {
   app.use(limiter);
 }
 
-app.get("/health", (req, res) => {
+app.get("/health", (_req, res) => {
   res.json({
     status: "OK",
     timestamp: new Date().toISOString(),
@@ -127,7 +127,7 @@ async function startServer() {
     app.set("io", io);
 
     //* 6. Add middleware to inject io into res.locals for all routes
-    app.use((req, res, next) => {
+    app.use((_req, res, next) => {
       res.locals.io = io;
       next();
     });

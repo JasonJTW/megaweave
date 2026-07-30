@@ -1,10 +1,5 @@
-import {
-  s3Client,
-  memoryUpload,
-  updateAvatar,
-  deleteS3Files,
-  uploadToS3,
-} from "./upload";
+import { memoryUpload, updateAvatar } from "./upload";
+import { defaultImageStorage } from "./storage/ImageStorage";
 import { Request, Response, Router } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { randomUUID } from "crypto";
@@ -34,7 +29,7 @@ router.post(
       const userRole = req.user!.role;
       
       // Upload directly to S3 (Lambda resizer handles thumbnailing asynchronously)
-      const { key: avatarKey, url: avatarUrl } = await uploadToS3(
+      const { key: avatarKey, url: avatarUrl } = await defaultImageStorage.upload(
         req.file.buffer,
         S3_BUCKET_AVATAR_FOLDER,
         `${Date.now()}-${randomUUID()}.webp`
@@ -50,7 +45,7 @@ router.post(
       const oldAvatarKey = result.oldAvatarKey;
       const newAvatarKey = avatarKey;
       if (oldAvatarKey && oldAvatarKey !== newAvatarKey) {
-        void deleteS3Files([oldAvatarKey])
+        void defaultImageStorage.delete([oldAvatarKey])
           .then(() => console.log(`Delete old Avatar ${oldAvatarKey}`))
           .catch((e) =>
             console.error("Failed to delete old avatar (async):", e)
@@ -120,7 +115,7 @@ router.delete(
       //! async delete avatar from S3 (fire-and-forget)
       // todo:
       if (oldAvatarKey) {
-        void deleteS3Files([oldAvatarKey])
+        void defaultImageStorage.delete([oldAvatarKey])
           .then(() => console.log(`Deleted avatar ${oldAvatarKey}`))
           .catch((e) =>
             console.error("Failed to delete avatar from S3 (async):", e)

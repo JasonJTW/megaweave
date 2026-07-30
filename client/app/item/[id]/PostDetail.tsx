@@ -389,7 +389,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const existingImages =
     post.images?.map((img) => ({
       id: img.id,
-      image_url: img.s3_key ? getImageUrl(img.s3_key, "medium") : img.image_url || "",
+      image_url: img.s3_key ? getImageUrl(img.s3_key, "medium") : "",
     })) || [];
 
   return (

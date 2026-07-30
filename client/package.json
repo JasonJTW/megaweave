@@ -7,7 +7,9 @@
     "build": "dotenv -e .env.production -- next build",
     "build:dev": "dotenv -e .env.development --next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hashintel/refractive": "^0.0.3",

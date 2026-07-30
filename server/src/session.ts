@@ -1,10 +1,8 @@
 import { z } from "zod";
-import { userRoles, UserSession } from "./schema";
+import { UserSession } from "./schema";
 import crypto from "crypto";
 import { getRedisClient, connectRedis, isRedisConnected } from "./utils/redis";
 import { CookieOptions, Request, Response } from "express";
-import cookieParser from "cookie-parser";
-import { disconnect } from "process";
 import { sessionSchema } from "./schema";
 import dotenv from "dotenv";
 dotenv.config();
@@ -16,7 +14,11 @@ const REDIS_SESSION_KEY = process.env.REDIS_SESSION_KEY || "session";
 const ROLE_SESSION_KEY = process.env.ROLE_SESSION_KEY || "user-role";
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN!;
 
-if (!process.env.COOKIE_SESSION_KEY || !process.env.REDIS_SESSION_KEY || !process.env.ROLE_SESSION_KEY) {
+if (
+  !process.env.COOKIE_SESSION_KEY ||
+  !process.env.REDIS_SESSION_KEY ||
+  !process.env.ROLE_SESSION_KEY
+) {
   console.warn(
     "⚠️ Warning: Some session-related environment variables are missing. Using default values.",
   );
@@ -50,7 +52,6 @@ export class UpdateSessionError extends SessionError {
 }
 
 function setCookie(res: Response, name: string, value: string) {
-  const isProduction = process.env.NODE_ENV === "production";
   res.cookie(name, value, {
     maxAge: SESSION_EXPIRATION_SECONDS * 1000,
     expires: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
@@ -58,14 +59,13 @@ function setCookie(res: Response, name: string, value: string) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    domain: COOKIE_DOMAIN
+    domain: COOKIE_DOMAIN,
   });
 }
 
 // 供 Middleware 讀取的 role cookie (httpOnly: false 以便伺服器端 Edge Runtime 讀取)
 // 不含敏感資料，真正的身份驗證仍由 Redis session 處理
 function setRoleCookie(res: Response, role: string) {
-  const isProduction = process.env.NODE_ENV === "production";
   res.cookie("user-role", role, {
     maxAge: SESSION_EXPIRATION_SECONDS * 1000,
     expires: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
@@ -73,7 +73,7 @@ function setRoleCookie(res: Response, role: string) {
     httpOnly: false, // Middleware (Edge Runtime) 需要能讀取這個 Cookie
     sameSite: "lax",
     path: "/",
-    domain:  COOKIE_DOMAIN,
+    domain: COOKIE_DOMAIN,
   });
 }
 
@@ -94,7 +94,7 @@ async function ensureRedisConnection(): Promise<void> {
 
 export async function createUserSession(
   user: UserSession,
-  req: Request,
+  _req: Request,
   res: Response,
 ) {
   try {
@@ -137,8 +137,7 @@ export async function createUserSession(
 
 export async function removeUserSession(req: Request, res: Response) {
   const sessionId = req.cookies[COOKIE_SESSION_KEY];
-  const isProduction = process.env.NODE_ENV === "production";
-  
+
   const cookieOptions: CookieOptions = {
     path: "/",
     domain: COOKIE_DOMAIN,
@@ -157,7 +156,6 @@ export async function removeUserSession(req: Request, res: Response) {
     // ✅ 清除所有相關 Cookies
     res.clearCookie(COOKIE_SESSION_KEY, cookieOptions);
     res.clearCookie(ROLE_SESSION_KEY, cookieOptions);
-    
   } catch (error) {
     console.error("Error removing user session:", error);
     // 即使 Redis 刪除失敗，也至少嘗試清除 Cookies
@@ -185,8 +183,8 @@ export async function getUserSessionFromRedis(
 
     if (!success) {
       console.error("Invalid session data format in Redis");
-      console.error("rawUser: ", rawUser)
-      console.error("parsedUser: ", parsedUser)
+      console.error("rawUser: ", rawUser);
+      console.error("parsedUser: ", parsedUser);
       return null;
     }
 

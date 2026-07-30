@@ -1,7 +1,6 @@
 // currentUser.ts
 import { Request, Response } from "express";
 import {
-  getUserFromCookie,
   updateUserSession,
   RedisConnectionError,
   UpdateSessionError,

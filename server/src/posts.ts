@@ -1,66 +1,22 @@
 //* posts.ts
 
 import { Request, Response, Router } from "express";
-import mysql, { ResultSetHeader, RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { handleError } from "./utils/errorHandler";
-import { getRedisClient, connectRedis } from "./utils/redis";
-import multer from "multer";
-import multerS3 from "multer-s3";
-import { S3Client } from "@aws-sdk/client-s3";
+
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import dotenv from "dotenv";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
-import { memoryUpload, insertImages, uploadToS3 } from "./upload";
-import { deleteS3Files } from "./upload";
+import { memoryUpload, uploadToS3, insertImages, deleteS3Files } from "./upload";
 import likeRouter from "./like";
 import { shouldIncrementView } from "./utils/viewCounter";
 import { getUserFromCookie } from "./session";
 dotenv.config();
 
 const router = Router();
-const redisClient = getRedisClient();
-const COOKIE_SESSION_KEY = process.env.COOKIE_SESSION_KEY!;
-const REDIS_SESSION_KEY = process.env.REDIS_SESSION_KEY!;
-const BUCKET_NAME = process.env.BUCKET_NAME;
-const BUCKET_REGION = process.env.BUCKET_REGION;
-const ACCESS_KEY = process.env.ACCESS_KEY;
-const SECRET_ACCESS_KEY = process.env.SECRET_ACCESS_KEY;
 const UPLOAD_IMAGE_LIMIT = process.env.UPLOAD_IMAGE_LIMIT || "5";
-
-//* AWS S3 config
-const s3Client = new S3Client({
-  region: BUCKET_REGION,
-  credentials: {
-    accessKeyId: ACCESS_KEY!,
-    secretAccessKey: SECRET_ACCESS_KEY!,
-  },
-});
-//* Multer S3 config
-const upload = multer({
-  storage: multerS3({
-    s3: s3Client,
-    bucket: BUCKET_NAME!,
-    key: function (req, file, cb) {
-      const fileExtension = file.originalname.split(".").pop();
-      const fileName = `posts/${Date.now()}-${randomUUID()}.${fileExtension}`;
-      cb(null, fileName);
-    },
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-  }),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    /// image file filter
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed!"));
-    }
-  },
-});
 
 /// Post validation Schema
 const ItemSchema = z.object({
@@ -307,11 +263,12 @@ router.post(
             thumbKey,
           });
         }
-
-        await insertImages(connection, postId, uploadedImages);
       }
 
       // 6. 提交事務
+      if (uploadedImages.length > 0) {
+        await insertImages(connection, postId, uploadedImages);
+      }
       await connection.commit();
 
       // 7. 返回創建的貼文信息
@@ -607,7 +564,10 @@ router.get("/:id", async (req: Request, res: Response) => {
     ]);
 
     // 將圖片 S3 key 轉換為逗號分隔的字串格式
-    const s3Keys = images.map((img: any) => img.s3_key).filter(Boolean).join(",");
+    const s3Keys = images
+      .map((img: any) => img.s3_key)
+      .filter(Boolean)
+      .join(",");
     const [items] = await dbPool.execute(
       `SELECT * FROM items WHERE post_id = ?`,
       [postId],
@@ -656,13 +616,19 @@ router.put(
     try {
       const raw = {
         ...req.body,
-        ...(req.body.categoryId    && { categoryId:    parseInt(req.body.categoryId) }),
-        ...(req.body.conditionLevel && { conditionLevel: parseInt(req.body.conditionLevel) }),
-        ...(req.body.lat           && { lat: parseFloat(req.body.lat) }),
-        ...(req.body.lng           && { lng: parseFloat(req.body.lng) }),
+        ...(req.body.categoryId && {
+          categoryId: parseInt(req.body.categoryId),
+        }),
+        ...(req.body.conditionLevel && {
+          conditionLevel: parseInt(req.body.conditionLevel),
+        }),
+        ...(req.body.lat && { lat: parseFloat(req.body.lat) }),
+        ...(req.body.lng && { lng: parseFloat(req.body.lng) }),
         ...(req.body.expiresAt === "" && { expiresAt: null }),
-        ...(req.body.items         && { items: JSON.parse(req.body.items) }),
-        ...(req.body.deleteImageIds && { deleteImageIds: JSON.parse(req.body.deleteImageIds) }),
+        ...(req.body.items && { items: JSON.parse(req.body.items) }),
+        ...(req.body.deleteImageIds && {
+          deleteImageIds: JSON.parse(req.body.deleteImageIds),
+        }),
       };
       incoming = EditPostSchema.parse(raw);
     } catch (error) {
@@ -677,8 +643,12 @@ router.put(
         "SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL",
         [postId],
       );
-      if (rows.length === 0) return res.status(404).json({ errorMessage: "Post not found" });
-      if (rows[0].user_id !== userId) return res.status(403).json({ errorMessage: "Forbidden: You are not the owner of this post" });
+      if (rows.length === 0)
+        return res.status(404).json({ errorMessage: "Post not found" });
+      if (rows[0].user_id !== userId)
+        return res.status(403).json({
+          errorMessage: "Forbidden: You are not the owner of this post",
+        });
 
       const existing = rows[0];
 
@@ -694,7 +664,12 @@ router.put(
 
       // 4. 處理地點更新
       let locationId = existing.location_id;
-      if (incoming.place_id && incoming.full_address && incoming.lat !== undefined && incoming.lng !== undefined) {
+      if (
+        incoming.place_id &&
+        incoming.full_address &&
+        incoming.lat !== undefined &&
+        incoming.lng !== undefined
+      ) {
         locationId = await findOrCreateLocation(connection, {
           place_id: incoming.place_id,
           full_address: incoming.full_address,
@@ -709,16 +684,19 @@ router.put(
 
       // 5. Merge 現有資料 + 傳入資料，固定 UPDATE（和 Create Post 對稱）
       const merged = {
-        title:           incoming.title           ?? existing.title,
-        content:         incoming.content         ?? existing.content,
-        status:          incoming.status          ?? existing.status,
-        type:            incoming.type            ?? existing.type,
-        tags:            incoming.tags            ?? existing.tags ?? null,
-        categoryId:      incoming.categoryId      ?? existing.category_id,
-        conditionLevel:  incoming.conditionLevel  ?? existing.condition_level,
-        expiresAt:       "expiresAt" in incoming
-                           ? (incoming.expiresAt ? new Date(incoming.expiresAt) : null)
-                           : existing.expires_at,
+        title: incoming.title ?? existing.title,
+        content: incoming.content ?? existing.content,
+        status: incoming.status ?? existing.status,
+        type: incoming.type ?? existing.type,
+        tags: incoming.tags ?? existing.tags ?? null,
+        categoryId: incoming.categoryId ?? existing.category_id,
+        conditionLevel: incoming.conditionLevel ?? existing.condition_level,
+        expiresAt:
+          "expiresAt" in incoming
+            ? incoming.expiresAt
+              ? new Date(incoming.expiresAt)
+              : null
+            : existing.expires_at,
       };
 
       await connection.execute(
@@ -728,17 +706,32 @@ router.put(
              location_id = ?, updated_at = NOW()
          WHERE id = ?`,
         [
-          merged.title, merged.content, merged.status, merged.type, merged.tags,
-          merged.categoryId, merged.conditionLevel, merged.expiresAt,
-          locationId, postId,
+          merged.title,
+          merged.content,
+          merged.status,
+          merged.type,
+          merged.tags,
+          merged.categoryId,
+          merged.conditionLevel,
+          merged.expiresAt,
+          locationId,
+          postId,
         ],
       );
 
       // 6. 更新 Items（先清除舊的再重新插入）
       if (incoming.items?.length) {
-        await connection.execute("DELETE FROM items WHERE post_id = ?", [postId]);
-        const placeholders = incoming.items.map(() => "(?, ?, ?, NOW(), NOW())").join(", ");
-        const values = incoming.items.flatMap((item) => [postId, item.title, item.quantity]);
+        await connection.execute("DELETE FROM items WHERE post_id = ?", [
+          postId,
+        ]);
+        const placeholders = incoming.items
+          .map(() => "(?, ?, ?, NOW(), NOW())")
+          .join(", ");
+        const values = incoming.items.flatMap((item) => [
+          postId,
+          item.title,
+          item.quantity,
+        ]);
         await connection.execute(
           `INSERT INTO items (post_id, title, quantity, created_at, updated_at) VALUES ${placeholders}`,
           values,
@@ -749,12 +742,15 @@ router.put(
       if (incoming.deleteImageIds?.length) {
         const ph = incoming.deleteImageIds.map(() => "?").join(", ");
         const args = [...incoming.deleteImageIds, postId];
-        const [imgRows] = await connection.execute(
+        const [imgRows] = (await connection.execute(
           `SELECT s3_key, thumbnail_s3_key FROM images WHERE id IN (${ph}) AND post_id = ?`,
           args,
-        ) as [RowDataPacket[], any];
+        )) as [RowDataPacket[], any];
 
-        await connection.execute(`DELETE FROM images WHERE id IN (${ph}) AND post_id = ?`, args);
+        await connection.execute(
+          `DELETE FROM images WHERE id IN (${ph}) AND post_id = ?`,
+          args,
+        );
 
         const keysToDelete = imgRows.flatMap((img: any) =>
           [img.s3_key, img.thumbnail_s3_key].filter(Boolean),
@@ -763,24 +759,29 @@ router.put(
       }
 
       // 8. 上傳新圖片
-      if (files?.length) {
+      if (files && files.length > 0) {
         const cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
-        const uploadedImages = await Promise.all(
-          files.map(async (file) => {
-            const fileId = randomUUID();
-            const timestamp = Date.now();
-            const fileName = `${timestamp}-${fileId}.webp`;
+        const uploadedImages: Array<{ url: string; thumbnailUrl: string; key: string }> = [];
 
-            const { key, url } = await uploadToS3(file.buffer, "posts", fileName);
-            const thumbKey = `thumbnails/posts/thumb/${fileName}`;
-            const thumbnailUrl = `${cloudfrontUrl}/${thumbKey}`;
+        for (const file of files) {
+          const fileId = randomUUID();
+          const timestamp = Date.now();
+          const fileName = `${timestamp}-${fileId}.webp`;
 
-            return { url, thumbnailUrl, key, thumbKey };
-          }),
-        );
+          const { key: mainKey, url: mainUrl } = await uploadToS3(
+            file.buffer,
+            "posts",
+            fileName,
+          );
+
+          const thumbKey = `thumbnails/posts/thumb/${fileName}`;
+          const thumbUrl = `${cloudfrontUrl}/${thumbKey}`;
+
+          uploadedImages.push({ url: mainUrl, thumbnailUrl: thumbUrl, key: mainKey });
+        }
+
         await insertImages(connection, postId, uploadedImages);
       }
-
       await connection.commit();
 
       const [updatedPost] = await dbPool.execute<RowDataPacket[]>(
@@ -798,7 +799,9 @@ router.put(
         [postId],
       );
 
-      res.status(200).json({ message: "Post updated successfully", post: updatedPost[0] });
+      res
+        .status(200)
+        .json({ message: "Post updated successfully", post: updatedPost[0] });
     } catch (error) {
       if (connection) await connection.rollback();
       console.error("⚠️ Edit post error:", error);
@@ -810,38 +813,47 @@ router.put(
 );
 
 //* Delete post api (Soft Delete)
-router.delete("/:id", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const postId = parseInt(req.params.id);
-    const userId = req.user!.userId;
+router.delete(
+  "/:id",
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const postId = parseInt(req.params.id);
+      const userId = req.user!.userId;
 
-    if (isNaN(postId)) {
-      return res.status(400).json({ errorMessage: "Invalid post ID" });
+      if (isNaN(postId)) {
+        return res.status(400).json({ errorMessage: "Invalid post ID" });
+      }
+
+      // Check ownership and if already deleted
+      const checkQuery =
+        "SELECT user_id FROM posts WHERE id = ? AND deleted_at IS NULL";
+      const [rows] = await dbPool.execute<RowDataPacket[]>(checkQuery, [
+        postId,
+      ]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ errorMessage: "Post not found" });
+      }
+
+      const post = rows[0];
+      if (post.user_id !== userId) {
+        return res.status(403).json({
+          errorMessage: "Forbidden: You are not the owner of this post",
+        });
+      }
+
+      // Perform soft delete
+      const deleteQuery = "UPDATE posts SET deleted_at = NOW() WHERE id = ?";
+      await dbPool.execute(deleteQuery, [postId]);
+
+      res.status(200).json({ message: "Post deleted successfully" });
+    } catch (error) {
+      console.error("Delete post error:", error);
+      return res.status(500).json({ errorMessage: "Internal server error" });
     }
-
-    // Check ownership and if already deleted
-    const checkQuery = "SELECT user_id FROM posts WHERE id = ? AND deleted_at IS NULL";
-    const [rows] = await dbPool.execute<RowDataPacket[]>(checkQuery, [postId]);
-
-    if (rows.length === 0) {
-      return res.status(404).json({ errorMessage: "Post not found" });
-    }
-
-    const post = rows[0];
-    if (post.user_id !== userId) {
-      return res.status(403).json({ errorMessage: "Forbidden: You are not the owner of this post" });
-    }
-
-    // Perform soft delete
-    const deleteQuery = "UPDATE posts SET deleted_at = NOW() WHERE id = ?";
-    await dbPool.execute(deleteQuery, [postId]);
-
-    res.status(200).json({ message: "Post deleted successfully" });
-  } catch (error) {
-    console.error("Delete post error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
-  }
-});
+  },
+);
 
 /// like & unlike post api
 router.use("/:id/like", likeRouter);

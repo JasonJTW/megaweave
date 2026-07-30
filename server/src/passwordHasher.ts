@@ -1,4 +1,4 @@
-import crypto, { hash } from "crypto";
+import crypto from "crypto";
 
 export function hashPassword(password: string, salt: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -16,7 +16,7 @@ export function generateSalt() {
 export async function verifyPassword(
   password: string,
   salt: string,
-  hashedPassword: string
+  hashedPassword: string,
 ) {
   const inputHashedPassword = await hashPassword(password, salt);
   console.log("inputHashedPassword:", inputHashedPassword);
@@ -24,6 +24,6 @@ export async function verifyPassword(
   console.log("salt:", salt);
   return crypto.timingSafeEqual(
     Buffer.from(inputHashedPassword, "hex"),
-    Buffer.from(hashedPassword, "hex")
+    Buffer.from(hashedPassword, "hex"),
   );
 }

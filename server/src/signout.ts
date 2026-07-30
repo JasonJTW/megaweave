@@ -1,6 +1,5 @@
 import { Request, Response, Router } from "express";
 import { removeUserSession } from "./session";
-import { requireAuth } from "./middleware/auth";
 import dotenv from "dotenv";
 dotenv.config();
 const router = Router();

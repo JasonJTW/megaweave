@@ -19,12 +19,12 @@ import messagesAPI from "./messages";
 import sendAPI from "./send";
 
 //* Test api
-router.post("/test", (req, res) => {
+router.post("/test", (_req, res) => {
   console.log("API test called");
   res.json({ message: "You're inside docker!" });
 });
 
-router.get("/test", (req, res) => {
+router.get("/test", (_req, res) => {
   console.log("API test called");
   res.json({ message: "You're inside docker!" });
 });

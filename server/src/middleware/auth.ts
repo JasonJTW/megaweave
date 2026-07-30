@@ -21,7 +21,7 @@ declare global {
 export async function requireAuth(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   try {
     const user = await getUserFromCookie(req);
@@ -56,8 +56,8 @@ export async function requireAuth(
  */
 export async function optionalAuth(
   req: Request,
-  res: Response,
-  next: NextFunction
+  _res: Response,
+  next: NextFunction,
 ) {
   try {
     const user = await getUserFromCookie(req);

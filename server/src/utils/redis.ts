@@ -4,7 +4,6 @@ import { createClient } from "@redis/client";
 import dotenv from "dotenv";
 dotenv.config();
 
-let isConnecting = false;
 //! New insert
 let connectionPromise: Promise<void> | null = null;
 
@@ -34,7 +33,6 @@ const redisClient = createClient({
 redisClient.on("error", (err) => {
   console.error("❌ Redis Client Error", err.message);
   console.log("Redis URL: ", process.env.REDIS_URL);
-  isConnecting = false;
 
   //! New insert
   connectionPromise = null;
@@ -42,28 +40,23 @@ redisClient.on("error", (err) => {
 
 redisClient.on("connect", () => {
   console.log("✅ Redis client connected successfully.");
-  isConnecting = false;
 });
 
 redisClient.on("ready", () => {
   console.log("✅ Redis client ready.");
-  isConnecting = false;
 });
 
 redisClient.on("disconnect", () => {
   console.log("⚠️ Redis client disconnected.");
-  isConnecting = false;
   connectionPromise = null;
 });
 
 redisClient.on("reconnecting", () => {
   console.log("🔄 Redis client reconnecting...");
-  isConnecting = true;
 });
 
 redisClient.on("end", () => {
   console.log("Redis connection ended.");
-  isConnecting = false;
   connectionPromise = null;
 });
 
@@ -81,12 +74,10 @@ export async function connectRedis(): Promise<void> {
   // ✅ 創建新的連接 Promise
   connectionPromise = (async () => {
     try {
-      isConnecting = true;
       console.log("🔌 Connecting to Redis...");
       await redisClient.connect();
       console.log("✅ Redis connected and ready");
     } catch (error) {
-      isConnecting = false;
       connectionPromise = null;
       console.error("❌ Failed to connect to Redis:", error);
       throw error;
@@ -101,7 +92,6 @@ export async function disconnectRedis(): Promise<void> {
   try {
     console.log("📍 [1/5] disconnectRedis called");
 
-    isConnecting = false;
     connectionPromise = null;
 
     console.log("📍 [2/5] Checking Redis status:");
@@ -110,13 +100,13 @@ export async function disconnectRedis(): Promise<void> {
 
     if (redisClient.isOpen) {
       console.log(
-        "📍 [3/5] Calling redisClient.quit() for graceful shutdown..."
+        "📍 [3/5] Calling redisClient.quit() for graceful shutdown...",
       );
 
       // ✅ Add timeout protection
       const quitPromise = redisClient.quit();
       const timeoutPromise = new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error("Quit timeout after 5s")), 5000)
+        setTimeout(() => reject(new Error("Quit timeout after 5s")), 5000),
       );
 
       try {

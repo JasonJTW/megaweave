@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
-import PostInfoCard from "./PostInfoCard";
+import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
 import { createWeave } from "@/services/weaveService";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -32,7 +32,7 @@ export const ChatPopup = () => {
   }, [pendingItem]);
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
-  const handleWeavingSubmit = async (quantity: number | "all") => {
+  const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
     if (!currentUser) {
       toast.error("Please log in to request items.");
       router.push(
@@ -47,26 +47,26 @@ export const ChatPopup = () => {
       return;
     }
 
-    try {
-      // displayedItem 保留最後選擇的 item；"all" 時 itemId = null
-      const isAll = !displayedItem || displayedItem.title === "all";
-      const targetItemId = isAll ? null : (displayedItem.id as number);
-      const targetQuantity = typeof quantity === "number" ? quantity : 1;
+    if (selectedItems.length === 0) {
+      toast.error("Please select at least one item.");
+      return;
+    }
 
+    try {
       const newWeave = await createWeave({
         postId: post.id,
-        itemId: targetItemId,
-        quantity: targetQuantity,
+        items: selectedItems.map((it) => ({
+          itemId: it.itemId,
+          quantity: it.quantity,
+        })),
       });
       void newWeave;
 
       // Clear all UI state after a successful weave
       setPendingItem(null);
       setDisplayedItem(null);
-      // closeChat();
 
       toast.success("Request sent successfully!");
-      // router.push(`/user?highlightWeaveId=${newWeave.weaveId}`);
     } catch (err: unknown) {
       console.error("Weaving submit error:", err);
       if (err instanceof Error) {

@@ -208,16 +208,21 @@ const WeavingCard = ({
       ? post.content
       : undefined;
 
+  const itemsToDisplay = activeWeave?.items && activeWeave.items.length > 0
+    ? activeWeave.items.map((it, idx) => ({
+        id: it.id || idx,
+        title: it.title || "Item",
+        quantity: it.quantity,
+      }))
+    : post?.items || [];
+
   const visibleItems = isInChatWindow
     ? []
-    : post?.items
-      ? post.items.slice(0, 2)
-      : [];
+    : itemsToDisplay.slice(0, 2);
+
   const hasMoreItems = isInChatWindow
     ? false
-    : post?.items
-      ? post.items.length > 2
-      : false;
+    : itemsToDisplay.length > 2;
 
   const displayUser = activeWeave && currentUserId
     ? currentUserId === activeWeave.giver_id

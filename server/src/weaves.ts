@@ -9,13 +9,19 @@ import { messageService } from "./utils/messageService";
 const router = Router();
 
 // 1. 定義型別
+interface WeaveItemRow {
+  id: number;
+  weave_id: number;
+  item_id: number | null;
+  quantity: number;
+  title: string | null;
+}
+
 interface WeaveRow extends RowDataPacket {
   id: number;
   post_id: number;
-  item_id: number | null;
   giver_id: number;
   receiver_id: number;
-  quantity: number;
   status: "pending" | "completed" | "cancelled" | "rejected" | "requested";
   giver_confirmed: boolean | number;
   receiver_confirmed: boolean | number;
@@ -28,10 +34,8 @@ interface WeaveRow extends RowDataPacket {
 interface WeaveOutput extends RowDataPacket {
   id: number;
   post_id: number;
-  item_id: number | null;
   giver_id: number;
   receiver_id: number;
-  quantity: number;
   status: "pending" | "completed" | "cancelled" | "rejected" | "requested";
   giver_confirmed: number;
   receiver_confirmed: number;
@@ -55,7 +59,6 @@ interface WeaveOutput extends RowDataPacket {
   post_created_at: Date;
   post_updated_at: Date;
   post_comment_count: number;
-  item_title: string | null;
   giver_name: string;
   giver_avatar: string;
   receiver_name: string;
@@ -64,7 +67,25 @@ interface WeaveOutput extends RowDataPacket {
 }
 
 // 2. 共用函數與 SQL
-function processWeaveRows(weaveRows: WeaveOutput[]) {
+async function processWeaveRows(weaveRows: WeaveOutput[]) {
+  if (weaveRows.length === 0) return [];
+  const weaveIds = weaveRows.map((r) => r.id);
+
+  // 批量抓取 items 明細
+  const [itemsRows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT wi.id, wi.weave_id, wi.item_id, wi.quantity, i.title
+     FROM weave_items wi
+     LEFT JOIN items i ON wi.item_id = i.id
+     WHERE wi.weave_id IN (?)`,
+    [weaveIds],
+  );
+
+  const itemsMap: Record<number, WeaveItemRow[]> = {};
+  (itemsRows as WeaveItemRow[]).forEach((item) => {
+    if (!itemsMap[item.weave_id]) itemsMap[item.weave_id] = [];
+    itemsMap[item.weave_id].push(item);
+  });
+
   return weaveRows.map((row) => {
     const post = {
       id: row.post_id_original,
@@ -86,19 +107,24 @@ function processWeaveRows(weaveRows: WeaveOutput[]) {
       s3_keys: row.s3_keys ?? "",
     };
 
+    const items = itemsMap[row.id] || [];
+    const firstItem = items[0];
+
     return {
       id: row.id,
       post_id: row.post_id,
-      item_id: row.item_id,
+      items,
+      // 向下相容舊欄位
+      item_id: firstItem ? firstItem.item_id : null,
+      item_title: firstItem ? firstItem.title : null,
+      quantity: firstItem ? firstItem.quantity : 1,
       giver_id: row.giver_id,
       receiver_id: row.receiver_id,
-      quantity: row.quantity,
       status: row.status,
       notes: row.notes,
       completed_at: row.completed_at,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      item_title: row.item_title,
       giver_name: row.giver_name,
       giver_avatar: row.giver_avatar,
       receiver_name: row.receiver_name,
@@ -129,7 +155,6 @@ const WEAVE_QUERY_BASE = `
       p.created_at AS post_created_at,
       p.updated_at AS post_updated_at,
       p.comment_count AS post_comment_count,
-      i.title AS item_title,
       giver.username AS giver_name,
       giver.avatar_url AS giver_avatar,
       receiver.username AS receiver_name,
@@ -138,7 +163,6 @@ const WEAVE_QUERY_BASE = `
   FROM weaves w
   JOIN posts p ON w.post_id = p.id
   LEFT JOIN locations l ON p.location_id = l.id
-  LEFT JOIN items i ON w.item_id = i.id
   JOIN users giver ON w.giver_id = giver.id
   JOIN users receiver ON w.receiver_id = receiver.id
   LEFT JOIN images img ON p.id = img.post_id
@@ -198,40 +222,60 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         .json({ errorMessage: "This post is no longer active" });
     }
 
-    // 2. 🔥 重要：處理指定 Item 的邏輯
-    if (itemId) {
-      // 檢查該 Item 是否真的屬於這則貼文，且庫存是否足夠
-      const [items] = await dbPool.execute<RowDataPacket[]>(
-        `SELECT quantity, title FROM items WHERE id = ? AND post_id = ?`,
-        [itemId, postId],
-      );
+    // 2. 🔥 處理多個 Item (或相容單個 itemId/quantity)
+    interface IncomingItem {
+      itemId?: number;
+      item_id?: number;
+      quantity?: number;
+    }
+    let itemsToProcess: { itemId: number; quantity: number }[] = [];
+    if (Array.isArray(req.body.items) && req.body.items.length > 0) {
+      itemsToProcess = req.body.items.map((it: IncomingItem) => ({
+        itemId: Number(it.itemId || it.item_id),
+        quantity: Number(it.quantity || 1),
+      }));
+    } else if (itemId) {
+      itemsToProcess = [{ itemId: Number(itemId), quantity: Number(quantity || 1) }];
+    }
 
-      if (items.length === 0) {
-        return res
-          .status(404)
-          .json({ errorMessage: "Selected item does not exist in this post" });
-      }
+    // 檢查指定 Items 的存在性與庫存
+    for (const item of itemsToProcess) {
+      if (item.itemId) {
+        const [dbItems] = await dbPool.execute<RowDataPacket[]>(
+          `SELECT quantity, title FROM items WHERE id = ? AND post_id = ?`,
+          [item.itemId, postId],
+        );
 
-      if (items[0].quantity < quantity) {
-        return res.status(400).json({
-          errorMessage: `Requested quantity (${quantity}) exceeds available stock (${items[0].quantity})`,
-        });
+        if (dbItems.length === 0) {
+          return res
+            .status(404)
+            .json({ errorMessage: `Item ${item.itemId} does not exist in this post` });
+        }
+
+        if (dbItems[0].quantity < item.quantity) {
+          return res.status(400).json({
+            errorMessage: `Requested quantity (${item.quantity}) exceeds available stock (${dbItems[0].quantity}) for "${dbItems[0].title}"`,
+          });
+        }
       }
     }
 
-    // 3. 建立 Weave 紀錄 (預設狀態為 requested，等待物主審核)
+    // 3. 建立 Weave 主表紀錄
     const [result] = await dbPool.execute<ResultSetHeader>(
-      `INSERT INTO weaves (post_id, item_id, giver_id, receiver_id, quantity, status, notes)
-       VALUES (?, ?, ?, ?, ?, 'requested', ?)`,
-      [
-        postId,
-        itemId || null, // 如果沒指定 item，存為 null
-        giverId,
-        receiverId,
-        quantity,
-        notes || null,
-      ],
+      `INSERT INTO weaves (post_id, giver_id, receiver_id, status, notes)
+       VALUES (?, ?, ?, 'requested', ?)`,
+      [postId, giverId, receiverId, notes || null],
     );
+
+    const newWeaveId = result.insertId;
+
+    // 4. 寫入 weave_items 明細表
+    for (const item of itemsToProcess) {
+      await dbPool.execute(
+        `INSERT INTO weave_items (weave_id, item_id, quantity) VALUES (?, ?, ?)`,
+        [newWeaveId, item.itemId || null, item.quantity],
+      );
+    }
 
     const targetUserId = initiatorId === giverId ? receiverId : giverId;
     let notificationSent = false;
@@ -281,7 +325,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
           type: "ORDER_UPDATE",
           title: notifTitle,
           content: notifContent,
-          link: `/user?highlightWeaveId=${result.insertId}`,
+          link: `/user?highlightWeaveId=${newWeaveId}`,
         });
 
         console.log("🔔 [Weave] Notification created successfully:", notif.id);
@@ -302,15 +346,18 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         targetUserId,
       );
 
-      // 取得 item 標題，如果沒有 itemId，標題可以使用 post 的標題
       let itemTitle = "All Items";
-      if (itemId) {
+      const firstProcessedItem = itemsToProcess[0];
+      if (firstProcessedItem && firstProcessedItem.itemId) {
         const [itemRows] = await dbPool.execute<RowDataPacket[]>(
           `SELECT title FROM items WHERE id = ?`,
-          [itemId],
+          [firstProcessedItem.itemId],
         );
         if (itemRows.length > 0) {
           itemTitle = itemRows[0].title;
+          if (itemsToProcess.length > 1) {
+            itemTitle += ` +${itemsToProcess.length - 1} more`;
+          }
         }
       } else {
         const [postRows] = await dbPool.execute<RowDataPacket[]>(
@@ -322,7 +369,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         }
       }
 
-      // 取得貼文的第一張圖片（只存 S3 key，避免寫死 CDN 網域）
+      // 取得貼文的第一張圖片
       let imageS3Key: string | null = null;
       const [imgRows] = await dbPool.execute<RowDataPacket[]>(
         `SELECT s3_key FROM images WHERE post_id = ? ORDER BY id ASC LIMIT 1`,
@@ -335,10 +382,10 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       const postAuthorPublicId =
         await messageService.getPublicIdByUserId(postOwnerId);
       const newMetadata = {
-        item_id: itemId,
+        item_id: firstProcessedItem?.itemId || null,
         item_title: itemTitle,
-        quantity,
-        weave_id: result.insertId,
+        quantity: firstProcessedItem?.quantity || 1,
+        weave_id: newWeaveId,
         post_id: postId,
         image_s3_key: imageS3Key,
         post_type: postType,
@@ -348,7 +395,6 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       const io = res.locals.io;
       const senderPublicId = req.user!.public_id;
 
-      // 每次 Request 都新增一筆全新的 system_start_weaving 訊息（作為小卡）
       const sysMsg = await messageService.createMessage(
         conversationId,
         initiatorId,
@@ -370,7 +416,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     return res.status(201).json({
       message: "Weave request sent successfully",
-      weaveId: result.insertId,
+      weaveId: newWeaveId,
       notificationSent,
       debugInfo,
     });
@@ -398,7 +444,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const query = `${WEAVE_QUERY_BASE} ${whereClause} GROUP BY w.id ORDER BY w.created_at DESC`;
     const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
-    return res.status(200).json({ weaves: processWeaveRows(weaveRows) });
+    const weaves = await processWeaveRows(weaveRows);
+    return res.status(200).json({ weaves });
   } catch (error) {
     console.error("Error retrieving weaves:", error);
     if (error instanceof Error) {
@@ -422,7 +469,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     if (weaveRows.length === 0) {
       return res.status(404).json({ errorMessage: "Weave not found" });
     }
-    const processed = processWeaveRows(weaveRows);
+    const processed = await processWeaveRows(weaveRows);
     return res.status(200).json({ weave: processed[0] });
   } catch (error) {
     console.error("Error retrieving single weave:", error);
@@ -516,10 +563,15 @@ router.patch(
             Boolean(check[0].giver_confirmed) &&
             Boolean(check[0].receiver_confirmed)
           ) {
-            if (weave.item_id) {
+            // 從 weave_items 扣減庫存
+            const [weaveItems] = await connection.execute<RowDataPacket[]>(
+              `SELECT item_id, quantity FROM weave_items WHERE weave_id = ? AND item_id IS NOT NULL`,
+              [weaveId],
+            );
+            for (const item of weaveItems) {
               await connection.execute(
                 `UPDATE items SET quantity = quantity - ? WHERE id = ?`,
-                [weave.quantity, weave.item_id],
+                [item.quantity, item.item_id],
               );
             }
             await connection.execute(
@@ -688,7 +740,8 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
       userId,
       userId,
     ]);
-    return res.status(200).json({ weaves: processWeaveRows(weaveRows) });
+    const processed = await processWeaveRows(weaveRows);
+    return res.status(200).json({ weaves: processed });
   } catch {
     res.status(500).json({ errorMessage: "Failed" });
   }

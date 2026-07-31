@@ -325,10 +325,29 @@ const WeavingCard = ({
           {isInChatWindow && (
             <div className="type-body-t5 mt-1.5 flex items-center justify-between">
               <span className="text-primary-75">
-                {inChatWindow.itemTitle === "all" ||
-                inChatWindow.itemTitle.startsWith("All Items - ")
-                  ? "Request all item"
-                  : `Request Qty: ${inChatWindow.quantity}`}
+                {(() => {
+                  const weaveItems = activeWeave?.items || [];
+                  const totalTypes = weaveItems.length;
+                  const totalQuantity = weaveItems.reduce(
+                    (sum, item) => sum + (Number(item.quantity) || 1),
+                    0,
+                  );
+
+                  if (
+                    inChatWindow.itemTitle === "all" ||
+                    inChatWindow.itemTitle.startsWith("All Items - ")
+                  ) {
+                    return "Request all items";
+                  }
+
+                  if (totalTypes > 1) {
+                    return `Request: ${totalTypes} items (${totalQuantity} total)`;
+                  }
+
+                  const singleQty =
+                    totalQuantity > 0 ? totalQuantity : inChatWindow.quantity;
+                  return `Request Qty: ${singleQty}`;
+                })()}
               </span>
               <Link
                 href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}

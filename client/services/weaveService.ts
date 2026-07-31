@@ -13,7 +13,7 @@ export interface Weave {
   post_id: number;
   post_title: string;
   item_title?: string;
-  status: "pending" | "completed" | "cancelled";
+  status: "pending" | "completed" | "cancelled" | "rejected" | "requested";
   giver_confirmed: boolean;
   receiver_confirmed: boolean;
   notes?: string;

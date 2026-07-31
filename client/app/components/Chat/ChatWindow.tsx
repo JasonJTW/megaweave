@@ -746,6 +746,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       )}
                       {shouldShowCard && (
                         <WeavingCard
+                          currentUserId={currentUser?.userId}
                           inChatWindow={{
                             itemTitle,
                             quantity,

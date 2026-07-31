@@ -4,13 +4,16 @@ import type { Weave } from "@/services/weaveService";
 import Image from "next/image";
 import Link from "next/link";
 import { User as UserIcon } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import type { Post } from "../types/schema";
 import AcceptIcon from "./icons/AcceptIcon";
 import CancelIcon from "./icons/CancelIcon";
 import WeavingIcon from "./icons/WeavingIcon";
 import { useWeaveActions } from "@/hooks/useWeaveActions";
+import { useSocket } from "@/hooks/useSocket";
+
+const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 interface WeavesCardProps {
   post?: Post;
@@ -50,14 +53,28 @@ function getDisplayUsername(
   return post.username;
 }
 
-type WeaveStatusLabel = "Weaved" | "Weaving" | "Canceled";
+type WeaveStatusLabel =
+  | "New Request"
+  | "Request Sent"
+  | "Weaved"
+  | "Weaving"
+  | "Rejected"
+  | "Canceled";
 
-function getWeaveStatusLabel(status: Weave["status"]): WeaveStatusLabel | null {
+function getWeaveStatusLabel(
+  status: Weave["status"] | undefined,
+  isGiverRole: boolean,
+): WeaveStatusLabel | null {
+  if (!status) return null;
   switch (status) {
+    case "requested":
+      return isGiverRole ? "New Request" : "Request Sent";
     case "completed":
       return "Weaved";
     case "pending":
       return "Weaving";
+    case "rejected":
+      return "Rejected";
     case "cancelled":
       return "Canceled";
     default:
@@ -67,8 +84,11 @@ function getWeaveStatusLabel(status: Weave["status"]): WeaveStatusLabel | null {
 
 const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> =
   {
+    "New Request": { badge: "bg-[#FEF3C7] text-[#92400E]", icon: "text-[#92400E]" },
+    "Request Sent": { badge: "bg-[#FEF3C7] text-[#92400E]", icon: "text-[#92400E]" },
     Weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
     Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
+    Rejected: { badge: "bg-[#FEE2E2] text-[#991B1B]", icon: "text-[#991B1B]" },
     Canceled: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
   };
 
@@ -81,15 +101,76 @@ const WeavingCard = ({
   onWeaveStatusChange,
   inChatWindow,
 }: WeavesCardProps) => {
+  const { socket } = useSocket();
+  const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(undefined);
+
+  const activeWeave = weave || fetchedWeave;
+  const targetWeaveId = weave?.id || inChatWindow?.weaveId;
+
+  // 自動拉取單筆 Weave 詳情 (當在 ChatWindow 中只傳入 weaveId 時)
+  useEffect(() => {
+    if (weave || !targetWeaveId) return;
+    let isMounted = true;
+    const fetchWeaveData = async () => {
+      try {
+        const res = await fetch(`${hostName}/api/weaves/${targetWeaveId}`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.weave) {
+            setFetchedWeave(data.weave);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch weave detail in WeavingCard:", err);
+      }
+    };
+    fetchWeaveData();
+    return () => {
+      isMounted = false;
+    };
+  }, [weave, targetWeaveId]);
+
+  // 監聽即時 Socket 狀態更新，在 ChatWindow 中自動重抓最新細節
+  useEffect(() => {
+    if (!socket || !targetWeaveId) return;
+
+    const handleStatusUpdate = (data: { weaveId: number }) => {
+      if (Number(data.weaveId) === Number(targetWeaveId)) {
+        fetch(`${hostName}/api/weaves/${targetWeaveId}`, {
+          credentials: "include",
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.weave) setFetchedWeave(data.weave);
+          })
+          .catch((err) => console.error("Error re-fetching weave:", err));
+      }
+    };
+
+    socket.on("weave_status_updated", handleStatusUpdate);
+    return () => {
+      socket.off("weave_status_updated", handleStatusUpdate);
+    };
+  }, [socket, targetWeaveId]);
+
   const {
+    isGiver,
     isReceiver,
     hasIConfirmed,
     hasOtherConfirmed,
     localStatus,
     isProcessing,
+    handleApproveWeave,
+    handleRejectWeave,
     handleCompleteWeave,
     handleCancelWeave,
-  } = useWeaveActions({ weave, currentUserId, onWeaveStatusChange });
+  } = useWeaveActions({
+    weave: activeWeave,
+    currentUserId,
+    onWeaveStatusChange,
+  });
 
   // Early return only if neither inChatWindow nor post is provided
   if (!inChatWindow && !post) return null;
@@ -107,13 +188,14 @@ const WeavingCard = ({
       ? "Weaving Request Received"
       : "Weaving Request Sent"
     : post
-      ? getDisplayUsername(post, weave, currentUserId)
+      ? getDisplayUsername(post, activeWeave, currentUserId)
       : "";
 
-  const currentStatus = isInChatWindow
-    ? "pending"
-    : localStatus || weave?.status;
-  const statusLabel = currentStatus ? getWeaveStatusLabel(currentStatus) : null;
+  const currentStatus =
+    localStatus || activeWeave?.status || (isInChatWindow ? "requested" : undefined);
+
+  const isGiverRole = isGiver || (isInChatWindow ? inChatWindow.isGiver : false);
+  const statusLabel = currentStatus ? getWeaveStatusLabel(currentStatus, isGiverRole) : null;
 
   const cardTitle = isInChatWindow
     ? inChatWindow.itemTitle
@@ -137,16 +219,24 @@ const WeavingCard = ({
       ? post.items.length > 2
       : false;
 
-  const displayUser = isInChatWindow
-    ? null
-    : weave && currentUserId
-      ? currentUserId === weave.giver_id
-        ? {
-            name: weave.receiver_name,
-            avatar: weave.receiver_avatar,
-            role: "Receiver",
-          }
-        : { name: weave.giver_name, avatar: weave.giver_avatar, role: "Giver" }
+  const displayUser = activeWeave && currentUserId
+    ? currentUserId === activeWeave.giver_id
+      ? {
+          name: activeWeave.receiver_name,
+          avatar: activeWeave.receiver_avatar,
+          role: "Receiver",
+        }
+      : {
+          name: activeWeave.giver_name,
+          avatar: activeWeave.giver_avatar,
+          role: "Giver",
+        }
+    : isInChatWindow
+      ? {
+          name: inChatWindow.isGiver ? "Receiver" : "Giver",
+          avatar: "",
+          role: inChatWindow.isGiver ? "Receiver" : "Giver",
+        }
       : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -274,6 +364,16 @@ const WeavingCard = ({
             </span>
             <span className="type-body-t5 text-[#666]">{displayUser.role}</span>
 
+            {currentStatus === "requested" && (
+              <div className="mt-1 flex flex-col gap-1">
+                <span className="text-xs font-medium text-amber-600">
+                  {isGiver
+                    ? "Requested by receiver. Approve or reject this request?"
+                    : "Waiting for giver's approval..."}
+                </span>
+              </div>
+            )}
+
             {currentStatus === "pending" && (
               <div className="mt-1 flex flex-col gap-1">
                 {!hasIConfirmed ? (
@@ -301,7 +401,42 @@ const WeavingCard = ({
             )}
           </div>
 
-          {/* Action buttons — pending only */}
+          {/* Action buttons — requested state */}
+          {currentStatus === "requested" && (
+            <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
+              {isGiver ? (
+                <>
+                  <button
+                    onClick={handleApproveWeave}
+                    disabled={isProcessing}
+                    className={`transition-all hover:text-green-600 ${isProcessing ? "opacity-50" : ""}`}
+                    title="Approve request"
+                  >
+                    <AcceptIcon className="h-auto w-[18px]" />
+                  </button>
+                  <button
+                    onClick={handleRejectWeave}
+                    disabled={isProcessing}
+                    className={`transition-all hover:text-red-600 ${isProcessing ? "opacity-50" : ""}`}
+                    title="Reject request"
+                  >
+                    <CancelIcon className="h-auto w-[18px]" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleCancelWeave}
+                  disabled={isProcessing}
+                  className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
+                  title="Cancel request"
+                >
+                  <CancelIcon className="h-auto w-[18px]" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Action buttons — pending state */}
           {currentStatus === "pending" && (
             <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
               <button
@@ -326,16 +461,22 @@ const WeavingCard = ({
           )}
 
           {/* Final status */}
-          {currentStatus !== "pending" && (
+          {currentStatus !== "requested" && currentStatus !== "pending" && (
             <div className="ml-auto">
               <span
                 className={`text-sm font-semibold ${
                   currentStatus === "completed"
                     ? "text-green-600"
-                    : "text-red-600"
+                    : currentStatus === "rejected"
+                      ? "text-red-600"
+                      : "text-gray-500"
                 }`}
               >
-                {currentStatus === "completed" ? "✓ Completed" : "✗ Cancelled"}
+                {currentStatus === "completed"
+                  ? "✓ Completed"
+                  : currentStatus === "rejected"
+                    ? "✗ Rejected"
+                    : "✗ Cancelled"}
               </span>
             </div>
           )}

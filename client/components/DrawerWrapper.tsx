@@ -47,6 +47,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
             currentUserId={currentUserId}
             highlightWeaveId={parsedHighlightId}
             fetchWeaves={fetchWeaves}
+            onWeaveStatusChange={fetchWeaves}
           />
         </div>
         <div className="min-w-0">

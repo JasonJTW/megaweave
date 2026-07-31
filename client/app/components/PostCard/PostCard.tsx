@@ -45,9 +45,19 @@ function PostCardInner({
 
   const s3Keys = parseS3Keys(post);
 
-  const imageSrc = s3Keys[0]?.startsWith("http")
+  const primarySrc = s3Keys[0]?.startsWith("http")
     ? s3Keys[0]
     : getImageUrl(s3Keys[0], "medium");
+
+  const fallbackSrc = s3Keys[0]?.startsWith("http")
+    ? s3Keys[0]
+    : getImageUrl(s3Keys[0], "original");
+
+  const [imageSrc, setImageSrc] = React.useState(primarySrc);
+
+  React.useEffect(() => {
+    setImageSrc(primarySrc);
+  }, [primarySrc]);
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()
@@ -106,6 +116,11 @@ function PostCardInner({
                   sizes="(min-width: 768px) 280px, 100vw"
                   className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
                   priority={!!isFirstVisible}
+                  onError={() => {
+                    if (imageSrc !== fallbackSrc) {
+                      setImageSrc(fallbackSrc);
+                    }
+                  }}
                 />
                 {isExpired && (
                   <div

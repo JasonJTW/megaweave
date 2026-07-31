@@ -22,7 +22,7 @@ import { useNavbar } from "./contexts/NavBarContext";
 import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
 import { Post, PostsResponse } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
-import { compressImage } from "@/utils/imageProcessor";
+import { compressImagesParallel } from "@/utils/imageProcessor";
 import OverlayTour, { TourStep } from "./components/OverlayTour";
 
 import { useRouter } from "next/navigation";
@@ -525,13 +525,16 @@ const PostsApp = () => {
       }
       formData.append("type", postType);
 
-      // 壓縮並添加圖片
-      for (const image of data.newImages) {
-        const compressedBlob = await compressImage(image, 1200, 1200, 0.85);
-        if (compressedBlob) {
-          formData.append("images", compressedBlob, "image.webp");
-        } else {
-          formData.append("images", image);
+      // 壓縮並添加圖片 (平行處理 + 量化基準測試日誌)
+      if (data.newImages && data.newImages.length > 0) {
+        const processedImages = await compressImagesParallel(
+          data.newImages,
+          1200,
+          1200,
+          0.85,
+        );
+        for (const { blob, filename } of processedImages) {
+          formData.append("images", blob, filename);
         }
       }
 

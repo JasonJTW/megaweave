@@ -93,7 +93,6 @@ router.post(
         .json({ errorMessage: "No valid fields to update" });
     }
 
-    //TODO: check member_name
     if (
       "member_name" in filteredUpdates &&
       !filteredUpdates.member_name?.trim()
@@ -125,7 +124,7 @@ router.post(
       console.error("Database error:", error);
       res.status(500).json({ errorMessage: "Failed to update member profile" });
     }
-  }
+  },
 );
 
 export default router;

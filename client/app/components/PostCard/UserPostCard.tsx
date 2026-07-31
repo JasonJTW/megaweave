@@ -34,9 +34,19 @@ function UserPostCardInner({
 }: UserPostCardProps) {
   const s3Keys = parseS3Keys(post);
 
-  const imageSrc = s3Keys[0]?.startsWith("http")
+  const primarySrc = s3Keys[0]?.startsWith("http")
     ? s3Keys[0]
     : getImageUrl(s3Keys[0], "thumb");
+
+  const fallbackSrc = s3Keys[0]?.startsWith("http")
+    ? s3Keys[0]
+    : getImageUrl(s3Keys[0], "original");
+
+  const [imageSrc, setImageSrc] = React.useState(primarySrc);
+
+  React.useEffect(() => {
+    setImageSrc(primarySrc);
+  }, [primarySrc]);
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()
@@ -67,6 +77,11 @@ function UserPostCardInner({
               sizes="145px"
               className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
               priority={!!isFirstVisible}
+              onError={() => {
+                if (imageSrc !== fallbackSrc) {
+                  setImageSrc(fallbackSrc);
+                }
+              }}
             />
             {isExpired && (
               <div

@@ -1,3 +1,5 @@
+import toast from "react-hot-toast";
+
 /**
  * Utility for compressing images on the client side using HTML5 Canvas.
  */
@@ -64,4 +66,62 @@ export async function compressImage(
     };
     reader.onerror = () => resolve(null);
   });
+}
+
+export interface ProcessedImage {
+  blob: Blob | File;
+  filename: string;
+  isCompressed: boolean;
+}
+
+/**
+ * Safely compresses a single image with error handling and proper filename resolution.
+ */
+export async function safeCompressImage(
+  file: File,
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.85,
+): Promise<ProcessedImage> {
+  try {
+    const compressedBlob = await compressImage(
+      file,
+      maxWidth,
+      maxHeight,
+      quality,
+    );
+    if (compressedBlob) {
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      return {
+        blob: compressedBlob,
+        filename: `${baseName}.webp`,
+        isCompressed: true,
+      };
+    }
+  } catch (error) {
+    console.warn(`[ImageProcessor] Error compressing ${file.name}:`, error);
+    toast.error(`Failed to compress image ${file.name}`);
+  }
+
+  return {
+    blob: file,
+    filename: file.name,
+    isCompressed: false,
+  };
+}
+
+/**
+ * Compresses multiple images concurrently using Promise.all.
+ */
+export async function compressImagesParallel(
+  files: File[],
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.85,
+): Promise<ProcessedImage[]> {
+  if (!files || files.length === 0) return [];
+
+  return Promise.all(
+    files.map((file) => safeCompressImage(file, maxWidth, maxHeight, quality)),
+  );
 }

@@ -67,7 +67,6 @@ router.post(
         avatarKey: result.avatarKey,
       });
     } catch (error) {
-      //TODO: handle errors
       console.error("Error uploading avatar:", error);
       if (error instanceof Error) {
         console.error("Error message:", error.message);

@@ -30,9 +30,8 @@ services:
     image: ghcr.io/pontusab/workbench-standalone:latest
     ports:
       - "9999:3000"
-    environment:
-      - QUEUE_NAMES=post-image
-      - REDIS_URL=${WORKBENCH_REDIS_URL}
+    env_file:
+      - ./workbench.env
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

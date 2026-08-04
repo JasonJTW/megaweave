@@ -98,7 +98,17 @@ export default function PostFormModal({
   });
 
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [deletedImageIds, setDeletedImageIds] = useState<number[]>([]);
+
+  // Manage preview URLs lifecycle to avoid calling URL.createObjectURL on re-renders
+  useEffect(() => {
+    const urls = selectedImages.map((file) => URL.createObjectURL(file));
+    setPreviewUrls(urls);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [selectedImages]);
 
   // Validation Errors State
   const [formErrors, setFormErrors] = useState<{
@@ -499,12 +509,12 @@ export default function PostFormModal({
                 })}
 
                 {/* 新選擇的圖片 */}
-                {selectedImages.map((image, index) => (
+                {selectedImages.map((_, index) => (
                   <div key={`new-${index}`} className="group relative">
                     <div className="aspect-square overflow-hidden rounded-lg border-2 border-dashed border-primary bg-gray-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={URL.createObjectURL(image)}
+                        src={previewUrls[index]}
                         alt={`New preview ${index + 1}`}
                         className="h-full w-full object-cover"
                       />

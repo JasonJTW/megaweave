@@ -3,18 +3,27 @@
 
 import { Queue } from "bullmq";
 import { bullmqConnection } from "./connection";
-import { EmailJobData } from "./jobs/email";
+import {
+  PostUploadImageJobData,
+  PostDeleteImageJobData,
+} from "./jobs/postImage";
 
-export const emailQueue = new Queue<EmailJobData>("email", {
+export const postImageQueue = new Queue<
+  PostUploadImageJobData | PostDeleteImageJobData
+>("post-image", {
   connection: bullmqConnection,
 });
 
-/** Route handler 呼叫這個來排入 email 任務 */
-export async function enqueueEmail(data: EmailJobData): Promise<void> {
-  await emailQueue.add("send-email", data);
-  console.log(`📨 Enqueued email to: ${data.to}`);
+export async function enqueuePostUploadImages(
+  data: PostUploadImageJobData,
+): Promise<void> {
+  await postImageQueue.add("upload-images", data);
+  console.log(`🖼️ Enqueued upload images job for post #${data.postId}`);
 }
 
-// 未來新增其他 Queue 也放在這裡，例如：
-// export const notificationQueue = new Queue<NotificationJobData>("notification", { connection: bullmqConnection });
-// export async function enqueueNotification(data: NotificationJobData) { ... }
+export async function enqueuePostDeleteImages(
+  data: PostDeleteImageJobData,
+): Promise<void> {
+  await postImageQueue.add("delete-images", data);
+  console.log(`🗑️ Enqueued delete images job for ${data.s3Keys.length} files`);
+}

@@ -83,7 +83,16 @@ function UserPostCardInner({
                 }
               }}
             />
-            {isExpired && (
+            {post.status === "inactive" ? (
+              <div
+                className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-black/60"
+                aria-hidden="true"
+              >
+                <span className="font-ddin text-[14px] font-bold tracking-[0.12em] text-white">
+                  HIDDEN
+                </span>
+              </div>
+            ) : isExpired ? (
               <div
                 className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-black/50"
                 aria-hidden="true"
@@ -92,7 +101,7 @@ function UserPostCardInner({
                   OVERDUE
                 </span>
               </div>
-            )}
+            ) : null}
           </>
         ) : (
           <div className="type-body-t5 flex h-full w-full items-center justify-center text-primary-75">

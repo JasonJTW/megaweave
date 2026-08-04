@@ -18,8 +18,9 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { usePost } from "../contexts/PostContext";
-import { CreatePostFormData, ItemInput } from "../types/schema";
+import { CreatePostFormData, ItemInput, Post } from "../types/schema";
 
 import AddIcon from "./icons/AddIcon";
 import DeleteIcon from "./icons/DeleteIcon";
@@ -34,6 +35,7 @@ export interface PostFormSubmitData {
   tags: string;
   categoryId: number;
   conditionLevel: number;
+  status: Post["status"];
   expires_at?: Date;
   items: ItemInput[];
   place_id?: string;
@@ -88,6 +90,7 @@ export default function PostFormModal({
       title: string;
       quantity: number | "";
     }[],
+    status: "active" as Post["status"],
     place_id: undefined as string | undefined,
     province: undefined as string | undefined,
     city: undefined as string | undefined,
@@ -139,6 +142,7 @@ export default function PostFormModal({
         categoryId: initialData?.categoryId || null,
         conditionLevel: initialData?.conditionLevel || null,
         expires_at: initialData?.expires_at || undefined,
+        status: initialData?.status || "active",
         items:
           initialData?.items && initialData.items.length > 0
             ? initialData.items.map((it) => ({
@@ -414,6 +418,7 @@ export default function PostFormModal({
       tags: formData.tags,
       categoryId: formData.categoryId!,
       conditionLevel: formData.conditionLevel!,
+      status: formData.status,
       expires_at: formData.expires_at,
       items: filteredItems,
       place_id: formData.place_id,
@@ -697,52 +702,76 @@ export default function PostFormModal({
                 </div>
               </div>
 
-              {/* Expiry Date */}
-              <div className="flex items-center gap-[5px]">
-                <ClockIcon className="h-[24px] w-[24px] text-primary" />
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      data-empty={!formData.expires_at}
-                      className={`w-[212px] justify-between bg-white text-left font-normal ${invalidFieldBorderClass(
-                        formErrors.expires_at,
-                      )}`}
-                    >
-                      {formData.expires_at ? (
-                        format(formData.expires_at, "PPP")
-                      ) : (
-                        <span className="text-[18px] font-medium tracking-normal text-primary-75">
-                          Expiry date
-                        </span>
-                      )}
-                      <CalendarIcon className="h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.expires_at}
-                      onSelect={(date) => {
-                        setFormErrors((prev) => ({
-                          ...prev,
-                          expires_at: false,
-                        }));
-                        setFormData({
-                          ...formData,
-                          expires_at: date || undefined,
-                        });
-                      }}
-                      defaultMonth={formData.expires_at}
-                      disabled={(date) => {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        return date < today;
-                      }}
-                      required
-                    />
-                  </PopoverContent>
-                </Popover>
+              {/* Expiry Date & Public/Hidden Switch */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-[5px]">
+                  <ClockIcon className="h-[24px] w-[24px] text-primary" />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        data-empty={!formData.expires_at}
+                        className={`w-[212px] justify-between bg-white text-left font-normal ${invalidFieldBorderClass(
+                          formErrors.expires_at,
+                        )}`}
+                      >
+                        {formData.expires_at ? (
+                          format(formData.expires_at, "PPP")
+                        ) : (
+                          <span className="text-[18px] font-medium tracking-normal text-primary-75">
+                            Expiry date
+                          </span>
+                        )}
+                        <CalendarIcon className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={formData.expires_at}
+                        onSelect={(date) => {
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            expires_at: false,
+                          }));
+                          setFormData({
+                            ...formData,
+                            expires_at: date || undefined,
+                          });
+                        }}
+                        defaultMonth={formData.expires_at}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
+                        required
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Status Switch (Public / Hidden) */}
+                <div className="flex items-center gap-2 rounded-xl bg-secondary/50 px-3 py-1.5 font-ddin">
+                  <span
+                    className={`text-[15px] font-medium transition-colors ${
+                      formData.status === "active"
+                        ? "font-bold text-megaweave-forest-dark"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {formData.status === "active" ? "Public" : "Hidden"}
+                  </span>
+                  <Switch
+                    checked={formData.status === "active"}
+                    onCheckedChange={(checked) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        status: checked ? "active" : "inactive",
+                      }));
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Description */}

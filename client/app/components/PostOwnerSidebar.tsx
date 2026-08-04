@@ -91,7 +91,12 @@ export default function PostOwnerSidebar({
 
       {/* Owner posts */}
       <div className="flex w-full flex-col gap-3">
-        {posts.map((ownerPost) => {
+        {posts
+          .filter((p) => p.status !== "inactive")
+          .map((ownerPost) => {
+          const isExpired = ownerPost.expires_at
+            ? new Date(ownerPost.expires_at) < new Date()
+            : false;
           const imageSrc = getPostImageSrc(ownerPost);
           const tags = ownerPost.tags
             ? ownerPost.tags
@@ -117,12 +122,22 @@ export default function PostOwnerSidebar({
                     src={imageSrc}
                     alt={ownerPost.title}
                     fill
-                    className="object-cover"
+                    className={`object-cover${isExpired ? " opacity-70" : ""}`}
                     sizes="72px"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-400">
                     {ownerPost.title.charAt(0)}
+                  </div>
+                )}
+                {isExpired && (
+                  <div
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50"
+                    aria-hidden="true"
+                  >
+                    <span className="font-ddin text-[10px] font-bold tracking-[0.10em] text-white">
+                      OVERDUE
+                    </span>
                   </div>
                 )}
               </div>

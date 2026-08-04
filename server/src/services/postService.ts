@@ -28,7 +28,7 @@ export interface PostItemData {
 export interface CreatePostInput {
   title: string;
   content: string;
-  status: "active" | "inactive" | "expired";
+  status: "active" | "inactive";
   type: "wish" | "share" | "commons";
   categoryId: number;
   conditionLevel: number;
@@ -500,6 +500,13 @@ export class PostService {
         });
       }
 
+      const newExpiresAt =
+        "expiresAt" in incoming
+          ? incoming.expiresAt
+            ? new Date(incoming.expiresAt)
+            : null
+          : existing.expires_at;
+
       const merged = {
         title: incoming.title ?? existing.title,
         content: incoming.content ?? existing.content,
@@ -508,12 +515,7 @@ export class PostService {
         tags: incoming.tags ?? existing.tags ?? null,
         categoryId: incoming.categoryId ?? existing.category_id,
         conditionLevel: incoming.conditionLevel ?? existing.condition_level,
-        expiresAt:
-          "expiresAt" in incoming
-            ? incoming.expiresAt
-              ? new Date(incoming.expiresAt)
-              : null
-            : existing.expires_at,
+        expiresAt: newExpiresAt,
       };
 
       await connection.execute(

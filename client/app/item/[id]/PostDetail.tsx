@@ -16,6 +16,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { mutate } from "swr";
 import CommentSection from "../../components/Comment/CommentSection";
 import EyesIcon from "../../components/icons/EyesIcon";
 import ImageGallery from "../../components/ImageGallery/ImageGalley";
@@ -141,9 +142,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       formData.append("title", data.title);
       formData.append("content", data.content);
       formData.append("location", data.location);
-      if (post?.status) {
-        formData.append("status", post.status);
-      }
+      formData.append("status", data.status);
       if (data.place_id) formData.append("place_id", data.place_id);
       if (data.location) formData.append("full_address", data.location);
       if (data.province) formData.append("province", data.province);
@@ -198,6 +197,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         toast.success("Post updated successfully");
         setShowEditForm(false);
         fetchPost(); // Refresh page data without changing URL layout
+        mutate(() => true, undefined, { revalidate: true }); // Revalidate all SWR caches (including main page feed)
       } else {
         const errorData = await response.json();
         toast.error(errorData.errorMessage || "Failed to update post");
@@ -370,6 +370,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     categoryId: post.category_id,
     conditionLevel: post.condition_level,
     expires_at: post.expires_at ? new Date(post.expires_at) : undefined,
+    status: post.status,
     items:
       post.items && post.items.length > 0
         ? post.items.map((item) => ({

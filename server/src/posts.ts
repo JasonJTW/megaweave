@@ -27,7 +27,7 @@ const CreatePostSchema = z.object({
     .string()
     .min(1, "Content is required")
     .max(2000, "Content too long"),
-  status: z.enum(["active", "inactive", "expired"]).default("active"),
+  status: z.enum(["active", "inactive"]).default("active"),
   place_id: z.string().optional(),
   full_address: z.string().optional(),
   province: z.string().optional(),

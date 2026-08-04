@@ -6,7 +6,7 @@ export interface Post {
   title: string;
   content: string;
   type: "wish" | "share" | "commons";
-  status: "active" | "inactive" | "expired";
+  status: "active" | "inactive";
   location?: string;
   tags?: string;
   category_id: number;
@@ -44,6 +44,7 @@ export interface CreatePostFormData {
   categoryId: number | null;
   conditionLevel: number | null;
   type: Post["type"];
+  status: Post["status"];
   items?: ItemInput[];
   place_id?: string;
   province?: string;

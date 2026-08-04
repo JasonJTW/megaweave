@@ -205,6 +205,17 @@ jobs:
           echo "🚀 Starting backend container..."
           docker compose up -d backend
 
+      - name: Start Workbench dashboard (if not already running)
+        run: |
+          if [ "$(docker inspect -f '{{.State.Running}}' megaweave-workbench 2>/dev/null)" != "true" ]; then
+            echo "⬇️ Pulling Workbench image from GHCR..."
+            docker compose pull workbench
+            echo "🔭 Starting Workbench container..."
+            docker compose up -d workbench
+          else
+            echo "✅ Workbench already running, skipping"
+          fi
+
       - name: Verify backend container
         run: |
           sleep 5

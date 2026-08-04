@@ -25,6 +25,21 @@ services:
     networks:
       - megaweave-net
 
+  workbench:
+    container_name: megaweave-workbench
+    image: ghcr.io/pontusab/workbench-standalone:latest
+    ports:
+      - "9999:3000"
+    environment:
+      - QUEUE_NAMES=post-image
+    env_file:
+      - ./server/.env.production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - megaweave-net
+
 networks:
   megaweave-net:
     driver: bridge

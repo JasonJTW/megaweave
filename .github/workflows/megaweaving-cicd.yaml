@@ -172,6 +172,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare .env.production files
+        env:
+          WORKBENCH_ENV: ${{ secrets.WORKBENCH_ENV_PRODUCTION }}
         run: |
           # docker compose 解析整個 config 時，會讀取所有服務的 env_file
           # 即使只啟動 backend，也需要 client/.env.production 存在，反之亦然
@@ -193,12 +195,14 @@ jobs:
             exit 1
           fi
 
-          # 寫入 workbench.env (使用 GitHub Actions Secrets)
-          printf "AUTH_USERNAME=%s\nAUTH_PASSWORD=%s\nREDIS_URL=%s\n" \
-            "${{ secrets.AUTH_USERNAME }}" \
-            "${{ secrets.AUTH_PASSWORD }}" \
-            "${{ secrets.REDIS_URL }}" > workbench.env
-          echo "✅ workbench.env created from GitHub Secrets"
+          # 寫入 workbench.env (從 WORKBENCH_ENV_PRODUCTION 密鑰建立)
+          if [ -n "$WORKBENCH_ENV" ]; then
+            printf "%s\n" "$WORKBENCH_ENV" > workbench.env
+            echo "✅ workbench.env created from WORKBENCH_ENV_PRODUCTION secret"
+          else
+            echo "❌ WORKBENCH_ENV_PRODUCTION secret not found or empty!"
+            exit 1
+          fi
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -247,6 +251,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare .env.production files
+        env:
+          WORKBENCH_ENV: ${{ secrets.WORKBENCH_ENV_PRODUCTION }}
         run: |
           # docker compose 解析整個 config 時，會讀取所有服務的 env_file
           # 即使只啟動 frontend，也需要其他服務的 env_file 存在
@@ -268,12 +274,14 @@ jobs:
             exit 1
           fi
 
-          # 寫入 workbench.env (使用 GitHub Actions Secrets)
-          printf "AUTH_USERNAME=%s\nAUTH_PASSWORD=%s\nREDIS_URL=%s\n" \
-            "${{ secrets.AUTH_USERNAME }}" \
-            "${{ secrets.AUTH_PASSWORD }}" \
-            "${{ secrets.REDIS_URL }}" > workbench.env
-          echo "✅ workbench.env created from GitHub Secrets"
+          # 寫入 workbench.env (從 WORKBENCH_ENV_PRODUCTION 密鑰建立)
+          if [ -n "$WORKBENCH_ENV" ]; then
+            printf "%s\n" "$WORKBENCH_ENV" > workbench.env
+            echo "✅ workbench.env created from WORKBENCH_ENV_PRODUCTION secret"
+          else
+            echo "❌ WORKBENCH_ENV_PRODUCTION secret not found or empty!"
+            exit 1
+          fi
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

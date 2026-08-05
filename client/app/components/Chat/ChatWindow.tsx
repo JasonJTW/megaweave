@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { compressImage } from "@/utils/imageProcessor";
@@ -58,10 +58,29 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isPopup = false,
 }) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightWeaveId = searchParams.get("highlightWeaveId");
+
   const { messages, conversation, isLoading, mutate, fetchMore, hasMore } =
     useMessages(conversationId);
   const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
+
+  // Auto-scroll to highlighted WeavingCard if highlightWeaveId query param exists
+  useEffect(() => {
+    if (!highlightWeaveId || isLoading) return;
+
+    const timer = setTimeout(() => {
+      const targetElement = document.getElementById(
+        `weave-card-${highlightWeaveId}`,
+      );
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [highlightWeaveId, isLoading]);
 
   const handleAvatarClick = () => {
     if (otherUser?.public_id) {
@@ -745,16 +764,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         </div>
                       )}
                       {shouldShowCard && (
-                        <WeavingCard
-                          currentUserId={currentUser?.userId}
-                          inChatWindow={{
-                            itemTitle,
-                            quantity,
-                            imageUrl: imageUrl || undefined,
-                            weaveId: weaveId!,
-                            isGiver,
-                          }}
-                        />
+                        <div id={`weave-card-${weaveId}`} className="w-full">
+                          <WeavingCard
+                            currentUserId={currentUser?.userId}
+                            isHighlighted={
+                              String(weaveId) === String(highlightWeaveId)
+                            }
+                            inChatWindow={{
+                              itemTitle,
+                              quantity,
+                              imageUrl: imageUrl || undefined,
+                              weaveId: weaveId!,
+                              isGiver,
+                            }}
+                          />
+                        </div>
                       )}
                     </div>
                     {dateHeader}

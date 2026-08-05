@@ -66,21 +66,55 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const { mutate: globalMutate } = useSWRConfig();
   useChatSocket(conversationId);
 
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+
   // Auto-scroll to highlighted WeavingCard if highlightWeaveId query param exists
   useEffect(() => {
     if (!highlightWeaveId || isLoading) return;
 
-    const timer = setTimeout(() => {
+    let attempts = 0;
+    const maxAttempts = 30; // 30 * 150ms = 4.5s max polling
+    let timerId: NodeJS.Timeout;
+
+    const tryScroll = async () => {
       const targetElement = document.getElementById(
         `weave-card-${highlightWeaveId}`,
       );
+
       if (targetElement) {
         targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
       }
-    }, 300);
 
-    return () => clearTimeout(timer);
-  }, [highlightWeaveId, isLoading]);
+      // If not found in current DOM and there are older messages, try loading more
+      if (hasMore && !isFetchingMore) {
+        setIsFetchingMore(true);
+        try {
+          await fetchMore();
+        } finally {
+          setIsFetchingMore(false);
+        }
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        timerId = setTimeout(tryScroll, 150);
+      }
+    };
+
+    timerId = setTimeout(tryScroll, 150);
+
+    return () => {
+      clearTimeout(timerId);
+    };
+  }, [
+    highlightWeaveId,
+    isLoading,
+    messages.length,
+    hasMore,
+    isFetchingMore,
+    fetchMore,
+  ]);
 
   const handleAvatarClick = () => {
     if (otherUser?.public_id) {
@@ -99,7 +133,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   // ponytail: activePost only used for optimistic banner, same conv check
   const activePost = popupConvId === conversationId ? post : null;
 
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Infinite scroll observer

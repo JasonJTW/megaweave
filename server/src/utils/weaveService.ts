@@ -178,11 +178,22 @@ export async function requestWeave(
   const receiverId = isWish ? postOwnerId : initiator.id;
   const targetUserId = initiator.id === giverId ? receiverId : giverId;
 
+  // Get conversationId first to store in weaves table
+  let conversationId: number | null = null;
+  try {
+    conversationId = await messageService.getConversationId(
+      initiator.id,
+      targetUserId,
+    );
+  } catch (e) {
+    console.error("[requestWeave] Failed to get conversationId:", e);
+  }
+
   // Write weave + items
   const [result] = await dbPool.execute<ResultSetHeader>(
-    `INSERT INTO weaves (post_id, giver_id, receiver_id, status, notes)
-     VALUES (?, ?, ?, 'requested', ?)`,
-    [postId, giverId, receiverId, notes ?? null],
+    `INSERT INTO weaves (post_id, giver_id, receiver_id, conversation_id, status, notes)
+     VALUES (?, ?, ?, ?, 'requested', ?)`,
+    [postId, giverId, receiverId, conversationId, notes ?? null],
   );
   const weaveId = result.insertId;
 
@@ -219,34 +230,32 @@ export async function requestWeave(
   }
 
   // System message in conversation
-  try {
-    const conversationId = await messageService.getConversationId(
-      initiator.id,
-      targetUserId,
-    );
-    const meta = await buildSystemMessageMeta(
-      items,
-      postId,
-      weaveId,
-      postType,
-      postOwnerId,
-    );
-    const sysMsg = await messageService.createMessage(
-      conversationId,
-      initiator.id,
-      "Start Weaving",
-      undefined,
-      "system_start_weaving",
-      meta,
-    );
-    if (io) {
-      const dto = messageService.toMessageDTO(sysMsg, initiator.publicId);
-      const payload = { ...dto, conversation_id: conversationId };
-      io.to(`user_${targetUserId}`).emit("new_message", payload);
-      io.to(`user_${initiator.id}`).emit("new_message", payload);
+  if (conversationId) {
+    try {
+      const meta = await buildSystemMessageMeta(
+        items,
+        postId,
+        weaveId,
+        postType,
+        postOwnerId,
+      );
+      const sysMsg = await messageService.createMessage(
+        conversationId,
+        initiator.id,
+        "Start Weaving",
+        undefined,
+        "system_start_weaving",
+        meta,
+      );
+      if (io) {
+        const dto = messageService.toMessageDTO(sysMsg, initiator.publicId);
+        const payload = { ...dto, conversation_id: conversationId };
+        io.to(`user_${targetUserId}`).emit("new_message", payload);
+        io.to(`user_${initiator.id}`).emit("new_message", payload);
+      }
+    } catch (e) {
+      console.error("[requestWeave] System message failed:", e);
     }
-  } catch (e) {
-    console.error("[requestWeave] System message failed:", e);
   }
 
   return { weaveId, notificationSent };

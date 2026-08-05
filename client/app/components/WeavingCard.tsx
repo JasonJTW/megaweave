@@ -84,8 +84,14 @@ function getWeaveStatusLabel(
 
 const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> =
   {
-    "New Request": { badge: "bg-[#FEF3C7] text-[#92400E]", icon: "text-[#92400E]" },
-    "Request Sent": { badge: "bg-[#FEF3C7] text-[#92400E]", icon: "text-[#92400E]" },
+    "New Request": {
+      badge: "bg-[#FEF3C7] text-[#92400E]",
+      icon: "text-[#92400E]",
+    },
+    "Request Sent": {
+      badge: "bg-[#FEF3C7] text-[#92400E]",
+      icon: "text-[#92400E]",
+    },
     Weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
     Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
     Rejected: { badge: "bg-[#FEE2E2] text-[#991B1B]", icon: "text-[#991B1B]" },
@@ -102,7 +108,9 @@ const WeavingCard = ({
   inChatWindow,
 }: WeavesCardProps) => {
   const { socket } = useSocket();
-  const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(undefined);
+  const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(
+    undefined,
+  );
 
   const activeWeave = weave || fetchedWeave;
   const targetWeaveId = weave?.id || inChatWindow?.weaveId;
@@ -192,10 +200,15 @@ const WeavingCard = ({
       : "";
 
   const currentStatus =
-    localStatus || activeWeave?.status || (isInChatWindow ? "requested" : undefined);
+    localStatus ||
+    activeWeave?.status ||
+    (isInChatWindow ? "requested" : undefined);
 
-  const isGiverRole = isGiver || (isInChatWindow ? inChatWindow.isGiver : false);
-  const statusLabel = currentStatus ? getWeaveStatusLabel(currentStatus, isGiverRole) : null;
+  const isGiverRole =
+    isGiver || (isInChatWindow ? inChatWindow.isGiver : false);
+  const statusLabel = currentStatus
+    ? getWeaveStatusLabel(currentStatus, isGiverRole)
+    : null;
 
   const cardTitle = isInChatWindow
     ? inChatWindow.itemTitle
@@ -208,41 +221,39 @@ const WeavingCard = ({
       ? post.content
       : undefined;
 
-  const itemsToDisplay = activeWeave?.items && activeWeave.items.length > 0
-    ? activeWeave.items.map((it, idx) => ({
-        id: it.id || idx,
-        title: it.title || "Item",
-        quantity: it.quantity,
-      }))
-    : post?.items || [];
+  const itemsToDisplay =
+    activeWeave?.items && activeWeave.items.length > 0
+      ? activeWeave.items.map((it, idx) => ({
+          id: it.id || idx,
+          title: it.title || "Item",
+          quantity: it.quantity,
+        }))
+      : post?.items || [];
 
-  const visibleItems = isInChatWindow
-    ? []
-    : itemsToDisplay.slice(0, 2);
+  const visibleItems = isInChatWindow ? [] : itemsToDisplay.slice(0, 2);
 
-  const hasMoreItems = isInChatWindow
-    ? false
-    : itemsToDisplay.length > 2;
+  const hasMoreItems = isInChatWindow ? false : itemsToDisplay.length > 2;
 
-  const displayUser = activeWeave && currentUserId
-    ? currentUserId === activeWeave.giver_id
-      ? {
-          name: activeWeave.receiver_name,
-          avatar: activeWeave.receiver_avatar,
-          role: "Receiver",
-        }
-      : {
-          name: activeWeave.giver_name,
-          avatar: activeWeave.giver_avatar,
-          role: "Giver",
-        }
-    : isInChatWindow
-      ? {
-          name: inChatWindow.isGiver ? "Receiver" : "Giver",
-          avatar: "",
-          role: inChatWindow.isGiver ? "Receiver" : "Giver",
-        }
-      : null;
+  const displayUser =
+    activeWeave && currentUserId
+      ? currentUserId === activeWeave.giver_id
+        ? {
+            name: activeWeave.receiver_name,
+            avatar: activeWeave.receiver_avatar,
+            role: "Receiver",
+          }
+        : {
+            name: activeWeave.giver_name,
+            avatar: activeWeave.giver_avatar,
+            role: "Giver",
+          }
+      : isInChatWindow
+        ? {
+            name: inChatWindow.isGiver ? "Receiver" : "Giver",
+            avatar: "",
+            role: inChatWindow.isGiver ? "Receiver" : "Giver",
+          }
+        : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -350,11 +361,12 @@ const WeavingCard = ({
                 })()}
               </span>
               <Link
-                href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
+                // href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
+                href={`/item/${activeWeave?.post_id}`}
                 onClick={(e) => e.stopPropagation()}
                 className="text-xs font-bold text-primary hover:underline"
               >
-                View Detail →
+                View Post Detail →
               </Link>
             </div>
           )}

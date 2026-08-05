@@ -29,6 +29,7 @@ interface WeaveOutput extends RowDataPacket {
   giver_confirmed: number;
   receiver_confirmed: number;
   notes: string | null;
+  conversation_id: number | null;
   completed_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -152,6 +153,7 @@ async function processWeaveRows(weaveRows: WeaveOutput[]) {
       receiver_avatar: row.receiver_avatar,
       giver_confirmed: Boolean(row.giver_confirmed),
       receiver_confirmed: Boolean(row.receiver_confirmed),
+      conversation_id: row.conversation_id ?? undefined,
       post,
     };
   });

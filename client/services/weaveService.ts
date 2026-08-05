@@ -42,6 +42,7 @@ export interface Weave {
   receiver_id: number;
   receiver_name: string;
   receiver_avatar: string;
+  conversation_id?: number;
   created_at: string;
   updated_at: string;
   completed_at?: string;

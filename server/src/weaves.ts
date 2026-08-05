@@ -10,7 +10,7 @@ const router = Router();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface WeaveItemRow {
+export interface WeaveItemRow {
   id: number;
   weave_id: number;
   item_id: number | null;
@@ -18,9 +18,7 @@ interface WeaveItemRow {
   title: string | null;
 }
 
-
-
-interface WeaveOutput extends RowDataPacket {
+export interface WeaveOutput extends RowDataPacket {
   id: number;
   post_id: number;
   giver_id: number;
@@ -90,7 +88,7 @@ const WEAVE_QUERY_BASE = `
   LEFT JOIN images img ON p.id = img.post_id
 `;
 
-async function processWeaveRows(weaveRows: WeaveOutput[]) {
+export async function processWeaveRows(weaveRows: WeaveOutput[]) {
   if (weaveRows.length === 0) return [];
   const weaveIds = weaveRows.map((r) => r.id);
 

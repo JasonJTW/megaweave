@@ -10,7 +10,6 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
-import type { Weave } from "@/services/weaveService";
 import { compressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
@@ -19,6 +18,7 @@ import { LogOut, Save, Share, User as UserIcon, Users, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 import { useForm, type Control, type FieldPath } from "react-hook-form";
 import toast from "react-hot-toast";
 import CommonShareIcon from "../components/icons/CommonShareIcon";
@@ -36,7 +36,7 @@ import {
   normalizeTeamMember,
   TeamMember,
 } from "../teamMembers";
-import { Post, UserStats } from "../types/schema";
+import { UserStats } from "../types/schema";
 import User from "../types/user";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
@@ -184,12 +184,37 @@ const UserPage = () => {
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [tempBio, setTempBio] = useState("");
   const [tempUsername, setTempUsername] = useState("");
-  const [stats, setStats] = useState<UserStats>(defaultStats);
   const router = useRouter();
   const { refetchTeamMembers } = useTeam();
-  const [weaves, setWeaves] = useState<Weave[]>([]);
-  const [userPosts, setUserPosts] = useState<Post[]>([]);
   const { conditions } = usePost();
+
+  // ─── /api/me — replaces 7 individual mount fetches ───────────────────────
+  const meKey = user ? `${hostName}/api/me` : null;
+  const {
+    data: meData,
+    isLoading: meLoading,
+    mutate: mutateMeData,
+  } = useSWR(
+    meKey,
+    (url: string) =>
+      fetch(url, { credentials: "include", cache: "no-store" }).then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch /api/me");
+        return r.json();
+      }),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000,
+    },
+  );
+
+  // Derived state from /api/me
+  const stats: UserStats = meData?.stats
+    ? {
+        postCount: meData.stats.postCount ?? 0,
+        weaveCount: meData.stats.weaveCount ?? 0,
+        points: meData.stats.points ?? 0,
+      }
+    : defaultStats;
 
   // Avatar preview / upload states
   const [previewSrc, setPreviewSrc] = useState<string | null>(null); // object URL for preview
@@ -219,30 +244,6 @@ const UserPage = () => {
     // 這裡可以添加 API 調用來保存設定
   };
 
-  const fetchWithTimeout = async (
-    url: string,
-    options: RequestInit,
-    timeout = 10000,
-  ) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("Request timeout - Server may be unavailable");
-      }
-      throw error;
-    }
-  };
-
   useEffect(() => {
     if (user) {
       setUsername(user.username);
@@ -257,10 +258,33 @@ const UserPage = () => {
     }
   }, [user]);
 
+  // Sync /api/me data into local state when it arrives
+  useEffect(() => {
+    if (!meData) return;
+    const p = meData.profile;
+    if (p.custom_name) setUsername(p.custom_name);
+    if (p.bio !== undefined) setBio(p.bio);
+    const emailVal = p.contact_email ?? "";
+    const phoneVal = p.contact_phone ?? "";
+    setContactEmail(emailVal);
+    setContactPhone(phoneVal);
+    contactForm.setValue("email", emailVal);
+    contactForm.setValue("phone", phoneVal);
+
+    // Member data for contributors
+    if (meData.member) {
+      const memberData = normalizeTeamMember(meData.member);
+      setMember(memberData);
+      memberForm.reset(memberToFormValues(memberData, memberForm.getValues()));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meData]);
+
   const fetchMemberData = async (
     memberUserId: number,
     options?: { silent?: boolean },
   ) => {
+    // Used only after a save action to refresh member data
     try {
       if (!options?.silent) setMemberLoading(true);
       const response = await fetch(
@@ -373,134 +397,12 @@ const UserPage = () => {
     setMemberError(null);
   };
 
-  useEffect(() => {
-    if (isContributor && user?.userId) {
-      fetchMemberData(user.userId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isContributor, user?.userId]);
+  // After saving member, do a silent refresh via the original endpoint
+  // (avoids re-fetching the entire /api/me payload)
 
-  const getBio = async () => {
-    const response = await fetch(`${hostName}/api/userprofile/bio`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const result = await response.json();
-      console.error("Error fetching userprofile:", result.errorMessage);
-      toast.error(result.errMessage);
-      return;
-    }
-    const result = await response.json();
-    const bioValue = result.bio || "";
-    setBio(bioValue);
-  };
-
-  const getUsername = async () => {
-    const response = await fetch(`${hostName}/api/userprofile/custom_name`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Error fetching userprofile:", error.errorMessage);
-      toast.error(error.errMessage);
-      return;
-    }
-
-    const result = await response.json();
-    console.log("get custom_name:", result.custom_name);
-    setUsername(result.custom_name);
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await fetchWithTimeout(
-        `${hostName}/api/user/stats`,
-        {
-          cache: "no-store",
-          method: "GET",
-          credentials: "include",
-        },
-        10000, //? 10 seconds timeout
-      );
-
-      if (!response.ok) {
-        const errorMessage = await response.json();
-        throw new Error(
-          errorMessage.errorMessage || "Failed to fetch user stats",
-        );
-      }
-      const statsData = await response.json();
-      console.log("Fetched User Stats: ", statsData);
-
-      setStats({
-        postCount: statsData.postCount || 0,
-        weaveCount: statsData.weaveCount || 0,
-        points: statsData.points || 0,
-      });
-    } catch (error) {
-      console.error("Error fetching user stats:", error);
-      // 這裡可以選擇不設置錯誤，讓 stats 保持為 defaultStats (0, 0, 0)
-    }
-  };
-
-  const fetchUserPosts = async () => {
-    try {
-      const response = await fetchWithTimeout(
-        `${hostName}/api/posts/user`,
-        {
-          cache: "no-store",
-          method: "GET",
-          credentials: "include",
-        },
-        10000, //? 10 seconds timeout
-      );
-
-      if (!response.ok) {
-        const errorMessage = await response.json();
-        throw new Error(
-          errorMessage.errorMessage || "Failed to fetch user posts",
-        );
-      }
-      const statsData = await response.json();
-      const postsData = statsData.userPosts || [];
-      setUserPosts(postsData);
-      console.log("Fetched User Posts: ", postsData);
-    } catch (error) {
-      console.error("Error fetching user posts:", error);
-    }
-  };
-
-  const fetchWeaves = async () => {
-    try {
-      const response = await fetchWithTimeout(
-        `${hostName}/api/weaves`, // 預設抓取所有相關 (giver + receiver)
-        {
-          cache: "no-store",
-          method: "GET",
-          credentials: "include",
-        },
-        10000,
-      );
-
-      if (!response.ok) {
-        // 如果不是 200，僅 log 錯誤但不阻擋頁面渲染 (非核心致命錯誤)
-        console.warn("Failed to fetch weaves history");
-        toast.error("Failed to fetch weaves history");
-        return;
-      }
-
-      const data = await response.json();
-      console.log("Fetched Weaves:", data.weaves);
-      setWeaves(data.weaves || []);
-    } catch (error) {
-      console.error("Error fetching weaves:", error);
-      toast.error("Error connecting to server");
-    }
-  };
+  // NOTE: getBio, getUsername, fetchStats, fetchUserPosts, fetchWeaves have been
+  // removed — their data now arrives via useSWR /api/me above.
+  // The POST/PUT helpers (insertBio, insertUsername, etc.) remain unchanged below.
 
   // --- Avatar: 使用者先預覽，確認後才上傳 ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -830,42 +732,6 @@ const UserPage = () => {
     }
   };
 
-  const getContactEmail = async () => {
-    const response = await fetch(`${hostName}/api/userprofile/contact_email`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const result = await response.json();
-      console.error("Error fetching userprofile:", result.errorMessage);
-      toast.error(result.errMessage || "Error fetching contact email");
-      return;
-    }
-    const result = await response.json();
-    const emailValue = result.contactEmail || "";
-    setContactEmail(emailValue);
-    contactForm.setValue("email", emailValue);
-  };
-
-  const getContactPhone = async () => {
-    const response = await fetch(`${hostName}/api/userprofile/contact_phone`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      const result = await response.json();
-      console.error("Error fetching userprofile:", result.errorMessage);
-      toast.error(result.errMessage || "Error fetching contact phone");
-      return;
-    }
-    const result = await response.json();
-    const phoneValue = result.contactPhone || "";
-    setContactPhone(phoneValue);
-    contactForm.setValue("phone", phoneValue);
-  };
-
   const handleSaveBio = () => {
     setBio(tempBio);
     setIsEditingBio(false);
@@ -1033,20 +899,6 @@ const UserPage = () => {
       return;
     }
 
-    // User is present, fetch other data
-    const init = async () => {
-      await Promise.all([
-        getBio(),
-        getContactEmail(),
-        getContactPhone(),
-        getUsername(),
-        fetchStats(),
-        fetchUserPosts(),
-        fetchWeaves(),
-      ]);
-    };
-    init();
-
     return () => {
       // cleanup any created object URLs on unmount
       if (previousPreviewRef.current) {
@@ -1058,14 +910,13 @@ const UserPage = () => {
         previousPreviewRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loading, redirecting, router]);
 
   useEffect(() => {
     console.log("Fetched UserId: ", user?.userId);
   }, [user?.userId]);
 
-  if (loading || redirecting) {
+  if (loading || meLoading || redirecting) {
     return (
       <>
         <div className="fixed inset-0 -z-10 bg-megaweave-forest-dark"></div>
@@ -1656,11 +1507,11 @@ const UserPage = () => {
         </div>
         <div className="mx-auto max-w-6xl">
           <DrawerWrapper
-            weaves={weaves}
+            weaves={meData?.weaves ?? []}
             conditions={conditions}
             currentUserId={user.userId}
-            fetchWeaves={fetchWeaves}
-            userPosts={userPosts}
+            fetchWeaves={mutateMeData}
+            userPosts={meData?.posts ?? []}
           />
         </div>
       </div>

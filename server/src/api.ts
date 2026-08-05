@@ -17,6 +17,7 @@ import healthAPI from "./health";
 import notificationsAPI from "./notifications";
 import messagesAPI from "./messages";
 import sendAPI from "./send";
+import meAPI from "./me";
 
 //* Test api
 router.post("/test", (_req, res) => {
@@ -46,5 +47,6 @@ router.use("/health", healthAPI);
 router.use("/notifications", notificationsAPI);
 router.use("/messages", messagesAPI);
 router.use("/send", sendAPI);
+router.use("/me", meAPI);
 
 export default router;

@@ -45,7 +45,10 @@ export interface CreatePostInput {
   items?: PostItemData[];
 }
 
-export interface EditPostInput extends Omit<Partial<CreatePostInput>, "expiresAt"> {
+export interface EditPostInput extends Omit<
+  Partial<CreatePostInput>,
+  "expiresAt"
+> {
   expiresAt?: string | null;
   deleteImageIds?: number[];
 }
@@ -65,7 +68,8 @@ export interface ListPostsParams {
 export class PostService {
   /** 驗證分類是否存在與 active */
   async validateCategory(categoryId: number): Promise<boolean> {
-    const query = "SELECT id FROM categories WHERE id = ? AND status = 'active'";
+    const query =
+      "SELECT id FROM categories WHERE id = ? AND status = 'active'";
     const [rows] = await dbPool.execute<RowDataPacket[]>(query, [categoryId]);
     return rows.length > 0;
   }
@@ -181,7 +185,7 @@ export class PostService {
       const fileJobs: Array<{ s3Key: string; bufferBase64: string }> = [];
       if (files && files.length > 0) {
         const dbImageValues: (number | string)[] = [];
-        const placeholders = files.map(() => "(?, ?, NOW())").join(", ");
+        const placeholders = files.map(() => "(?, ?, ?, NOW())").join(", ");
 
         for (const file of files) {
           const fileId = randomUUID();
@@ -189,7 +193,7 @@ export class PostService {
           const fileName = `${timestamp}-${fileId}.webp`;
           const s3Key = `posts/${fileName}`;
 
-          dbImageValues.push(postId, s3Key);
+          dbImageValues.push(postId, s3Key, `Image for post ${postId}`);
           fileJobs.push({
             s3Key,
             bufferBase64: file.buffer.toString("base64"),
@@ -197,7 +201,7 @@ export class PostService {
         }
 
         await connection.execute(
-          `INSERT INTO images (post_id, s3_key, created_at) VALUES ${placeholders}`,
+          `INSERT INTO images (post_id, s3_key, alt_text, created_at) VALUES ${placeholders}`,
           dbImageValues,
         );
       }
@@ -583,7 +587,7 @@ export class PostService {
       const fileJobs: Array<{ s3Key: string; bufferBase64: string }> = [];
       if (files && files.length > 0) {
         const dbImageValues: (number | string)[] = [];
-        const placeholders = files.map(() => "(?, ?, NOW())").join(", ");
+        const placeholders = files.map(() => "(?, ?, ?, NOW())").join(", ");
 
         for (const file of files) {
           const fileId = randomUUID();
@@ -591,7 +595,7 @@ export class PostService {
           const fileName = `${timestamp}-${fileId}.webp`;
           const s3Key = `posts/${fileName}`;
 
-          dbImageValues.push(postId, s3Key);
+          dbImageValues.push(postId, s3Key, `Image for post ${postId}`);
           fileJobs.push({
             s3Key,
             bufferBase64: file.buffer.toString("base64"),
@@ -599,7 +603,7 @@ export class PostService {
         }
 
         await connection.execute(
-          `INSERT INTO images (post_id, s3_key, created_at) VALUES ${placeholders}`,
+          `INSERT INTO images (post_id, s3_key, alt_text, created_at) VALUES ${placeholders}`,
           dbImageValues,
         );
       }
@@ -638,10 +642,9 @@ export class PostService {
       throw new Error("FORBIDDEN");
     }
 
-    await dbPool.execute(
-      "UPDATE posts SET deleted_at = NOW() WHERE id = ?",
-      [postId],
-    );
+    await dbPool.execute("UPDATE posts SET deleted_at = NOW() WHERE id = ?", [
+      postId,
+    ]);
   }
 
   private async getPostDetailsQuery(postId: number): Promise<RowDataPacket> {

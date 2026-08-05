@@ -82,7 +82,6 @@ export default function PostFormModal({
     title: "",
     content: "",
     location: "",
-    tags: "",
     categoryId: null as number | null,
     conditionLevel: null as number | null,
     expires_at: undefined as Date | undefined,
@@ -99,6 +98,10 @@ export default function PostFormModal({
     lat: undefined as number | undefined,
     lng: undefined as number | undefined,
   });
+
+  // Tags chip state
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -138,7 +141,6 @@ export default function PostFormModal({
         title: initialData?.title || "",
         content: initialData?.content || "",
         location: initialData?.location || "",
-        tags: initialData?.tags || "",
         categoryId: initialData?.categoryId || null,
         conditionLevel: initialData?.conditionLevel || null,
         expires_at: initialData?.expires_at || undefined,
@@ -158,6 +160,15 @@ export default function PostFormModal({
         lat: initialData?.lat || undefined,
         lng: initialData?.lng || undefined,
       });
+      // Parse existing tags from comma-separated string
+      const parsedTags = initialData?.tags
+        ? initialData.tags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
+      setTags(parsedTags);
+      setTagInput("");
       setSelectedImages([]);
       setDeletedImageIds([]);
       setFormErrors({});
@@ -392,7 +403,40 @@ export default function PostFormModal({
     });
   };
 
+  // --- Tag chip handlers ---
+  const commitTagInput = () => {
+    const value = tagInput.trim().replace(/^#/, "");
+    if (value && !tags.includes(value)) {
+      setTags((prev) => [...prev, value]);
+    }
+    setTagInput("");
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Ignore Space/Enter while IME is composing (e.g. Zhuyin / Pinyin)
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      commitTagInput();
+    } else if (e.key === "Backspace" && tagInput === "" && tags.length > 0) {
+      // Remove last tag on backspace when input is empty
+      setTags((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const removeTag = (index: number) => {
+    setTags((prev) => prev.filter((_, i) => i !== index));
+  };
+  // --- End tag chip handlers ---
+
   const handleSubmitClick = () => {
+    // Commit any in-progress tag before submitting
+    const pendingTag = tagInput.trim().replace(/^#/, "");
+    const finalTags =
+      pendingTag && !tags.includes(pendingTag)
+        ? [...tags, pendingTag]
+        : tags;
+
     if (!validateForm()) {
       alert("Required fields cannot be empty.");
       return;
@@ -415,7 +459,7 @@ export default function PostFormModal({
       title: formData.title,
       content: formData.content,
       location: formData.location,
-      tags: formData.tags,
+      tags: finalTags.join(", "),
       categoryId: formData.categoryId!,
       conditionLevel: formData.conditionLevel!,
       status: formData.status,
@@ -660,20 +704,40 @@ export default function PostFormModal({
                 />
               </div>
 
-              {/* Hashtag */}
-              <div className="flex items-center gap-[5px]">
-                <TagIcon className="h-[24px] w-[24px] text-primary" />
-                <Input
-                  type="text"
-                  placeholder="Hashtag separate with commas"
-                  value={formData.tags}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      tags: e.target.value,
-                    })
-                  }
-                />
+              {/* Hashtag – tag chips */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-[5px]">
+                  <TagIcon className="h-[24px] w-[24px] shrink-0 text-primary" />
+                  <input
+                    type="text"
+                    placeholder="Add tag, press Space"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                    onBlur={commitTagInput}
+                    className="h-9 w-full rounded-[20px] border border-gray-300 bg-white px-3 py-1 text-[18px] placeholder:text-[18px] placeholder:font-medium placeholder:text-primary-75 focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                {tags.length > 0 && (
+                  <div className="ml-8 flex flex-wrap gap-1.5 pt-0.5">
+                    {tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-sm font-medium text-primary"
+                      >
+                        #{tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(i)}
+                          className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-primary/60 transition-colors hover:bg-primary/20 hover:text-primary"
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Location */}

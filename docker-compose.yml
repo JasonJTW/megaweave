@@ -31,7 +31,8 @@ services:
     ports:
       - "9999:3000"
     env_file:
-      - ./workbench.env
+      - path: ./workbench.env
+        required: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

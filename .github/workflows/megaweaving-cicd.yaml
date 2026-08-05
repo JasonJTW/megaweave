@@ -27,9 +27,11 @@ jobs:
             server:
               - 'server/**'
               - 'docker-compose.yml'
+              - '.github/workflows/megaweaving-cicd.yaml'
             client:
               - 'client/**'
               - 'docker-compose.yml'
+              - '.github/workflows/megaweaving-cicd.yaml'
 
   # ─────────────────────────────────────────────────────────
   # 2. EC2 Pre-Deploy Cleanup（與 Build 平行執行，節省總時間）
@@ -191,6 +193,13 @@ jobs:
             exit 1
           fi
 
+          # 寫入 workbench.env (使用 GitHub Actions Secrets)
+          printf "AUTH_USERNAME=%s\nAUTH_PASSWORD=%s\nREDIS_URL=%s\n" \
+            "${{ secrets.AUTH_USERNAME }}" \
+            "${{ secrets.AUTH_PASSWORD }}" \
+            "${{ secrets.REDIS_URL }}" > workbench.env
+          echo "✅ workbench.env created from GitHub Secrets"
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -198,15 +207,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and deploy backend container
+      - name: Pull and deploy backend & workbench containers
         run: |
-          echo "⬇️ Pulling latest backend image from GHCR..."
-          docker compose pull backend
-          echo "🚀 Starting backend container..."
-          docker compose up -d backend
+          echo "⬇️ Pulling latest backend and workbench images from GHCR..."
+          docker compose pull backend workbench
+          echo "🚀 Force-recreating backend and workbench containers with updated workbench.env..."
+          docker compose up -d --force-recreate backend workbench
 
-
-      - name: Verify backend container
+      - name: Verify backend & workbench containers
         run: |
           sleep 5
           if [ "$(docker inspect -f '{{.State.Running}}' megaweave-backend 2>/dev/null)" = "true" ]; then
@@ -216,6 +224,14 @@ jobs:
             echo "❌ Backend container failed to start"
             docker logs megaweave-backend --tail 50
             exit 1
+          fi
+
+          if [ "$(docker inspect -f '{{.State.Running}}' megaweave-workbench 2>/dev/null)" = "true" ]; then
+            echo "✅ Workbench container is running successfully"
+            docker compose ps workbench
+          else
+            echo "⚠️ Workbench container is not running"
+            docker logs megaweave-workbench --tail 50 || true
           fi
 
   # ─────────────────────────────────────────────────────────
@@ -252,6 +268,12 @@ jobs:
             exit 1
           fi
 
+          # 寫入 workbench.env (使用 GitHub Actions Secrets)
+          printf "AUTH_USERNAME=%s\nAUTH_PASSWORD=%s\nREDIS_URL=%s\n" \
+            "${{ secrets.AUTH_USERNAME }}" \
+            "${{ secrets.AUTH_PASSWORD }}" \
+            "${{ secrets.REDIS_URL }}" > workbench.env
+          echo "✅ workbench.env created from GitHub Secrets"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

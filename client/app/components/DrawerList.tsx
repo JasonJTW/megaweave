@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
 import WeavingCard from "./WeavingCard";
-import toast from "react-hot-toast";
 
 const MAX_VISIBLE_POSTS = 5;
 const LIST_ITEM_ESTIMATED_HEIGHT_PX = 120;
@@ -216,7 +215,6 @@ const DrawerList: React.FC<DrawerListProps> = ({
                         currentUserId={currentUserId}
                         isHighlighted={weave?.id === highlightWeaveId}
                         onClick={() => {
-                          toast("conv_id: " + weave?.conversation_id);
                           if (weave?.conversation_id) {
                             router.push(
                               `/messages/${weave.conversation_id}?highlightWeaveId=${weave.id}`,

@@ -41,7 +41,17 @@ const CreatePostSchema = z.object({
   categoryId: z.number().int().positive("Invalid category ID"),
   conditionLevel: z.number().int().min(1).max(5, "Condition level must be 1-5"),
   expiresAt: z.string().datetime().optional(),
-  items: z.array(ItemSchema).min(1, "At least one item is required").optional(),
+  items: z
+    .array(ItemSchema)
+    .min(1, "At least one item is required")
+    .refine(
+      (items) => {
+        const titles = items.map((i) => i.title.trim().toLowerCase());
+        return new Set(titles).size === titles.length;
+      },
+      { message: "Item titles must be unique" },
+    )
+    .optional(),
 });
 
 type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;

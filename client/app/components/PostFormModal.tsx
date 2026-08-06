@@ -27,7 +27,7 @@ import DeleteIcon from "./icons/DeleteIcon";
 import TagIcon from "./icons/TagIcon";
 import LocationIcon from "./icons/LocationIcon";
 import ClockIcon from "./icons/ClockIcon";
-
+import toast from "react-hot-toast";
 export interface PostFormSubmitData {
   title: string;
   content: string;
@@ -293,22 +293,36 @@ export default function PostFormModal({
     hasError ? "[&_input]:!border-red-500" : "";
 
   const validateForm = () => {
+    // Count occurrences of non-empty titles (case-insensitive or trimmed)
+    const titleCounts = new Map<string, number>();
+    formData.items.forEach((item) => {
+      const trimmedTitle = item.title.trim().toLowerCase();
+      if (trimmedTitle) {
+        titleCounts.set(trimmedTitle, (titleCounts.get(trimmedTitle) || 0) + 1);
+      }
+    });
+
     const itemErrors =
       formData.items.map((item) => {
-        const hasTitle = !!item.title.trim();
+        const trimmedTitle = item.title.trim();
+        const hasTitle = !!trimmedTitle;
         const hasQuantity =
           item.quantity !== "" &&
           item.quantity !== null &&
           item.quantity !== undefined;
 
-        // If both are empty, it is considered a valid empty row (skip validation)
+        // If both are empty, it is considered a valid empty row
         if (!hasTitle && !hasQuantity) {
           return { title: false, quantity: false };
         }
 
-        // If either is filled, both become required and quantity must be >= 1
+        // Title duplicate check
+        const isDuplicateTitle =
+          hasTitle && (titleCounts.get(trimmedTitle.toLowerCase()) || 0) > 1;
+
+        // If either is filled, both become required, quantity must be >= 1, and title must be unique
         return {
-          title: !hasTitle,
+          title: !hasTitle || isDuplicateTitle,
           quantity: !hasQuantity || Number(item.quantity) < 1,
         };
       }) ?? [];
@@ -332,16 +346,41 @@ export default function PostFormModal({
 
     setFormErrors(errors);
 
-    return (
-      !errors.images &&
-      !errors.categoryId &&
-      !errors.conditionLevel &&
-      !errors.title &&
-      !errors.location &&
-      !errors.content &&
-      !errors.expires_at &&
-      !itemErrors.some((item) => item.title || item.quantity)
+    const hasMissingFields =
+      errors.images ||
+      errors.categoryId ||
+      errors.conditionLevel ||
+      errors.title ||
+      errors.location ||
+      errors.content ||
+      errors.expires_at ||
+      itemErrors.some(
+        (item, index) =>
+          (!formData.items[index].title.trim() &&
+            formData.items[index].quantity !== "" &&
+            formData.items[index].quantity !== null &&
+            formData.items[index].quantity !== undefined) ||
+          (formData.items[index].title.trim() &&
+            (formData.items[index].quantity === "" ||
+              formData.items[index].quantity === null ||
+              formData.items[index].quantity === undefined ||
+              Number(formData.items[index].quantity) < 1)),
+      );
+
+    const hasDuplicateItemTitles = itemErrors.some(
+      (item, index) =>
+        !!formData.items[index].title.trim() &&
+        (titleCounts.get(formData.items[index].title.trim().toLowerCase()) ||
+          0) > 1,
     );
+
+    if (hasDuplicateItemTitles) {
+      return "duplicate_items";
+    }
+    if (hasMissingFields) {
+      return "missing_fields";
+    }
+    return "ok";
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -351,17 +390,17 @@ export default function PostFormModal({
       selectedImages.length;
 
     if (activeImageCount + files.length > 5) {
-      alert("Limit of 5 images exceeded");
+      toast.error("Limit of 5 images exceeded");
       return;
     }
 
     const validFiles = files.filter((file) => {
       if (file.size > 10 * 1024 * 1024) {
-        alert(`${file.name} exceeds 10MB size limit`);
+        toast.error(`${file.name} exceeds 10MB size limit`);
         return false;
       }
       if (!file.type.startsWith("image/")) {
-        alert(`${file.name} is not a valid image file`);
+        toast.error(`${file.name} is not a valid image file`);
         return false;
       }
       return true;
@@ -433,12 +472,14 @@ export default function PostFormModal({
     // Commit any in-progress tag before submitting
     const pendingTag = tagInput.trim().replace(/^#/, "");
     const finalTags =
-      pendingTag && !tags.includes(pendingTag)
-        ? [...tags, pendingTag]
-        : tags;
+      pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags;
 
-    if (!validateForm()) {
-      alert("Required fields cannot be empty.");
+    const validationResult = validateForm();
+    if (validationResult === "duplicate_items") {
+      toast.error("Item titles cannot be duplicated.");
+      return;
+    } else if (validationResult === "missing_fields") {
+      toast.error("Required fields cannot be empty.");
       return;
     }
 
@@ -482,7 +523,7 @@ export default function PostFormModal({
   return (
     <div className="pointer-events-auto fixed inset-0 z-50 flex justify-center overflow-y-auto bg-primary-5 font-ddin">
       <div className="min-h-screen w-full max-w-2xl rounded-lg bg-primary-5 md:max-w-5xl">
-        <div className="p-6">
+        <div className="px-7 py-6">
           <div className="relative flex items-center justify-center border-b pb-2">
             <h2 className="text-2xl font-bold capitalize text-gray-900">
               {title}
@@ -775,7 +816,7 @@ export default function PostFormModal({
                       <Button
                         variant="outline"
                         data-empty={!formData.expires_at}
-                        className={`w-[212px] justify-between bg-white text-left font-normal ${invalidFieldBorderClass(
+                        className={`w-[212px] justify-between bg-white text-left font-medium tracking-normal text-primary-75 ${invalidFieldBorderClass(
                           formErrors.expires_at,
                         )}`}
                       >

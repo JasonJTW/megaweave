@@ -82,15 +82,15 @@ function PostCardInner({
       <div className="relative min-h-[414px] pt-3">
         {post.type === "share" &&
           (isExpired ? (
-            <ShareBadgeExpiredIcon className="absolute -top-1 right-5 z-20" />
+            <ShareBadgeExpiredIcon className="absolute right-6 top-2 z-20" />
           ) : (
-            <ShareBadgeIcon className="absolute -top-1 right-5 z-20" />
+            <ShareBadgeIcon className="absolute right-6 top-2 z-20" />
           ))}
         {post.type === "wish" &&
           (isExpired ? (
-            <SeekBadgeExpiredIcon className="absolute -top-1 right-5 z-20" />
+            <SeekBadgeExpiredIcon className="absolute right-6 top-2 z-20" />
           ) : (
-            <SeekBadgeIcon className="absolute -top-1 right-5 z-20" />
+            <SeekBadgeIcon className="absolute right-6 top-2 z-20" />
           ))}
 
         <motion.div

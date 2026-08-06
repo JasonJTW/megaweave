@@ -9,7 +9,6 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
 import { compressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
@@ -42,8 +41,6 @@ import User from "../types/user";
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
   phone?: string; // 可選填的電話號碼
-  emailVisible: boolean; // 是否公開 toggle
-  phoneVisible: boolean;
 };
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -54,8 +51,6 @@ const userNameMaxLength =
 const defaultContactValues: ContactSettingsValues = {
   email: "",
   phone: "",
-  emailVisible: false,
-  phoneVisible: false,
 };
 
 const defaultStats: UserStats = {
@@ -69,10 +64,6 @@ type MemberFormValues = {
   location?: string;
   website?: string;
   email?: string;
-  titleVisible: boolean;
-  locationVisible: boolean;
-  websiteVisible: boolean;
-  emailVisible: boolean;
 };
 
 const defaultMemberValues: MemberFormValues = {
@@ -80,10 +71,6 @@ const defaultMemberValues: MemberFormValues = {
   location: "",
   website: "",
   email: "",
-  titleVisible: true,
-  locationVisible: true,
-  websiteVisible: true,
-  emailVisible: false,
 };
 
 type InfoFieldRowValues = MemberFormValues | ContactSettingsValues;
@@ -91,7 +78,6 @@ type InfoFieldRowValues = MemberFormValues | ContactSettingsValues;
 interface MemberInfoFieldRowProps<T extends InfoFieldRowValues> {
   label: string;
   name: FieldPath<T>;
-  visibleName: FieldPath<T>;
   control: Control<T>;
   isEditing: boolean;
   placeholder: string;
@@ -103,7 +89,6 @@ interface MemberInfoFieldRowProps<T extends InfoFieldRowValues> {
 const MemberInfoFieldRow = <T extends InfoFieldRowValues>({
   label,
   name,
-  visibleName,
   control,
   isEditing,
   placeholder,
@@ -116,25 +101,6 @@ const MemberInfoFieldRow = <T extends InfoFieldRowValues>({
       <FormLabel className="font-bold leading-tight text-megaweave-forest-dark">
         {label}
       </FormLabel>
-      <FormField
-        control={control}
-        name={visibleName}
-        render={({ field }) => (
-          <FormItem className="space-y-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-primary-75">Private</span>
-              <FormControl>
-                <Switch
-                  checked={Boolean(field.value)}
-                  onCheckedChange={field.onChange}
-                  disabled={!isEditing}
-                  className="data-[state=checked]:bg-primary"
-                />
-              </FormControl>
-            </div>
-          </FormItem>
-        )}
-      />
     </div>
     <FormField
       control={control}
@@ -280,7 +246,7 @@ const UserPage = () => {
     if (meData.member) {
       const memberData = normalizeTeamMember(meData.member);
       setMember(memberData);
-      memberForm.reset(memberToFormValues(memberData, memberForm.getValues()));
+      memberForm.reset(memberToFormValues(memberData));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meData]);
@@ -312,7 +278,7 @@ const UserPage = () => {
       }
       const memberData = normalizeTeamMember(result[0]);
       setMember(memberData);
-      memberForm.reset(memberToFormValues(memberData, memberForm.getValues()));
+      memberForm.reset(memberToFormValues(memberData));
       setMemberError(null);
     } catch (err) {
       console.error("Error fetching member data:", err);
@@ -374,7 +340,7 @@ const UserPage = () => {
       });
 
       setMember(updatedMember);
-      memberForm.reset(memberToFormValues(updatedMember, formData));
+      memberForm.reset(memberToFormValues(updatedMember));
       setIsEditingMember(false);
       setMemberError(null);
       toast.success("Team member info saved");
@@ -396,7 +362,7 @@ const UserPage = () => {
 
   const handleCancelMember = () => {
     if (member) {
-      memberForm.reset(memberToFormValues(member, memberForm.getValues()));
+      memberForm.reset(memberToFormValues(member));
     }
     setIsEditingMember(false);
     setMemberError(null);
@@ -749,8 +715,6 @@ const UserPage = () => {
     contactForm.reset({
       email: contactEmail,
       phone: contactPhone,
-      emailVisible: contactForm.getValues("emailVisible"),
-      phoneVisible: contactForm.getValues("phoneVisible"),
     });
     setIsEditingContact(true);
   };
@@ -1343,7 +1307,6 @@ const UserPage = () => {
                     <MemberInfoFieldRow
                       label="Email"
                       name="email"
-                      visibleName="emailVisible"
                       control={contactForm.control}
                       isEditing={isEditingContact}
                       placeholder="Enter your email"
@@ -1353,7 +1316,6 @@ const UserPage = () => {
                     <MemberInfoFieldRow
                       label="Phone"
                       name="phone"
-                      visibleName="phoneVisible"
                       control={contactForm.control}
                       isEditing={isEditingContact}
                       placeholder="Enter your contact phone number"
@@ -1429,7 +1391,6 @@ const UserPage = () => {
                         <MemberInfoFieldRow
                           label="Title"
                           name="title"
-                          visibleName="titleVisible"
                           control={memberForm.control}
                           isEditing={isEditingMember}
                           placeholder="Enter your title"
@@ -1438,7 +1399,6 @@ const UserPage = () => {
                         <MemberInfoFieldRow
                           label="Location"
                           name="location"
-                          visibleName="locationVisible"
                           control={memberForm.control}
                           isEditing={isEditingMember}
                           placeholder="Enter your location"
@@ -1447,7 +1407,6 @@ const UserPage = () => {
                         <MemberInfoFieldRow
                           label="Website"
                           name="website"
-                          visibleName="websiteVisible"
                           control={memberForm.control}
                           isEditing={isEditingMember}
                           placeholder="https://your-website.com"
@@ -1458,7 +1417,6 @@ const UserPage = () => {
                         <MemberInfoFieldRow
                           label="Email"
                           name="email"
-                          visibleName="emailVisible"
                           control={memberForm.control}
                           isEditing={isEditingMember}
                           placeholder="Enter your email"

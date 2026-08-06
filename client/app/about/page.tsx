@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { useTeam } from "../contexts/TeamContext";
 import Image from "next/image";
+import { getImageUrl } from "@/utils/imageUtils";
 
 interface MemberCardProps {
   member: TeamMember;
@@ -270,7 +271,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
       >
         <div className="relative aspect-[3/4] w-full">
           <Image
-            src={member.avatar_url}
+            src={getImageUrl(member.avatar_key)}
             alt={member.member_name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

@@ -221,6 +221,11 @@ export default {
           fontWeight: "600",
           letterSpacing: "0.05em", // 5% 字距
         },
+        ".type-h2-mobile": {
+          fontSize: "36px", // 48pt
+          lineHeight: "1.1",
+          fontWeight: "700", // Semibold (SB)
+        },
       };
 
       addComponents(typeStyles);

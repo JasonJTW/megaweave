@@ -329,6 +329,7 @@ const UserPage = () => {
           user_id: user!.userId,
           member_name: username,
           avatar_url: user?.avatar_url ?? "",
+          avatar_key: user?.avatar_key ?? "",
           user_role: user?.role ?? "contributor",
         }),
         title: formData.title,

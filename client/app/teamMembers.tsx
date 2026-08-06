@@ -20,6 +20,7 @@ export interface TeamMember {
   user_id: number;
   member_name: string;
   avatar_url: string;
+  avatar_key: string;
   user_role: string;
   location?: string;
   title?: string;
@@ -60,19 +61,12 @@ export type MemberFormVisibility = {
   emailVisible: boolean;
 };
 
-export function memberToFormValues(
-  member: TeamMember,
-  visibility?: Partial<MemberFormVisibility>,
-) {
+export function memberToFormValues(member: TeamMember) {
   return {
     title: member.title || "",
     location: member.location || "",
     website: member.websites?.[0]?.url || "",
     email: member.email || "",
-    titleVisible: visibility?.titleVisible ?? true,
-    locationVisible: visibility?.locationVisible ?? true,
-    websiteVisible: visibility?.websiteVisible ?? true,
-    emailVisible: visibility?.emailVisible ?? false,
   };
 }
 

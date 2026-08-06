@@ -1,10 +1,10 @@
 // PostCard.tsx 重點改寫
 "use client";
 import { Badge } from "@/components/ui/badge";
+import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
-import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import type { Category, Condition, Post } from "../../types/schema";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
@@ -69,7 +69,7 @@ function PostCardInner({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
-      className={`cursor-pointer rounded-[30px] font-ddin ${isExpired ? "bg-secondary" : "bg-white"} relative mt-4 py-0 pb-4 transition-all duration-300 ${
+      className={`cursor-pointer rounded-[30px] font-ddin ${isExpired ? "bg-secondary" : "bg-white"} relative  py-0 pb-1 transition-all duration-300 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -79,7 +79,7 @@ function PostCardInner({
       }
     >
       {/*//* pt-3 for title margin */}
-      <div className="relative min-h-[414px] pt-3">
+      <div className="relative min-h-[280px] pt-3">
         {post.type === "share" &&
           (isExpired ? (
             <ShareBadgeExpiredIcon className="absolute right-6 top-2 z-20" />
@@ -104,9 +104,9 @@ function PostCardInner({
         >
           {imageSrc && (
             //* mx-3 for image margin
-            <div className="relative mx-4 mb-0">
+            <div className="relative mx-4 mb-2">
               {/* Mobile: w-full + auto height; Desktop: fill column width (max 280px) + fixed 240px height */}
-              <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[240px] sm:max-w-[280px]">
+              <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[184px] sm:max-w-[215px]">
                 {/* Mobile: responsive width/height */}
                 <Image
                   src={imageSrc}
@@ -151,11 +151,11 @@ function PostCardInner({
               </div>
             </div>
           )}
-          <h2 className="mx-4 flex-1 truncate font-ddin text-[36px] font-semibold text-gray-800">
+          <h2 className="mx-4 flex-1 truncate font-ddin text-[24px] font-semibold text-gray-800">
             {post.title}
           </h2>
 
-          {(category || post.category_name_en) && (
+          {/* {(category || post.category_name_en) && (
             <div
               className="mx-4 mt-[8px] inline-flex cursor-pointer leading-[34px]"
               onClick={(e) => {
@@ -169,7 +169,7 @@ function PostCardInner({
                 {category?.name_en || post.category_name_en}
               </Badge>
             </div>
-          )}
+          )} */}
 
           <div className="mx-0 flex flex-col rounded-[20px] bg-transparent px-4 pb-3">
             <p className="truncate text-[18px] text-black sm:hidden">
@@ -249,7 +249,7 @@ function PostCardInner({
               {post.expires_at && (
                 <div className="flex items-center gap-2">
                   <ClockIcon className="text-primary" />
-                  {new Date(post.expires_at).toLocaleDateString()}
+                  {new Date(post.created_at).toLocaleDateString()} - {new Date(post.expires_at).toLocaleDateString()}
                 </div>
               )}
             </div>

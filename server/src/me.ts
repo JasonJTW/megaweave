@@ -101,7 +101,6 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const weaves = await processWeaveRows(weaveRows[0] as WeaveOutput[]);
     const member = (memberRows[0] as RowDataPacket[])[0] ?? null;
 
-    //TODO: check if this necessary?
     return res.status(200).json({
       profile: {
         bio: profile.bio ?? "",

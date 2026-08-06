@@ -196,11 +196,16 @@ const UserPage = () => {
     mutate: mutateMeData,
   } = useSWR(
     meKey,
-    (url: string) =>
-      fetch(url, { credentials: "include", cache: "no-store" }).then((r) => {
-        if (!r.ok) throw new Error("Failed to fetch /api/me");
-        return r.json();
-      }),
+    async (url: string) => {
+      const res = await fetch(url, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("Failed to fetch /api/me");
+      const data = await res.json();
+      console.log("me:", data);
+      return data;
+    },
     {
       revalidateOnFocus: false,
       dedupingInterval: 60_000,
@@ -446,44 +451,6 @@ const UserPage = () => {
     setSelectedAvatarFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-  // optional: client-side resize/compress (commented - keep if you want)
-  // async function compressImage(
-  //   file: File,
-  //   maxWidth = 1200,
-  //   maxHeight = 1200,
-  //   quality = 0.85
-  // ) {
-  //   return new Promise<Blob | null>((resolve) => {
-  //     const img = new Image();
-  //     img.onload = () => {
-  //       const canvas = document.createElement("canvas");
-  //       let { width, height } = img;
-  //       if (width > maxWidth) {
-  //         height = (maxWidth / width) * height;
-  //         width = maxWidth;
-  //       }
-  //       if (height > maxHeight) {
-  //         width = (maxHeight / height) * width;
-  //         height = maxHeight;
-  //       }
-  //       canvas.width = width;
-  //       canvas.height = height;
-  //       const ctx = canvas.getContext("2d");
-  //       if (!ctx) return resolve(null);
-  //       ctx.drawImage(img, 0, 0, width, height);
-  //       canvas.toBlob(
-  //         (blob) => {
-  //           resolve(blob);
-  //         },
-  //         "image/jpeg",
-  //         quality
-  //       );
-  //     };
-  //     img.onerror = () => resolve(null);
-  //     img.src = URL.createObjectURL(file);
-  //   });
-  // }
 
   const updateUserSession = async (updates: Partial<User>) => {
     if (!updates || Object.keys(updates).length === 0) return;
@@ -912,9 +879,9 @@ const UserPage = () => {
     };
   }, [user, loading, redirecting, router]);
 
-  useEffect(() => {
-    console.log("Fetched UserId: ", user?.userId);
-  }, [user?.userId]);
+  // useEffect(() => {
+  //   console.log("Fetched UserId: ", user?.userId);
+  // }, [user?.userId]);
 
   if (loading || meLoading || redirecting) {
     return (
@@ -943,7 +910,7 @@ const UserPage = () => {
   return (
     <>
       <div className="fixed inset-0 -z-10 bg-primary-5"></div>
-      <div className="min-h-screen px-0 sm:px-6 md:px-12 lg:px-16">
+      <div className="min-h-screen overflow-x-hidden px-0 sm:px-6 md:px-12 lg:px-16">
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
@@ -1027,6 +994,7 @@ const UserPage = () => {
                             fill
                             sizes="(max-width: 1024px) 222px, 220px"
                             className="object-cover"
+                            loading="eager"
                           />
                         </div>
                       ) : (

@@ -19,7 +19,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 const fetcher = async (url: string) => {
   const res = await fetch(url, { credentials: "include" });
   const data = await res.json();
-  console.log("fetcher data:", data);
+  console.log("UserContext:", data);
 
   if (!res.ok) {
     if (res.status === 401) {
@@ -45,7 +45,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     fetcher,
     {
       shouldRetryOnError: false, // Don't retry if 401
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       dedupingInterval: 30000,
     },
   );

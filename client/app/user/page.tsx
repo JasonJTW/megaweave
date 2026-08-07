@@ -331,6 +331,7 @@ const UserPage = () => {
           avatar_url: user?.avatar_url ?? "",
           avatar_key: user?.avatar_key ?? "",
           user_role: user?.role ?? "contributor",
+          sort_order: 0,
         }),
         title: formData.title,
         location: formData.location,

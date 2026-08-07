@@ -29,6 +29,7 @@ export interface TeamMember {
   email?: string;
   experience?: Experience[];
   skills?: string[];
+  sort_order: number;
 }
 
 export function parseMemberWebsites(websites: unknown): Website[] {

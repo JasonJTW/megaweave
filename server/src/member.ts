@@ -34,6 +34,7 @@ export interface TeamMember {
   email?: string;
   experience?: Experience[];
   skills?: string[];
+  sort_order: number;
 }
 //RWD userProfile for contributor, displaying on about page
 
@@ -47,7 +48,7 @@ router.get(`/all`, async (req: Request, res: Response) => {
     query = `SELECT * FROM members WHERE user_id = ?`;
     queryParams = [userId as string];
   } else {
-    query = `SELECT * FROM members`;
+    query = `SELECT * FROM members ORDER BY sort_order ASC`;
   }
 
   try {

@@ -10,6 +10,17 @@ import { useTeam } from "@/app/contexts/TeamContext";
 import Image from "next/image";
 import { getImageUrl } from "@/utils/imageUtils";
 import { motion, AnimatePresence } from "framer-motion";
+import EmailIcon from "@/app/components/icons/EmailIcon";
+import { useNavbar } from "@/app/contexts/NavBarContext";
+import WebsiteIcon from "@/app/components/icons/WebsiteIcon";
+import TitleBadgeIcon1 from "@/app/components/icons/TitleBadge1";
+import TitleBadgeIcon2 from "@/app/components/icons/TitleBadge2";
+import TitleBadgeIcon3 from "@/app/components/icons/TitleBadge3";
+import TitleBadgeIcon4 from "@/app/components/icons/TitleBadge4";
+import TitleBadgeIcon5 from "@/app/components/icons/TitleBadge5";
+import TitleBadgeIcon6 from "@/app/components/icons/TitleBadge6";
+import { RefractiveDiv } from "@/app/components/Refractive";
+import BgCloud from "@/app/components/icons/BgCloud";
 
 const MemberPage = () => {
   const router = useRouter();
@@ -34,9 +45,10 @@ const MemberPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 控制按鈕顯示/隱藏的狀態
-  const [isNavVisible, setIsNavVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const { isNavbarVisible, hasUserScrolled } = useNavbar();
+
+  // 進入頁面時按鈕預設顯示；使用者開始滑動後才跟隨 Navbar 動態顯示/隱藏
+  const isNavButtonsVisible = !hasUserScrolled || isNavbarVisible;
 
   // 當網址 id 變更時同步內部 currentId
   useEffect(() => {
@@ -44,27 +56,6 @@ const MemberPage = () => {
       setCurrentId(routeMemberId);
     }
   }, [routeMemberId]);
-
-  // 滾動偵測
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setIsNavVisible(false);
-      } else if (currentScrollY < lastScrollY) {
-        setIsNavVisible(true);
-      }
-
-      setLastScrollY(currentScrollY);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, [lastScrollY]);
 
   useEffect(() => {
     if (teamLoading) {
@@ -147,14 +138,32 @@ const MemberPage = () => {
     }),
   };
 
+  const titleLocation = [
+    "right-0 top-12",
+    "-left-2 top-10",
+    "-left-4 bottom-12",
+    "-right-4 top-12",
+    "-right-6 bottom-12",
+    "-left-6 top-10",
+  ];
+
+  const titleBadges = [
+    TitleBadgeIcon1,
+    TitleBadgeIcon2,
+    TitleBadgeIcon3,
+    TitleBadgeIcon4,
+    TitleBadgeIcon5,
+    TitleBadgeIcon6,
+  ];
+
   if (loading) {
     return (
       <>
         <div className="fixed inset-0 -z-10 bg-primary-5"></div>
-        <div className="flex min-h-screen items-center justify-center bg-primary-75">
+        <div className="flex min-h-screen items-center justify-center bg-primary-5">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-secondary"></div>
-            <p className="text-[#222222]">Loading member data...</p>
+            <p className="font-ddin text-[#222222]">Loading member data...</p>
           </div>
         </div>
       </>
@@ -172,7 +181,7 @@ const MemberPage = () => {
             </h2>
             <Button
               onClick={() => router.push("/about")}
-              className="rounded-full bg-black px-6 py-2 text-white hover:bg-gray-800"
+              className="rounded-full bg-black px-6 py-2 text-white md:hover:bg-gray-400"
             >
               Back to About
             </Button>
@@ -185,11 +194,11 @@ const MemberPage = () => {
   return (
     <>
       <div className="fixed inset-0 -z-10 bg-primary-5"></div>
-      <div className="relative min-h-screen overflow-x-hidden bg-primary-5 font-ddin">
+      <div className="relative mx-auto min-h-screen max-w-3xl overflow-x-hidden bg-primary-5 font-ddin">
         {/* Navigation */}
         <div
-          className={`fixed left-8 top-20 z-50 transition-all duration-300 ease-in-out ${
-            isNavVisible
+          className={`fixed left-8 top-1/2 z-50 transition-all duration-300 ease-in-out ${
+            isNavButtonsVisible
               ? "translate-y-0 opacity-100"
               : "pointer-events-none -translate-y-20 opacity-0"
           }`}
@@ -199,20 +208,19 @@ const MemberPage = () => {
             size="sm"
             onClick={handlePrevious}
             disabled={!canGoPrevious}
-            className={`mr-4 rounded-full px-6 py-2 transition-colors duration-200 ${
+            className={`rounded-full px-2 py-2 transition-colors duration-200 ${
               canGoPrevious
-                ? "bg-black text-white hover:bg-gray-800"
-                : "cursor-not-allowed bg-gray-400 text-gray-600 opacity-50"
+                ? "text-[#222222] md:hover:bg-gray-400"
+                : "text-white opacity-0"
             }`}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Prev
           </Button>
         </div>
 
         <div
-          className={`fixed right-8 top-20 z-50 flex gap-4 transition-all duration-300 ease-in-out ${
-            isNavVisible
+          className={`fixed right-8 top-1/2 z-50 flex gap-4 transition-all duration-300 ease-in-out ${
+            isNavButtonsVisible
               ? "translate-y-0 opacity-100"
               : "pointer-events-none -translate-y-20 opacity-0"
           }`}
@@ -222,31 +230,32 @@ const MemberPage = () => {
             size="sm"
             onClick={handleNext}
             disabled={!canGoNext}
-            className={`rounded-full px-6 py-2 transition-colors duration-200 ${
+            className={`rounded-full px-2 py-2 transition-colors duration-200 ${
               canGoNext
-                ? "bg-black text-white hover:bg-gray-800"
-                : "cursor-not-allowed bg-gray-400 text-gray-600 opacity-50"
+                ? "text-[#222222] md:hover:bg-gray-400"
+                : "cursor-not-allowed text-white opacity-0"
             }`}
           >
-            Next
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+        </div>
+
+        <div className="fixed right-4 top-40 z-20">
           <Button
             variant="ghost"
-            size="sm"
             onClick={handleClose}
-            className="rounded-full bg-black p-2 text-white hover:bg-gray-800"
+            className="h-6 min-h-0 w-6 min-w-0 rounded-full bg-black p-0 text-white hover:bg-gray-800 [&_svg]:!size-3"
           >
-            <X className="h-4 w-4" />
+            <X />
           </Button>
         </div>
 
         <div className="w-full px-10 md:px-20">
-          <div className="type-h2-mobile mb-16 mt-20 flex border-b-[1px] border-[#AAA] py-3 font-ddin text-[#222222]">
+          <div className="type-h2-mobile mb-14 mt-0 flex justify-center border-b-[1px] border-[#AAA] py-3 text-center font-ddin tracking-wide text-[#222222]">
             megaweaving Team
           </div>
 
-          <div className="relative w-full overflow-hidden">
+          <div className="relative w-full">
             <AnimatePresence mode="wait" initial={false} custom={direction}>
               <motion.div
                 key={member.user_id}
@@ -263,63 +272,89 @@ const MemberPage = () => {
                 className="w-full"
               >
                 {/* Main Content Grid */}
-                <div className="grid grid-cols-1 gap-12 pb-20 lg:gap-20">
-                  <div className="space-y-8">
+                <div className="grid grid-cols-1 pb-10 md:gap-10">
+                  <div className="">
                     {/* Member Image */}
                     <div className="relative mx-auto min-w-[300px] max-w-[400px] px-10 md:px-0">
-                      <div className="relative aspect-[3/4] w-full">
+                      <div className="relative aspect-[3/4] w-full select-none">
                         <Image
                           src={getImageUrl(member.avatar_key)}
                           alt={member.member_name}
                           fill
                           priority
-                          className="rounded-[50px] bg-gray-200 object-cover shadow-lg"
+                          draggable={false}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="pointer-events-none select-none rounded-[45px] bg-gray-200 object-cover shadow-lg brightness-90"
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
+                        <div
+                          className={`absolute ${titleLocation[member.index % titleLocation.length]} z-50 flex flex-col items-center justify-center`}
+                        >
+                          {(() => {
+                            const BadgeIcon =
+                              titleBadges[member.index % titleBadges.length];
+                            return (
+                              <BadgeIcon className="absolute w-[62px] sm:w-[80px]" />
+                            );
+                          })()}
+                          <div className="relative z-[60] w-[47px] text-center text-[9px] leading-tight text-white sm:w-[70px] sm:text-[13px]">
+                            {member.title}
+                          </div>
+                        </div>
+                        <div className="absolute -left-40 top-4 -z-10 w-60">
+                          <BgCloud className="" />
+                        </div>
                       </div>
                     </div>
-                    {/* Header with Member Location */}
-                    <div className="mx-auto pb-2">
-                      <div className="flex items-center justify-center">
-                        {member.location && (
-                          <div className="rounded-full bg-black px-4 py-2 text-sm text-white">
+
+                    <div className="mx-auto -mt-6 flex items-center justify-center">
+                      {member.location && (
+                        <RefractiveDiv
+                          className="rounded-full bg-primary-75/20 px-4 py-2 mix-blend-lighten"
+                          refraction={{
+                            radius: 20,
+                            blur: 2,
+                            glassThickness: 80,
+                            bezelWidth: 10,
+                            specularOpacity: 0.5,
+                            specularAngle: 20,
+                          }}
+                        >
+                          <span className="text-white mix-blend-lighten">
                             {member.location}
-                          </div>
-                        )}
-                      </div>
+                          </span>
+                        </RefractiveDiv>
+                      )}
                     </div>
                     {/* Member Name and Department */}
-                    <div>
-                      <h1 className="type-h4 mb-2 text-center text-[#222222] md:text-5xl">
+                    <div className="mb-2 mt-8 md:mb-28 md:mt-12">
+                      <h1 className="type-h4 text-center text-[#222222] md:text-5xl">
                         {member.member_name}
                       </h1>
-                      <p className="mb-4 text-xl text-[#222222]">
-                        {member.title}
-                      </p>
                     </div>
 
                     {/* Contact Information */}
                     {member.email && (
-                      <div className="mb-3">
-                        <p className="mb-1 text-sm uppercase tracking-wide text-[#222222]">
-                          Email
-                        </p>
-                        <p className="text-[#222222]">{member.email}</p>
+                      <div className="flex items-center justify-start gap-3 text-[18px]">
+                        <div className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                          <EmailIcon className="mt-0.5" />
+                        </div>
+                        {member.email}
                       </div>
                     )}
 
                     {member.websites && member.websites?.length > 0 && (
-                      <div className="mb-3">
-                        <p className="mb-1 text-sm uppercase tracking-wide text-[#222222]">
-                          Website
-                        </p>
+                      <div className="flex items-center justify-start gap-3 text-[18px]">
+                        <div className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+                          <WebsiteIcon className="mt-0.5" />
+                        </div>
                         {member.websites.map((website, index) => (
                           <a
                             key={index}
                             href={website.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-[#222222] transition-colors duration-150 hover:text-[#222222]"
+                            className="truncate break-all text-[#222222]"
                           >
                             {website.url}
                           </a>
@@ -328,14 +363,11 @@ const MemberPage = () => {
                     )}
                   </div>
 
-                  <div className="space-y-12">
+                  <div className="">
                     {/* Profile Section */}
                     {member.member_bio && (
-                      <div>
-                        <h2 className="mb-6 border-b border-megaweave-stone pb-4 text-2xl text-[#222222]">
-                          Profile
-                        </h2>
-                        <p className="text-lg leading-relaxed text-[#222222]">
+                      <div className="mt-10">
+                        <p className="break-all text-[20px] font-medium leading-relaxed text-[#222222]">
                           {member.member_bio}
                         </p>
                       </div>

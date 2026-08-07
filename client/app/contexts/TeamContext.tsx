@@ -37,7 +37,7 @@ export const TeamProvider: React.FC<TeamProviderProps> = ({ children }) => {
       setLoading(true);
       setError(null);
       const members = await getTeamMembers();
-      setTeamMembers(members);
+      setTeamMembers(members.map((m, i) => ({ ...m, index: i })));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to fetch team members",

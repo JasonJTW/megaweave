@@ -8,6 +8,12 @@ import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.share
 import { useTeam } from "../contexts/TeamContext";
 import Image from "next/image";
 import { getImageUrl } from "@/utils/imageUtils";
+import TitleBadgeIcon1 from "@/app/components/icons/TitleBadge1";
+import TitleBadgeIcon2 from "@/app/components/icons/TitleBadge2";
+import TitleBadgeIcon3 from "@/app/components/icons/TitleBadge3";
+import TitleBadgeIcon4 from "@/app/components/icons/TitleBadge4";
+import TitleBadgeIcon5 from "@/app/components/icons/TitleBadge5";
+import TitleBadgeIcon6 from "@/app/components/icons/TitleBadge6";
 
 interface MemberCardProps {
   member: TeamMember;
@@ -16,213 +22,40 @@ interface MemberCardProps {
 
 interface TitleSVGProps {
   text: string;
+  index: number;
 }
 
-// 幫Member Title 隨機一個SVG 當背景
-const TitleWithBgRender: React.FC<TitleSVGProps> = ({ text }) => {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  const lineLength = 11; // 每行幾個字
-  let currentLine = "";
-  let initY = 0;
+const titleLocation = [
+  "right-0 top-12",
+  "-left-2 top-10",
+  "-right-4 bottom-12",
+  "-right-4 top-12",
+  "-right-6 bottom-12",
+  "-left-6 top-10",
+];
 
-  // Member title換行，以及若分成兩行文字起始位置上移一些以便垂直置中
-  for (const word of words) {
-    if ((currentLine + " " + word).trim().length <= lineLength) {
-      currentLine += (currentLine ? " " : "") + word;
-    } else {
-      lines.push(currentLine);
-      currentLine = word;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
+const partners = [
+  { name: "FabDao", link: "" },
+  { name: "FabDAO Green Sofa 綠沙發", link: "" },
+  { name: "Fab DAO 行動客廳 ", link: "" },
+  { name: "草率季", link: "" },
+  { name: "大直順", link: "" },
+  { name: "實踐大學建築設計學系", link: "" },
+];
 
-  if (lines.length > 1) initY = -12;
+const titleBadges = [
+  TitleBadgeIcon1,
+  TitleBadgeIcon2,
+  TitleBadgeIcon3,
+  TitleBadgeIcon4,
+  TitleBadgeIcon5,
+  TitleBadgeIcon6,
+];
 
-  const svgList = [
-    <div key="shape-1" className="absolute -right-[2%] -top-[2%] w-1/3">
-      <svg
-        className="h-auto w-full"
-        viewBox="0 0 100 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M100 50C100 77.6142 77.6142 100 50 100C22.3858 100 2.09312e-05 77.6142 1.8517e-05 50L1.50201e-05 10C1.45373e-05 4.47717 4.47716 1.59803e-05 10 1.54974e-05L90 8.50362e-06C95.5228 8.0208e-06 100 4.47716 100 10L100 50Z"
-          fill="#C05421"
-        />
-        <text
-          x="50%"
-          y="50%"
-          fill="white"
-          fontSize="18"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="font-ddin font-bold"
-        >
-          {lines.map((line, index) => (
-            <tspan key={index} x="50%" dy={index === 0 ? initY : 24}>
-              {line}
-            </tspan>
-          ))}
-        </text>
-      </svg>
-    </div>,
-
-    <div key="shape-2" className="absolute -right-[18%] top-[40%] w-1/3">
-      <svg
-        className="h-auto w-full"
-        viewBox="0 0 115 94"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M59.3027 0C72.0927 1.19208e-06 82.9715 7.62457 87.001 18.2646H104.414C109.937 18.2646 114.414 22.7418 114.414 28.2646V65.7354C114.414 71.2582 109.937 75.7354 104.414 75.7354H86.8428C82.6925 86.1621 71.9288 93.5928 59.3027 93.5928H55.1113C42.4852 93.5928 31.7215 86.1622 27.5713 75.7354H10C4.4773 75.7352 -2.40297e-07 71.2581 0 65.7354V28.2646C2.40297e-07 22.7419 4.4773 18.2648 10 18.2646H27.4131C31.4425 7.62453 42.3214 5.9449e-05 55.1113 0H59.3027Z"
-          fill="#C05421"
-        />
-        <text
-          x="50%"
-          y="50%"
-          fill="white"
-          fontSize="18"
-          className="font-ddin font-bold"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontWeight="bold"
-        >
-          {lines.map((line, index) => (
-            <tspan key={index} x="50%" dy={index === 0 ? initY : 24}>
-              {line}
-            </tspan>
-          ))}
-        </text>
-      </svg>
-    </div>,
-
-    <div key="shape-3" className="absolute -right-[18%] top-[10%] w-1/3">
-      <svg
-        className="h-auto w-full"
-        viewBox="0 0 120 120"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M87 0C105.225 0 120 14.7746 120 33C120 43.1417 115.424 52.2138 108.226 58.2671C107.166 59.1577 107.166 60.8423 108.226 61.7329C115.424 67.7862 120 76.8583 120 87C120 105.225 105.225 120 87 120C76.8583 120 67.7862 115.424 61.7329 108.226C60.8423 107.166 59.1577 107.166 58.2671 108.226C52.2138 115.424 43.1417 120 33 120C14.7746 120 0 105.225 0 87C0 76.8586 4.57511 67.7862 11.7735 61.7328C12.8326 60.8423 12.8326 59.1577 11.7735 58.2672C4.57511 52.2138 0 43.1414 0 33C0 14.7746 14.7746 0 33 0C43.1414 0 52.2138 4.57511 58.2672 11.7735C59.1577 12.8326 60.8423 12.8326 61.7328 11.7735C67.7862 4.57511 76.8586 0 87 0Z"
-          fill="#58A89B"
-        />
-        <text
-          x="50%"
-          y="50%"
-          fill="white"
-          fontSize="18"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="font-ddin font-bold"
-        >
-          {lines.map((line, index) => (
-            <tspan key={index} x="50%" dy={index === 0 ? initY : 24}>
-              {line}
-            </tspan>
-          ))}
-        </text>
-      </svg>
-    </div>,
-
-    <div key="shape-4" className="absolute -top-[4%] left-0 w-1/3">
-      <svg
-        className="h-auto w-full"
-        viewBox="0 0 112 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M29.6234 0C40.0017 0 48.9553 5.98897 53.0966 14.6391C53.5639 15.5149 54.4862 16.1111 55.548 16.1111C56.6096 16.111 57.5307 15.5146 57.998 14.6391C62.1392 5.9889 71.0933 -1.21495e-07 81.4716 0H85.171C99.4882 4.45095e-06 111.095 11.3974 111.095 25.4564V74.5436C111.095 88.6026 99.4882 100 85.171 100H81.4716C71.0931 100 62.1392 94.0108 57.998 85.3604C57.5306 84.4851 56.6094 83.889 55.548 83.8889C54.4864 83.8889 53.564 84.4848 53.0966 85.3604C48.9553 94.0107 40.0019 100 29.6234 100H25.9241C11.6068 100 0 88.6026 0 74.5436V25.4564C0 11.3974 11.6068 0 25.9241 0H29.6234Z"
-          fill="#58A89B"
-        />
-        <text
-          x="50%"
-          y="50%"
-          fill="white"
-          fontSize="18"
-          className="font-ddin font-bold"
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          {lines.map((line, index) => (
-            <tspan key={index} x="50%" dy={index === 0 ? initY : 24}>
-              {line}
-            </tspan>
-          ))}
-        </text>
-      </svg>
-    </div>,
-
-    <div key="shape-5" className="absolute -left-[17%] bottom-[40%] w-1/3">
-      <svg
-        className="h-auto w-full"
-        viewBox="0 0 130 91"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M67.9455 0C93.3713 1.22194e-06 115.661 16.5927 128.114 41.4943C129.374 44.0151 129.374 46.9849 128.114 49.5057C115.661 74.4073 93.3713 91 67.9455 91H62.0552C36.6292 91 14.3393 74.4074 1.88619 49.5056C0.625561 46.9848 0.625561 44.0152 1.88619 41.4943C14.3393 16.5926 36.6293 0 62.0552 0H67.9455Z"
-          fill="#F0AF1E"
-        />
-        <text
-          x="50%"
-          y="50%"
-          fill="white"
-          fontSize="18"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          className="font-ddin font-bold"
-        >
-          {lines.map((line, index) => (
-            <tspan key={index} x="50%" dy={index === 0 ? initY : 24}>
-              {line}
-            </tspan>
-          ))}
-        </text>
-      </svg>
-    </div>,
-
-    <div key="shape-6" className="absolute -left-[17%] top-[12%] w-1/3">
-      <svg
-        className="h-auto w-full"
-        viewBox="0 0 120 120"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <rect
-          x="120"
-          width="120"
-          height="120"
-          rx="50"
-          transform="rotate(90 120 0)"
-          fill="#F0AF1E"
-        />
-        <text
-          x="50%"
-          y="50%"
-          fill="white"
-          fontSize="18"
-          className="font-ddin font-bold"
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          {lines.map((line, index) => (
-            <tspan key={index} x="50%" dy={index === 0 ? initY : 24}>
-              {line}
-            </tspan>
-          ))}
-        </text>
-      </svg>
-    </div>,
-  ];
-
-  const randomIndex = useRef(Math.floor(Math.random() * svgList.length));
-  // Return the div at the random index
-  return svgList[randomIndex.current];
+// 幫Member Title 用對應index選一個SVG Badge 當背景
+const TitleWithBgRender: React.FC<TitleSVGProps> = ({ index }) => {
+  const BadgeIcon = titleBadges[index % titleBadges.length];
+  return <BadgeIcon className="absolute w-[62px]" />;
 };
 
 // 獨立的成員卡片組件
@@ -259,7 +92,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
   return (
     <div
       key={member.user_id}
-      className="relative min-w-[270px] shrink-0 justify-self-center hover:cursor-pointer sm:w-[270px] md:w-[450px] lg:w-[540px]"
+      className="relative w-[170px] shrink-0 justify-self-center hover:cursor-pointer sm:w-[200px] md:w-[230px] xl:w-[360px]"
       onClick={handleClick}
     >
       <div
@@ -275,8 +108,17 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
             alt={member.member_name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="rounded-5xl bg-gray-200 object-cover"
+            className="rounded-[50px] bg-gray-200 object-cover"
           />
+
+          <div
+            className={`absolute ${titleLocation[member.index % titleLocation.length]} z-30 flex flex-col items-center justify-center`}
+          >
+            <TitleWithBgRender text={title} index={member.index} />
+            <div className="relative w-[47px] text-center text-[9px] leading-tight text-white">
+              {title}
+            </div>
+          </div>
         </div>
 
         {/* Tooltip - 只在這個卡片 hover 時顯示 */}
@@ -297,10 +139,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
         )}
       </div>
 
-      <div>
-        <TitleWithBgRender text={title} />
-      </div>
-      <p className="mb-20 mt-8 font-ddin text-4xl font-extrabold text-black">
+      <p className="type-body-t4 mb-20 mt-2 font-ddin text-black sm:type-body-t1 sm:font-bold">
         {member.member_name}
       </p>
     </div>
@@ -344,8 +183,8 @@ const TeamInfoPage = () => {
   return (
     <>
       <div className="fixed inset-0 -z-10 bg-primary-5"></div>
-      <div className="min-h-screen overflow-hidden bg-primary-5 sm:px-8 md:px-16 lg:px-24 xl:px-32">
-        <div className="flex flex-col md:px-20">
+      <div className="max-w-8xl mx-auto min-h-screen overflow-hidden bg-primary-5">
+        <div className="flex flex-col">
           {/* Header */}
           <div className="pb-6 pt-10">
             <div className="mx-auto w-fit">
@@ -363,7 +202,7 @@ const TeamInfoPage = () => {
 
           {/* Content */}
           <div className="pb-20">
-            <div className="item-center mx-auto max-w-full text-center">
+            <div className="item-center mx-auto text-center">
               <div className="mb-20 flex justify-center md:mb-60">
                 {/* The SVG for mobile & sm */}
                 <svg
@@ -718,15 +557,17 @@ const TeamInfoPage = () => {
                     />
                   ))}
                 </div>
-                <h3 className="relative mb-2 pt-6 font-ddin text-2xl font-bold text-black sm:text-[20px] md:text-[50px]">
+                <h3 className="type-h4 relative mb-4 pt-6 font-ddin font-extrabold text-megaweave-forest-dark sm:type-h1">
                   OUR PARTNER
                 </h3>
-                <h4 className="relative font-ddin text-xl font-bold text-black sm:text-[14px] md:text-[40px]">
-                  FAB DAO Green Sofa 綠沙發
-                </h4>
-                <h4 className="relative mb-[90px] font-ddin text-xl font-bold text-black sm:text-[14px] md:text-[40px]">
-                  FAB DAO 行動客廳
-                </h4>
+                {partners.map((partner, i) => (
+                  <div
+                    key={i}
+                    className="type-t4 relative mb-2 font-ddin font-bold text-black sm:type-h3"
+                  >
+                    {partner.name}
+                  </div>
+                ))}
               </div>
 
               {/* Timeline Section */}

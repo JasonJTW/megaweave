@@ -141,7 +141,7 @@ const MemberPage = () => {
   const titleLocation = [
     "right-0 top-12",
     "-left-2 top-10",
-    "-rihg-4 bottom-12",
+    "-left-4 bottom-12",
     "-right-4 top-12",
     "-right-6 bottom-12",
     "-left-6 top-10",
@@ -251,7 +251,7 @@ const MemberPage = () => {
         </div>
 
         <div className="w-full px-10 md:px-20">
-          <div className="type-h2-mobile mb-14 mt-0 flex border-b-[1px] border-[#AAA] py-3 font-ddin text-[#222222]">
+          <div className="type-h2-mobile mb-14 mt-0 flex justify-center border-b-[1px] border-[#AAA] py-3 text-center font-ddin tracking-wide text-[#222222]">
             megaweaving Team
           </div>
 
@@ -293,9 +293,11 @@ const MemberPage = () => {
                           {(() => {
                             const BadgeIcon =
                               titleBadges[member.index % titleBadges.length];
-                            return <BadgeIcon className="absolute w-[62px]" />;
+                            return (
+                              <BadgeIcon className="absolute w-[62px] sm:w-[80px]" />
+                            );
                           })()}
-                          <div className="relative z-[60] w-[47px] text-center text-[9px] leading-tight text-white">
+                          <div className="relative z-[60] w-[47px] text-center text-[9px] leading-tight text-white sm:w-[70px] sm:text-[13px]">
                             {member.title}
                           </div>
                         </div>

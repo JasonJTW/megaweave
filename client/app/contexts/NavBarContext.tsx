@@ -11,12 +11,14 @@ import { usePathname } from "next/navigation";
 interface NavbarContextType {
   isNavbarVisible: boolean;
   isAtTop: boolean;
+  hasUserScrolled: boolean;
   showNavbar: () => void;
 }
 
 const NavbarContext = createContext<NavbarContextType>({
   isNavbarVisible: true,
   isAtTop: true,
+  hasUserScrolled: false,
   showNavbar: () => {},
 });
 
@@ -30,6 +32,7 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
   const pathname = usePathname();
   const [isNavbarVisible, setIsNavbarVisible] = useState(true);
   const [isAtTop, setIsAtTop] = useState(true);
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
 
   const hasScrolledRef = useRef(false);
   const lastScrollYRef = useRef(0);
@@ -45,9 +48,11 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (isHiddenRoute) {
       setIsNavbarVisible(false);
+      setHasUserScrolled(false);
       hasScrolledRef.current = false;
     } else {
       setIsNavbarVisible(true);
+      setHasUserScrolled(true);
       hasScrolledRef.current = true;
     }
 
@@ -86,6 +91,7 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
         // 只有當「向下滾動超過 5px」或「滾動距離大於 30px」時，才判定為使用者手動開始滑動
         if (delta > 5 || currentScrollY > 30) {
           hasScrolledRef.current = true;
+          setHasUserScrolled(true);
           setIsNavbarVisible(true); // 使用者手動滑動，顯示 Navbar
         }
         return;
@@ -115,7 +121,7 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <NavbarContext.Provider value={{ isNavbarVisible, isAtTop, showNavbar }}>
+    <NavbarContext.Provider value={{ isNavbarVisible, isAtTop, hasUserScrolled, showNavbar }}>
       {children}
     </NavbarContext.Provider>
   );

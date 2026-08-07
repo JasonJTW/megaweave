@@ -11,7 +11,7 @@ import Image from "next/image";
 import { getImageUrl } from "@/utils/imageUtils";
 import { motion, AnimatePresence } from "framer-motion";
 import EmailIcon from "@/app/components/icons/EmailIcon";
-// import { useNavbar } from "@/app/contexts/NavBarContext";
+import { useNavbar } from "@/app/contexts/NavBarContext";
 import WebsiteIcon from "@/app/components/icons/WebsiteIcon";
 
 const MemberPage = () => {
@@ -37,7 +37,10 @@ const MemberPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // const { isNavbarVisible } = useNavbar();
+  const { isNavbarVisible, hasUserScrolled } = useNavbar();
+
+  // 進入頁面時按鈕預設顯示；使用者開始滑動後才跟隨 Navbar 動態顯示/隱藏
+  const isNavButtonsVisible = !hasUserScrolled || isNavbarVisible;
 
   // 當網址 id 變更時同步內部 currentId
   useEffect(() => {
@@ -168,7 +171,11 @@ const MemberPage = () => {
       <div className="relative min-h-screen overflow-x-hidden bg-primary-5 font-ddin">
         {/* Navigation */}
         <div
-          className={`fixed left-8 top-1/2 z-50 transition-all duration-300 ease-in-out`}
+          className={`fixed left-8 top-1/2 z-50 transition-all duration-300 ease-in-out ${
+            isNavButtonsVisible
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-20 opacity-0"
+          }`}
         >
           <Button
             variant="ghost"
@@ -186,7 +193,11 @@ const MemberPage = () => {
         </div>
 
         <div
-          className={`fixed right-8 top-1/2 z-50 flex gap-4 transition-all duration-300 ease-in-out`}
+          className={`fixed right-8 top-1/2 z-50 flex gap-4 transition-all duration-300 ease-in-out ${
+            isNavButtonsVisible
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none -translate-y-20 opacity-0"
+          }`}
         >
           <Button
             variant="ghost"

@@ -19,9 +19,9 @@ export async function processPostUploadImages(
   job: Job<PostUploadImageJobData>,
 ): Promise<void> {
   const { postId, files } = job.data;
-  console.log(
-    `🖼️ [Worker] Processing ${files.length} image WebP compress & S3 uploads for post #${postId}`,
-  );
+  const startMsg = `🖼️ [Worker] Processing ${files.length} image WebP compress & S3 uploads for post #${postId}`;
+  console.log(startMsg);
+  await job.log(startMsg);
 
   for (const file of files) {
     const segments = file.s3Key.split("/");
@@ -40,16 +40,17 @@ export async function processPostUploadImages(
             })
             .webp({ quality: 80 })
             .toBuffer();
+          await job.log(`✅ [sharp] Compressed ${file.tempPath} to WebP`);
         } catch (compressError) {
-          console.warn(
-            `⚠️ [Worker] sharp compression failed for ${file.tempPath}, uploading raw file:`,
-            compressError,
-          );
+          const warnMsg = `⚠️ [Worker] sharp compression failed for ${file.tempPath}, uploading raw file`;
+          console.warn(warnMsg, compressError);
+          await job.log(warnMsg);
           uploadBuffer = await fs.promises.readFile(file.tempPath);
         }
       } else {
-        console.error(`❌ [Worker] Temporary file not found: ${file.tempPath}`);
-        continue;
+        const errorMsg = `Temporary file not found for upload: ${file.tempPath || "undefined"}`;
+        await job.log(`❌ ${errorMsg}`);
+        throw new Error(errorMsg);
       }
 
       await defaultImageStorage.upload(
@@ -58,14 +59,18 @@ export async function processPostUploadImages(
         fileName,
         "image/webp",
       );
+      await job.log(`✅ [S3] Uploaded ${file.s3Key}`);
 
       // 只有在上傳 S3 成功後才刪除本機臨時檔
       await fs.promises.unlink(file.tempPath).catch(() => {});
     } catch (uploadError) {
-      console.error(
-        `❌ [Worker] S3 upload failed for post #${postId}, tempPath: ${file.tempPath}`,
-        uploadError,
-      );
+      const errMessage =
+        uploadError instanceof Error
+          ? uploadError.message
+          : String(uploadError);
+      const errMsg = `❌ [Worker] S3 upload failed for post #${postId}: ${errMessage}`;
+      console.error(errMsg, uploadError);
+      await job.log(errMsg);
 
       // 若已達到最大重試次數 (BullMQ 重試失敗)，清理臨時檔防止硬碟空間洩漏
       const maxAttempts = job.opts.attempts || 1;
@@ -78,7 +83,9 @@ export async function processPostUploadImages(
     }
   }
 
-  console.log(`✅ [Worker] S3 upload finished for post #${postId}`);
+  const finishMsg = `✅ [Worker] S3 upload finished for post #${postId}`;
+  console.log(finishMsg);
+  await job.log(finishMsg);
 }
 
 export async function processPostDeleteImages(

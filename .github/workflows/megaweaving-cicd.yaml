@@ -211,14 +211,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and deploy backend & workbench containers
+      - name: Pull and deploy backend container
         run: |
-          echo "⬇️ Pulling latest backend and workbench images from GHCR..."
-          docker compose pull backend workbench
-          echo "🚀 Force-recreating backend and workbench containers with updated workbench.env..."
-          docker compose up -d --force-recreate backend workbench
+          echo "⬇️ Pulling latest backend image from GHCR..."
+          docker compose pull backend
+          echo "🚀 Starting backend container..."
+          docker compose up -d backend
 
-      - name: Verify backend & workbench containers
+      - name: Verify backend container
         run: |
           sleep 5
           if [ "$(docker inspect -f '{{.State.Running}}' megaweave-backend 2>/dev/null)" = "true" ]; then
@@ -228,14 +228,6 @@ jobs:
             echo "❌ Backend container failed to start"
             docker logs megaweave-backend --tail 50
             exit 1
-          fi
-
-          if [ "$(docker inspect -f '{{.State.Running}}' megaweave-workbench 2>/dev/null)" = "true" ]; then
-            echo "✅ Workbench container is running successfully"
-            docker compose ps workbench
-          else
-            echo "⚠️ Workbench container is not running"
-            docker logs megaweave-workbench --tail 50 || true
           fi
 
   # ─────────────────────────────────────────────────────────

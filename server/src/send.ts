@@ -12,7 +12,9 @@ router.get("/", async (_req: Request, res: Response) => {
     title: "Your order has been confirmed ✓",
     description:
       "your item exchange request has been accepted. The other party has confirmed the trade — here's a summary of your transaction.",
-    orderId: "#TXN-20240614",
+    //todo: Public WeaveId?
+    weaveId: "#TXN-20240614",
+    weaving_status: "pending",
     itemOffered: "A new job🐶",
     itemReceived: "A new job",
     ctaUrl: "https://megaweaving.net/transactions/TXN-20240614",

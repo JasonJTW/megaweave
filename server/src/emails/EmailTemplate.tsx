@@ -13,12 +13,14 @@ import {
   Hr,
 } from "react-email";
 import EmailBanner from "./EmailBanner";
+import { WeaveStatus } from "../utils/weaveService";
 
 export interface EmailTemplateProps {
   username: string;
   title: string;
   description: string;
-  orderId: string;
+  weaveId: string;
+  weaving_status: WeaveStatus;
   itemOffered: string;
   itemReceived: string;
   ctaUrl: string;
@@ -29,7 +31,7 @@ const EmailTemplate = ({
   username,
   title,
   description,
-  orderId,
+  weaveId,
   itemOffered,
   itemReceived,
   ctaUrl,
@@ -147,7 +149,7 @@ const EmailTemplate = ({
                       margin: 0,
                     }}
                   >
-                    {orderId}
+                    {weaveId}
                   </Text>
                 </Column>
               </Row>

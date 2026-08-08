@@ -1,4 +1,5 @@
-// server/src/queue/jobs/postImage.ts
+import fs from "fs";
+import sharp from "sharp";
 import { Job } from "bullmq";
 import { defaultImageStorage } from "../../storage/ImageStorage";
 
@@ -6,7 +7,7 @@ export interface PostUploadImageJobData {
   postId: number;
   files: Array<{
     s3Key: string;
-    bufferBase64: string;
+    tempPath: string;
   }>;
 }
 
@@ -19,17 +20,62 @@ export async function processPostUploadImages(
 ): Promise<void> {
   const { postId, files } = job.data;
   console.log(
-    `🖼️ [Worker] Processing ${files.length} image S3 uploads for post #${postId}`,
+    `🖼️ [Worker] Processing ${files.length} image WebP compress & S3 uploads for post #${postId}`,
   );
 
   for (const file of files) {
-    const buffer = Buffer.from(file.bufferBase64, "base64");
-    // s3Key 格式為 "posts/filename.webp"，取出資料夾與檔名
     const segments = file.s3Key.split("/");
     const folder = segments[0];
     const fileName = segments.slice(1).join("/");
 
-    await defaultImageStorage.upload(buffer, folder, fileName);
+    try {
+      let uploadBuffer: Buffer;
+      if (file.tempPath && fs.existsSync(file.tempPath)) {
+        try {
+          // 使用 sharp 將圖片壓縮並轉換為 WebP 格式 (等比例 1200x1200, 品質 80)
+          uploadBuffer = await sharp(file.tempPath)
+            .resize(1200, 1200, {
+              fit: "inside",
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 80 })
+            .toBuffer();
+        } catch (compressError) {
+          console.warn(
+            `⚠️ [Worker] sharp compression failed for ${file.tempPath}, uploading raw file:`,
+            compressError,
+          );
+          uploadBuffer = await fs.promises.readFile(file.tempPath);
+        }
+      } else {
+        console.error(`❌ [Worker] Temporary file not found: ${file.tempPath}`);
+        continue;
+      }
+
+      await defaultImageStorage.upload(
+        uploadBuffer,
+        folder,
+        fileName,
+        "image/webp",
+      );
+
+      // 只有在上傳 S3 成功後才刪除本機臨時檔
+      await fs.promises.unlink(file.tempPath).catch(() => {});
+    } catch (uploadError) {
+      console.error(
+        `❌ [Worker] S3 upload failed for post #${postId}, tempPath: ${file.tempPath}`,
+        uploadError,
+      );
+
+      // 若已達到最大重試次數 (BullMQ 重試失敗)，清理臨時檔防止硬碟空間洩漏
+      const maxAttempts = job.opts.attempts || 1;
+      if (job.attemptsMade >= maxAttempts) {
+        if (file.tempPath && fs.existsSync(file.tempPath)) {
+          await fs.promises.unlink(file.tempPath).catch(() => {});
+        }
+      }
+      throw uploadError; // 重新拋出錯誤讓 BullMQ 進行 Retry
+    }
   }
 
   console.log(`✅ [Worker] S3 upload finished for post #${postId}`);

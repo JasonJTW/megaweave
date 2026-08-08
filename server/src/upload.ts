@@ -22,6 +22,39 @@ async function cleanupFailedAvatarUpload(fileKey: string) {
   }
 }
 
+import fs from "fs";
+import os from "os";
+import path from "path";
+
+const tempUploadDir = path.join(os.tmpdir(), "megaweave-uploads");
+if (!fs.existsSync(tempUploadDir)) {
+  fs.mkdirSync(tempUploadDir, { recursive: true });
+}
+
+//* Disk storage for temporary file uploads
+export const diskUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, tempUploadDir);
+    },
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const ext = path.extname(file.originalname) || ".img";
+      cb(null, `${uniqueSuffix}${ext}`);
+    },
+  }),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"));
+    }
+  },
+});
+
 //* Memory storage for images that need processing
 export const memoryUpload = multer({
   storage: multer.memoryStorage(),

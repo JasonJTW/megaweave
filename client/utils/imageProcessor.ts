@@ -1,7 +1,7 @@
-import toast from "react-hot-toast";
+import * as Sentry from "@sentry/nextjs";
 
 /**
- * Utility for compressing images on the client side using HTML5 Canvas.
+ * Utility for compressing images on the client side using HTML5 Canvas and URL.createObjectURL.
  */
 export async function compressImage(
   file: File,
@@ -10,12 +10,26 @@ export async function compressImage(
   quality = 0.8,
 ): Promise<Blob | null> {
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
+    let objectUrl: string | null = null;
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      resolve(null);
+      return;
+    }
+
+    const img = new Image();
+    img.src = objectUrl;
+
+    const cleanup = () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+    };
+
+    img.onload = () => {
+      try {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
@@ -38,19 +52,21 @@ export async function compressImage(
 
         const ctx = canvas.getContext("2d");
         if (!ctx) {
+          cleanup();
           resolve(null);
           return;
         }
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Use WebP if supported, otherwise fallback to JPEG
+        // Try WebP first, then fallback to JPEG
         canvas.toBlob(
           (blob) => {
+            cleanup();
             if (blob) {
               resolve(blob);
             } else {
-              // Final fallback to JPEG if WebP blob creation fails
+              // Fallback to JPEG
               canvas.toBlob(
                 (jpegBlob) => resolve(jpegBlob),
                 "image/jpeg",
@@ -61,10 +77,20 @@ export async function compressImage(
           "image/webp",
           quality,
         );
-      };
-      img.onerror = () => resolve(null);
+      } catch (error) {
+        console.warn(
+          "[ImageProcessor] Error during canvas compression:",
+          error,
+        );
+        cleanup();
+        resolve(null);
+      }
     };
-    reader.onerror = () => resolve(null);
+
+    img.onerror = () => {
+      cleanup();
+      resolve(null);
+    };
   });
 }
 
@@ -92,15 +118,36 @@ export async function safeCompressImage(
     );
     if (compressedBlob) {
       const baseName = file.name.replace(/\.[^/.]+$/, "");
+      const ext = compressedBlob.type === "image/jpeg" ? "jpg" : "webp";
       return {
         blob: compressedBlob,
-        filename: `${baseName}.webp`,
+        filename: `${baseName}.${ext}`,
         isCompressed: true,
       };
     }
+
+    // 當壓縮失敗 (compressedBlob === null) 時，發送 Warning 給 Sentry 記錄
+    Sentry.captureMessage(
+      `[ImageProcessor] Client compression failed for ${file.name}, fallback to raw file`,
+      {
+        level: "warning",
+        tags: {
+          feature: "image_compression",
+          file_type: file.type,
+        },
+        extra: {
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+        },
+      },
+    );
   } catch (error) {
     console.warn(`[ImageProcessor] Error compressing ${file.name}:`, error);
-    toast.error(`Failed to compress image ${file.name}`);
+    Sentry.captureException(error, {
+      tags: { feature: "image_compression" },
+      extra: { fileName: file.name, fileSize: file.size },
+    });
   }
 
   return {

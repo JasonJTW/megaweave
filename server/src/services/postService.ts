@@ -182,7 +182,7 @@ export class PostService {
       }
 
       // 預先在 DB 事務中插入 s3_key，確保即時回傳 201 時 posts 資料表已有圖檔 key 關聯
-      const fileJobs: Array<{ s3Key: string; bufferBase64: string }> = [];
+      const fileJobs: Array<{ s3Key: string; tempPath: string }> = [];
       if (files && files.length > 0) {
         const dbImageValues: (number | string)[] = [];
         const placeholders = files.map(() => "(?, ?, ?, NOW())").join(", ");
@@ -196,7 +196,7 @@ export class PostService {
           dbImageValues.push(postId, s3Key, `Image for post ${postId}`);
           fileJobs.push({
             s3Key,
-            bufferBase64: file.buffer.toString("base64"),
+            tempPath: file.path,
           });
         }
 
@@ -584,7 +584,7 @@ export class PostService {
       }
 
       // 上傳新圖片：先在 DB 事務中預先插入 s3_key
-      const fileJobs: Array<{ s3Key: string; bufferBase64: string }> = [];
+      const fileJobs: Array<{ s3Key: string; tempPath: string }> = [];
       if (files && files.length > 0) {
         const dbImageValues: (number | string)[] = [];
         const placeholders = files.map(() => "(?, ?, ?, NOW())").join(", ");
@@ -598,7 +598,7 @@ export class PostService {
           dbImageValues.push(postId, s3Key, `Image for post ${postId}`);
           fileJobs.push({
             s3Key,
-            bufferBase64: file.buffer.toString("base64"),
+            tempPath: file.path,
           });
         }
 

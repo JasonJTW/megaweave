@@ -4,7 +4,7 @@ import { Request, Response, Router } from "express";
 import { z } from "zod";
 import dotenv from "dotenv";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
-import { memoryUpload } from "./upload";
+import { diskUpload } from "./upload";
 import likeRouter from "./like";
 import { getUserFromCookie } from "./session";
 import { handleError } from "./utils/errorHandler";
@@ -60,7 +60,7 @@ type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
 router.post(
   "/",
   requireAuth,
-  memoryUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
+  diskUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
   async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
     const files = req.files as Express.Multer.File[];
@@ -189,7 +189,7 @@ type EditPostSchemaType = z.infer<typeof EditPostSchema>;
 router.put(
   "/:id",
   requireAuth,
-  memoryUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
+  diskUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
   async (req: AuthenticatedRequest, res: Response) => {
     const postId = parseInt(req.params.id);
     const userId = req.user!.userId;

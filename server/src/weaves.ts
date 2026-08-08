@@ -5,7 +5,7 @@ import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { requestWeave, approveWeave, WeaveError } from "./utils/weaveService";
-
+import { WeaveStatus } from "./utils/weaveService";
 const router = Router();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ export interface WeaveOutput extends RowDataPacket {
   post_id: number;
   giver_id: number;
   receiver_id: number;
-  status: "pending" | "completed" | "cancelled" | "rejected" | "requested";
+  status: WeaveStatus;
   giver_confirmed: number;
   receiver_confirmed: number;
   notes: string | null;
@@ -163,10 +163,15 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   const { postId, itemId, quantity = 1, notes } = req.body;
 
-  if (!postId) return res.status(400).json({ errorMessage: "Post ID is required" });
+  if (!postId)
+    return res.status(400).json({ errorMessage: "Post ID is required" });
 
   // Normalise items: support array format and legacy single-item format
-  interface IncomingItem { itemId?: number; item_id?: number; quantity?: number; }
+  interface IncomingItem {
+    itemId?: number;
+    item_id?: number;
+    quantity?: number;
+  }
   let items: Array<{ itemId: number | null; quantity: number }> = [];
   if (Array.isArray(req.body.items) && req.body.items.length > 0) {
     items = req.body.items.map((it: IncomingItem) => ({
@@ -237,7 +242,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const weaveId = req.params.id;
     const query = `${WEAVE_QUERY_BASE} WHERE w.id = ? AND (w.giver_id = ? OR w.receiver_id = ?) GROUP BY w.id`;
-    const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [weaveId, userId, userId]);
+    const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [
+      weaveId,
+      userId,
+      userId,
+    ]);
     if (weaveRows.length === 0)
       return res.status(404).json({ errorMessage: "Weave not found" });
     const processed = await processWeaveRows(weaveRows);
@@ -249,29 +258,33 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 });
 
 // PATCH /:id/status - 更新 Weave 狀態（雙向確認流程）
-router.patch("/:id/status", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const result = await approveWeave(
-      {
-        weaveId: req.params.id,
-        newStatus: req.body.status,
-        userId: Number(req.user!.userId),
-        actorName: req.user?.username ?? "Someone",
-      },
-      res.locals.io ?? null,
-    );
-    return res.status(200).json({
-      message: result.fullyCompleted ? "Success" : "Waiting",
-      newStatus: result.newStatus,
-      fullyCompleted: result.fullyCompleted,
-    });
-  } catch (err) {
-    if (err instanceof WeaveError)
-      return res.status(err.httpStatus).json({ errorMessage: err.message });
-    console.error("Error in approveWeave:", err);
-    return res.status(500).json({ errorMessage: "Server error" });
-  }
-});
+router.patch(
+  "/:id/status",
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const result = await approveWeave(
+        {
+          weaveId: req.params.id,
+          newStatus: req.body.status,
+          userId: Number(req.user!.userId),
+          actorName: req.user?.username ?? "Someone",
+        },
+        res.locals.io ?? null,
+      );
+      return res.status(200).json({
+        message: result.fullyCompleted ? "Success" : "Waiting",
+        newStatus: result.newStatus,
+        fullyCompleted: result.fullyCompleted,
+      });
+    } catch (err) {
+      if (err instanceof WeaveError)
+        return res.status(err.httpStatus).json({ errorMessage: err.message });
+      console.error("Error in approveWeave:", err);
+      return res.status(500).json({ errorMessage: "Server error" });
+    }
+  },
+);
 
 // GET /public/:uuid - 公開交易紀錄
 router.get("/public/:uuid", async (req: Request, res: Response) => {
@@ -286,7 +299,10 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
 
     const userId = userRows[0].id as number;
     const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) GROUP BY w.id ORDER BY w.created_at DESC`;
-    const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [userId, userId]);
+    const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [
+      userId,
+      userId,
+    ]);
     const processed = await processWeaveRows(weaveRows);
     return res.status(200).json({ weaves: processed });
   } catch {

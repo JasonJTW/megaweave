@@ -550,6 +550,7 @@ const PostsApp = () => {
 
       if (response.ok) {
         setShowCreateForm(false);
+        toast.success("Post created successfully!");
         mutate(); // 重新獲取貼文列表
       } else {
         const errorData = await response.json();

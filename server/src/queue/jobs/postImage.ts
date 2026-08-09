@@ -32,17 +32,34 @@ export async function processPostUploadImages(
       let uploadBuffer: Buffer;
       if (file.tempPath && fs.existsSync(file.tempPath)) {
         try {
-          // 使用 sharp 將圖片壓縮並轉換為 WebP 格式 (等比例 1200x1200, 品質 80)
-          uploadBuffer = await sharp(file.tempPath)
-            .resize(1200, 1200, {
-              fit: "inside",
-              withoutEnlargement: true,
-            })
-            .webp({ quality: 80 })
-            .toBuffer();
-          await job.log(`✅ [sharp] Compressed ${file.tempPath} to WebP`);
+          // 先讀取真實的圖片 metadata（使用 libvips 魔術字節，無法被前端偽造）
+          const meta = await sharp(file.tempPath).metadata();
+          const isAlreadyOptimal =
+            meta.format === "webp" &&
+            (meta.width ?? Infinity) <= 1200 &&
+            (meta.height ?? Infinity) <= 1200;
+
+          if (isAlreadyOptimal) {
+            // 前端已完成 WebP 壓縮且尺寸符合規格，直接讀取上傳，跳過 CPU 密集壓縮
+            uploadBuffer = await fs.promises.readFile(file.tempPath);
+            await job.log(
+              `⚡ [sharp] Skipped compression (already WebP ${meta.width}×${meta.height}): ${file.tempPath}`,
+            );
+          } else {
+            // 前端未壓縮（PNG/JPEG/超大尺寸）→ 後端執行 resize + WebP 轉換
+            uploadBuffer = await sharp(file.tempPath)
+              .resize(1200, 1200, {
+                fit: "inside",
+                withoutEnlargement: true,
+              })
+              .webp({ quality: 80 })
+              .toBuffer();
+            await job.log(
+              `✅ [sharp] Compressed ${meta.format?.toUpperCase() ?? "unknown"} → WebP: ${file.tempPath}`,
+            );
+          }
         } catch (compressError) {
-          const warnMsg = `⚠️ [Worker] sharp compression failed for ${file.tempPath}, uploading raw file`;
+          const warnMsg = `⚠️ [Worker] sharp processing failed for ${file.tempPath}, uploading raw file`;
           console.warn(warnMsg, compressError);
           await job.log(warnMsg);
           uploadBuffer = await fs.promises.readFile(file.tempPath);

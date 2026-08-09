@@ -117,7 +117,17 @@
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 @keyframes neon-pulse {
+
   0% {
     box-shadow:
       0 0 20px rgba(59, 130, 246, 0.5),

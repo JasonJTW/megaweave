@@ -124,7 +124,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
           }
         }
       } else {
-        toast.error("Failed to fetch post");
+        if (response.status !== 404) {
+          toast.error("Failed to fetch post");
+        }
       }
     } catch (error) {
       console.error("Error fetching post:", error);
@@ -258,6 +260,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
       if (response.ok) {
         toast.success("Post deleted successfully");
+        mutate(
+          (key) =>
+            typeof key === "string" && key.startsWith(`${hostName}/api/posts?`),
+          undefined,
+          { revalidate: true },
+        );
         router.push("/");
       } else {
         const errorData = await response.json();

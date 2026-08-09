@@ -14,6 +14,73 @@ import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
 import ShareBadgeIcon from "../icons/ShareBadgeIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
 
+// ─── Image Retry Hook (Exponential Backoff) ───────────────────────────────────
+const MAX_RETRIES = 4; // 最多重試 4 次
+const BASE_DELAY_MS = 2000; // 初始等待 2 秒，後續 4s → 8s → 16s
+
+type ImageStatus = "idle" | "retrying" | "failed";
+
+function useImageWithRetry(
+  primarySrc: string | undefined,
+  fallbackSrc: string | undefined,
+) {
+  const [src, setSrc] = React.useState(primarySrc);
+  const [status, setStatus] = React.useState<ImageStatus>("idle");
+  const retryCountRef = React.useRef(0);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFallbackRef = React.useRef(false); // 標記是否已切換到 fallback URL
+
+  // 當 primarySrc 變更（例如切換貼文）時，重置所有狀態
+  React.useEffect(() => {
+    retryCountRef.current = 0;
+    isFallbackRef.current = false;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setSrc(primarySrc);
+    setStatus("idle");
+  }, [primarySrc]);
+
+  const onError = React.useCallback(() => {
+    // fallback URL 也載入失敗 → 真正的最終失敗，顯示 X 佔位符
+    if (isFallbackRef.current) {
+      setStatus("failed");
+      return;
+    }
+
+    if (retryCountRef.current < MAX_RETRIES) {
+      const attempt = retryCountRef.current + 1;
+      const delay = BASE_DELAY_MS * Math.pow(2, retryCountRef.current); // 指數退避
+      retryCountRef.current = attempt;
+      setStatus("retrying"); // 顯示 shimmer
+
+      timerRef.current = setTimeout(() => {
+        // 強制 Next/Image 重新請求：在 src 末尾附加 ?retry=<n> 使 URL 不同
+        setSrc(`${primarySrc}?retry=${attempt}`);
+        setStatus("idle");
+      }, delay);
+    } else {
+      // 重試耗盡 → 切換到 fallback original URL（繞過 CloudFront thumbnail lambda）
+      if (fallbackSrc) {
+        isFallbackRef.current = true;
+        setSrc(fallbackSrc);
+        setStatus("retrying");
+      } else {
+        setStatus("failed");
+      }
+    }
+  }, [primarySrc, fallbackSrc]);
+
+  // 清理計時器，防止 unmount 後 setState
+  React.useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  return { src, status, onError };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface PostCardProps {
   post: Post;
   conditions: Condition[];
@@ -32,16 +99,16 @@ interface PostCardProps {
 function PostCardInner({
   post,
   // conditions,
-  categories,
+  // categories,
   onPostClick,
   isExpanded = false,
   isFirstVisible,
-  onCategoryClick,
+  // onCategoryClick,
   onLocationClick,
 }: PostCardProps) {
   // const condition = conditions.find((c) => c.level === post.condition_level);
 
-  const category = categories.find((c) => c.id === post.category_id);
+  // const category = categories.find((c) => c.id === post.category_id);
 
   const s3Keys = parseS3Keys(post);
 
@@ -53,11 +120,11 @@ function PostCardInner({
     ? s3Keys[0]
     : getImageUrl(s3Keys[0], "original");
 
-  const [imageSrc, setImageSrc] = React.useState(primarySrc);
-
-  React.useEffect(() => {
-    setImageSrc(primarySrc);
-  }, [primarySrc]);
+  const {
+    src: imageSrc,
+    status: imageStatus,
+    onError: handleImageError,
+  } = useImageWithRetry(primarySrc, fallbackSrc);
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()
@@ -69,7 +136,7 @@ function PostCardInner({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
       onClick={() => onPostClick(post)}
-      className={`cursor-pointer rounded-[30px] font-ddin ${isExpired ? "bg-secondary" : "bg-white"} relative  py-0 pb-1 transition-all duration-300 ${
+      className={`cursor-pointer rounded-[30px] font-ddin ${isExpired ? "bg-secondary" : "bg-white"} relative py-0 pb-1 transition-all duration-300 ${
         isExpanded ? "postcard-expanded" : "postcard-collapsed"
       }`}
       style={
@@ -107,21 +174,52 @@ function PostCardInner({
             <div className="relative mx-4 mb-2">
               {/* Mobile: w-full + auto height; Desktop: fill column width (max 280px) + fixed 240px height */}
               <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[184px] sm:max-w-[215px]">
-                {/* Mobile: responsive width/height */}
-                <Image
-                  src={imageSrc}
-                  alt={post.title}
-                  width={0}
-                  height={0}
-                  sizes="(min-width: 768px) 280px, 100vw"
-                  className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
-                  priority={!!isFirstVisible}
-                  onError={() => {
-                    if (imageSrc !== fallbackSrc) {
-                      setImageSrc(fallbackSrc);
-                    }
-                  }}
-                />
+                {/* ── 全部重試失敗：顯示純色底 + X 佔位符 ── */}
+                {imageStatus === "failed" ? (
+                  <div className="flex h-[184px] w-full items-center justify-center rounded-[20px] bg-[#e8e8e8]">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="36"
+                      height="36"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#b0b0b0"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-label="Image unavailable"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </div>
+                ) : (
+                  <>
+                    {/* ── 正在重試：shimmer skeleton overlay ── */}
+                    {imageStatus === "retrying" && (
+                      <div
+                        className="absolute inset-0 z-10 animate-pulse rounded-[20px] bg-gradient-to-r from-primary-15 via-primary-30 to-primary-15 bg-[length:200%_100%]"
+                        aria-hidden="true"
+                        style={{
+                          animation: "shimmer 1.4s ease-in-out infinite",
+                        }}
+                      />
+                    )}
+
+                    {/* Mobile: responsive width/height */}
+                    <Image
+                      src={imageSrc}
+                      alt={post.title}
+                      width={0}
+                      height={0}
+                      sizes="(min-width: 768px) 280px, 100vw"
+                      className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
+                      priority={!!isFirstVisible}
+                      onError={handleImageError}
+                    />
+                  </>
+                )}
+
                 {isExpired && (
                   <div
                     className="pointer-events-none absolute inset-0 flex items-center justify-center"
@@ -249,7 +347,8 @@ function PostCardInner({
               {post.expires_at && (
                 <div className="flex items-center gap-2">
                   <ClockIcon className="text-primary" />
-                  {new Date(post.created_at).toLocaleDateString()} - {new Date(post.expires_at).toLocaleDateString()}
+                  {new Date(post.created_at).toLocaleDateString()} -{" "}
+                  {new Date(post.expires_at).toLocaleDateString()}
                 </div>
               )}
             </div>

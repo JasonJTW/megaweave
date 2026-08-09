@@ -172,7 +172,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE p.user_id = ?
+      WHERE p.user_id = ? AND p.deleted_at IS NULL
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `;

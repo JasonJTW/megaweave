@@ -1,13 +1,14 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useInView } from "react-intersection-observer";
-import PostCard from "./PostCard";
-import { usePost } from "../../contexts/PostContext";
 import { Weave } from "@/services/weaveService";
-import type { Post, Condition } from "../../types/schema";
-import ElfIcon from "../icons/ElfIcon";
-import WazowskiIcon from "../icons/WazowskiIcon";
-import WeavingIcon from "../icons/WeavingIcon";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useInView } from "react-intersection-observer";
+import { usePost } from "../../contexts/PostContext";
+import type { Condition, Post } from "../../types/schema";
+import CommonShareFlowerIcon from "../icons/CommonShareFlowerIcon";
+import CommonShareMascotIcon from "../icons/CommonShareMascotIcon";
+import CommonShareWIcon from "../icons/CommonShareWIcon";
+import ElfFeedIcon from "../icons/ElfFeedIcon";
+import PostCard from "./PostCard";
 
 interface FeedProps {
   posts: Post[];
@@ -16,6 +17,7 @@ interface FeedProps {
   weaves?: Weave[];
   highlightWeaveId?: number;
   onCategoryClick?: (categoryId: number) => void;
+  onTypeFilterClick?: (type: Post["type"] | "") => void;
   onLocationClick?: (
     type: "province" | "city" | "route",
     value: string,
@@ -24,6 +26,11 @@ interface FeedProps {
   hasMore?: boolean;
 }
 
+type MascotFilter = {
+  categoryKeywords: string[];
+  type?: Post["type"];
+};
+
 export default function Feed({
   posts,
   conditions,
@@ -31,6 +38,7 @@ export default function Feed({
   weaves,
   highlightWeaveId,
   onCategoryClick,
+  onTypeFilterClick,
   onLocationClick,
   onLoadMore,
   hasMore,
@@ -40,6 +48,23 @@ export default function Feed({
   const rafRef = useRef<number | null>(null);
   const debounceTimer = useRef<number | null>(null);
   const { categories } = usePost();
+
+  const handleMascotFilterClick = useCallback(
+    (filter: MascotFilter) => {
+      if (filter.type !== undefined) {
+        onTypeFilterClick?.(filter.type);
+      }
+      const matched = categories.find((cat) =>
+        filter.categoryKeywords.some((keyword) =>
+          cat.name_en.toLowerCase().includes(keyword.toLowerCase()),
+        ),
+      );
+      if (matched) {
+        onCategoryClick?.(matched.id);
+      }
+    },
+    [categories, onCategoryClick, onTypeFilterClick],
+  );
 
   // state + ref pair to avoid stale closures
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
@@ -240,7 +265,7 @@ export default function Feed({
   );
 
   return (
-    <div className="feed-snap snap-y snap-mandatory px-4 sm:grid sm:snap-none sm:auto-rows-max sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6 sm:gap-y-[30px] sm:px-0">
+    <div className="feed-snap snap-y snap-mandatory px-4 sm:grid sm:snap-none sm:auto-rows-max sm:grid-cols-[repeat(auto-fill,280px)] sm:items-end sm:justify-center sm:gap-x-6 sm:gap-y-[30px] sm:px-0">
       {posts.map((p, i) => {
         // ✅ 取得對應的 weave 資料
         // ✅ 修正邏輯：
@@ -278,19 +303,120 @@ export default function Feed({
 
             {/* Desktop-only Sprite Injection */}
             {i === 1 && (
-              <div className="relative hidden w-full items-end justify-end self-end sm:flex">
-                <ElfIcon className="h-full w-full text-[#CB5E32]" />
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleMascotFilterClick({
+                    categoryKeywords: ["book"],
+                    type: "wish",
+                  })
+                }
+                className="relative hidden w-full cursor-pointer flex-col items-center md:flex"
+              >
+                <div className="relative z-0 mb-3 w-[190px] max-w-[85%] rounded-[32px] rounded-br-[12px] bg-white px-5 py-4 font-ddin text-[16px] font-bold leading-snug text-gray-900">
+                  Looking for
+                  <br />
+                  some books?
+                  <svg
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-[18px] right-0 h-[20px] w-[18px]"
+                    viewBox="0 0 38 43"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M11.5658 42.9998C11.5658 42.9998 18.606 11.5217 0 0H36.4867C43.7491 16.5311 23.1318 43.0813 11.5658 42.9998Z"
+                      fill="white"
+                    />
+                  </svg>
+                </div>
+                <ElfFeedIcon />
+              </button>
             )}
-            {i === 3 && (
-              <div className="relative hidden w-full items-end justify-end self-end sm:flex">
-                <WazowskiIcon className="h-full w-full" />
-              </div>
+            {i === 4 && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleMascotFilterClick({ categoryKeywords: ["appliance"] })
+                }
+                className="relative hidden w-full cursor-pointer flex-col items-center md:flex"
+              >
+                <CommonShareMascotIcon className="h-auto w-full" />
+                <div className="relative z-0 mt-2 w-[190px] max-w-[85%] rounded-[32px] rounded-tl-[12px] bg-white px-5 py-4 text-center font-ddin text-[16px] font-bold leading-snug text-gray-900">
+                  Find some tools
+                  <svg
+                    aria-hidden
+                    className="pointer-events-none absolute -top-[18px] left-0 h-[20px] w-[18px]"
+                    viewBox="0 0 38 43"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g transform="translate(38,43) scale(-1,-1)">
+                      <path
+                        d="M11.5658 42.9998C11.5658 42.9998 18.606 11.5217 0 0H36.4867C43.7491 16.5311 23.1318 43.0813 11.5658 42.9998Z"
+                        fill="white"
+                      />
+                    </g>
+                  </svg>
+                </div>
+              </button>
             )}
             {i === 8 && (
-              <div className="relative hidden w-full items-end justify-end self-end sm:flex">
-                <WeavingIcon className="mt-10 h-full w-full text-[#3B6232]" />
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleMascotFilterClick({ categoryKeywords: ["home"] })
+                }
+                className="relative hidden w-full cursor-pointer flex-col items-center md:flex"
+              >
+                <div className="relative z-0 mb-3 w-[190px] max-w-[85%] rounded-[32px] rounded-br-[12px] bg-white px-5 py-4 text-center font-ddin text-[16px] font-bold leading-snug text-gray-900">
+                  Styling ur home!
+                  <svg
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-[18px] right-0 h-[20px] w-[18px]"
+                    viewBox="0 0 38 43"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M11.5658 42.9998C11.5658 42.9998 18.606 11.5217 0 0H36.4867C43.7491 16.5311 23.1318 43.0813 11.5658 42.9998Z"
+                      fill="white"
+                    />
+                  </svg>
+                </div>
+                <CommonShareFlowerIcon className="h-auto w-full" />
+              </button>
+            )}
+            {i === 12 && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleMascotFilterClick({
+                    categoryKeywords: ["material"],
+                    type: "share",
+                  })
+                }
+                className="relative hidden w-full cursor-pointer flex-col items-center md:flex"
+              >
+                <CommonShareWIcon className="h-auto w-full" />
+                <div className="relative z-0 mt-2 w-[190px] max-w-[85%] rounded-[32px] rounded-tr-[12px] bg-white px-5 py-4 text-center font-ddin text-[16px] font-bold leading-snug text-gray-900">
+                  NEED materials!
+                  <svg
+                    aria-hidden
+                    className="pointer-events-none absolute -top-[18px] right-0 h-[20px] w-[18px]"
+                    viewBox="0 0 38 43"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <g transform="translate(0,43) scale(1,-1)">
+                      <path
+                        d="M11.5658 42.9998C11.5658 42.9998 18.606 11.5217 0 0H36.4867C43.7491 16.5311 23.1318 43.0813 11.5658 42.9998Z"
+                        fill="white"
+                      />
+                    </g>
+                  </svg>
+                </div>
+              </button>
             )}
           </React.Fragment>
         );

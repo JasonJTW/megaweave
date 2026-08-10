@@ -9,6 +9,8 @@ export async function processSendEmail(
 ): Promise<void> {
   const props = job.data;
 
+  await job.log(`Starting to send email to ${props.toEmail}`);
+
   const { data, error } = await resend.emails.send({
     from: "JasonJTW <no-reply@notification.megaweaving.net>",
     to: props.toEmail,
@@ -17,8 +19,11 @@ export async function processSendEmail(
   });
 
   if (error) {
+    await job.log(
+      `⚠️ Failed to send email to ${props.toEmail}: ${error.message}`,
+    );
     throw Error(`Failed to send email to ${props.toEmail}: ${error.message}`);
   }
 
-  console.log(`✅ [Worker] Email sent to ${props.toEmail}(ID: ${data?.id})`);
+  await job.log(`✅ Email sent to ${props.toEmail}(ID: ${data?.id})`);
 }

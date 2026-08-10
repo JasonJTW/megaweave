@@ -9,7 +9,7 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
-import { compressImage } from "@/utils/imageProcessor";
+import { safeCompressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
 import { motion } from "framer-motion";
@@ -460,13 +460,12 @@ const UserPage = () => {
 
     try {
       // 1. Compress before processing to save bandwidth to the effect service
-      const compressedBlob = await compressImage(
+      const { blob: blobToProcess } = await safeCompressImage(
         selectedAvatarFile,
         800,
         800,
         0.85,
       );
-      const blobToProcess = compressedBlob || selectedAvatarFile;
 
       // 2. Add effects/filters via the processing host
       const effectFormData = new FormData();

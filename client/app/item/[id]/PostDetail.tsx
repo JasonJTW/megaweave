@@ -9,7 +9,7 @@ import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { compressImage } from "@/utils/imageProcessor";
+import { safeCompressImage } from "@/utils/imageProcessor";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -180,12 +180,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       }
 
       // new images
-      for (const image of data.newImages) {
-        const compressedBlob = await compressImage(image, 1200, 1200, 0.85);
-        if (compressedBlob) {
-          formData.append("images", compressedBlob, "image.webp");
-        } else {
-          formData.append("images", image);
+      if (data.newImages && data.newImages.length > 0) {
+        for (const image of data.newImages) {
+          const { blob, filename } = await safeCompressImage(image, 1200, 1200, 0.85);
+          formData.append("images", blob, filename);
         }
       }
 

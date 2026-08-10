@@ -9,6 +9,8 @@ import {
   PostUploadImageJobData,
   PostDeleteImageJobData,
 } from "./jobs/postImage";
+import { processSendEmail } from "./jobs/email";
+import { EmailTemplateProps } from "../emails/EmailTemplate";
 
 export function startWorkers(): void {
   const postImageWorker = new Worker(
@@ -33,6 +35,28 @@ export function startWorkers(): void {
     console.error(
       `❌ [post-image] Job ${job?.id} (${job?.name}) failed:`,
       err.message,
+    );
+  });
+
+  const emailWorker = new Worker<EmailTemplateProps>(
+    "email",
+    async (job: Job<EmailTemplateProps>) => {
+      if (job.name === "send-email") {
+        await processSendEmail(job);
+      }
+    },
+    { connection: bullmqConnection },
+  );
+
+  emailWorker.on("completed", (job) => {
+    console.log(
+      `🎉 [email-wroker] Job ${job.id} (${job.name}) finished successfully`,
+    );
+  });
+
+  emailWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [email-wroker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
     );
   });
 

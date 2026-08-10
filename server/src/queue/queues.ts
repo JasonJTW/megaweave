@@ -9,6 +9,8 @@ import {
   PostDeleteImageJobData,
 } from "./jobs/postImage";
 
+import { EmailTemplateProps } from "../emails/EmailTemplate";
+
 export const postImageQueue = new Queue<
   PostUploadImageJobData | PostDeleteImageJobData
 >("post-image", {
@@ -34,4 +36,29 @@ export async function enqueuePostDeleteImages(
 ): Promise<void> {
   await postImageQueue.add("delete-images", data);
   console.log(`🗑️ Enqueued delete images job for ${data.s3Keys.length} files`);
+}
+
+export const emailQueue = new Queue<EmailTemplateProps>("email", {
+  connection: bullmqConnection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 2000,
+    },
+    removeOnComplete: {
+      age: 7 * 24 * 60 * 60, // 7 days in seconds
+      count: 1000, // keep at most 1000 completed jobs
+    },
+    removeOnFail: {
+      age: 7 * 24 * 60 * 60, // 7 days in seconds
+    },
+  },
+});
+
+export async function enqueueSendEmail(
+  data: EmailTemplateProps,
+): Promise<void> {
+  await emailQueue.add("send-email", data);
+  console.log(`📧 Enqueued email job for ${data.toEmail}`);
 }

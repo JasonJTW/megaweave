@@ -8,6 +8,9 @@ import dbPool from "./db";
 import { createNotification } from "./notificationService";
 import { messageService } from "./messageService";
 import { updateUserStats } from "./updateUserStats";
+import { enqueueSendEmail } from "../queue/queues";
+import { EmailTemplateProps } from "../emails/EmailTemplate";
+
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -158,7 +161,149 @@ async function buildSystemMessageMeta(
   };
 }
 
+// ─── Notification & Email Helpers ─────────────────────────────────────────────
+
+export type WeaveActionType =
+  | "requested"
+  | "approved"
+  | "declined"
+  | "cancelled"
+  | "confirmed"
+  | "completed";
+
+interface WeaveNoticeCopy {
+  title: string;
+  content: string;
+}
+
+/**
+ * 根據 Weave 動作事件 (Action) 統一生成通知與 Email 標題與內容
+ */
+function getWeaveNoticeCopy(
+  action: WeaveActionType,
+  actorName: string,
+  postTitle: string,
+): WeaveNoticeCopy | null {
+  switch (action) {
+    case "requested":
+      return {
+        title: "New Weave Request",
+        content: `${actorName} sent a weave request for "${postTitle}"`,
+      };
+    case "approved":
+      return {
+        title: "Weave Request Approved",
+        content: `${actorName} approved your weave request for "${postTitle}"`,
+      };
+    case "declined":
+      return {
+        title: "Weave Request Declined",
+        content: `${actorName} declined your weave request for "${postTitle}"`,
+      };
+    case "cancelled":
+      return {
+        title: "Weave Cancelled",
+        content: `${actorName} cancelled the weave for "${postTitle}"`,
+      };
+    case "confirmed":
+      return {
+        title: "Weave Confirmed",
+        content: `${actorName} confirmed the weave for "${postTitle}". Waiting for your confirmation.`,
+      };
+    case "completed":
+      return {
+        title: "Weave Completed",
+        content: `Weave for "${postTitle}" is successfully completed!`,
+      };
+    default:
+      return null;
+  }
+}
+
+interface NotifyWeaveStatusParams {
+  io: Server | null;
+  weaveId: number;
+  recipientId: number;
+  senderId: number;
+  actorName: string;
+  postTitle: string;
+  action: WeaveActionType;
+}
+
+/**
+ * 統一派發站內通知 (Socket + DB) 與 站外 Email (BullMQ Queue)
+ */
+async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
+  const {
+    io,
+    weaveId,
+    recipientId,
+    senderId,
+    actorName,
+    postTitle,
+    action,
+  } = params;
+
+  const copy = getWeaveNoticeCopy(action, actorName, postTitle);
+  if (!copy) return;
+
+  const link = `/user?highlightWeaveId=${weaveId}`;
+
+  // 1. 站內通知 (Socket + DB)
+  if (io) {
+    createNotification(io, {
+      recipient_id: recipientId,
+      sender_id: senderId,
+      type: "ORDER_UPDATE",
+      title: copy.title,
+      content: copy.content,
+      link,
+    }).catch((e) => console.error("🔔 Notification creation failed:", e));
+  }
+
+  // 2. 站外 Email (Queue)
+  try {
+    const [userRows] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT username, email FROM users WHERE id = ?",
+      [recipientId],
+    );
+
+    if (userRows.length > 0 && userRows[0].email) {
+      const recipient = userRows[0];
+      const host = process.env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
+
+      // 映射 action 至 Email 的 weaving_status 呈現
+      const emailStatusMap: Record<WeaveActionType, WeaveStatus> = {
+        requested: "requested",
+        approved: "pending",
+        declined: "rejected",
+        cancelled: "cancelled",
+        confirmed: "pending",
+        completed: "completed",
+      };
+
+      const emailProps: EmailTemplateProps = {
+        username: recipient.username,
+        toEmail: recipient.email,
+        title: copy.title,
+        description: copy.content,
+        weaveId: `#TXN-${weaveId}`,
+        weaving_status: emailStatusMap[action],
+        itemOffered: postTitle,
+        itemReceived: "Trade Item",
+        ctaUrl: `${host}${link}`,
+      };
+
+      await enqueueSendEmail(emailProps);
+    }
+  } catch (e) {
+    console.error("📧 Enqueue email failed:", e);
+  }
+}
+
+
 // ─── Public API ───────────────────────────────────────────────────────────────
+
 
 /**
  * 建立 Weave 請求：驗證 → 寫入 DB → 發通知 → 建立對話系統訊息
@@ -204,30 +349,30 @@ export async function requestWeave(
     );
   }
 
-  // Notification
+  // Notification & Email
   let notificationSent = false;
-  if (io) {
-    try {
-      const [postInfo] = await dbPool.execute<RowDataPacket[]>(
-        "SELECT title FROM posts WHERE id = ?",
-        [postId],
-      );
-      const postTitle = (postInfo[0]?.title as string) ?? "Item";
-      await createNotification(io, {
-        recipient_id: targetUserId,
-        sender_id: initiator.id,
-        type: "ORDER_UPDATE",
-        title: isWish ? "New Share Offer" : "New Wish Request",
-        content: isWish
-          ? `${initiator.name} wants to share "${postTitle}" with you!`
-          : `${initiator.name} is wishing for your "${postTitle}"`,
-        link: `/user?highlightWeaveId=${weaveId}`,
-      });
-      notificationSent = true;
-    } catch (e) {
-      console.error("🔔 [requestWeave] Notification failed:", e);
-    }
+  try {
+    const [postInfo] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT title FROM posts WHERE id = ?",
+      [postId],
+    );
+    const postTitle = (postInfo[0]?.title as string) ?? "Item";
+
+    await notifyWeaveStatusChange({
+      io,
+      weaveId: Number(weaveId),
+      recipientId: targetUserId,
+      senderId: initiator.id,
+      actorName: initiator.name,
+      postTitle,
+      action: "requested",
+    });
+    notificationSent = true;
+  } catch (e) {
+    console.error("🔔 [requestWeave] Notification/Email failed:", e);
   }
+
+
 
   // System message in conversation
   if (conversationId) {
@@ -350,9 +495,9 @@ export async function approveWeave(
         } else {
           // Partial confirm: commit early, broadcast partial state, return
           await connection.commit();
+          const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
           if (io) {
             try {
-              const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
               const [latestRows] = await dbPool.execute<RowDataPacket[]>(
                 `SELECT status, giver_confirmed, receiver_confirmed FROM weaves WHERE id = ?`,
                 [weaveId],
@@ -373,6 +518,26 @@ export async function approveWeave(
               console.error("Socket emit failed on partial confirm:", emitErr);
             }
           }
+
+          // 派發單邊確認的通知與 Email
+          const [details] = await dbPool.execute<RowDataPacket[]>(
+            `SELECT p.title FROM posts p WHERE p.id = ?`,
+            [weave.post_id],
+          );
+          const postTitle = (details[0]?.title as string) ?? "Item";
+
+          notifyWeaveStatusChange({
+            io,
+            weaveId: Number(weaveId),
+            recipientId,
+            senderId: userId,
+            actorName,
+            postTitle,
+            action: "confirmed",
+          }).catch((err) =>
+            console.error("Notification/Email failed on partial confirm:", err),
+          );
+
           return { newStatus: "pending", fullyCompleted: false };
         }
       } else {
@@ -383,55 +548,62 @@ export async function approveWeave(
     await connection.commit();
 
     // ── Post-commit: notification + socket broadcast ───────────────────────────
-    if (io) {
-      try {
-        const [details] = await dbPool.execute<RowDataPacket[]>(
-          `SELECT p.title FROM posts p WHERE p.id = ?`,
-          [weave.post_id],
+    try {
+      const [details] = await dbPool.execute<RowDataPacket[]>(
+        `SELECT p.title FROM posts p WHERE p.id = ?`,
+        [weave.post_id],
+      );
+      const postTitle = (details[0]?.title as string) ?? "Item";
+      const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
+
+      // 判斷觸發的 Action 類型
+      let action: WeaveActionType | null = null;
+      if (newStatus === "pending" && weave.status === "requested") {
+        action = "approved";
+      } else if (newStatus === "rejected") {
+        action = "declined";
+      } else if (newStatus === "cancelled") {
+        action = "cancelled";
+      } else if (newStatus === "completed") {
+        const [statusCheck] = await dbPool.execute<RowDataPacket[]>(
+          `SELECT status FROM weaves WHERE id = ?`,
+          [weaveId],
         );
-        const postTitle = (details[0]?.title as string) ?? "Item";
-        const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
+        action =
+          (statusCheck[0]?.status as string) === "completed"
+            ? "completed"
+            : "confirmed";
+      }
 
-        // Pick notification copy
-        let notifTitle = "";
-        let notifContent = "";
+      // 派發通知與 Email
+      if (action) {
+        // 1. 寄給對方 (Recipient)
+        await notifyWeaveStatusChange({
+          io,
+          weaveId: Number(weaveId),
+          recipientId,
+          senderId: userId,
+          actorName,
+          postTitle,
+          action,
+        });
 
-        if (newStatus === "pending" && weave.status === "requested") {
-          notifTitle = "Weave Request Approved";
-          notifContent = `${actorName} approved your weave request for "${postTitle}"`;
-        } else if (newStatus === "rejected") {
-          notifTitle = "Weave Request Declined";
-          notifContent = `${actorName} declined your weave request for "${postTitle}"`;
-        } else if (newStatus === "cancelled") {
-          notifTitle = "Weave Cancelled";
-          notifContent = `${actorName} cancelled the weave for "${postTitle}"`;
-        } else if (newStatus === "completed") {
-          // Check actual DB status to distinguish full vs partial completion
-          const [statusCheck] = await dbPool.execute<RowDataPacket[]>(
-            `SELECT status FROM weaves WHERE id = ?`,
-            [weaveId],
-          );
-          if ((statusCheck[0]?.status as string) === "completed") {
-            notifTitle = "Weave Completed";
-            notifContent = `Weave for "${postTitle}" is successfully completed!`;
-          } else {
-            notifTitle = "Weave Confirmed";
-            notifContent = `${actorName} confirmed the weave for "${postTitle}". Waiting for your confirmation.`;
-          }
-        }
-
-        if (notifTitle) {
-          await createNotification(io, {
-            recipient_id: recipientId,
-            sender_id: userId,
-            type: "ORDER_UPDATE",
-            title: notifTitle,
-            content: notifContent,
-            link: `/user?highlightWeaveId=${weaveId}`,
+        // 2. 如果狀態為「完全完成 (completed)」，觸發動作的這一方 (userId) 也必須收到 Completed 通知與 Email
+        if (action === "completed") {
+          await notifyWeaveStatusChange({
+            io,
+            weaveId: Number(weaveId),
+            recipientId: userId,
+            senderId: userId,
+            actorName,
+            postTitle,
+            action: "completed",
           });
         }
+      }
 
-        // Broadcast real-time status update to both parties
+      // Broadcast real-time status update to both parties via Socket
+      if (io) {
         const [latestRows] = await dbPool.execute<RowDataPacket[]>(
           `SELECT status, giver_confirmed, receiver_confirmed FROM weaves WHERE id = ?`,
           [weaveId],
@@ -447,10 +619,11 @@ export async function approveWeave(
           statusPayload,
         );
         io.to(`user_${userId}`).emit("weave_status_updated", statusPayload);
-      } catch (e) {
-        console.error("Weave update notification failed:", e);
       }
+    } catch (e) {
+      console.error("Weave update notification/socket failed:", e);
     }
+
 
     // Async stats recalculation (fire-and-forget)
     if (newStatus === "completed") {

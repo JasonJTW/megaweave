@@ -32,6 +32,7 @@ const EmailTemplate = ({
   title,
   description,
   weaveId,
+  weaving_status,
   itemOffered,
   itemReceived,
   ctaUrl,
@@ -228,7 +229,7 @@ const EmailTemplate = ({
                       margin: 0,
                     }}
                   >
-                    Confirmed
+                    {weaving_status}
                   </Text>
                 </Column>
               </Row>

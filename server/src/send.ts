@@ -1,38 +1,37 @@
 import { Router, Request, Response } from "express";
-import { jsx } from "react/jsx-runtime";
-import { Resend } from "resend";
-import EmailTemplate, { EmailTemplateProps } from "./emails/EmailTemplate";
+import { EmailTemplateProps } from "./emails/EmailTemplate";
+import { enqueueSendEmail } from "./queue/queues";
 
 const router = Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
-router.get("/", async (_req: Request, res: Response) => {
-  const props: EmailTemplateProps = {
-    username: "Jason",
-    title: "Your order has been confirmed ✓",
-    description:
-      "your item exchange request has been accepted. The other party has confirmed the trade — here's a summary of your transaction.",
-    //todo: Public WeaveId?
-    weaveId: "#TXN-20240614",
-    weaving_status: "pending",
-    itemOffered: "A new job🐶",
-    itemReceived: "A new job",
-    ctaUrl: "https://megaweaving.net/transactions/TXN-20240614",
-    toEmail: "way6107715@gmail.com",
-  };
+router.post("/", async (req: Request, res: Response) => {
+  // const props: EmailTemplateProps = {
+  //   username: "Jason",
+  //   title: "Your order has been confirmed ✓",
+  //   description:
+  //     "your item exchange request has been accepted. The other party has confirmed the trade — here's a summary of your transaction.",
+  //   //todo: Public WeaveId?
+  //   weaveId: "#TXN-20240614",
+  //   weaving_status: "pending",
+  //   itemOffered: "A new job🐶",
+  //   itemReceived: "A new job",
+  //   ctaUrl: "https://megaweaving.net/transactions/TXN-20240614",
+  //   toEmail: "way6107715@gmail.com",
+  // };
 
-  const { data, error } = await resend.emails.send({
-    from: "JasonJTW <no-reply@notification.megaweaving.net>",
-    to: ["way6107715@gmail.com"],
-    subject: props.title,
-    react: jsx(EmailTemplate, props),
-  });
+  const props: EmailTemplateProps = req.body.props;
 
-  if (error) {
-    return res.status(400).json({ error });
+  try {
+    await enqueueSendEmail(props);
+    return res.status(202).json({
+      message: "Email job enqueued successfully",
+    });
+  } catch (error) {
+    console.error("Failed to enqueue email job: ", error);
+    return res
+      .status(500)
+      .json({ errorMessage: "Failed to enqueue email job." });
   }
-
-  res.status(200).json({ data });
 });
 
 export default router;

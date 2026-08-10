@@ -688,14 +688,15 @@ export default function PostFormModal({
                       : undefined
                   }
                   onValueChange={(value) => {
-                    setFormErrors((prev) => ({
+                    setFormErrors((prev) =>
+                      prev.conditionLevel
+                        ? { ...prev, conditionLevel: false }
+                        : prev,
+                    );
+                    setFormData((prev) => ({
                       ...prev,
-                      conditionLevel: false,
-                    }));
-                    setFormData({
-                      ...formData,
                       conditionLevel: parseInt(value),
-                    });
+                    }));
                   }}
                   required
                 >
@@ -733,14 +734,14 @@ export default function PostFormModal({
                   placeholder="Title"
                   value={formData.title}
                   onChange={(e) => {
-                    setFormErrors((prev) => ({
+                    const value = e.target.value;
+                    setFormErrors((prev) =>
+                      prev.title ? { ...prev, title: false } : prev,
+                    );
+                    setFormData((prev) => ({
                       ...prev,
-                      title: false,
+                      title: value,
                     }));
-                    setFormData({
-                      ...formData,
-                      title: e.target.value,
-                    });
                   }}
                 />
               </div>
@@ -794,14 +795,14 @@ export default function PostFormModal({
                     placeholder="Location (City)"
                     value={formData.location}
                     onChange={(e) => {
-                      setFormErrors((prev) => ({
+                      const value = e.target.value;
+                      setFormErrors((prev) =>
+                        prev.location ? { ...prev, location: false } : prev,
+                      );
+                      setFormData((prev) => ({
                         ...prev,
-                        location: false,
+                        location: value,
                       }));
-                      setFormData({
-                        ...formData,
-                        location: e.target.value,
-                      });
                     }}
                   />
                 </div>
@@ -835,14 +836,13 @@ export default function PostFormModal({
                         mode="single"
                         selected={formData.expires_at}
                         onSelect={(date) => {
-                          setFormErrors((prev) => ({
+                          setFormErrors((prev) =>
+                            prev.expires_at ? { ...prev, expires_at: false } : prev,
+                          );
+                          setFormData((prev) => ({
                             ...prev,
-                            expires_at: false,
-                          }));
-                          setFormData({
-                            ...formData,
                             expires_at: date || undefined,
-                          });
+                          }));
                         }}
                         defaultMonth={formData.expires_at}
                         disabled={(date) => {
@@ -890,14 +890,14 @@ export default function PostFormModal({
                   }`}
                   value={formData.content}
                   onChange={(e) => {
-                    setFormErrors((prev) => ({
+                    const value = e.target.value;
+                    setFormErrors((prev) =>
+                      prev.content ? { ...prev, content: false } : prev,
+                    );
+                    setFormData((prev) => ({
                       ...prev,
-                      content: false,
+                      content: value,
                     }));
-                    setFormData({
-                      ...formData,
-                      content: e.target.value,
-                    });
                   }}
                 />
               </div>

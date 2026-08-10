@@ -108,6 +108,12 @@
   }
 }
 
+@layer utilities {
+  .field-sizing-content {
+    field-sizing: content;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -127,7 +133,6 @@
 }
 
 @keyframes neon-pulse {
-
   0% {
     box-shadow:
       0 0 20px rgba(59, 130, 246, 0.5),

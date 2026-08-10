@@ -9,7 +9,9 @@ export async function processSendEmail(
 ): Promise<void> {
   const props = job.data;
 
-  await job.log(`Starting to send email to ${props.toEmail}`);
+  await job.log(
+    `Starting to send email to ${props.toEmail}, title: ${props.title}`,
+  );
 
   const { data, error } = await resend.emails.send({
     from: "JasonJTW <no-reply@notification.megaweaving.net>",

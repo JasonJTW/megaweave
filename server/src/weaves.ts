@@ -268,10 +268,11 @@ router.patch(
           weaveId: req.params.id,
           newStatus: req.body.status,
           userId: Number(req.user!.userId),
-          actorName: req.user?.username ?? "Someone",
+          actorName: req.user!.username,
         },
         res.locals.io ?? null,
       );
+
       return res.status(200).json({
         message: result.fullyCompleted ? "Success" : "Waiting",
         newStatus: result.newStatus,

@@ -14,7 +14,7 @@ export const postImageQueue = new Queue<
 >("post-image", {
   connection: bullmqConnection,
   defaultJobOptions: {
-    attempts: 3,
+    attempts: 5,
     backoff: {
       type: "exponential",
       delay: 1000,

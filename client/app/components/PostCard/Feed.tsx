@@ -319,7 +319,7 @@ export default function Feed({
                   some books?
                   <svg
                     aria-hidden
-                    className="pointer-events-none absolute -bottom-[18px] right-0 h-[20px] w-[18px]"
+                    className="pointer-events-none absolute -bottom-[18px] right-4 h-[20px] w-[18px]"
                     viewBox="0 0 38 43"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -346,7 +346,7 @@ export default function Feed({
                   Find some tools
                   <svg
                     aria-hidden
-                    className="pointer-events-none absolute -top-[18px] left-0 h-[20px] w-[18px]"
+                    className="pointer-events-none absolute -top-[18px] left-4 h-[20px] w-[18px]"
                     viewBox="0 0 38 43"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -373,7 +373,7 @@ export default function Feed({
                   Styling ur home!
                   <svg
                     aria-hidden
-                    className="pointer-events-none absolute -bottom-[18px] right-0 h-[20px] w-[18px]"
+                    className="pointer-events-none absolute -bottom-[18px] right-4 h-[20px] w-[18px]"
                     viewBox="0 0 38 43"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -403,7 +403,7 @@ export default function Feed({
                   NEED materials!
                   <svg
                     aria-hidden
-                    className="pointer-events-none absolute -top-[18px] right-0 h-[20px] w-[18px]"
+                    className="pointer-events-none absolute -top-[18px] right-4 h-[20px] w-[18px]"
                     viewBox="0 0 38 43"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"

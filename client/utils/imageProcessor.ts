@@ -7,8 +7,66 @@ export interface ProcessedImage {
 }
 
 /**
+ * Detects whether the browser's Canvas API can actually encode to WebP.
+ * iOS Safari silently falls back to image/png when image/webp is requested,
+ * so we must proactively check rather than trust the MIME type we passed.
+ */
+let _webpSupportCache: boolean | null = null;
+function isWebPEncodingSupported(): boolean {
+  if (_webpSupportCache !== null) return _webpSupportCache;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    _webpSupportCache = canvas
+      .toDataURL("image/webp")
+      .startsWith("data:image/webp");
+  } catch {
+    _webpSupportCache = false;
+  }
+  return _webpSupportCache;
+}
+
+/**
+ * iOS Safari canvas pixel limit is 16,777,216 px (4096×4096).
+ * High-resolution iPhone photos (12MP+) must be pre-scaled before canvas draw
+ * or toBlob() returns null / produces a blank image.
+ */
+const IOS_CANVAS_MAX_PIXELS = 16_777_216;
+
+function safeScale(
+  width: number,
+  height: number,
+  maxWidth: number,
+  maxHeight: number,
+): { width: number; height: number } {
+  let w = width;
+  let h = height;
+
+  // Scale down proportionally if either dimension exceeds the limit
+  const scaleW = w > maxWidth ? maxWidth / w : 1;
+  const scaleH = h > maxHeight ? maxHeight / h : 1;
+  const scale = Math.min(scaleW, scaleH);
+  if (scale < 1) {
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+  }
+
+  // Additionally enforce iOS canvas pixel budget (16MP max)
+  const totalPixels = w * h;
+  if (totalPixels > IOS_CANVAS_MAX_PIXELS) {
+    const pixelScale = Math.sqrt(IOS_CANVAS_MAX_PIXELS / totalPixels);
+    w = Math.floor(w * pixelScale);
+    h = Math.floor(h * pixelScale);
+  }
+
+  return { width: w, height: h };
+}
+
+/**
  * Internal helper to compress a image Blob/File with max dimensions & quality.
  * Implements a 5-second timeout and fallback mechanism to guarantee promise resolution.
+ * Handles iOS Safari WebP-to-PNG silent downgrade by always requesting JPEG on iOS.
  */
 async function compressSingleImage(
   file: File,
@@ -39,54 +97,59 @@ async function compressSingleImage(
       safeResolve(null);
     }, 5000);
 
+    // Choose output MIME type: use JPEG on iOS since Safari silently turns WebP → PNG
+    const webpSupported = isWebPEncodingSupported();
+    const targetMime = webpSupported ? "image/webp" : "image/jpeg";
+
+    const drawAndBlob = (
+      source: HTMLImageElement | ImageBitmap,
+      w: number,
+      h: number,
+    ) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) {
+        clearTimeout(timer);
+        safeResolve(null);
+        return;
+      }
+      ctx.drawImage(source, 0, 0, w, h);
+
+      canvas.toBlob(
+        (blob) => {
+          clearTimeout(timer);
+          if (blob && blob.size > 0) {
+            safeResolve(blob);
+          } else {
+            // toBlob returned null or empty (e.g. canvas too large on old iOS) — try JPEG as last resort
+            canvas.toBlob(
+              (jpegBlob) => safeResolve(jpegBlob),
+              "image/jpeg",
+              quality,
+            );
+          }
+        },
+        targetMime,
+        quality,
+      );
+    };
+
     const processBitmapOrImg = async () => {
-      // 1. Try modern native createImageBitmap API (faster, background thread, no HTMLImageElement DOM overhead)
+      // 1. Try modern native createImageBitmap API (faster, off-main-thread, avoids HTMLImageElement quirks)
       if (typeof window !== "undefined" && "createImageBitmap" in window) {
         try {
           const bitmap = await createImageBitmap(file);
-          let width = bitmap.width;
-          let height = bitmap.height;
-
-          if (width > height) {
-            if (width > maxWidth) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = Math.round((width * maxHeight) / height);
-              height = maxHeight;
-            }
-          }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d", { alpha: false });
-          if (ctx) {
-            ctx.drawImage(bitmap, 0, 0, width, height);
-            bitmap.close();
-
-            canvas.toBlob(
-              (blob) => {
-                clearTimeout(timer);
-                if (blob) {
-                  safeResolve(blob);
-                } else {
-                  // Fallback to JPEG if WebP generation fails (legacy mobile WebViews)
-                  canvas.toBlob(
-                    (jpegBlob) => safeResolve(jpegBlob),
-                    "image/jpeg",
-                    quality,
-                  );
-                }
-              },
-              "image/webp",
-              quality,
-            );
-            return;
-          }
+          const { width, height } = safeScale(
+            bitmap.width,
+            bitmap.height,
+            maxWidth,
+            maxHeight,
+          );
+          drawAndBlob(bitmap, width, height);
           bitmap.close();
+          return;
         } catch (bitmapErr) {
           console.warn(
             `[ImageProcessor] createImageBitmap failed for ${file.name}, falling back to HTMLImageElement`,
@@ -109,50 +172,13 @@ async function compressSingleImage(
 
       img.onload = () => {
         try {
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > maxWidth) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            }
-          } else {
-            if (height > maxHeight) {
-              width = Math.round((width * maxHeight) / height);
-              height = maxHeight;
-            }
-          }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext("2d", { alpha: false });
-          if (!ctx) {
-            clearTimeout(timer);
-            safeResolve(null);
-            return;
-          }
-
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob(
-            (blob) => {
-              clearTimeout(timer);
-              if (blob) {
-                safeResolve(blob);
-              } else {
-                canvas.toBlob(
-                  (jpegBlob) => safeResolve(jpegBlob),
-                  "image/jpeg",
-                  quality,
-                );
-              }
-            },
-            "image/webp",
-            quality,
+          const { width, height } = safeScale(
+            img.width,
+            img.height,
+            maxWidth,
+            maxHeight,
           );
+          drawAndBlob(img, width, height);
         } catch (err) {
           console.warn(
             `[ImageProcessor] Canvas drawing error for ${file.name}:`,
@@ -203,7 +229,22 @@ export async function safeCompressImage(
 
     if (compressedBlob) {
       const baseName = file.name.replace(/\.[^/.]+$/, "");
-      const ext = compressedBlob.type === "image/jpeg" ? "jpg" : "webp";
+      let ext: string;
+      if (compressedBlob.type === "image/jpeg") {
+        ext = "jpg";
+      } else if (compressedBlob.type === "image/webp") {
+        ext = "webp";
+      } else {
+        // PNG or unknown (e.g. unexpected Safari fallback) — still accept but log it
+        ext = "jpg";
+        const unexpectedMsg = `[ImageProcessor] Unexpected blob type ${compressedBlob.type} for ${file.name}, re-encoding as JPEG`;
+        console.warn(unexpectedMsg);
+        Sentry.captureMessage(unexpectedMsg, {
+          level: "warning",
+          tags: { feature: "image_compression", file_type: file.type },
+          extra: { blobType: compressedBlob.type, fileName: file.name },
+        });
+      }
       return {
         blob: compressedBlob,
         filename: `${baseName}.${ext}`,

@@ -121,7 +121,9 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <NavbarContext.Provider value={{ isNavbarVisible, isAtTop, hasUserScrolled, showNavbar }}>
+    <NavbarContext.Provider
+      value={{ isNavbarVisible, isAtTop, hasUserScrolled, showNavbar }}
+    >
       {children}
     </NavbarContext.Provider>
   );

@@ -354,7 +354,7 @@ const MemberPage = () => {
                             href={website.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="truncate break-all text-[#222222]"
+                            className="truncate break-all text-[#222222] hover:underline"
                           >
                             {website.url}
                           </a>
@@ -367,7 +367,7 @@ const MemberPage = () => {
                     {/* Profile Section */}
                     {member.member_bio && (
                       <div className="mt-10">
-                        <p className="break-all text-[20px] font-medium leading-relaxed text-[#222222]">
+                        <p className="text-justify text-[20px] font-medium leading-relaxed text-[#222222]">
                           {member.member_bio}
                         </p>
                       </div>

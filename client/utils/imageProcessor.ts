@@ -30,11 +30,10 @@ export async function compressImage(
 
     img.onload = () => {
       try {
-        const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
 
-        // Calculate new dimensions
+        // If image resolution is huge (e.g. mobile 48MP photo), scale down aspect ratio target
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
@@ -47,10 +46,11 @@ export async function compressImage(
           }
         }
 
+        const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { alpha: false });
         if (!ctx) {
           cleanup();
           resolve(null);
@@ -66,7 +66,7 @@ export async function compressImage(
             if (blob) {
               resolve(blob);
             } else {
-              // Fallback to JPEG
+              // Fallback to JPEG if WebP generation fails (e.g. legacy mobile WebViews)
               canvas.toBlob(
                 (jpegBlob) => resolve(jpegBlob),
                 "image/jpeg",

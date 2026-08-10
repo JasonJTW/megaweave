@@ -15,6 +15,17 @@ export interface PostDeleteImageJobData {
   s3Keys: string[];
 }
 
+async function waitForFile(filePath: string, maxWaitMs = 1000, intervalMs = 100): Promise<boolean> {
+  const startTime = Date.now();
+  while (Date.now() - startTime < maxWaitMs) {
+    if (fs.existsSync(filePath)) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return fs.existsSync(filePath);
+}
+
 export async function processPostUploadImages(
   job: Job<PostUploadImageJobData>,
 ): Promise<void> {
@@ -30,7 +41,8 @@ export async function processPostUploadImages(
 
     try {
       let uploadBuffer: Buffer;
-      if (file.tempPath && fs.existsSync(file.tempPath)) {
+      const fileExists = file.tempPath ? await waitForFile(file.tempPath) : false;
+      if (file.tempPath && fileExists) {
         try {
           // 先讀取真實的圖片 metadata（使用 libvips 魔術字節，無法被前端偽造）
           const meta = await sharp(file.tempPath).metadata();

@@ -25,7 +25,7 @@ export const postImageQueue = new Queue<
 export async function enqueuePostUploadImages(
   data: PostUploadImageJobData,
 ): Promise<void> {
-  await postImageQueue.add("upload-images", data);
+  await postImageQueue.add("upload-images", data, { delay: 100 });
   console.log(`🖼️ Enqueued upload images job for post #${data.postId}`);
 }
 

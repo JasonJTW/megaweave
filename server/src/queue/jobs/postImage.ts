@@ -59,6 +59,8 @@ export async function processPostUploadImages(
             );
           } else {
             // 前端未壓縮（PNG/JPEG/超大尺寸）→ 後端執行 resize + WebP 轉換
+            const origStats = await fs.promises.stat(file.tempPath);
+            const origSizeKB = (origStats.size / 1024).toFixed(1);
             uploadBuffer = await sharp(file.tempPath)
               .resize(1200, 1200, {
                 fit: "inside",
@@ -66,8 +68,9 @@ export async function processPostUploadImages(
               })
               .webp({ quality: 80 })
               .toBuffer();
+            const compressedSizeKB = (uploadBuffer.length / 1024).toFixed(1);
             await job.log(
-              `✅ [sharp] Compressed ${meta.format?.toUpperCase() ?? "unknown"} → WebP: ${file.tempPath}`,
+              `✅ [sharp] Compressed ${meta.format?.toUpperCase() ?? "unknown"} → WebP (${origSizeKB}KB → ${compressedSizeKB}KB): ${file.tempPath}`,
             );
           }
         } catch (compressError) {

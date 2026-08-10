@@ -479,6 +479,11 @@ const PostsApp = () => {
     window.scrollTo({ top: 300, behavior: "smooth" });
   }, []);
 
+  const handleFeedTypeFilterClick = useCallback((type: Post["type"] | "") => {
+    setPostFilterType(type);
+    window.scrollTo({ top: 300, behavior: "smooth" });
+  }, []);
+
   const handleFeedLocationClick = useCallback(
     (type: "province" | "city" | "route", value: string) => {
       console.log("Location clicked:", type, value);
@@ -1281,6 +1286,7 @@ const PostsApp = () => {
                 onPostClick={handleFeedPostClick}
                 weaves={[]} // 這裡先傳空陣列，因為還沒從後端抓 weaves
                 onCategoryClick={handleFeedCategoryClick}
+                onTypeFilterClick={handleFeedTypeFilterClick}
                 onLocationClick={handleFeedLocationClick}
                 hasMore={hasMore}
                 onLoadMore={() => {

@@ -25,7 +25,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
-import { compressImage } from "@/utils/imageProcessor";
+import { safeCompressImage } from "@/utils/imageProcessor";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import WeavingCard from "@/app/components/WeavingCard";
 
@@ -527,12 +527,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       // Compress and append images
       for (const file of filesToSend) {
-        const compressed = await compressImage(file, 1200, 1200, 0.85);
-        if (compressed) {
-          formData.append("images", compressed, "image.webp");
-        } else {
-          formData.append("images", file);
-        }
+        const { blob: blobToUpload } = await safeCompressImage(file, 1200, 1200, 0.85);
+        formData.append("images", blobToUpload, "image.webp");
       }
 
       const res = await fetch(`${hostName}/api/messages`, {

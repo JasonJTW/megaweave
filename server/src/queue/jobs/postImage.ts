@@ -15,7 +15,7 @@ export interface PostDeleteImageJobData {
   s3Keys: string[];
 }
 
-async function waitForFile(filePath: string, maxWaitMs = 1000, intervalMs = 100): Promise<boolean> {
+async function waitForFile(filePath: string, maxWaitMs = 5000, intervalMs = 100): Promise<boolean> {
   const startTime = Date.now();
   while (Date.now() - startTime < maxWaitMs) {
     if (fs.existsSync(filePath)) {

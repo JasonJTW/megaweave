@@ -51,6 +51,7 @@
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
     "eslint": "^10.8.0",
+    "eslint-plugin-react": "^7.37.5",
     "globals": "^17.8.0",
     "jest": "^30.4.2",
     "nodemon": "^3.1.9",
@@ -60,6 +61,9 @@
     "typescript-eslint": "^8.65.0"
   },
   "overrides": {
-    "brace-expansion": ">=2.0.1"
+    "brace-expansion": ">=2.0.1",
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    }
   }
 }

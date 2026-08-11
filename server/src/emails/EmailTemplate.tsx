@@ -15,14 +15,19 @@ import {
 import EmailBanner from "./EmailBanner";
 import { WeaveStatus } from "../utils/weaveService";
 
+export interface WeaveItem {
+  title?: string | null;
+  quantity: number | null;
+}
+
 export interface EmailTemplateProps {
   username: string;
   title: string;
   description: string;
   weaveId: string;
   weaving_status: WeaveStatus;
-  itemOffered: string;
-  itemReceived: string;
+  itemsOffered?: WeaveItem[];
+  itemsReceived?: WeaveItem[];
   ctaUrl: string;
   toEmail: string;
 }
@@ -33,8 +38,8 @@ const EmailTemplate = ({
   description,
   weaveId,
   weaving_status,
-  itemOffered,
-  itemReceived,
+  itemsOffered,
+  itemsReceived,
   ctaUrl,
   toEmail,
 }: EmailTemplateProps) => {
@@ -156,58 +161,110 @@ const EmailTemplate = ({
               </Row>
 
               {/* Item offered */}
-              <Row
-                style={{
-                  borderBottom: "1px solid #e5e7eb",
-                  paddingBottom: 6,
-                  marginBottom: 6,
-                }}
-              >
-                <Column>
-                  <Text style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
+              {itemsOffered && itemsOffered.length > 0 && (
+                <Section
+                  style={{
+                    borderBottom: "1px solid #e5e7eb",
+                    paddingBottom: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#6b7280",
+                      margin: "0 0 6px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
                     Item offered
                   </Text>
-                </Column>
-                <Column align="right">
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "#111827",
-                      margin: 0,
-                    }}
-                  >
-                    {itemOffered}
-                  </Text>
-                </Column>
-              </Row>
+                  {itemsOffered.map((item, idx) => (
+                    <Row key={idx} style={{ marginTop: idx > 0 ? 4 : 0 }}>
+                      <Column>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: "#111827",
+                            margin: 0,
+                          }}
+                        >
+                          {item.title}
+                        </Text>
+                      </Column>
+                      {item.quantity && (
+                        <Column align="right">
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: "#6b7280",
+                              margin: 0,
+                            }}
+                          >
+                            x{item.quantity}
+                          </Text>
+                        </Column>
+                      )}
+                    </Row>
+                  ))}
+                </Section>
+              )}
 
               {/* Item received */}
-              <Row
-                style={{
-                  borderBottom: "1px solid #e5e7eb",
-                  paddingBottom: 6,
-                  marginBottom: 6,
-                }}
-              >
-                <Column>
-                  <Text style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-                    Item received
-                  </Text>
-                </Column>
-                <Column align="right">
+              {itemsReceived && itemsReceived.length > 0 && (
+                <Section
+                  style={{
+                    borderBottom: "1px solid #e5e7eb",
+                    paddingBottom: 8,
+                    marginBottom: 8,
+                  }}
+                >
                   <Text
                     style={{
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: 600,
-                      color: "#111827",
-                      margin: 0,
+                      color: "#6b7280",
+                      margin: "0 0 6px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
                     }}
                   >
-                    {itemReceived}
+                    Item received
                   </Text>
-                </Column>
-              </Row>
+                  {itemsReceived.map((item, idx) => (
+                    <Row key={idx} style={{ marginTop: idx > 0 ? 4 : 0 }}>
+                      <Column>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: "#111827",
+                            margin: 0,
+                          }}
+                        >
+                          {item.title}
+                        </Text>
+                      </Column>
+                      {item.quantity && (
+                        <Column align="right">
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              color: "#6b7280",
+                              margin: 0,
+                            }}
+                          >
+                            x{item.quantity}
+                          </Text>
+                        </Column>
+                      )}
+                    </Row>
+                  ))}
+                </Section>
+              )}
 
               {/* Status */}
               <Row>

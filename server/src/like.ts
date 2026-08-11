@@ -8,8 +8,13 @@ const router = Router({ mergeParams: true });
 
 //* check user's like status
 router.get("/", requireAuth, async (req: Request, res: Response) => {
-  const postId = parseInt(req.params.id, 10);
+  const postIdStr = req.params.postId || req.params.id;
+  const postId = parseInt(postIdStr, 10);
   const userId = req.user?.userId;
+
+  if (!postIdStr || isNaN(postId)) {
+    return res.status(400).json({ errorMessage: "Invalid post ID" });
+  }
 
   if (!userId)
     return res.status(401).json({ errorMessage: "Please signin first" });
@@ -29,9 +34,14 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
 //* like / unlike
 router.post("/", requireAuth, async (req: Request, res: Response) => {
-  const postId = parseInt(req.params.id, 10);
+  const postIdStr = req.params.postId || req.params.id;
+  const postId = parseInt(postIdStr, 10);
   const userId = req.user?.userId;
   const username = req.user?.username;
+
+  if (!postIdStr || isNaN(postId)) {
+    return res.status(400).json({ errorMessage: "Invalid post ID" });
+  }
 
   if (!userId) {
     return res.status(401).json({ errorMessage: "Please signin first" });

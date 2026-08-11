@@ -74,7 +74,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         post,
         item.key !== "all"
           ? { id: item.key, title: item.title }
-          : { id: post.id, title: "all" },
+          : { id: "all", title: "all" },
       );
     } catch (error) {
       console.error("Message error:", error);

@@ -2,7 +2,7 @@
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 import { Post } from "../app/types/schema";
 interface WeaveItemParam {
-  itemId: number;
+  itemId: number | null;
   quantity: number;
 }
 

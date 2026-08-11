@@ -19,7 +19,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 const MAX_WEAVING_QUANTITY = 20;
 
 export interface SelectedWeaveItem {
-  itemId: number;
+  itemId: number | null;
   quantity: number;
   title: string;
 }
@@ -88,6 +88,20 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
 
   const handleSubmit = () => {
     if (!onWeavingSubmit) return;
+
+    // "All" intent: always submit as null itemId, regardless of post sub-items.
+    if (!item || item.id === "all") {
+      onWeavingSubmit([{ itemId: null, quantity: 1, title: post.title }]);
+      return;
+    }
+
+    // If no sub-items are selected (e.g. post has no items, or user picked none),
+    // treat it as "all items" with itemId null.
+    if (Object.keys(selectedQuantities).length === 0) {
+      onWeavingSubmit([{ itemId: null, quantity: 1, title: post.title }]);
+      return;
+    }
+
     const resultItems: SelectedWeaveItem[] = Object.entries(
       selectedQuantities,
     ).map(([itemIdStr, qty]) => {
@@ -154,10 +168,11 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
           <div className="flex flex-shrink-0 items-center gap-2">
             <Button
               onClick={handleSubmit}
-              disabled={selectedCount === 0}
+              disabled={postItems.length > 0 && selectedCount === 0}
               className="h-[34px] w-auto flex-shrink-0 rounded-full bg-primary px-3.5 text-[13px] font-bold text-white hover:bg-primary/90 disabled:opacity-50"
             >
-              {post.type === "wish" ? "Offer" : "Request"} ({selectedCount})
+              {post.type === "wish" ? "Offer" : "Request"}
+              {postItems.length > 0 ? ` (${selectedCount})` : ""}
             </Button>
           </div>
         )}

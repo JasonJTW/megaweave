@@ -9,8 +9,7 @@ import { createNotification } from "./notificationService";
 import { messageService } from "./messageService";
 import { updateUserStats } from "./updateUserStats";
 import { enqueueSendEmail } from "../queue/queues";
-import { EmailTemplateProps } from "../emails/EmailTemplate";
-
+import { EmailTemplateProps, WeaveItem } from "../emails/EmailTemplate";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -220,6 +219,36 @@ function getWeaveNoticeCopy(
   }
 }
 
+async function getWeaveItemsList(
+  weaveId: number,
+  _postId: number,
+): Promise<WeaveItem[]> {
+  const [weaveItems] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT item_id, quantity FROM weave_items WHERE weave_id = ?`,
+    [weaveId],
+  );
+
+  const result: WeaveItem[] = [];
+
+  for (const item of weaveItems) {
+    if (item.item_id === null) {
+      // All-items weave — no specific item selected
+      result.push({ title: "All items", quantity: null });
+    } else {
+      const qty: number = item.quantity ?? 1;
+      const [itemRows] = await dbPool.execute<RowDataPacket[]>(
+        `SELECT title FROM items WHERE id = ?`,
+        [item.item_id],
+      );
+      if (itemRows.length > 0) {
+        result.push({ title: itemRows[0].title as string, quantity: qty });
+      }
+    }
+  }
+
+  return result;
+}
+
 interface NotifyWeaveStatusParams {
   io: Server | null;
   weaveId: number;
@@ -228,6 +257,8 @@ interface NotifyWeaveStatusParams {
   actorName: string;
   postTitle: string;
   action: WeaveActionType;
+  items: WeaveItem[];
+  isRecipientGiver: boolean;
 }
 
 /**
@@ -242,6 +273,8 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     actorName,
     postTitle,
     action,
+    items,
+    isRecipientGiver,
   } = params;
 
   const copy = getWeaveNoticeCopy(action, actorName, postTitle);
@@ -270,7 +303,8 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 
     if (userRows.length > 0 && userRows[0].email) {
       const recipient = userRows[0];
-      const host = process.env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
+      const host =
+        process.env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
 
       // 映射 action 至 Email 的 weaving_status 呈現
       const emailStatusMap: Record<WeaveActionType, WeaveStatus> = {
@@ -289,8 +323,8 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
         description: copy.content,
         weaveId: `#TXN-${weaveId}`,
         weaving_status: emailStatusMap[action],
-        itemOffered: postTitle,
-        itemReceived: "Trade Item",
+        itemsOffered: isRecipientGiver ? items : undefined,
+        itemsReceived: isRecipientGiver ? undefined : items,
         ctaUrl: `${host}${link}`,
       };
 
@@ -301,9 +335,7 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
   }
 }
 
-
 // ─── Public API ───────────────────────────────────────────────────────────────
-
 
 /**
  * 建立 Weave 請求：驗證 → 寫入 DB → 發通知 → 建立對話系統訊息
@@ -357,6 +389,7 @@ export async function requestWeave(
       [postId],
     );
     const postTitle = (postInfo[0]?.title as string) ?? "Item";
+    const items = await getWeaveItemsList(Number(weaveId), postId);
 
     await notifyWeaveStatusChange({
       io,
@@ -366,13 +399,13 @@ export async function requestWeave(
       actorName: initiator.name,
       postTitle,
       action: "requested",
+      items,
+      isRecipientGiver: targetUserId === giverId,
     });
     notificationSent = true;
   } catch (e) {
     console.error("🔔 [requestWeave] Notification/Email failed:", e);
   }
-
-
 
   // System message in conversation
   if (conversationId) {
@@ -525,6 +558,7 @@ export async function approveWeave(
             [weave.post_id],
           );
           const postTitle = (details[0]?.title as string) ?? "Item";
+          const items = await getWeaveItemsList(Number(weaveId), weave.post_id);
 
           notifyWeaveStatusChange({
             io,
@@ -534,6 +568,8 @@ export async function approveWeave(
             actorName,
             postTitle,
             action: "confirmed",
+            items,
+            isRecipientGiver: recipientId === weave.giver_id,
           }).catch((err) =>
             console.error("Notification/Email failed on partial confirm:", err),
           );
@@ -555,6 +591,7 @@ export async function approveWeave(
       );
       const postTitle = (details[0]?.title as string) ?? "Item";
       const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
+      const items = await getWeaveItemsList(Number(weaveId), weave.post_id);
 
       // 判斷觸發的 Action 類型
       let action: WeaveActionType | null = null;
@@ -586,6 +623,8 @@ export async function approveWeave(
           actorName,
           postTitle,
           action,
+          items,
+          isRecipientGiver: recipientId === weave.giver_id,
         });
 
         // 2. 如果狀態為「完全完成 (completed)」，觸發動作的這一方 (userId) 也必須收到 Completed 通知與 Email
@@ -598,6 +637,8 @@ export async function approveWeave(
             actorName,
             postTitle,
             action: "completed",
+            items,
+            isRecipientGiver: userId === weave.giver_id,
           });
         }
       }
@@ -623,7 +664,6 @@ export async function approveWeave(
     } catch (e) {
       console.error("Weave update notification/socket failed:", e);
     }
-
 
     // Async stats recalculation (fire-and-forget)
     if (newStatus === "completed") {

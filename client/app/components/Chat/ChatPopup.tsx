@@ -56,7 +56,7 @@ export const ChatPopup = () => {
       const newWeave = await createWeave({
         postId: post.id,
         items: selectedItems.map((it) => ({
-          itemId: it.itemId,
+          itemId: it.itemId ?? null,
           quantity: it.quantity,
         })),
       });

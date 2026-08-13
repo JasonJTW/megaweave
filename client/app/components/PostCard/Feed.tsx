@@ -1,6 +1,12 @@
 "use client";
 import { Weave } from "@/services/weaveService";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useInView } from "react-intersection-observer";
 import { usePost } from "../../contexts/PostContext";
 import type { Condition, Post } from "../../types/schema";
@@ -308,7 +314,7 @@ export default function Feed({
                 onClick={() =>
                   handleMascotFilterClick({
                     categoryKeywords: ["book"],
-                    type: "wish",
+                    // type: "share",
                   })
                 }
                 className="relative hidden w-full cursor-pointer flex-col items-center md:flex"

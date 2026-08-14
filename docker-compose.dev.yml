@@ -1,0 +1,8 @@
+services:
+  redis:
+    container_name: megaweave-redis-dev
+    image: redis/redis-stack:latest
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+      - "8001:8001" # 方便前端/後端打開 Redis Insight 檢視快取與向量索引

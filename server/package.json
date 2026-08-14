@@ -8,6 +8,8 @@
     "build:dev": "dotenv -e .env.development -- npx tsc --build",
     "start": "dotenv -e .env.production -- node ./dist/server.js",
     "dev": "dotenv -e .env.development -- nodemon ./src/server.ts",
+    "docker:redis": "docker compose -f ../docker-compose.dev.yml up -d",
+    "docker:redis:stop": "docker compose -f ../docker-compose.dev.yml down",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "typecheck": "npx tsc --noEmit"

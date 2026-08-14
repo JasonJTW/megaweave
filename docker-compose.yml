@@ -5,8 +5,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:6379:6379"
-    env_file:
-      - ./server/.env.production
     environment:
       - REDIS_ARGS=--requirepass ${REDIS_PASSWORD} --dir /data --dbfilename dump.rdb
     volumes:

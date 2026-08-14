@@ -212,6 +212,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull and deploy backend container
+        env:
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           echo "⬇️ Pulling latest backend image from GHCR..."
           docker compose pull backend
@@ -283,6 +285,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull and deploy frontend container
+        env:
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           echo "⬇️ Pulling latest frontend image from GHCR..."
           docker compose pull frontend

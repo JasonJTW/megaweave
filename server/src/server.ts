@@ -15,6 +15,7 @@ import { closeDatabase } from "./utils/db";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { startWorkers } from "./queue/workers";
+import { ensureVectorIndexExists } from "./services/vectorIndexService";
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ app.get("/health", (_req, res) => {
 async function startServer() {
   try {
     await connectRedis();
+    await ensureVectorIndexExists();
     startWorkers();
     const redisClient = getRedisClient();
 

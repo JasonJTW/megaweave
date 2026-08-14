@@ -215,7 +215,7 @@ jobs:
         run: |
           echo "⬇️ Pulling latest backend image from GHCR..."
           docker compose pull backend
-          echo "🚀 Starting backend container..."
+          echo "🚀 Starting backend & redis container..."
           docker compose up -d backend
 
       - name: Verify backend container

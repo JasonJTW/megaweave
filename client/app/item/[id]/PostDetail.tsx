@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { safeCompressImage } from "@/utils/imageProcessor";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { ArrowLeft, Heart, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import React, { useCallback, useEffect, useState } from "react";
@@ -38,6 +38,34 @@ interface OwnerProfile {
 type PostDetailProps = {
   postId: string;
 };
+
+/** 解析 seeded 貼文 footer，拆出主文與來源資訊 */
+function parsePostContent(content: string): {
+  body: string;
+  author?: string;
+  originalUrl?: string;
+  hasDisclaimer: boolean;
+} {
+  const SEPARATOR = "\n\n---\n";
+  const sepIndex = content.indexOf(SEPARATOR);
+  if (sepIndex === -1) {
+    return { body: content, hasDisclaimer: false };
+  }
+
+  const body = content.slice(0, sepIndex);
+  const footer = content.slice(sepIndex + SEPARATOR.length);
+
+  const authorMatch = footer.match(/^Author:\s*(.+)$/m);
+  const urlMatch = footer.match(/^Original Post:\s*(https?:\/\/\S+)$/m);
+  const hasDisclaimer = footer.includes("reposted from Facebook");
+
+  return {
+    body,
+    author: authorMatch?.[1]?.trim(),
+    originalUrl: urlMatch?.[1]?.trim(),
+    hasDisclaimer,
+  };
+}
 
 const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const router = useRouter();
@@ -182,7 +210,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       // new images
       if (data.newImages && data.newImages.length > 0) {
         for (const image of data.newImages) {
-          const { blob, filename } = await safeCompressImage(image, 1200, 1200, 0.85);
+          const { blob, filename } = await safeCompressImage(
+            image,
+            1200,
+            1200,
+            0.85,
+          );
           formData.append("images", blob, filename);
         }
       }
@@ -480,11 +513,52 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <Badge>{post.category_name_en}</Badge>
               </div>
               {/* 內容 */}
-              <div className="prose prose-gray mb-6 max-w-none">
-                <p className="whitespace-pre-wrap break-words text-gray-700">
-                  {post.content}
-                </p>
-              </div>
+              {(() => {
+                const { body, author, originalUrl, hasDisclaimer } =
+                  parsePostContent(post.content);
+                return (
+                  <>
+                    <div className="prose prose-gray mb-4 max-w-none">
+                      <p className="whitespace-pre-wrap break-words text-gray-700">
+                        {body}
+                      </p>
+                    </div>
+
+                    {/* 來源區塊 */}
+                    {(originalUrl || hasDisclaimer) && (
+                      <div className="mb-6 rounded-lg border border-primary-30 bg-primary-15 px-4 py-3 text-sm text-megaweave-forest">
+                        {author && (
+                          <p className="mb-1">
+                            <span className="font-medium">Author:</span>{" "}
+                            {author}
+                          </p>
+                        )}
+                        {originalUrl && (
+                          <p className="mb-1">
+                            <a
+                              href={originalUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-medium hover:opacity-70"
+                            >
+                              Original Post
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </p>
+                        )}
+                        {hasDisclaimer && (
+                          <p className="mt-2 border-t border-megaweave-forest pt-2 text-xs font-semibold text-megaweave-red-light">
+                            This content is reposted from Facebook by{" "}
+                            <span className="font-extrabold">@megaweaving</span>
+                            . In case of any discrepancies, the original
+                            Facebook post shall prevail.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div className="min-h-[18px]">
                 {post.tags && (
                   <div className="flex flex-wrap gap-0 leading-[18px]">
@@ -546,7 +620,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 </div>
                 <div className="ml-[18px]">
                   <h3 className="font-semibold text-gray-900">
-                    {`${post.username} (owner)`}
+                    {`${post.username}`}
                   </h3>
                 </div>
               </div>

@@ -48,7 +48,7 @@ const CreatePostSchema = z.object({
   tags: z.string().max(500).optional(),
   categoryId: z.number().int().positive("Invalid category ID"),
   conditionLevel: z.number().int().min(1).max(5, "Condition level must be 1-5"),
-  expiresAt: z.string().datetime().optional(),
+  expiresAt: z.string().datetime(),
   items: z
     .array(ItemSchema)
     .min(1, "At least one item is required")

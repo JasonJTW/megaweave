@@ -255,7 +255,7 @@ export class PostService {
     const postQuery = `
       SELECT 
         p.*,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         u.public_id as author_public_id,
         u.id as author_user_id,
         u.email,
@@ -265,6 +265,7 @@ export class PostService {
         l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
@@ -394,7 +395,7 @@ export class PostService {
     const postsQuery = `
       SELECT 
         p.*,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         u.public_id as author_public_id,
         u.id as author_user_id,
         u.avatar_url,
@@ -404,6 +405,7 @@ export class PostService {
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
@@ -451,7 +453,7 @@ export class PostService {
     const postsQuery = `
       SELECT 
         p.*,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         u.public_id as author_public_id,
         u.id as author_user_id,
         u.avatar_url,
@@ -461,6 +463,7 @@ export class PostService {
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
@@ -764,13 +767,14 @@ export class PostService {
     const getPostQuery = `
       SELECT 
         p.*,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         c.name_en as category_name_en,
         cond.name as condition_name,
         l.place_id, l.full_address, l.province, l.city, l.lat, l.lng,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id

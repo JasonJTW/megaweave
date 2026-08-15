@@ -3,12 +3,17 @@
 import { Request, Response, Router } from "express";
 import { z } from "zod";
 import dotenv from "dotenv";
-import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
+import {
+  requireAuth,
+  requireRole,
+  AuthenticatedRequest,
+} from "./middleware/auth";
 import { diskUpload } from "./upload";
 import likeRouter from "./like";
 import { getUserFromCookie } from "./session";
 import { handleError } from "./utils/errorHandler";
 import { postService } from "./services/postService";
+import type { PostType } from "./types/post";
 
 dotenv.config();
 
@@ -22,11 +27,14 @@ const ItemSchema = z.object({
 });
 
 const CreatePostSchema = z.object({
-  title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  title: z
+    .string()
+    .min(5, "Title must be at least 5 characters")
+    .max(60, "Title too long"),
   content: z
     .string()
-    .min(1, "Content is required")
-    .max(2000, "Content too long"),
+    .min(3, "Content must be at least 3 characters")
+    .max(1000, "Content too long"),
   status: z.enum(["active", "inactive"]).default("active"),
   place_id: z.string().optional(),
   full_address: z.string().optional(),
@@ -36,7 +44,7 @@ const CreatePostSchema = z.object({
   zip: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
-  type: z.enum(["wish", "share", "commons"]),
+  type: z.enum(["wish", "share", "commons"] as [PostType, ...PostType[]]),
   tags: z.string().max(500).optional(),
   categoryId: z.number().int().positive("Invalid category ID"),
   conditionLevel: z.number().int().min(1).max(5, "Condition level must be 1-5"),
@@ -44,6 +52,7 @@ const CreatePostSchema = z.object({
   items: z
     .array(ItemSchema)
     .min(1, "At least one item is required")
+    .max(20, "At most 20 items are allowed")
     .refine(
       (items) => {
         const titles = items.map((i) => i.title.trim().toLowerCase());
@@ -283,6 +292,39 @@ router.delete(
       }
       console.error("Delete post error:", error);
       return res.status(500).json({ errorMessage: "Internal server error" });
+    }
+  },
+);
+
+//* Manual Trigger Embedding API (POST /:id/embedding)
+// 安全防護：限管理員 (admin) 角色可手動呼叫，嚴格防止一般用戶調用消耗 OpenAI Credits
+router.post(
+  "/:id/embedding",
+  requireAuth,
+  requireRole("admin"),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const postId = parseInt(req.params.id);
+
+      if (isNaN(postId)) {
+        return res.status(400).json({ errorMessage: "Invalid post ID" });
+      }
+
+      const result = await postService.generatePostEmbeddingSync(postId);
+
+      return res.status(200).json({
+        message: `Embedding generated and saved successfully for post #${postId}`,
+        postId,
+        ...result,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.message === "POST_NOT_FOUND") {
+        return res.status(404).json({ errorMessage: "Post not found" });
+      }
+      console.error("Manual generate embedding error:", error);
+      return res
+        .status(500)
+        .json({ errorMessage: "Internal server error", error });
     }
   },
 );

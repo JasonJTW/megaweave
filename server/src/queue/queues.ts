@@ -8,6 +8,7 @@ import {
   PostUploadImageJobData,
   PostDeleteImageJobData,
 } from "./jobs/postImage";
+import { PostEmbeddingJobData } from "./jobs/postEmbedding";
 
 import { EmailTemplateProps } from "../emails/EmailTemplate";
 
@@ -61,4 +62,26 @@ export async function enqueueSendEmail(
 ): Promise<void> {
   await emailQueue.add("send-email", data);
   console.log(`📧 Enqueued email job for ${data.toEmail}`);
+}
+
+//* ─── Embedding Queue ─────────────────────────────────────────────────────────
+
+export const embeddingQueue = new Queue<PostEmbeddingJobData>(
+  "post-embedding",
+  {
+    connection: bullmqConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 2000 },
+      removeOnComplete: { count: 500 },
+      removeOnFail: { age: 7 * 24 * 60 * 60 },
+    },
+  },
+);
+
+export async function enqueuePostEmbedding(
+  data: PostEmbeddingJobData,
+): Promise<void> {
+  await embeddingQueue.add("generate-embedding", data, { delay: 500 });
+  console.log(`🧠 Enqueued embedding job for post #${data.postId}`);
 }

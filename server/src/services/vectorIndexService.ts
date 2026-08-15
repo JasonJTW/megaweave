@@ -3,43 +3,58 @@ import { getRedisClient } from "../utils/redis";
 /**
  * 確保 Redis Vector Index (idx:posts_v) 存在。
  * 若不存在則自動建立 HNSW 向量索引。
+ *
+ * 注意：@redis/client v5 不內建 .ft 命名空間，
+ * 改用 sendCommand 直接執行 FT.INFO / FT.CREATE 原始命令。
  */
 export async function ensureVectorIndexExists(): Promise<void> {
   const redis = getRedisClient();
 
   try {
     // 檢查索引是否已經存在
-    await (redis as unknown as { ft: { info: (name: string) => Promise<unknown>; create: (...args: unknown[]) => Promise<unknown> } }).ft.info("idx:posts_v");
+    await redis.sendCommand(["FT.INFO", "idx:posts_v"]);
     console.log("✅ Redis Vector Index (idx:posts_v) is ready.");
   } catch (err: unknown) {
     const error = err as Error;
-    const errorMsg = error?.message || String(err);
-    if (errorMsg.includes("Unknown Index name") || errorMsg.includes("not found")) {
+    const errorMsg = (error?.message || String(err)).toLowerCase();
+    if (
+      errorMsg.includes("unknown index name") ||
+      errorMsg.includes("not found")
+    ) {
       console.log("⚙️  Creating Redis Vector Index (idx:posts_v)...");
       try {
-        await (redis as unknown as { ft: { create: (...args: unknown[]) => Promise<unknown> } }).ft.create(
+        // FT.CREATE idx:posts_v ON HASH PREFIX 1 post:
+        //   SCHEMA
+        //     v       VECTOR HNSW 8 TYPE FLOAT32 DIM 1536 DISTANCE_METRIC COSINE
+        //     post_id NUMERIC
+        //     status  TAG
+        await redis.sendCommand([
+          "FT.CREATE",
           "idx:posts_v",
-          {
-            v: {
-              type: "VECTOR",
-              ALGORITHM: "HNSW",
-              TYPE: "FLOAT32",
-              DIM: 1536,
-              DISTANCE_METRIC: "COSINE",
-            },
-            post_id: {
-              type: "NUMERIC",
-            },
-            status: {
-              type: "TAG",
-            },
-          },
-          {
-            ON: "HASH",
-            PREFIX: "product:",
-          }
+          "ON",
+          "HASH",
+          "PREFIX",
+          "1",
+          "post:",
+          "SCHEMA",
+          "v",
+          "VECTOR",
+          "HNSW",
+          "6",
+          "TYPE",
+          "FLOAT32",
+          "DIM",
+          "1536",
+          "DISTANCE_METRIC",
+          "COSINE",
+          "post_id",
+          "NUMERIC",
+          "status",
+          "TAG",
+        ]);
+        console.log(
+          "🚀 Redis Vector Index (idx:posts_v) created successfully!",
         );
-        console.log("🚀 Redis Vector Index (idx:posts_v) created successfully!");
       } catch (createErr) {
         console.error("❌ Failed to create Redis vector index:", createErr);
       }

@@ -1,6 +1,3 @@
-// server/src/queue/workers.ts
-// 職責：註冊並啟動所有 Worker，由 server.ts 呼叫一次
-
 import { Worker, Job } from "bullmq";
 import { bullmqConnection } from "./connection";
 import {
@@ -11,6 +8,10 @@ import {
 } from "./jobs/postImage";
 import { processSendEmail } from "./jobs/email";
 import { EmailTemplateProps } from "../emails/EmailTemplate";
+import {
+  processPostEmbedding,
+  PostEmbeddingJobData,
+} from "./jobs/postEmbedding";
 
 export function startWorkers(): void {
   const postImageWorker = new Worker(
@@ -57,6 +58,29 @@ export function startWorkers(): void {
   emailWorker.on("failed", (job, err) => {
     console.error(
       `❌ [email-wroker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+    );
+  });
+
+  // ─── Embedding Worker ──────────────────────────────────────────────────
+  const embeddingWorker = new Worker<PostEmbeddingJobData>(
+    "post-embedding",
+    async (job: Job<PostEmbeddingJobData>) => {
+      if (job.name === "generate-embedding") {
+        await processPostEmbedding(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: 2 },
+  );
+
+  embeddingWorker.on("completed", (job) => {
+    console.log(
+      `🎉 [embedding-worker] Job ${job.id} (${job.name}) finished successfully`,
+    );
+  });
+
+  embeddingWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [embedding-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
     );
   });
 

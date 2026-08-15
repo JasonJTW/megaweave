@@ -1,6 +1,6 @@
 //* middleware/auth.ts
 import { Request, Response, NextFunction } from "express";
-import { UserSession } from "../schema";
+import { UserRole, UserSession } from "../schema";
 import { getUserFromCookie } from "../session";
 import dotenv from "dotenv";
 dotenv.config();
@@ -76,9 +76,9 @@ export async function optionalAuth(
 
 /**
  * 角色驗證中間件工廠函數
- * 檢查用戶是否具有指定的角色
+ * 檢查用戶是否具有指定的角色 (限定 UserRole: "user" | "admin" | "contributor")
  */
-export function requireRole(...allowedRoles: string[]) {
+export function requireRole(...allowedRoles: UserRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({

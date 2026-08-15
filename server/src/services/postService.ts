@@ -7,7 +7,19 @@ import { shouldIncrementView } from "../utils/viewCounter";
 import {
   enqueuePostUploadImages,
   enqueuePostDeleteImages,
+  enqueuePostEmbedding,
 } from "../queue/queues";
+import {
+  PostType,
+  PostItemData,
+  PostTextInput,
+  PostDetail,
+  PostImage,
+} from "../types/post";
+import { generatePostText } from "../utils/generatePostText";
+import { fetchEmbedding } from "../queue/jobs/postEmbedding";
+import { getRedisClient } from "../utils/redis";
+export type { PostType, PostItemData, PostTextInput, PostDetail, PostImage };
 
 export interface LocationData {
   place_id: string;
@@ -20,16 +32,11 @@ export interface LocationData {
   lng: number;
 }
 
-export interface PostItemData {
-  title: string;
-  quantity: number;
-}
-
 export interface CreatePostInput {
   title: string;
   content: string;
   status: "active" | "inactive";
-  type: "wish" | "share" | "commons";
+  type: PostType;
   categoryId: number;
   conditionLevel: number;
   tags?: string;
@@ -216,6 +223,21 @@ export class PostService {
         });
       }
 
+      // 非同步產生語義向量（不阻塞 HTTP response）
+      await enqueuePostEmbedding({
+        postId,
+        post: {
+          title: input.title,
+          content: input.content,
+          type: input.type,
+          tags: input.tags,
+          items: input.items,
+          city: input.city,
+          province: input.province,
+          // category_name / condition_name 由 Worker 省略（不影響向量品質，避免額外 JOIN）
+        },
+      });
+
       return await this.getPostDetailsQuery(postId);
     } catch (error) {
       await connection.rollback();
@@ -229,7 +251,7 @@ export class PostService {
   async getPostById(
     postId: number,
     options?: { currentUserId?: number; viewerIp?: string },
-  ): Promise<RowDataPacket | null> {
+  ): Promise<PostDetail | null> {
     const postQuery = `
       SELECT 
         p.*,
@@ -284,15 +306,16 @@ export class PostService {
 
     const imagesQuery =
       "SELECT * FROM images WHERE post_id = ? ORDER BY created_at";
-    const [images] = await dbPool.execute<RowDataPacket[]>(imagesQuery, [
-      postId,
-    ]);
+    const [images] = await dbPool.execute<(RowDataPacket & PostImage)[]>(
+      imagesQuery,
+      [postId],
+    );
 
     const s3Keys = images
-      .map((img: RowDataPacket) => img.s3_key as string)
+      .map((img) => img.s3_key)
       .filter(Boolean)
       .join(",");
-    const [items] = await dbPool.execute(
+    const [items] = await dbPool.execute<(RowDataPacket & PostItemData)[]>(
       `SELECT * FROM items WHERE post_id = ?`,
       [postId],
     );
@@ -302,7 +325,7 @@ export class PostService {
       s3_keys: s3Keys,
       images,
       items,
-    };
+    } as unknown as PostDetail;
   }
 
   /** 取得貼文列表 (分頁 & 搜尋) */
@@ -645,6 +668,96 @@ export class PostService {
     await dbPool.execute("UPDATE posts SET deleted_at = NOW() WHERE id = ?", [
       postId,
     ]);
+  }
+
+  /** 為指定貼文排入向量生成任務（包含完整詳情供 generatePostText 使用） */
+  async enqueueEmbeddingForPost(postId: number): Promise<PostDetail> {
+    const post: PostDetail | null = await this.getPostById(postId);
+    if (!post) {
+      throw new Error("POST_NOT_FOUND");
+    }
+
+    console.log("postGotById: ", post);
+
+    const embeddingPayload: PostTextInput = {
+      title: post.title,
+      content: post.content,
+      type: post.type,
+      category_name: post.category_name_en,
+      condition_name: post.condition_name,
+      tags: post.tags,
+      items: post.items || [],
+      city: post.city,
+      province: post.province,
+    };
+
+    await enqueuePostEmbedding({
+      postId,
+      post: embeddingPayload,
+    });
+
+    return post;
+  }
+
+  /**
+   * //*[手動/測試用] 同步為指定貼文生成向量並存入 Redis/MySQL
+   * //*繞過背景佇列，直接同步呼叫 OpenAI 並回傳產生的文字與向量資料
+   */
+  async generatePostEmbeddingSync(postId: number) {
+    const post: PostDetail | null = await this.getPostById(postId);
+    if (!post) {
+      throw new Error("POST_NOT_FOUND");
+    }
+
+    const embeddingPayload: PostTextInput = {
+      title: post.title,
+      content: post.content,
+      type: post.type,
+      category_name: post.category_name_en,
+      condition_name: post.condition_name,
+      tags: post.tags,
+      items: post.items || [],
+      city: post.city,
+      province: post.province,
+    };
+
+    const text = generatePostText(embeddingPayload);
+    const {
+      buffer: vectorBuffer,
+      vector,
+      dimensions,
+      byteLength,
+    } = await fetchEmbedding(text);
+
+    // 寫入 Redis 向量索引
+    const redis = getRedisClient();
+    await redis.hSet(`post:${postId}`, {
+      v: vectorBuffer,
+      post_id: postId,
+      status: post.type,
+    });
+
+    // 持久化到 MySQL
+    const vectorJson = JSON.stringify(
+      Array.from(new Float32Array(vectorBuffer.buffer)),
+    );
+    await dbPool.execute("UPDATE posts SET embedding = ? WHERE id = ?", [
+      vectorJson,
+      postId,
+    ]);
+
+    return {
+      post,
+      text,
+      embedding: {
+        dimensions,
+        byteLength,
+        vectorBufferBase64: vectorBuffer.toString("base64"),
+        vectorBufferHex: vectorBuffer.toString("hex"),
+        vectorSample: vector.slice(0, 10),
+        vectorLength: vector.length,
+      },
+    };
   }
 
   private async getPostDetailsQuery(postId: number): Promise<RowDataPacket> {

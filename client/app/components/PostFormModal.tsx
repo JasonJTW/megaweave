@@ -28,6 +28,11 @@ import TagIcon from "./icons/TagIcon";
 import LocationIcon from "./icons/LocationIcon";
 import ClockIcon from "./icons/ClockIcon";
 import toast from "react-hot-toast";
+const MAX_CONTENT_LENGTH = 1000;
+const MIN_CONTENT_LENGTH = 3;
+const MAX_ITEMS_COUNT = 20;
+const MAX_ITEM_TITLE_LENGTH = 20;
+
 export interface PostFormSubmitData {
   title: string;
   content: string;
@@ -319,10 +324,12 @@ export default function PostFormModal({
         // Title duplicate check
         const isDuplicateTitle =
           hasTitle && (titleCounts.get(trimmedTitle.toLowerCase()) || 0) > 1;
+        const isTitleTooLong =
+          hasTitle && trimmedTitle.length > MAX_ITEM_TITLE_LENGTH;
 
-        // If either is filled, both become required, quantity must be >= 1, and title must be unique
+        // If either is filled, both become required, quantity must be >= 1, and title must be unique & <= 20 chars
         return {
-          title: !hasTitle || isDuplicateTitle,
+          title: !hasTitle || isDuplicateTitle || isTitleTooLong,
           quantity: !hasQuantity || Number(item.quantity) < 1,
         };
       }) ?? [];
@@ -339,7 +346,10 @@ export default function PostFormModal({
         formData.conditionLevel === undefined,
       title: !formData.title.trim(),
       location: !formData.location.trim(),
-      content: !formData.content.trim(),
+      content:
+        !formData.content.trim() ||
+        formData.content.trim().length < MIN_CONTENT_LENGTH ||
+        formData.content.length > MAX_CONTENT_LENGTH,
       expires_at: !formData.expires_at,
       items: itemErrors,
     };
@@ -364,7 +374,9 @@ export default function PostFormModal({
             (formData.items[index].quantity === "" ||
               formData.items[index].quantity === null ||
               formData.items[index].quantity === undefined ||
-              Number(formData.items[index].quantity) < 1)),
+              Number(formData.items[index].quantity) < 1 ||
+              formData.items[index].title.trim().length >
+                MAX_ITEM_TITLE_LENGTH)),
       );
 
     const hasDuplicateItemTitles = itemErrors.some(
@@ -374,6 +386,9 @@ export default function PostFormModal({
           0) > 1,
     );
 
+    if (formData.items.length > MAX_ITEMS_COUNT) {
+      return "too_many_items";
+    }
     if (hasDuplicateItemTitles) {
       return "duplicate_items";
     }
@@ -475,7 +490,10 @@ export default function PostFormModal({
       pendingTag && !tags.includes(pendingTag) ? [...tags, pendingTag] : tags;
 
     const validationResult = validateForm();
-    if (validationResult === "duplicate_items") {
+    if (validationResult === "too_many_items") {
+      toast.error(`At most ${MAX_ITEMS_COUNT} items are allowed.`);
+      return;
+    } else if (validationResult === "duplicate_items") {
       toast.error("Item titles cannot be duplicated.");
       return;
     } else if (validationResult === "missing_fields") {
@@ -884,6 +902,7 @@ export default function PostFormModal({
                 <textarea
                   required
                   rows={4}
+                  maxLength={MAX_CONTENT_LENGTH}
                   placeholder="description..."
                   className={`w-full rounded-[20px] border px-3 py-2 placeholder:text-lg placeholder:font-semibold placeholder:text-primary-75 ${
                     formErrors.content ? "border-red-500" : "border-gray-300"
@@ -900,6 +919,15 @@ export default function PostFormModal({
                     }));
                   }}
                 />
+                <div
+                  className={`mt-0.5 pr-2 text-right text-xs ${
+                    formData.content.length >= MAX_CONTENT_LENGTH
+                      ? "font-bold text-red-500"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {formData.content.length} / {MAX_CONTENT_LENGTH}
+                </div>
               </div>
 
               {/* Items */}
@@ -910,6 +938,7 @@ export default function PostFormModal({
                   >
                     <Input
                       type="text"
+                      maxLength={MAX_ITEM_TITLE_LENGTH}
                       placeholder={`Item (Optional)`}
                       value={item.title}
                       forceShowClear={true}
@@ -962,6 +991,7 @@ export default function PostFormModal({
                   >
                     <Input
                       type="number"
+                      min={1}
                       className="!flex-[1] text-center text-[18px] placeholder:text-center placeholder:text-[14px]"
                       placeholder="Quantity"
                       value={item.quantity ?? ""}
@@ -988,19 +1018,35 @@ export default function PostFormModal({
                 </div>
               ))}
 
-              <div className="flex space-x-3">
+              <div className="flex items-center justify-between space-x-3">
                 <Button
                   type="button"
+                  disabled={formData.items.length >= MAX_ITEMS_COUNT}
                   onClick={() => {
+                    if (formData.items.length >= MAX_ITEMS_COUNT) {
+                      toast.error(`At most ${MAX_ITEMS_COUNT} items are allowed`);
+                      return;
+                    }
                     setFormData({
                       ...formData,
                       items: [...formData.items, { title: "", quantity: "" }],
                     });
                   }}
-                  className="border border-primary-30 bg-white py-[8px] text-[18pt] leading-[18px] text-primary shadow-none"
+                  className="border border-primary-30 bg-white py-[8px] text-[18pt] leading-[18px] text-primary shadow-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   +
                 </Button>
+                {formData.items.length > 0 && (
+                  <span
+                    className={`text-xs ${
+                      formData.items.length >= MAX_ITEMS_COUNT
+                        ? "font-bold text-red-500"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    {formData.items.length} / {MAX_ITEMS_COUNT} items
+                  </span>
+                )}
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

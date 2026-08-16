@@ -1,4 +1,11 @@
 // server/src/scripts/seedFacebookPosts.ts
+
+/*
+ //* Command to run:
+ //* npm run dev
+ //* npx ts-node --transpile-only src/scripts/seedFacebookPosts.ts ~/megaweavingFB/posts.json
+ */
+
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -7,13 +14,24 @@ import dotenv from "dotenv";
 // Load development environment variables
 dotenv.config({ path: path.resolve(process.cwd(), ".env.development") });
 
-/// <reference types="multer" />
+// Local interface matching the fields of Express.Multer.File used by postService
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  destination: string;
+  filename: string;
+  path: string;
+  size: number;
+}
 
 import { postService } from "../services/postService";
 import type { PostType } from "../types/post";
 
 interface RawFacebookPost {
   index: string;
+  id: string;
   author: string;
   title: string;
   content: string;
@@ -22,6 +40,8 @@ interface RawFacebookPost {
   type: "share" | "wish" | "commons";
   category: string;
   condition: string;
+  scraped_at: string;
+  posted: boolean;
 }
 
 // Configuration constants
@@ -116,7 +136,7 @@ function resolveImagePath(imgRelPath: string, baseDir: string): string | null {
 async function seedFacebookPosts() {
   // Search for posts.json path
   const postsJsonPaths = [
-    process.argv[2], // Allows passing path via CLI: npx tsx seedFacebookPosts.ts <path>
+    process.argv[2], // Allows passing path via CLI: npx ts-node seedFacebookPosts.ts <path>
     path.resolve(process.cwd(), "posts.json"),
     path.resolve(process.cwd(), "..", "posts.json"),
     path.join(HOME_DIR, "megaweavingFB", "posts.json"),
@@ -135,7 +155,7 @@ async function seedFacebookPosts() {
       "❌ Could not find posts.json. Please place posts.json in root or pass it as an argument.",
     );
     console.error(
-      "Usage: npx tsx server/src/scripts/seedFacebookPosts.ts /path/to/posts.json",
+      "Usage: npx ts-node server/src/scripts/seedFacebookPosts.ts /path/to/posts.json",
     );
     process.exit(1);
   }
@@ -143,20 +163,32 @@ async function seedFacebookPosts() {
   const postsDir = path.dirname(postsDataPath);
   console.log(`📖 Loading posts from: ${postsDataPath}`);
   console.log(`📂 Base directory for images: ${postsDir}`);
+
   const rawPosts: RawFacebookPost[] = JSON.parse(
     fs.readFileSync(postsDataPath, "utf-8"),
   );
-  console.log(`📊 Found ${rawPosts.length} posts to import\n`);
+
+  const pending = rawPosts.filter((p) => !p.posted);
+  const alreadyPosted = rawPosts.length - pending.length;
+
+  console.log(
+    `📊 Found ${rawPosts.length} posts total: ${pending.length} pending, ${alreadyPosted} already posted (skipped)\n`,
+  );
+
+  if (pending.length === 0) {
+    console.log("✅ All posts have already been published. Nothing to do.");
+    process.exit(0);
+  }
 
   let successCount = 0;
   let failCount = 0;
 
-  for (let i = 0; i < rawPosts.length; i++) {
-    const post = rawPosts[i];
-    const postIndex = post.index || `${i}`;
+  for (let i = 0; i < pending.length; i++) {
+    const post = pending[i];
+    const postIndex = post.index ?? `${i}`;
     console.log(`--------------------------------------------------`);
     console.log(
-      `[${i + 1}/${rawPosts.length}] Processing Post Index: ${postIndex} (Author: ${post.author})`,
+      `[${i + 1}/${pending.length}] Processing Post Index: ${postIndex} (Author: ${post.author})`,
     );
 
     const title = sanitizeTitle(post);
@@ -168,7 +200,7 @@ async function seedFacebookPosts() {
     ) as PostType;
 
     // Image handling: Copy to OS temp directory to avoid Worker unlinking the original file after S3 upload
-    const mockFiles: Express.Multer.File[] = [];
+    const mockFiles: MulterFile[] = [];
     if (Array.isArray(post.images) && post.images.length > 0) {
       for (const imgRelPath of post.images) {
         const srcPath = resolveImagePath(imgRelPath, postsDir);
@@ -191,7 +223,7 @@ async function seedFacebookPosts() {
             filename: tempFileName,
             path: tempDestPath,
             size: (await fs.promises.stat(tempDestPath)).size,
-          } as Express.Multer.File);
+          });
         } catch (copyErr) {
           console.error(
             `  ⚠️ Failed to copy image to temp directory (${srcPath}):`,
@@ -219,7 +251,8 @@ async function seedFacebookPosts() {
           status: "active",
           expiresAt,
         },
-        mockFiles.length > 0 ? mockFiles : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mockFiles.length > 0 ? (mockFiles as any[]) : undefined,
       );
 
       console.log(`  ✅ Successfully created post ID: ${createdPost.id}`);
@@ -227,6 +260,18 @@ async function seedFacebookPosts() {
       console.log(
         `     Category: ${categoryId}, Condition: ${conditionLevel}, Images: ${mockFiles.length}`,
       );
+
+      // Mark as posted in the JSON file immediately after success
+      const postInArray = rawPosts.find((p) => p.index === post.index);
+      if (postInArray) {
+        postInArray.posted = true;
+        fs.writeFileSync(
+          postsDataPath,
+          JSON.stringify(rawPosts, null, 2),
+          "utf-8",
+        );
+      }
+
       successCount++;
     } catch (err) {
       console.error(`  ❌ Failed to create post:`, err);

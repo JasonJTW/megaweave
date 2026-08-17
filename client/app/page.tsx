@@ -817,18 +817,18 @@ const PostsApp = () => {
           )}
 
           {/* Mirror the Feed wrapper padding so the grid columns align exactly */}
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {/* Same grid definition as Feed: sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center */}
-            <div className="relative sm:grid sm:grid-cols-[repeat(auto-fill,280px)] sm:justify-center sm:gap-x-6">
-              {/* 2 cols (<936px): full | 3+ cols (>=936px): all-except-last
-                  936px = viewport where 3×280px + 2×24px gap fits with sm:px-6 (48px) padding */}
-              <div className="sm:[grid-column:1/-1] min-[936px]:[grid-column:1/-2]">
+          <div className="mx-auto max-w-7xl px-[20px]">
+            {/* Same grid definition as Feed: sm:grid-cols-[repeat(auto-fill,255px)] sm:justify-center */}
+            <div className="relative sm:grid sm:grid-cols-[repeat(auto-fill,255px)] sm:justify-center sm:gap-x-6">
+              {/* 2 cols (<854px): full | 3+ cols (≥854px): all-except-last
+                  854px ≈ 3×255px + 2×24px gap + 20px side padding */}
+              <div className="sm:[grid-column:1/-1] min-[854px]:[grid-column:1/-2]">
                 <LetsStartWeavingBanner className="h-auto w-full" />
               </div>
 
               {/* Collapsible Weaving button — only in the last column when 3+ cols */}
               {isStuck && (
-                <div className="hidden items-stretch justify-center overflow-visible min-[936px]:flex min-[936px]:[grid-column:-2/-1]">
+                <div className="hidden items-stretch justify-center overflow-visible min-[854px]:flex min-[854px]:[grid-column:-2/-1]">
                   <div
                     ref={weavingButtonRef}
                     onMouseEnter={() => setIsWeavingExpanded(true)}
@@ -1224,7 +1224,7 @@ const PostsApp = () => {
           </RefractiveButton>
         </>
         {/* Error message and posts*/}
-        <div className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl px-[20px] pb-6">
           {/* 錯誤提示 */}
 
           {/* 下拉刷新時顯示的頂部 Spinner (不會隱藏 Feed) */}

@@ -147,18 +147,27 @@ function PostCardInner({
     >
       {/*//* pt-3 for title margin */}
       <div className="relative min-h-[280px] pt-3">
-        {post.type === "share" &&
-          (isExpired ? (
-            <ShareBadgeExpiredIcon className="absolute right-6 top-2 z-20" />
-          ) : (
-            <ShareBadgeIcon className="absolute right-6 top-2 z-20" />
-          ))}
-        {post.type === "wish" &&
-          (isExpired ? (
-            <SeekBadgeExpiredIcon className="absolute right-6 top-2 z-20" />
-          ) : (
-            <SeekBadgeIcon className="absolute right-6 top-2 z-20" />
-          ))}
+        {/* Type badges aligned to the image column (outside overflow-hidden so ribbon isn't clipped) */}
+        <div
+          className={`pointer-events-none absolute top-3 z-20 ${
+            imageSrc
+              ? "inset-x-4 sm:inset-x-auto sm:left-1/2 sm:w-[215px] sm:-translate-x-1/2"
+              : "inset-x-0"
+          }`}
+        >
+          {post.type === "share" &&
+            (isExpired ? (
+              <ShareBadgeExpiredIcon className="absolute right-[10px] top-0" />
+            ) : (
+              <ShareBadgeIcon className="absolute right-[10px] top-0" />
+            ))}
+          {post.type === "wish" &&
+            (isExpired ? (
+              <SeekBadgeExpiredIcon className="absolute right-[10px] top-0" />
+            ) : (
+              <SeekBadgeIcon className="absolute right-[10px] top-0" />
+            ))}
+        </div>
 
         <motion.div
           className="overflow-hidden"
@@ -172,7 +181,7 @@ function PostCardInner({
           {imageSrc && (
             //* mx-3 for image margin
             <div className="relative mx-4 mb-2">
-              {/* Mobile: w-full + auto height; Desktop: fill column width (max 280px) + fixed 240px height */}
+              {/* Mobile: w-full + auto height; Desktop: fill column width (max 215px) + fixed 184px height */}
               <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[184px] sm:max-w-[215px]">
                 {/* ── 全部重試失敗：顯示純色底 + X 佔位符 ── */}
                 {imageStatus === "failed" ? (
@@ -212,7 +221,7 @@ function PostCardInner({
                       alt={post.title}
                       width={0}
                       height={0}
-                      sizes="(min-width: 768px) 280px, 100vw"
+                      sizes="(min-width: 768px) 255px, 100vw"
                       className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
                       priority={!!isFirstVisible}
                       onError={handleImageError}
@@ -230,22 +239,17 @@ function PostCardInner({
                     </span>
                   </div>
                 )}
-              </div>
 
-              <div className="absolute bottom-0 flex w-full flex-row justify-between px-3 py-3">
-                {post.view_count > 0 && (
-                  <div className="flex items-center">
-                    <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
-                      <EyesIcon className="mr-[4px]" />
-                      {post.view_count}
-                    </Badge>
-                  </div>
-                )}
-                {/* {condition && (
-                  <div className="flex items-center">
-                    <Badge>{condition.name}</Badge>
-                  </div>
-                )} */}
+                <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
+                  {post.view_count > 0 && (
+                    <div className="flex items-center">
+                      <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
+                        <EyesIcon className="mr-[4px]" />
+                        {post.view_count}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

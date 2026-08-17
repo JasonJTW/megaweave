@@ -41,6 +41,21 @@ function SigninForm() {
     }
   }, [returnTo]);
 
+  //* Dismiss overlay → always return home
+  const handleDismiss = useCallback(() => {
+    window.location.href = "/";
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleDismiss();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleDismiss]);
+
   //* Google Sign in
   const handleGoogleSignin = async (credentialResponse: CredentialResponse) => {
     console.log("Credential Response:", credentialResponse);
@@ -276,12 +291,17 @@ function SigninForm() {
 
   return (
     <>
-      <div className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-secondary font-ddin md:bg-[#000000]/80">
+      <div
+        className="relative flex min-h-screen items-center justify-center overflow-x-hidden bg-secondary font-ddin md:bg-[#000000]/80"
+        onClick={handleDismiss}
+        role="presentation"
+      >
         <motion.div
           initial={{ opacity: 0, y: -60, filter: "blur(5px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.5, ease: easeInOut }}
           className="z-10 w-full max-w-md md:max-w-[640px]"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="flex flex-col items-center space-y-6 rounded-2xl bg-secondary p-8 shadow-none md:space-y-8 md:rounded-[60px] md:bg-white md:px-16 md:py-12 md:shadow-2xl">
             <div className="flex w-full justify-center">

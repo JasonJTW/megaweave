@@ -481,26 +481,28 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                     {post.type === "wish" && (
                       <WishBadgeIcon className="absolute -top-1 right-5 z-20" />
                     )}
-                    <div className="relative overflow-hidden rounded-[20px] bg-white shadow-sm">
-                      <ImageGallery images={images} fullImages={fullImages} />
-
-                      {/* tags */}
-                      <div className="absolute bottom-0 flex w-full flex-row justify-between px-5 py-5">
-                        {/* Condition tag */}
-                        {post.view_count > 0 && (
-                          <div className="flex items-center">
-                            <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
-                              <EyesIcon className="mr-[4px]" />
-                              {post.view_count}
-                            </Badge>
+                    <div className="relative">
+                      <ImageGallery
+                        images={images}
+                        fullImages={fullImages}
+                        mainOverlay={
+                          <div className="pointer-events-none absolute bottom-0 flex w-full flex-row justify-between px-5 py-5">
+                            {post.view_count > 0 && (
+                              <div className="flex items-center">
+                                <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
+                                  <EyesIcon className="mr-[4px]" />
+                                  {post.view_count}
+                                </Badge>
+                              </div>
+                            )}
+                            {post.condition_name && (
+                              <div className="flex items-center">
+                                <Badge>{post.condition_name}</Badge>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {post.condition_name && (
-                          <div className="flex items-center">
-                            <Badge>{post.condition_name}</Badge>
-                          </div>
-                        )}
-                      </div>
+                        }
+                      />
                     </div>
                   </div>
                 </>

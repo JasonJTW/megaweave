@@ -202,7 +202,7 @@ const Navbar = () => {
           bezelWidth: 20,
         }}
         className={cn(
-          "fixed left-0 right-0 top-0 transition-all duration-100 ease-in-out",
+          "relative left-0 right-0 top-0 transition-all duration-100 ease-in-out",
           isMobileMenuOpen ? "z-[60]" : "z-50",
           isNavbarVisible ? "translate-y-0" : "-translate-y-full",
           isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg",

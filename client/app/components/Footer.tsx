@@ -14,7 +14,7 @@ const Footer: FC = () => {
   return (
     <footer
       className={cn(
-        "sticky bottom-0 z-40 max-w-full overflow-hidden bg-[#f4f5f3] font-ddin text-[#14321f] transition-transform duration-300 ease-in-out",
+        "z-40 max-w-full overflow-hidden bg-[#f4f5f3] font-ddin text-[#14321f] transition-transform duration-300 ease-in-out",
         isNavbarVisible ? "translate-y-0" : "translate-y-full",
       )}
     >

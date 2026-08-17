@@ -404,7 +404,10 @@ const Navbar = () => {
                             key={index}
                             href={item.href}
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className={itemClassName}
+                            className={cn(
+                              itemClassName,
+                              item.href === "/install" && "md:hidden",
+                            )}
                           >
                             <div className="flex-shrink-0">
                               <Icon className="h-5 w-5" />

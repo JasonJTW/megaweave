@@ -59,10 +59,8 @@ const PostsApp = () => {
   const [isStuck, setIsStuck] = useState(false);
   // Ref on the desktop header — we watch its bottom edge to decide when to stick
   const desktopHeaderRef = useRef<HTMLDivElement>(null);
-  // Ref on the search/filter bar — needed to measure its natural height for the spacer
+  // Ref on the search/filter bar
   const barRef = useRef<HTMLDivElement>(null);
-  // Natural height of the bar while it's in document flow (not fixed)
-  const [barHeight, setBarHeight] = useState(0);
   // Track stuck state in a ref so the scroll handler can read it without stale-closure issues
   const isStuckRef = useRef(false);
 
@@ -71,13 +69,6 @@ const PostsApp = () => {
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [isWeavingExpanded, setIsWeavingExpanded] = useState(false);
   const weavingButtonRef = useRef<HTMLDivElement>(null);
-
-  // Measure the bar's natural height (only meaningful while it's in normal document flow)
-  useEffect(() => {
-    if (!isStuck && barRef.current) {
-      setBarHeight(barRef.current.offsetHeight);
-    }
-  }, [isStuck]);
 
   useEffect(() => {
     const checkSticky = () => {
@@ -658,31 +649,8 @@ const PostsApp = () => {
             </div>
           </div>
         </div>
-        {/*
-          SPACER: When the bar is fixed (out of document flow), this div holds its original space
-          so the document height doesn't shrink — which would trigger browser scroll-anchoring
-          and cause the Navbar to spuriously reappear.
-        */}
-        {isStuck && (
-          <div className="hidden md:block" style={{ height: barHeight }} />
-        )}
-        {/* Desktop search & filter bar — fixed when stuck, static when not */}
-        <div
-          ref={barRef}
-          className="z-20 hidden bg-[#f4f5f3] md:block"
-          style={
-            isStuck
-              ? {
-                  position: "fixed",
-                  top: isNavbarVisible ? 80 : 0,
-                  left: 0,
-                  right: 0,
-                  // Smoothly animate top when Navbar shows/hides
-                  transition: "top 150ms ease-in-out",
-                }
-              : {}
-          }
-        >
+        {/* Desktop search & filter bar — scrolls away with the page (no sticky/fixed) */}
+        <div ref={barRef} className="z-20 hidden bg-[#f4f5f3] md:block">
           {/* Inner wrapper mirrors the original max-w / padding */}
           <div className="mx-auto max-w-7xl px-8 pb-2 pt-4">
             <div
@@ -835,9 +803,7 @@ const PostsApp = () => {
           </div>
         </div>
         <div
-          className={`sticky hidden transition-all duration-150 ease-in-out md:block ${
-            isNavbarVisible ? "top-[152px]" : "top-[72px]"
-          } mb-4 mt-8 bg-[#f4f5f3] ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
+          className={`hidden md:block mb-4 mt-8 bg-[#f4f5f3] ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
         >
           {/* 全局透明遮罩：當 Weaving 展開時，攔截所有外部點擊並防止事件穿透 */}
           {isWeavingExpanded && (

@@ -271,7 +271,7 @@ export default function Feed({
   );
 
   return (
-    <div className="feed-snap snap-y snap-mandatory px-4 sm:grid sm:snap-none sm:auto-rows-max sm:grid-cols-[repeat(auto-fill,280px)] sm:items-end sm:justify-center sm:gap-x-6 sm:gap-y-[30px] sm:px-0">
+    <div className="feed-snap snap-y snap-mandatory sm:grid sm:snap-none sm:auto-rows-max sm:grid-cols-[repeat(auto-fill,255px)] sm:items-end sm:justify-center sm:gap-x-6 sm:gap-y-[30px]">
       {posts.map((p, i) => {
         // ✅ 取得對應的 weave 資料
         // ✅ 修正邏輯：

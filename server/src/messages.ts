@@ -16,15 +16,15 @@ router.get(
   requireAuth,
   async (req: Request, res: Response) => {
     const userId = req.user!.userId;
-    console.log(`[GET /conversations] Fetching for userId: ${userId}`);
+    // console.log(`[GET /conversations] Fetching for userId: ${userId}`);
     try {
       const conversations = await messageService.getUserConversations(userId);
       const dtos = conversations.map((c) =>
         messageService.toConversationDTO(c),
       );
-      console.log(
-        `[GET /conversations] Found ${conversations.length} conversations`,
-      );
+      // console.log(
+      //   `[GET /conversations] Found ${conversations.length} conversations`,
+      // );
       return res.json({ conversations: dtos });
     } catch (error) {
       console.error("Get conversations error:", error);
@@ -89,7 +89,8 @@ router.post(
   async (req: Request, res: Response) => {
     const senderId = req.user!.userId;
     const senderPublicId = req.user!.public_id;
-    const { recipient_public_id, content, item_id, item_title, post_id } = req.body;
+    const { recipient_public_id, content, item_id, item_title, post_id } =
+      req.body;
 
     if (
       !recipient_public_id ||
@@ -143,7 +144,7 @@ router.post(
         if (parsedPostId) {
           const [postRows] = await dbPool.execute<RowDataPacket[]>(
             "SELECT p.type, u.public_id FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?",
-            [parsedPostId]
+            [parsedPostId],
           );
           if (postRows.length > 0) {
             postType = postRows[0].type;

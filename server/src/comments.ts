@@ -3,6 +3,7 @@ import express, { Request, Response } from "express";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import dbPool from "./utils/db";
 import { createNotification } from "./utils/notificationService";
+import { enqueueUserVectorUpdate } from "./queue/queues";
 
 const router = express.Router();
 
@@ -183,6 +184,15 @@ router.post("/", async (req: Request, res: Response) => {
               link: `/item/${post_id}#comment-${newComment.id}`,
             });
           }
+
+          // 🧠 非作者留言 → 觸發使用者興趣向量更新（fire-and-forget）
+          enqueueUserVectorUpdate({
+            userId: user_id,
+            postId: post_id,
+            action: "comment",
+          }).catch((err) =>
+            console.error("Failed to enqueue user-vector (comment):", err),
+          );
         }
         
         // Optional: Notify parent comment author if reply

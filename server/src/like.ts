@@ -3,6 +3,7 @@ import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { RowDataPacket } from "mysql2";
 import { createNotification } from "./utils/notificationService";
+import { enqueueUserVectorUpdate } from "./queue/queues";
 
 const router = Router({ mergeParams: true });
 
@@ -91,7 +92,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
       await connection.commit();
 
-      // Trigger notification if liker is not the owner
+      // Trigger notification & user-vector update if liker is not the owner
       if (postRows.length > 0) {
         const post = postRows[0];
         if (post.user_id !== userId) {
@@ -108,6 +109,11 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
               console.error("Failed to create like notification:", err)
             );
           }
+
+          // 🧠 非作者按讚 → 觸發使用者興趣向量更新（fire-and-forget）
+          enqueueUserVectorUpdate({ userId: userId!, postId, action: "like" }).catch(
+            (err) => console.error("Failed to enqueue user-vector (like):", err),
+          );
         }
       }
 

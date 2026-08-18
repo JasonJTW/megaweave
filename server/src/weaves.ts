@@ -6,6 +6,7 @@ import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { requestWeave, approveWeave, WeaveError } from "./utils/weaveService";
 import { WeaveStatus } from "./utils/weaveService";
+import { enqueueUserVectorUpdate } from "./queue/queues";
 const router = Router();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -196,6 +197,15 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       },
       res.locals.io ?? null,
     );
+    // 🧠 觸發使用者興趣向量更新（fire-and-forget）
+    enqueueUserVectorUpdate({
+      userId: Number(req.user!.userId),
+      postId: Number(postId),
+      action: "weave",
+    }).catch((err) =>
+      console.error("Failed to enqueue user-vector (weave):", err),
+    );
+
     return res.status(201).json({
       message: "Weave request sent successfully",
       weaveId: result.weaveId,

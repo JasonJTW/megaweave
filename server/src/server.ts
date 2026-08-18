@@ -15,6 +15,7 @@ import { closeDatabase } from "./utils/db";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { startWorkers } from "./queue/workers";
+import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 
 dotenv.config();
@@ -67,7 +68,9 @@ async function startServer() {
   try {
     await connectRedis();
     await ensureVectorIndexExists();
-    startWorkers();
+    await startWorkers();
+
+    await initHotScoreCron();
     const redisClient = getRedisClient();
 
     //* 1.Get Redis clients for Socket.IO adapter
@@ -115,13 +118,13 @@ async function startServer() {
 
     //* 4.Socket.IO connection handling
     io.on("connection", (socket) => {
-      console.log(`🔌 New client connected: ${socket.id}`);
+      // console.log(`🔌 New client connected: ${socket.id}`);
 
       //* 讓客戶端告知 User ID 並加入 Room
       socket.on("join_room", (userId: string) => {
         const roomName = `user_${userId}`;
         socket.join(roomName);
-        console.log(`👤User ${userId} joined room: ${roomName}`);
+        // console.log(`👤User ${userId} joined room: ${roomName}`);
       });
       socket.on("disconnect", () => {
         console.log(`❌ Client disconnected: ${socket.id}`);

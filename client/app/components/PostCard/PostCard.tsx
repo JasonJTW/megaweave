@@ -148,13 +148,7 @@ function PostCardInner({
       {/*//* pt-3 for title margin */}
       <div className="relative min-h-[280px] pt-3">
         {/* Type badges aligned to the image column (outside overflow-hidden so ribbon isn't clipped) */}
-        <div
-          className={`pointer-events-none absolute top-3 z-20 ${
-            imageSrc
-              ? "inset-x-4 sm:inset-x-auto sm:left-1/2 sm:w-[215px] sm:-translate-x-1/2"
-              : "inset-x-0"
-          }`}
-        >
+        <div className="pointer-events-none absolute inset-x-4 top-3 z-20 sm:inset-x-auto sm:left-1/2 sm:w-[215px] sm:-translate-x-1/2">
           {post.type === "share" &&
             (isExpired ? (
               <ShareBadgeExpiredIcon className="absolute right-[10px] top-0" />
@@ -178,81 +172,63 @@ function PostCardInner({
           transition={{ duration: 0.6, ease: "easeIn" }}
           style={{ pointerEvents: isExpanded ? "auto" : "none" }}
         >
-          {imageSrc && (
-            //* mx-3 for image margin
-            <div className="relative mx-4 mb-2">
-              {/* Mobile: w-full + auto height; Desktop: fill column width (max 215px) + fixed 184px height */}
-              <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[184px] sm:max-w-[215px]">
-                {/* ── 全部重試失敗：顯示純色底 + X 佔位符 ── */}
-                {imageStatus === "failed" ? (
-                  <div className="flex h-[184px] w-full items-center justify-center rounded-[20px] bg-[#e8e8e8]">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="36"
-                      height="36"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#b0b0b0"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-label="Image unavailable"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </div>
-                ) : (
-                  <>
-                    {/* ── 正在重試：shimmer skeleton overlay ── */}
-                    {imageStatus === "retrying" && (
-                      <div
-                        className="absolute inset-0 z-10 animate-pulse rounded-[20px] bg-gradient-to-r from-primary-15 via-primary-30 to-primary-15 bg-[length:200%_100%]"
-                        aria-hidden="true"
-                        style={{
-                          animation: "shimmer 1.4s ease-in-out infinite",
-                        }}
-                      />
-                    )}
-
-                    {/* Mobile: responsive width/height */}
-                    <Image
-                      src={imageSrc}
-                      alt={post.title}
-                      width={0}
-                      height={0}
-                      sizes="(min-width: 768px) 255px, 100vw"
-                      className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
-                      priority={!!isFirstVisible}
-                      onError={handleImageError}
+          {/* mx-3 for image margin */}
+          <div className="relative mx-4 mb-2">
+            {/* Mobile: w-full + auto height; Desktop: fill column width (max 215px) + fixed 184px height */}
+            <div className="relative w-full overflow-hidden rounded-[20px] sm:mx-auto sm:h-[184px] sm:max-w-[215px]">
+              {/* ── 無圖片或全部重試失敗：顯示純色底 + X 佔位符 ── */}
+              {!imageSrc || imageStatus === "failed" ? (
+                <div className="flex h-[184px] w-full items-center justify-center rounded-[20px] bg-primary-15"></div>
+              ) : (
+                <>
+                  {/* ── 正在重試：shimmer skeleton overlay ── */}
+                  {imageStatus === "retrying" && (
+                    <div
+                      className="absolute inset-0 z-10 animate-pulse rounded-[20px] bg-gradient-to-r from-primary-15 via-primary-30 to-primary-15 bg-[length:200%_100%]"
+                      aria-hidden="true"
+                      style={{
+                        animation: "shimmer 1.4s ease-in-out infinite",
+                      }}
                     />
-                  </>
-                )}
+                  )}
 
-                {isExpired && (
-                  <div
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
-                    aria-hidden="true"
-                  >
-                    <span className="font-ddin text-[28px] font-bold tracking-[0.12em] text-white sm:text-[32px]">
-                      OVERDUE
-                    </span>
+                  {/* Mobile: responsive width/height */}
+                  <Image
+                    src={imageSrc}
+                    alt={post.title}
+                    width={0}
+                    height={0}
+                    sizes="(min-width: 768px) 255px, 100vw"
+                    className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
+                    priority={!!isFirstVisible}
+                    onError={handleImageError}
+                  />
+                </>
+              )}
+
+              {isExpired && (
+                <div
+                  className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <span className="font-ddin text-[28px] font-bold tracking-[0.12em] text-white sm:text-[32px]">
+                    OVERDUE
+                  </span>
+                </div>
+              )}
+
+              <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
+                {post.view_count > 0 && (
+                  <div className="flex items-center">
+                    <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
+                      <EyesIcon className="mr-[4px]" />
+                      {post.view_count}
+                    </Badge>
                   </div>
                 )}
-
-                <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
-                  {post.view_count > 0 && (
-                    <div className="flex items-center">
-                      <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
-                        <EyesIcon className="mr-[4px]" />
-                        {post.view_count}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
-          )}
+          </div>
           <h2 className="mx-4 flex-1 truncate font-ddin text-[24px] font-semibold text-gray-800">
             {post.title}
           </h2>
@@ -296,58 +272,60 @@ function PostCardInner({
             </div> */}
 
             <div className="mt-[12px] flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
-              {(post.province ||
-                post.city ||
-                post.route ||
-                post.full_address) && (
-                <div className="flex w-full items-start gap-2 sm:items-center">
-                  <LocationIcon className="mt-[2px] flex-shrink-0 text-primary sm:mt-0" />
-                  <div className="w-full min-w-0 flex-1 truncate text-[16px] text-gray-700">
-                    {post.province && (
-                      <span
-                        className="cursor-pointer transition-colors hover:text-primary hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onLocationClick)
-                            onLocationClick("province", post.province!);
-                        }}
-                      >
-                        {post.province}
-                      </span>
-                    )}
-                    {post.province && (post.city || post.route) && ", "}
-                    {post.city && (
-                      <span
-                        className="cursor-pointer transition-colors hover:text-primary hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onLocationClick)
-                            onLocationClick("city", post.city!);
-                        }}
-                      >
-                        {post.city}
-                      </span>
-                    )}
-                    {post.city && post.route && ", "}
-                    {post.route && (
-                      <span
-                        className="cursor-pointer transition-colors hover:text-primary hover:underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onLocationClick)
-                            onLocationClick("route", post.route!);
-                        }}
-                      >
-                        {post.route}
-                      </span>
-                    )}
-                    {!post.province &&
-                      !post.city &&
-                      !post.route &&
-                      post.full_address && <span>{post.full_address}</span>}
+              <div className="min-h-[18px]">
+                {(post.province ||
+                  post.city ||
+                  post.route ||
+                  post.full_address) && (
+                  <div className="flex w-full items-start gap-2 sm:items-center">
+                    <LocationIcon className="mt-[2px] flex-shrink-0 text-primary sm:mt-0" />
+                    <div className="w-full min-w-0 flex-1 truncate text-[16px] text-gray-700">
+                      {post.province && (
+                        <span
+                          className="cursor-pointer transition-colors hover:text-primary hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onLocationClick)
+                              onLocationClick("province", post.province!);
+                          }}
+                        >
+                          {post.province}
+                        </span>
+                      )}
+                      {post.province && (post.city || post.route) && ", "}
+                      {post.city && (
+                        <span
+                          className="cursor-pointer transition-colors hover:text-primary hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onLocationClick)
+                              onLocationClick("city", post.city!);
+                          }}
+                        >
+                          {post.city}
+                        </span>
+                      )}
+                      {post.city && post.route && ", "}
+                      {post.route && (
+                        <span
+                          className="cursor-pointer transition-colors hover:text-primary hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onLocationClick)
+                              onLocationClick("route", post.route!);
+                          }}
+                        >
+                          {post.route}
+                        </span>
+                      )}
+                      {!post.province &&
+                        !post.city &&
+                        !post.route &&
+                        post.full_address && <span>{post.full_address}</span>}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
               {post.expires_at && (
                 <div className="flex items-center gap-2">
                   <ClockIcon className="text-primary" />

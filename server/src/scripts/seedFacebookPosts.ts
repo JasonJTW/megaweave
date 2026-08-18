@@ -29,6 +29,8 @@ interface MulterFile {
 
 import { postService } from "../services/postService";
 import type { PostType } from "../types/post";
+import dbPool from "../utils/db";
+import { RowDataPacket } from "mysql2";
 
 interface RawFacebookPost {
   index: string;
@@ -181,6 +183,24 @@ async function seedFacebookPosts() {
     process.exit(0);
   }
 
+  // Pre-load category and condition maps from database
+  console.log("🔄 Fetching category and condition metadata from database...");
+  const categoryMap = new Map<number, string>();
+  const [categories] = await dbPool.query<RowDataPacket[]>(
+    "SELECT id, name_en, name FROM categories WHERE status = 'active'",
+  );
+  for (const cat of categories) {
+    categoryMap.set(cat.id, (cat.name_en as string) || (cat.name as string));
+  }
+
+  const conditionMap = new Map<number, string>();
+  const [conditions] = await dbPool.query<RowDataPacket[]>(
+    "SELECT level, name FROM conditions WHERE status = 'active'",
+  );
+  for (const cond of conditions) {
+    conditionMap.set(cond.level, cond.name as string);
+  }
+
   let successCount = 0;
   let failCount = 0;
 
@@ -194,8 +214,14 @@ async function seedFacebookPosts() {
 
     const title = sanitizeTitle(post);
     const content = sanitizeContent(post);
-    const categoryId = parseInt(post.category, 10);
-    const conditionLevel = parseInt(post.condition, 10);
+    const parsedCatId = parseInt(post.category, 10);
+    const categoryId = isNaN(parsedCatId) ? 4 : parsedCatId; // Default to 4 (Others)
+    const parsedCondLevel = parseInt(post.condition, 10);
+    const conditionLevel = isNaN(parsedCondLevel) ? 3 : parsedCondLevel; // Default to 3 (Good)
+
+    const categoryName = categoryMap.get(categoryId) || "Others";
+    const conditionName = conditionMap.get(conditionLevel) || "Good";
+
     const type = (
       ["share", "wish", "commons"].includes(post.type) ? post.type : "share"
     ) as PostType;
@@ -259,7 +285,7 @@ async function seedFacebookPosts() {
       console.log(`  ✅ Successfully created post ID: ${createdPost.id}`);
       console.log(`     Title: ${title}`);
       console.log(
-        `     Category: ${categoryId}, Condition: ${conditionLevel}, Images: ${mockFiles.length}`,
+        `     Category: ${categoryId} (${categoryName}), Condition: ${conditionLevel} (${conditionName}), Images: ${mockFiles.length}`,
       );
 
       // Mark as posted in the JSON file immediately after success

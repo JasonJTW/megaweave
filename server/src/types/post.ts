@@ -15,17 +15,33 @@ export interface PostItemData {
   quantity: number;
 }
 
-/** 供向量化文字組裝用的貼文資料結構 */
-export interface PostTextInput {
+/** 向量文字組裝的共用基底欄位 */
+interface PostTextBase {
   title: string;
   content: string;
   type: PostType;
-  category_name?: string;
-  condition_name?: string;
   tags?: string | null;
   items?: PostItemData[];
   city?: string | null;
   province?: string | null;
+}
+
+/**
+ * Queue Payload：傳入 BullMQ 的貼文向量化任務資料。
+ * 只傳 ID，由 Worker 從記憶體快取解析分類與狀況名稱。
+ */
+export interface PostTextInput extends PostTextBase {
+  categoryId: number;
+  conditionLevel: number;
+}
+
+/**
+ * generatePostText 的輸入結構。
+ * 分類與狀況已由 Worker 解析為文字名稱（category_name / condition_name）。
+ */
+export interface PostTextRendered extends PostTextBase {
+  category_name?: string;
+  condition_name?: string;
 }
 /** 貼文圖片資料結構 */
 export interface PostImage {

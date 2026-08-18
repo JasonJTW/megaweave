@@ -2,6 +2,7 @@
 
 /*
  //* Command to run:
+ //* cd server
  //* npm run dev
  //* npx ts-node --transpile-only src/scripts/seedFacebookPosts.ts ~/megaweavingFB/posts.json
  */

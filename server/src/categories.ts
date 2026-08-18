@@ -11,6 +11,7 @@ router.get("/", async (_req: Request, res: Response) => {
     const categoriesQuery = `
       SELECT 
         id,
+        name,
         name_en,
         description,
         status,
@@ -18,7 +19,7 @@ router.get("/", async (_req: Request, res: Response) => {
         updated_at
       FROM categories 
       WHERE status = 'active'
-      ORDER BY name_en ASC
+      ORDER BY id ASC
     `;
 
     const [categories] = await dbPool.query<RowDataPacket[]>(categoriesQuery);
@@ -45,6 +46,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     const categoryQuery = `
       SELECT 
         id,
+        name,
         name_en,
         description,
         status,

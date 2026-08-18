@@ -13,13 +13,14 @@ import {
   PostType,
   PostItemData,
   PostTextInput,
+  PostTextRendered,
   PostDetail,
   PostImage,
 } from "../types/post";
 import { generatePostText } from "../utils/generatePostText";
 import { fetchEmbedding } from "../queue/jobs/postEmbedding";
 import { getRedisClient } from "../utils/redis";
-export type { PostType, PostItemData, PostTextInput, PostDetail, PostImage };
+export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
 
 export interface LocationData {
   place_id: string;
@@ -223,18 +224,19 @@ export class PostService {
         });
       }
 
-      // 非同步產生語義向量（不阻塞 HTTP response）
+      // 非同步產生語義向量（不阻塞 HTTP response，由 Worker 自動補齊分類與狀況名稱）
       await enqueuePostEmbedding({
         postId,
         post: {
           title: input.title,
           content: input.content,
           type: input.type,
+          categoryId: input.categoryId,
+          conditionLevel: input.conditionLevel,
           tags: input.tags,
           items: input.items,
           city: input.city,
           province: input.province,
-          // category_name / condition_name 由 Worker 省略（不影響向量品質，避免額外 JOIN）
         },
       });
 
@@ -761,30 +763,26 @@ export class PostService {
     ]);
   }
 
-  /** 為指定貼文排入向量生成任務（包含完整詳情供 generatePostText 使用） */
+  /** 為指定貼文排入向量生成任務（Worker 自動從快取解析分類與狀況名稱） */
   async enqueueEmbeddingForPost(postId: number): Promise<PostDetail> {
     const post: PostDetail | null = await this.getPostById(postId);
     if (!post) {
       throw new Error("POST_NOT_FOUND");
     }
 
-    console.log("postGotById: ", post);
-
-    const embeddingPayload: PostTextInput = {
-      title: post.title,
-      content: post.content,
-      type: post.type,
-      category_name: post.category_name_en,
-      condition_name: post.condition_name,
-      tags: post.tags,
-      items: post.items || [],
-      city: post.city,
-      province: post.province,
-    };
-
     await enqueuePostEmbedding({
       postId,
-      post: embeddingPayload,
+      post: {
+        title: post.title,
+        content: post.content,
+        type: post.type,
+        categoryId: post.category_id,
+        conditionLevel: post.condition_level,
+        tags: post.tags,
+        items: post.items || [],
+        city: post.city,
+        province: post.province,
+      },
     });
 
     return post;
@@ -800,12 +798,13 @@ export class PostService {
       throw new Error("POST_NOT_FOUND");
     }
 
-    const embeddingPayload: PostTextInput = {
+    // 同步路徑直接使用 getPostById 的 JOIN 結果，不需要繞經 Worker 快取
+    const embeddingPayload: PostTextRendered = {
       title: post.title,
       content: post.content,
       type: post.type,
-      category_name: post.category_name_en,
-      condition_name: post.condition_name,
+      category_name: post.category_name_en ?? undefined,
+      condition_name: post.condition_name ?? undefined,
       tags: post.tags,
       items: post.items || [],
       city: post.city,

@@ -12,8 +12,8 @@
  *    Location: Da'an District, Taipei"
  */
 
-import { PostType, PostTextInput } from "../types/post";
-export type { PostTextInput };
+import { PostType, PostTextRendered } from "../types/post";
+export type { PostTextRendered };
 
 const TYPE_LABEL: Record<PostType, string> = {
   share: "Share",
@@ -25,7 +25,7 @@ const TYPE_LABEL: Record<PostType, string> = {
  * Builds the embedding text for a post.
  * Optional fields are omitted entirely when blank to avoid wasting tokens.
  */
-export function generatePostText(post: PostTextInput): string {
+export function generatePostText(post: PostTextRendered): string {
   const parts: string[] = [];
 
   // Header: [Type][Category] Title (Condition)

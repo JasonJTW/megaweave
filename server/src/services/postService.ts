@@ -496,6 +496,77 @@ export class PostService {
     return userPosts;
   }
 
+  /** 取得使用者瀏覽過的貼文紀錄 */
+  async getViewedPosts(
+    userId: number,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    posts: RowDataPacket[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalPosts: number;
+      postsPerPage: number;
+    };
+  }> {
+    const offset = (page - 1) * limit;
+
+    const [countRows] = await dbPool.execute<RowDataPacket[]>(
+      `
+      SELECT COUNT(DISTINCT pv.post_id) as total
+      FROM post_views pv
+      JOIN posts p ON pv.post_id = p.id
+      WHERE pv.user_id = ? AND p.deleted_at IS NULL
+      `,
+      [userId],
+    );
+    const total = (countRows[0] as { total: number })?.total || 0;
+    const totalPages = Math.ceil(total / limit);
+
+    const postsQuery = `
+      SELECT 
+        p.*,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
+        u.public_id as author_public_id,
+        u.id as author_user_id,
+        u.avatar_url,
+        c.name_en as category_name_en,
+        cond.name as condition_name,
+        l.place_id, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
+        GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys,
+        MAX(pv.viewed_at) as viewed_at
+      FROM post_views pv
+      JOIN posts p ON pv.post_id = p.id
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN conditions cond ON p.condition_level = cond.level
+      LEFT JOIN locations l ON p.location_id = l.id
+      LEFT JOIN images i ON p.id = i.post_id
+      WHERE pv.user_id = ? AND p.deleted_at IS NULL
+      GROUP BY p.id
+      ORDER BY viewed_at DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [viewedPosts] = await dbPool.query<RowDataPacket[]>(postsQuery, [
+      userId,
+      Number(limit),
+      Number(offset),
+    ]);
+
+    return {
+      posts: viewedPosts,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalPosts: total,
+        postsPerPage: limit,
+      },
+    };
+  }
+
   /** 編輯貼文 */
   async updatePost(
     postId: number,

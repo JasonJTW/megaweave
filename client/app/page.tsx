@@ -49,9 +49,9 @@ import DeleteIcon from "./components/icons/DeleteIcon";
 import SearchIcon from "./components/icons/SearchIcon";
 import ElfIcon from "./components/icons/ElfIcon";
 import ReuseIcon from "./components/icons/ReuseIcon";
-import WeavingIcon from "./components/icons/WeavingIcon";
 import WazowskiIcon from "./components/icons/WazowskiIcon";
 import LetsStartWeavingBanner from "./components/ui/LetsStartWeavingBanner";
+import CommonShareIcon from "./components/icons/CommonShareIcon";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -652,7 +652,7 @@ const PostsApp = () => {
                   </span>
                 </div>
                 <div className="pointer-events-none absolute right-[-20px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
-                  <WeavingIcon className="!h-full !w-full text-[#2c4b25] opacity-50" />
+                  <CommonShareIcon className="!h-full !w-full text-[#2c4b25] opacity-50" />
                 </div>
               </Button>
             </div>
@@ -812,7 +812,7 @@ const PostsApp = () => {
           </div>
         </div>
         <div
-          className={`hidden md:block mb-4 mt-8 bg-[#f4f5f3] ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
+          className={`mb-4 mt-8 hidden bg-[#f4f5f3] md:block ${isWeavingExpanded ? "z-[60]" : "z-10"}`}
         >
           {/* 全局透明遮罩：當 Weaving 展開時，攔截所有外部點擊並防止事件穿透 */}
           {isWeavingExpanded && (

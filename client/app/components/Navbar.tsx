@@ -16,6 +16,7 @@ import {
   // Info,
   // Mail,
   // GalleryHorizontalEnd,
+  History,
   LogOut,
   SquarePlus,
   NewspaperIcon,
@@ -145,6 +146,16 @@ const Navbar = () => {
       description: "User Profile",
       icon: UserIcon,
     },
+    ...(user
+      ? [
+          {
+            href: "/history",
+            title: "Viewing History",
+            description: "Posts you recently browsed",
+            icon: History,
+          },
+        ]
+      : []),
     {
       href: "/about",
       title: "About Us",

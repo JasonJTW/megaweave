@@ -13,7 +13,7 @@ import { safeCompressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
 import { motion } from "framer-motion";
-import { LogOut, Save, Share, User as UserIcon, Users, X } from "lucide-react";
+import { History, LogOut, Save, Share, User as UserIcon, Users, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -896,13 +896,24 @@ const UserPage = () => {
               </span>
             </div>
 
-            <button
-              onClick={handleSignOut}
-              className="hidden items-center space-x-2 rounded-full px-4 py-2 font-ddin font-bold text-megaweave-forest-dark transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35 md:flex"
-            >
-              <span>Sign Out</span>
-              <LogOut className="h-4 w-4" />
-            </button>
+            <div className="hidden items-center space-x-2 md:flex">
+              <button
+                type="button"
+                onClick={() => router.push("/history")}
+                className="flex items-center space-x-2 rounded-full px-4 py-2 font-ddin font-bold text-megaweave-forest-dark transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
+              >
+                <History className="h-4 w-4" />
+                <span>History</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="flex items-center space-x-2 rounded-full px-4 py-2 font-ddin font-bold text-megaweave-forest-dark transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
+              >
+                <span>Sign Out</span>
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </motion.header>
         {/* Main Content */}

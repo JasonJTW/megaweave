@@ -1,11 +1,10 @@
 "use client";
 
 import type { Post } from "@/app/types/schema";
-import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { Heart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import CompactPostCard from "./PostCard/CompactPostCard";
 import CommonShareIcon from "./icons/CommonShareIcon";
 import ElfIcon from "./icons/ElfIcon";
 import ReuseIcon from "./icons/ReuseIcon";
@@ -18,12 +17,6 @@ interface PostOwnerSidebarProps {
   authorPublicId: string;
   posts: Post[];
   currentPostId?: number;
-}
-
-function getPostImageSrc(post: Post): string | null {
-  const keys = parseS3Keys(post);
-  if (!keys[0]) return null;
-  return keys[0].startsWith("http") ? keys[0] : getImageUrl(keys[0], "thumb");
 }
 
 export default function PostOwnerSidebar({
@@ -93,85 +86,13 @@ export default function PostOwnerSidebar({
       <div className="flex w-full flex-col gap-3">
         {posts
           .filter((p) => p.status !== "inactive")
-          .map((ownerPost) => {
-          const isExpired = ownerPost.expires_at
-            ? new Date(ownerPost.expires_at) < new Date()
-            : false;
-          const imageSrc = getPostImageSrc(ownerPost);
-          const tags = ownerPost.tags
-            ? ownerPost.tags
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean)
-                .slice(0, 3)
-            : [];
-          const isCurrent = currentPostId === ownerPost.id;
-
-          return (
-            <button
+          .map((ownerPost) => (
+            <CompactPostCard
               key={ownerPost.id}
-              type="button"
-              onClick={() => router.push(`/item/${ownerPost.id}`)}
-              className={`flex w-full gap-3 rounded-[20px] bg-white p-2.5 text-left shadow-sm transition-colors hover:bg-white/90 ${
-                isCurrent ? "ring-1 ring-primary/40" : ""
-              }`}
-            >
-              <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[14px] bg-secondary/40">
-                {imageSrc ? (
-                  <Image
-                    src={imageSrc}
-                    alt={ownerPost.title}
-                    fill
-                    className={`object-cover${isExpired ? " opacity-70" : ""}`}
-                    sizes="72px"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gray-400">
-                    {ownerPost.title.charAt(0)}
-                  </div>
-                )}
-                {isExpired && (
-                  <div
-                    className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/50"
-                    aria-hidden="true"
-                  >
-                    <span className="font-ddin text-[10px] font-bold tracking-[0.10em] text-white">
-                      OVERDUE
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
-                <div>
-                  <h3 className="truncate text-[16px] font-bold text-gray-900">
-                    {ownerPost.title}
-                  </h3>
-                  {tags.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-gray-500"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1 text-[12px] text-megaweave-brown">
-                    <Heart className="h-3.5 w-3.5 fill-current" />
-                    {ownerPost.likes_count ?? 0}
-                  </span>
-                  <ReuseIcon className="h-5 w-5 text-megaweave-gold" />
-                </div>
-              </div>
-            </button>
-          );
-        })}
+              post={ownerPost}
+              isCurrent={currentPostId === ownerPost.id}
+            />
+          ))}
       </div>
     </aside>
   );

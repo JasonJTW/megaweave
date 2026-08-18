@@ -160,6 +160,36 @@ router.get("/user", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+//* Get user's viewed posts history API
+router.get("/history", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await postService.getViewedPosts(userId, page, limit);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Get viewed posts history error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
+
+// Alias for /history
+router.get("/viewed", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await postService.getViewedPosts(userId, page, limit);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Get viewed posts error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
+
 // 🌟 統一推薦 Feed API (Unified Hybrid Feed)
 // GET /api/posts/feed?page=1&limit=20&type=share&category_id=1&lat=25.033&lng=121.565
 router.get("/feed", async (req: Request, res: Response) => {

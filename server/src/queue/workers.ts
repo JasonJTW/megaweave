@@ -12,8 +12,16 @@ import {
   processPostEmbedding,
   PostEmbeddingJobData,
 } from "./jobs/postEmbedding";
+import {
+  processUserVector,
+  UserVectorJobData,
+} from "./jobs/userVector";
+import { processUserVectorFlush } from "./jobs/userVectorFlush";
+import { processCalculateHotScore } from "./jobs/hotScore";
+import { initUserVectorFlushCron } from "./queues";
 
-export function startWorkers(): void {
+
+export async function startWorkers(): Promise<void> {
   const postImageWorker = new Worker(
     "post-image",
     async (job: Job<PostUploadImageJobData | PostDeleteImageJobData>) => {
@@ -83,6 +91,80 @@ export function startWorkers(): void {
       `❌ [embedding-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
     );
   });
+
+  // ─── User Vector Worker ────────────────────────────────────────────────
+  const userVectorWorker = new Worker<UserVectorJobData>(
+    "user-vector",
+    async (job: Job<UserVectorJobData>) => {
+      if (job.name === "update-user-vector") {
+        await processUserVector(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: 5 },
+  );
+
+  userVectorWorker.on("completed", (job) => {
+    console.log(
+      `🎉 [user-vector-worker] Job ${job.id} (${job.name}) finished successfully`,
+    );
+  });
+
+  userVectorWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [user-vector-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+    );
+  });
+
+  // ─── Hot Score Worker ──────────────────────────────────────────────────
+  const hotScoreWorker = new Worker(
+    "hot-score",
+    async (job: Job) => {
+      if (job.name === "calculate-hot-score") {
+        await processCalculateHotScore(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: 1 },
+  );
+
+  hotScoreWorker.on("completed", (job) => {
+    console.log(
+      `🎉 [hot-score-worker] Job ${job.id} (${job.name}) finished successfully`,
+    );
+  });
+
+  hotScoreWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [hot-score-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+    );
+  });
+
+  // ─── User Vector Flush Worker (Write-Back cron) ────────────────────────
+  const userVectorFlushWorker = new Worker(
+    "user-vector-flush",
+    async (job: Job) => {
+      if (job.name === "flush-user-vectors") {
+        await processUserVectorFlush(job);
+      }
+    },
+    // concurrency: 1 — 確保同一時間只有一個 flush job 操作 dirty set，
+    // 避免多個 worker 同時 SPOP 造成資料競態。
+    { connection: bullmqConnection, concurrency: 1 },
+  );
+
+  userVectorFlushWorker.on("completed", (job) => {
+    console.log(
+      `🎉 [vector-flush-worker] Job ${job.id} (${job.name}) finished successfully`,
+    );
+  });
+
+  userVectorFlushWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [vector-flush-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+    );
+  });
+
+  // 啟動 Write-Back flush cron 排程（每 10 分鐘把 Redis dirty set 批次寫回 MySQL）
+  await initUserVectorFlushCron();
 
   console.log("🚀 All workers started");
 }

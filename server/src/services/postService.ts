@@ -293,11 +293,28 @@ export class PostService {
             viewerIdentifier,
           );
           if (shouldCount) {
+            // FIXME: 同步寫入 MySQL 在高並發下可能造成 row-level lock 競爭成為瓶頸。
+            // 未來考慮改為透過 post_views 明細表 + BullMQ batch worker 非同步處理，
+            // 並將 view_count 改為由 batch job 定期彙總更新，而非每次請求同步寫入。
             await dbPool.execute(
               "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
               [postId],
             );
             postData.view_count += 1;
+
+            // TODO: 目前直接單筆寫入 post_views（開發階段使用者少，暫不批次處理）。
+            // 未來流量增加後，應改為：Express 丟 BullMQ → Worker 累積 100 筆或 5 分鐘後
+            // 批次 INSERT INTO post_views，避免每次請求都直接打 DB。
+            if (currentUserId) {
+              dbPool
+                .execute(
+                  "INSERT INTO post_views (user_id, post_id, viewed_at) VALUES (?, ?, NOW())",
+                  [currentUserId, postId],
+                )
+                .catch((err) =>
+                  console.error("Failed to insert post_views record:", err),
+                );
+            }
           }
         }
       } catch (viewError) {
@@ -412,7 +429,7 @@ export class PostService {
       LEFT JOIN images i ON p.id = i.post_id
       WHERE ${whereClause}
       GROUP BY p.id
-      ORDER BY (p.expires_at IS NOT NULL AND p.expires_at < NOW()) ASC, p.created_at DESC
+      ORDER BY (p.expires_at IS NOT NULL AND p.expires_at < NOW()) ASC, p.id DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
 

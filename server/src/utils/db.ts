@@ -36,21 +36,21 @@ const dbPool = mysql
   .promise();
 
 // 連接池事件監聽
-dbPool.on("connection", (connection) => {
-  console.log("New connection established as id " + connection.threadId);
-});
+// dbPool.on("connection", (connection) => {
+//   console.log("New connection established as id " + connection.threadId);
+// });
 
-dbPool.on("acquire", (connection) => {
-  console.log("Connection %d acquired", connection.threadId);
-});
+// dbPool.on("acquire", (connection) => {
+//   console.log("Connection %d acquired", connection.threadId);
+// });
 
-dbPool.on("release", (connection) => {
-  console.log("Connection %d released", connection.threadId);
-});
+// dbPool.on("release", (connection) => {
+//   console.log("Connection %d released", connection.threadId);
+// });
 
-dbPool.on("enqueue", () => {
-  console.log("Waiting for available connection slot");
-});
+// dbPool.on("enqueue", () => {
+//   console.log("Waiting for available connection slot");
+// });
 
 interface InternalPool {
   _allConnections?: unknown[];

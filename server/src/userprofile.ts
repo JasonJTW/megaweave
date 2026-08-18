@@ -21,7 +21,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
       });
     }
 
-    console.log(`Fetching public profile for user: ${uuid}`);
+    // console.log(`Fetching public profile for user: ${uuid}`);
 
     // 1. 獲取用戶基本資料 (通過 public_id)
     const userQuery = `
@@ -47,7 +47,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     }
 
     const user = (userRows as RowDataPacket[])[0];
-    console.log(`Found user: ${user.username} (id: ${user.id})`);
+    // console.log(`Found user: ${user.username} (id: ${user.id})`);
 
     // 2. 使用 users.id 來查詢 user_profiles
     const profileQuery = `
@@ -58,7 +58,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     const [profileRows] = await dbPool.query(profileQuery, [user.id]); // 🔥 使用 user.id 而不是 uuid
     const profile = (profileRows as RowDataPacket[])[0] || {};
 
-    console.log(`Profile data:`, profile);
+    // console.log(`Profile data:`, profile);
 
     // 3. 組合回傳資料
     const responseData = {
@@ -74,7 +74,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
       contact_phone: profile.contact_phone || null,
     };
 
-    console.log(`Returning profile data for ${user.username}`);
+    // console.log(`Returning profile data for ${user.username}`);
     return res.status(200).json(responseData);
   } catch (error) {
     console.error("Error fetching public profile:", error);
@@ -180,7 +180,7 @@ router.post(
       console.error("Database error:", error);
       res.status(500).json({ errorMessage: "Failed to update profile" });
     }
-  }
+  },
 );
 
 router.get(
@@ -214,7 +214,7 @@ router.get(
         .status(500)
         .json({ errorMessage: "Failed to fetch user profile" });
     }
-  }
+  },
 );
 
 router.post(
@@ -240,7 +240,7 @@ router.post(
       console.error("Database error:", error);
       res.status(500).json({ errorMessage: "Failed to update profile" });
     }
-  }
+  },
 );
 
 router.get(
@@ -274,7 +274,7 @@ router.get(
         .status(500)
         .json({ errorMessage: "Failed to fetch user profile" });
     }
-  }
+  },
 );
 
 router.post(
@@ -300,7 +300,7 @@ router.post(
       console.error("Database error:", error);
       res.status(500).json({ errorMessage: "Failed to update profile" });
     }
-  }
+  },
 );
 
 export default router;

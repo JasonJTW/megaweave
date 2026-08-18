@@ -182,7 +182,15 @@ const PostsApp = () => {
       if (searchProvince) params.append("province", searchProvince);
       if (postFilterType) params.append("type", postFilterType);
 
-      return `${hostName}/api/posts?${params.toString()}`;
+      // 主動關鍵字或特定地點搜尋走 /api/posts；常規首頁瀏覽走個人化/熱門推薦 /api/posts/feed
+      const isCustomSearch = Boolean(
+        searchTerm || selectedLocation || searchCity || searchProvince,
+      );
+      const basePath = isCustomSearch
+        ? `${hostName}/api/posts`
+        : `${hostName}/api/posts/feed`;
+
+      return `${basePath}?${params.toString()}`;
     },
     [
       hostName,
@@ -195,7 +203,8 @@ const PostsApp = () => {
     ],
   );
 
-  const fetcher = (url: string) => fetch(url).then((res) => res.json());
+  const fetcher = (url: string) =>
+    fetch(url, { credentials: "include" }).then((res) => res.json());
 
   const { data, size, setSize, isValidating, mutate } =
     useSWRInfinite<PostsResponse>(getKey, fetcher, {

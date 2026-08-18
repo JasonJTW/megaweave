@@ -13,7 +13,9 @@ import likeRouter from "./like";
 import { getUserFromCookie } from "./session";
 import { handleError } from "./utils/errorHandler";
 import { postService } from "./services/postService";
+import { feedService } from "./services/feedService";
 import type { PostType } from "./types/post";
+import { enqueueUserVectorUpdate } from "./queue/queues";
 
 dotenv.config();
 
@@ -158,6 +160,39 @@ router.get("/user", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// 🌟 統一推薦 Feed API (Unified Hybrid Feed)
+// GET /api/posts/feed?page=1&limit=20&type=share&category_id=1&lat=25.033&lng=121.565
+router.get("/feed", async (req: Request, res: Response) => {
+  try {
+    const session = await getUserFromCookie(req);
+    const userId = session?.userId;
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const type = req.query.type as string | undefined;
+    const category_id = req.query.category_id
+      ? parseInt(req.query.category_id as string)
+      : undefined;
+    const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
+    const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+
+    const result = await feedService.getFeed({
+      userId,
+      page,
+      limit,
+      type,
+      category_id,
+      lat,
+      lng,
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Get feed error:", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
+  }
+});
+
 //* Get post details api
 router.get("/:id", async (req: Request, res: Response) => {
   try {
@@ -178,6 +213,17 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     if (!post) {
       return res.status(404).json({ errorMessage: "Post not found" });
+    }
+
+    // 🧠 登入使用者看非自己的貼文 → 觸發興趣向量更新（fire-and-forget）
+    if (currentUserId && post.user_id !== currentUserId) {
+      enqueueUserVectorUpdate({
+        userId: currentUserId,
+        postId,
+        action: "view",
+      }).catch((err) =>
+        console.error("Failed to enqueue user-vector (view):", err),
+      );
     }
 
     res.status(200).json({ post });

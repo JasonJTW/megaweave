@@ -182,15 +182,8 @@ const PostsApp = () => {
       if (searchProvince) params.append("province", searchProvince);
       if (postFilterType) params.append("type", postFilterType);
 
-      // 主動關鍵字或特定地點搜尋走 /api/posts；常規首頁瀏覽走個人化/熱門推薦 /api/posts/feed
-      const isCustomSearch = Boolean(
-        searchTerm || selectedLocation || searchCity || searchProvince,
-      );
-      const basePath = isCustomSearch
-        ? `${hostName}/api/posts`
-        : `${hostName}/api/posts/feed`;
-
-      return `${basePath}?${params.toString()}`;
+      // 首頁所有的瀏覽與條件篩選（分類、Wish/Share、地點、關鍵字）統一走個人化推薦混合重排 API
+      return `${hostName}/api/posts/feed?${params.toString()}`;
     },
     [
       hostName,

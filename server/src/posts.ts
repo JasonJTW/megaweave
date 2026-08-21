@@ -203,6 +203,10 @@ router.get("/feed", async (req: Request, res: Response) => {
     const category_id = req.query.category_id
       ? parseInt(req.query.category_id as string)
       : undefined;
+    const search = req.query.search as string | undefined;
+    const location = req.query.location as string | undefined;
+    const city = req.query.city as string | undefined;
+    const province = req.query.province as string | undefined;
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
 
@@ -212,6 +216,10 @@ router.get("/feed", async (req: Request, res: Response) => {
       limit,
       type,
       category_id,
+      search,
+      location,
+      city,
+      province,
       lat,
       lng,
     });

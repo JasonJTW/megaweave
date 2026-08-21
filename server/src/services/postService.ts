@@ -19,6 +19,7 @@ import {
 } from "../types/post";
 import { generatePostText } from "../utils/generatePostText";
 import { fetchEmbedding } from "../queue/jobs/postEmbedding";
+import { calculatePostHotScore } from "../queue/jobs/hotScore";
 import { getRedisClient } from "../utils/redis";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
 
@@ -239,6 +240,35 @@ export class PostService {
           province: input.province,
         },
       });
+
+      // 🌟 即時將新貼文寫入 Redis feed:trending (熱門推薦榜) 與更新 hot_score
+      const postStatus = input.status || "active";
+      if (postStatus === "active") {
+        try {
+          const initialScore = calculatePostHotScore({
+            status: "active",
+            view_count: 0,
+            likes_count: 0,
+            comment_count: 0,
+            weave_count: 0,
+            created_at: new Date(),
+          });
+
+          if (initialScore > 0) {
+            const redis = getRedisClient();
+            await redis.zAdd("feed:trending", {
+              score: initialScore,
+              value: String(postId),
+            });
+            await dbPool.execute(
+              "UPDATE posts SET hot_score = ? WHERE id = ?",
+              [initialScore, postId],
+            );
+          }
+        } catch (redisErr) {
+          console.warn("⚠️ Failed to add new post to feed:trending:", redisErr);
+        }
+      }
 
       return await this.getPostDetailsQuery(postId);
     } catch (error) {
@@ -761,6 +791,17 @@ export class PostService {
     await dbPool.execute("UPDATE posts SET deleted_at = NOW() WHERE id = ?", [
       postId,
     ]);
+
+    // 🌟 即時自 Redis 移除已刪除的貼文（避免 feed:trending 與向量檢索殘留）
+    try {
+      const redis = getRedisClient();
+      await Promise.all([
+        redis.zRem("feed:trending", String(postId)),
+        redis.del(`post:${postId}`),
+      ]);
+    } catch (redisErr) {
+      console.warn("⚠️ Failed to remove deleted post from Redis:", redisErr);
+    }
   }
 
   /** 為指定貼文排入向量生成任務（Worker 自動從快取解析分類與狀況名稱） */

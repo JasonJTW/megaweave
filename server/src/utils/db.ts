@@ -35,32 +35,8 @@ const dbPool = mysql
   })
   .promise();
 
-// 連接池事件監聽
-// dbPool.on("connection", (connection) => {
-//   console.log("New connection established as id " + connection.threadId);
-// });
-
-// dbPool.on("acquire", (connection) => {
-//   console.log("Connection %d acquired", connection.threadId);
-// });
-
-// dbPool.on("release", (connection) => {
-//   console.log("Connection %d released", connection.threadId);
-// });
-
-// dbPool.on("enqueue", () => {
-//   console.log("Waiting for available connection slot");
-// });
-
-interface InternalPool {
-  _allConnections?: unknown[];
-  _freeConnections?: unknown[];
-  _connectionQueue?: unknown[];
-}
-
 // 錯誤處理
-const poolConnection = dbPool.pool;
-poolConnection.on("error", (err: unknown) => {
+dbPool.pool.on("error", (err: unknown) => {
   console.error("Database pool error:", err);
   if (
     typeof err === "object" &&
@@ -72,67 +48,31 @@ poolConnection.on("error", (err: unknown) => {
   }
 });
 
-// ✅ 新增：監控連接池狀態
+// 監控連接池使用壓力
 const monitorInterval = setInterval(() => {
-  try {
-    const pool = dbPool.pool as unknown as InternalPool; // 需要訪問內部屬性
-    const allConnections = pool._allConnections?.length || 0;
-    const freeConnections = pool._freeConnections?.length || 0;
-    const queueLength = pool._connectionQueue?.length || 0;
-    const inUse = allConnections - freeConnections;
+  const pool = dbPool.pool as unknown as {
+    _allConnections?: unknown[];
+    _freeConnections?: unknown[];
+    _connectionQueue?: unknown[];
+  };
+  const total = pool._allConnections?.length ?? 0;
+  const free = pool._freeConnections?.length ?? 0;
+  const queued = pool._connectionQueue?.length ?? 0;
+  const inUse = total - free;
 
-    // const status = {
-    //   timestamp: new Date().toISOString(),
-    //   total: allConnections,
-    //   free: freeConnections,
-    //   inUse: inUse,
-    //   queued: queueLength,
-    //   utilizationRate:
-    //     allConnections > 0
-    //       ? ((inUse / allConnections) * 100).toFixed(1) + "%"
-    //       : "0%",
-    // };
-
-    // console.log("📊 Pool Status:", status);
-
-    // ⚠️ 警告：如果使用率過高或有排隊，發出警告
-    if (inUse >= 18 || queueLength > 0) {
-      console.warn("⚠️  WARNING: Connection pool under pressure!", {
-        inUse,
-        limit: 20,
-        queued: queueLength,
-      });
-    }
-  } catch (error) {
-    console.error("Error monitoring pool:", error);
+  if (inUse >= 18 || queued > 0) {
+    console.warn("⚠️  WARNING: Connection pool under pressure!", {
+      inUse,
+      limit: 20,
+      queued,
+    });
   }
-}, 10000); // 每 10 秒
+}, 10000);
 
 // 優雅關閉連接池
 export async function closeDatabase(): Promise<void> {
-  console.log("📍 Closing database pool...");
-
-  // 停止監控
   clearInterval(monitorInterval);
-
-  try {
-    // 最後一次報告狀態
-    const pool = dbPool.pool as unknown as InternalPool;
-    console.log("Final pool status:", {
-      total: pool._allConnections?.length || 0,
-      free: pool._freeConnections?.length || 0,
-      inUse:
-        (pool._allConnections?.length || 0) -
-        (pool._freeConnections?.length || 0),
-      queued: pool._connectionQueue?.length || 0,
-    });
-
-    await dbPool.end();
-    console.log("✅ Database pool closed successfully");
-  } catch (error) {
-    console.error("❌ Error closing database pool:", error);
-    throw error;
-  }
+  await dbPool.end();
 }
 
 export default dbPool;

@@ -76,7 +76,7 @@ export const NavbarProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      const currentScrollY = window.scrollY;
+      const currentScrollY = Math.max(0, window.scrollY);
       const delta = currentScrollY - lastScrollYRef.current;
       lastScrollYRef.current = currentScrollY;
 

@@ -10,7 +10,9 @@ import { usePathname } from "next/navigation";
 const Footer: FC = () => {
   const { isNavbarVisible } = useNavbar();
   const pathname = usePathname();
-  if (pathname.startsWith("/messages")) return null;
+  if (pathname.startsWith("/messages") || pathname.startsWith("/tinder")) {
+    return null;
+  }
   return (
     <footer
       className={cn(

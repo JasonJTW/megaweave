@@ -2,9 +2,11 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
+import { getPostDistance } from "@/utils/locationUtils";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
+import { useLocation } from "../../contexts/LocationContext";
 import type {
   Category,
   Condition,
@@ -127,6 +129,9 @@ function PostCardInner({
     status: imageStatus,
     onError: handleImageError,
   } = useImageWithRetry(primarySrc, fallbackSrc);
+
+  const { coords } = useLocation();
+  const distanceStr = getPostDistance(coords, post.lat, post.lng);
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()
@@ -325,13 +330,22 @@ function PostCardInner({
                   );
                 })()}
               </div>
-              {post.expires_at && (
-                <div className="flex items-center gap-2">
-                  <ClockIcon className="text-primary" />
-                  {new Date(post.created_at).toLocaleDateString()} -{" "}
-                  {new Date(post.expires_at).toLocaleDateString()}
-                </div>
-              )}
+              <div className="flex w-full items-center justify-between">
+                {post.expires_at && (
+                  <div className="flex gap-2">
+                    <ClockIcon className="text-primary" />
+                    {new Date(post.created_at).toLocaleDateString()} -{" "}
+                    {new Date(post.expires_at).toLocaleDateString()}
+                  </div>
+                )}
+                {distanceStr && (
+                  <div>
+                    <span className="font-medium text-megaweave-blue">
+                      {distanceStr}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

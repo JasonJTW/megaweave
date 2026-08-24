@@ -4,8 +4,8 @@
   "main": "server.js",
   "scripts": {
     "test": "jest",
-    "build": "dotenv -e .env.production -- npx tsc --build",
-    "build:dev": "dotenv -e .env.development -- npx tsc --build",
+    "build": "dotenv -e .env.production -- tsc -p tsconfig.build.json",
+    "build:dev": "dotenv -e .env.development -- tsc -p tsconfig.build.json",
     "start": "dotenv -e .env.production -- node ./dist/server.js",
     "dev": "dotenv -e .env.development -- nodemon ./src/server.ts",
     "docker:redis": "docker compose -f ../docker-compose.dev.yml up -d",

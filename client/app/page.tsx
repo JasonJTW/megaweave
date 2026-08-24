@@ -52,6 +52,7 @@ import ReuseIcon from "./components/icons/ReuseIcon";
 import WazowskiIcon from "./components/icons/WazowskiIcon";
 import LetsStartWeavingBanner from "./components/ui/LetsStartWeavingBanner";
 import CommonShareIcon from "./components/icons/CommonShareIcon";
+import { useLocation } from "./contexts/LocationContext";
 const PostsApp = () => {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -66,6 +67,8 @@ const PostsApp = () => {
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
+  const { coords } = useLocation();
+
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [isWeavingExpanded, setIsWeavingExpanded] = useState(false);
   const weavingButtonRef = useRef<HTMLDivElement>(null);
@@ -181,6 +184,10 @@ const PostsApp = () => {
       if (searchCity) params.append("city", searchCity);
       if (searchProvince) params.append("province", searchProvince);
       if (postFilterType) params.append("type", postFilterType);
+      if (coords?.lat !== undefined && coords?.lng !== undefined) {
+        params.append("lat", coords.lat.toString());
+        params.append("lng", coords.lng.toString());
+      }
 
       // 首頁所有的瀏覽與條件篩選（分類、Wish/Share、地點、關鍵字）統一走個人化推薦混合重排 API
       return `${hostName}/api/posts/feed?${params.toString()}`;
@@ -193,6 +200,8 @@ const PostsApp = () => {
       searchCity,
       searchProvince,
       postFilterType,
+      coords?.lat,
+      coords?.lng,
     ],
   );
 

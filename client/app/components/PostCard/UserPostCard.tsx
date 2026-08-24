@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import type { Category, Condition, Post } from "../../types/schema";
+import type { Category, Condition, Post, PostLocationField } from "../../types/schema";
 import SeekBadgeExpiredIcon from "../icons/SeekBadgeExpiredIcon";
 import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
 import ShareBadgeIcon from "../icons/ShareBadgeIcon";
@@ -21,10 +21,7 @@ interface UserPostCardProps {
   currentUserId?: number;
   isFirstVisible?: boolean;
   onCategoryClick?: (categoryId: number) => void;
-  onLocationClick?: (
-    type: "province" | "city" | "route",
-    value: string,
-  ) => void;
+  onLocationClick?: (type: PostLocationField, value: string) => void;
 }
 
 function UserPostCardInner({

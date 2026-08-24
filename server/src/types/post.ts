@@ -89,6 +89,8 @@ export interface PostDetail {
   condition_name?: string;
   // 關聯 Location 欄位
   place_id?: string | null;
+  location_name?: string | null;
+  location_url?: string | null;
   full_address?: string | null;
   province?: string | null;
   city?: string | null;

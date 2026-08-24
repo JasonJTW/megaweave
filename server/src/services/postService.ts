@@ -25,6 +25,8 @@ export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetai
 
 export interface LocationData {
   place_id: string;
+  name?: string;
+  url?: string;
   full_address: string;
   province?: string;
   city?: string;
@@ -44,6 +46,8 @@ export interface CreatePostInput {
   tags?: string;
   expiresAt?: string;
   place_id?: string;
+  location_name?: string;
+  location_url?: string;
   full_address?: string;
   province?: string;
   city?: string;
@@ -88,24 +92,32 @@ export class PostService {
     connection: PoolConnection,
     locationData: LocationData,
   ): Promise<number> {
-    const checkQuery = "SELECT id FROM locations WHERE place_id = ?";
+    const checkQuery = "SELECT id, name, url FROM locations WHERE place_id = ?";
     const [rows] = await connection.execute<RowDataPacket[]>(checkQuery, [
       locationData.place_id,
     ]);
 
     if (rows.length > 0) {
-      return rows[0].id as number;
+      const existing = rows[0] as { id: number; name?: string | null; url?: string | null };
+      if ((!existing.name && locationData.name) || (!existing.url && locationData.url)) {
+        await connection.execute(
+          "UPDATE locations SET name = COALESCE(name, ?), url = COALESCE(url, ?) WHERE id = ?",
+          [locationData.name || null, locationData.url || null, existing.id],
+        );
+      }
+      return existing.id;
     }
 
     const insertQuery = `
       INSERT INTO locations (
-        place_id, full_address, province, city, 
-        route, zip_code, lat, lng
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        place_id, name, full_address, province, city, 
+        route, zip_code, lat, lng, url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await connection.execute<ResultSetHeader>(insertQuery, [
       locationData.place_id,
+      locationData.name || null,
       locationData.full_address,
       locationData.province || null,
       locationData.city || null,
@@ -113,6 +125,7 @@ export class PostService {
       locationData.zip || null,
       locationData.lat,
       locationData.lng,
+      locationData.url || null,
     ]);
 
     return result.insertId;
@@ -142,6 +155,8 @@ export class PostService {
       ) {
         locationId = await this.findOrCreateLocation(connection, {
           place_id: input.place_id,
+          name: input.location_name,
+          url: input.location_url,
           full_address: input.full_address,
           province: input.province,
           city: input.city,
@@ -294,7 +309,7 @@ export class PostService {
         u.avatar_url,
         c.name_en as category_name_en,
         cond.name as condition_name,
-        l.place_id, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN user_profiles up ON u.id = up.user_id
@@ -414,9 +429,11 @@ export class PostService {
       }
     } else if (params.location) {
       whereConditions.push(
-        "(l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
+        "(l.name LIKE ? OR l.route LIKE ? OR l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
       );
       queryParams.push(
+        `%${params.location}%`,
+        `%${params.location}%`,
         `%${params.location}%`,
         `%${params.location}%`,
         `%${params.location}%`,
@@ -450,7 +467,7 @@ export class PostService {
         u.avatar_url,
         c.name_en as category_name_en,
         cond.name as condition_name,
-        l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
@@ -508,7 +525,7 @@ export class PostService {
         u.avatar_url,
         c.name_en as category_name_en,
         cond.name as condition_name,
-        l.place_id, l.full_address, l.route,l.province, l.city, l.lat, l.lng, l.zip_code,
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
@@ -565,7 +582,7 @@ export class PostService {
         u.avatar_url,
         c.name_en as category_name_en,
         cond.name as condition_name,
-        l.place_id, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys,
         MAX(pv.viewed_at) as viewed_at
       FROM post_views pv
@@ -640,6 +657,8 @@ export class PostService {
       ) {
         locationId = await this.findOrCreateLocation(connection, {
           place_id: incoming.place_id,
+          name: incoming.location_name,
+          url: incoming.location_url,
           full_address: incoming.full_address,
           province: incoming.province,
           city: incoming.city,
@@ -898,7 +917,7 @@ export class PostService {
         COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         c.name_en as category_name_en,
         cond.name as condition_name,
-        l.place_id, l.full_address, l.province, l.city, l.lat, l.lng,
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.province, l.city, l.lat, l.lng,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id

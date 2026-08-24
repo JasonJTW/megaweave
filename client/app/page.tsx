@@ -20,7 +20,7 @@ import { LucideLoader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavbar } from "./contexts/NavBarContext";
 import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
-import { Post, PostsResponse } from "./types/schema";
+import { Post, PostsResponse, PostLocationField } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import OverlayTour, { TourStep } from "./components/OverlayTour";
@@ -478,21 +478,27 @@ const PostsApp = () => {
   }, []);
 
   const handleFeedLocationClick = useCallback(
-    (type: "province" | "city" | "route", value: string) => {
-      console.log("Location clicked:", type, value);
-      if (type === "province") {
-        setSearchProvince(value);
-        setSearchCity("");
-        setSelectedLocation("");
-        setLocationInput(value);
-      } else if (type === "city") {
-        setSearchCity(value);
-        setSelectedLocation("");
-        setLocationInput(value);
-      } else if (type === "route") {
-        setSelectedLocation(value);
-        setLocationInput(value);
+    (type: PostLocationField, value: string) => {
+      setLocationInput(value);
+      console.log(type);
+
+      switch (type) {
+        case "province":
+          setSearchProvince(value);
+          setSearchCity("");
+          setSelectedLocation("");
+          break;
+        case "city":
+          setSearchCity(value);
+          setSelectedLocation("");
+          break;
+        case "route":
+        case "location_name":
+          setSelectedLocation(value);
+          break;
       }
+
+      window.scrollTo({ top: 300, behavior: "smooth" });
     },
     [],
   );
@@ -506,6 +512,9 @@ const PostsApp = () => {
       formData.append("content", data.content);
       formData.append("location", data.location);
       if (data.place_id) formData.append("place_id", data.place_id);
+      if (data.location_name)
+        formData.append("location_name", data.location_name);
+      if (data.location_url) formData.append("location_url", data.location_url);
       if (data.location) formData.append("full_address", data.location);
       if (data.province) formData.append("province", data.province);
       if (data.city) formData.append("city", data.city);

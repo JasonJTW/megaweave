@@ -127,10 +127,18 @@ const CardV2 = ({
             )}
           </div>
           <div className="mt-[6px] flex flex-col gap-[6px]">
-            {post.location && (
+            {(post.location_name ||
+              post.province ||
+              post.city ||
+              post.route ||
+              post.full_address) && (
               <div className="flex items-center gap-2 text-[16px] leading-[18px]">
                 <LocationIcon className="text-primary" />
-                {post.location}
+                {post.location_name ||
+                  [post.province, post.city, post.route]
+                    .filter(Boolean)
+                    .join("") ||
+                  post.full_address}
               </div>
             )}
             {post.created_at && (

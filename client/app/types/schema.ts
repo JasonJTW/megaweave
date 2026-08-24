@@ -7,7 +7,6 @@ export interface Post {
   content: string;
   type: "wish" | "share" | "commons";
   status: "active" | "inactive";
-  location?: string;
   tags?: string;
   category_id: number;
   condition_level: number;
@@ -27,6 +26,8 @@ export interface Post {
   author_public_id: string;
   author_user_id: number;
   place_id?: string;
+  location_name?: string;
+  location_url?: string;
   province?: string;
   city?: string;
   route?: string;
@@ -47,6 +48,8 @@ export interface CreatePostFormData {
   status: Post["status"];
   items?: ItemInput[];
   place_id?: string;
+  location_name?: string;
+  location_url?: string;
   province?: string;
   city?: string;
   route?: string;
@@ -161,3 +164,6 @@ export interface User {
   avatar_url?: string;
   avatar_key?: string;
 }
+
+/** 可用於 onLocationClick 的地理欄位鍵，直接從 Post 推導，不需手動維護 */
+export type PostLocationField = Extract<keyof Post, "province" | "city" | "route" | "location_name">;

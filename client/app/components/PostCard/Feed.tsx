@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useInView } from "react-intersection-observer";
 import { usePost } from "../../contexts/PostContext";
-import type { Condition, Post } from "../../types/schema";
+import type { Condition, Post, PostLocationField } from "../../types/schema";
 import CommonShareFlowerIcon from "../icons/CommonShareFlowerIcon";
 import CommonShareMascotIcon from "../icons/CommonShareMascotIcon";
 import CommonShareWIcon from "../icons/CommonShareWIcon";
@@ -24,10 +24,7 @@ interface FeedProps {
   highlightWeaveId?: number;
   onCategoryClick?: (categoryId: number) => void;
   onTypeFilterClick?: (type: Post["type"] | "") => void;
-  onLocationClick?: (
-    type: "province" | "city" | "route",
-    value: string,
-  ) => void;
+  onLocationClick?: (type: PostLocationField, value: string) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
 }

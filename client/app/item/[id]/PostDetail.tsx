@@ -174,6 +174,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       formData.append("location", data.location);
       formData.append("status", data.status);
       if (data.place_id) formData.append("place_id", data.place_id);
+      if (data.location_name)
+        formData.append("location_name", data.location_name);
+      if (data.location_url) formData.append("location_url", data.location_url);
       if (data.location) formData.append("full_address", data.location);
       if (data.province) formData.append("province", data.province);
       if (data.city) formData.append("city", data.city);
@@ -398,13 +401,27 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     key.startsWith("http") ? key : getImageUrl(key, "original"),
   );
 
+  const locationText = (() => {
+    const parts: string[] = [];
+    const add = (value: string | undefined) => {
+      if (value && !parts.includes(value)) {
+        parts.push(value);
+        return true;
+      }
+      return false;
+    };
+    add(post.province);
+    add(post.city);
+    if (!add(post.location_name)) {
+      add(post.route);
+    }
+    return parts.length > 0 ? parts.join("") : post.full_address || "";
+  })();
+
   const initialFormData = {
     title: post.title,
     content: post.content,
-    location:
-      [post.province, post.city, post.route].filter(Boolean).join("") ||
-      post.full_address ||
-      "",
+    location: locationText || post.full_address || "",
     tags: post.tags || "",
     categoryId: post.category_id,
     conditionLevel: post.condition_level,
@@ -418,6 +435,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
           }))
         : [{ title: "", quantity: "" as const }],
     place_id: post.place_id,
+    location_name: post.location_name,
+    location_url: post.location_url,
     province: post.province,
     city: post.city,
     route: post.route,
@@ -582,15 +601,26 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 )}
               </div>
               <div className="flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
-                {(post.province ||
-                  post.city ||
-                  post.route ||
-                  post.full_address) && (
+                {locationText && (
                   <div className="flex items-center gap-2">
-                    <LocationIcon className="text-primary" />
-                    {[post.province, post.city, post.route]
-                      .filter(Boolean)
-                      .join("") || post.full_address}
+                    <LocationIcon className="shrink-0 text-primary" />
+                    {post.location_url ? (
+                      <a
+                        href={post.location_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="line-clamp-1 transition-colors hover:text-primary hover:underline"
+                        title={
+                          locationText ||
+                          post.full_address ||
+                          post.location_name
+                        }
+                      >
+                        {locationText}
+                      </a>
+                    ) : (
+                      <span className="line-clamp-1">{locationText}</span>
+                    )}
                   </div>
                 )}
                 {post.expires_at && (

@@ -20,6 +20,7 @@ import {
   LogOut,
   SquarePlus,
   NewspaperIcon,
+  Flame,
   // FileText,
 } from "lucide-react";
 import { googleLogout } from "@react-oauth/google";
@@ -117,6 +118,7 @@ const Navbar = () => {
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
+    { href: "/tinder", label: "Tinder", icon: Flame },
     { href: "/messages", label: "Messages", icon: DirectMessageIcon },
     { href: "/notifications", label: "Notifications", icon: NotificationIcon },
     { href: "/user", label: "Profile", icon: UserIcon },
@@ -140,6 +142,12 @@ const Navbar = () => {
 
   //* mobile hamburger menu
   const mobileNavItems: NavigationItem[] = [
+    {
+      href: "/tinder",
+      title: "Tinder Feed",
+      description: "Swipe to discover posts",
+      icon: Flame,
+    },
     {
       href: "/user",
       title: "Profile",
@@ -213,7 +221,7 @@ const Navbar = () => {
           bezelWidth: 20,
         }}
         className={cn(
-          "relative left-0 right-0 top-0 transition-all duration-100 ease-in-out",
+          "sticky top-0 left-0 right-0 transition-transform duration-300 ease-in-out",
           isMobileMenuOpen ? "z-[60]" : "z-50",
           isNavbarVisible ? "translate-y-0" : "-translate-y-full",
           isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg",
@@ -251,7 +259,12 @@ const Navbar = () => {
               )}
             >
               {/* //* mobile nav bar top item (Visible only on mobile) */}
-              <div className="flex items-center space-x-2 sm:hidden">
+              <div className="flex items-center space-x-3 sm:hidden">
+                <Link href="/tinder" className="group relative">
+                  <Flame className="h-[18px] w-[18px] text-orange-500 transition-colors hover:text-orange-600" />
+                  <span className="sr-only">Tinder</span>
+                </Link>
+
                 {!user && (
                   <Link href="/user" className="">
                     <UserIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
@@ -442,7 +455,7 @@ const Navbar = () => {
       </RefractiveNav>
 
       {/* 佔位符 */}
-      <div className="h-16" />
+      {/* <div className="h-16" /> */}
     </>
   );
 };

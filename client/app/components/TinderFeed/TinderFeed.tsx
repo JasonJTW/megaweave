@@ -52,10 +52,13 @@ export default function TinderFeed() {
   const fetcher = (url: string) =>
     fetch(url, { credentials: "include" }).then((res) => res.json());
 
-  const { data, setSize, isValidating, mutate } =
-    useSWRInfinite<PostsResponse>(getKey, fetcher, {
+  const { data, setSize, isValidating, mutate } = useSWRInfinite<PostsResponse>(
+    getKey,
+    fetcher,
+    {
       revalidateFirstPage: false,
-    });
+    },
+  );
 
   // Flatten posts and deduplicate
   const posts = useMemo(() => {
@@ -213,12 +216,12 @@ export default function TinderFeed() {
   const isOutOfCards = posts.length > 0 && currentIndex >= posts.length;
 
   return (
-    <div className="relative mx-auto flex h-[calc(100dvh-64px)] w-full max-w-md flex-col items-center justify-between px-3 pb-4 pt-2 select-none sm:px-4 sm:pb-6">
+    <div className="relative mx-auto flex h-[calc(100dvh-64px)] w-full max-w-md select-none flex-col items-center justify-between px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
       {/* ─── Card Stack Deck Area ─── */}
       <div className="relative flex h-full w-full flex-1 items-center justify-center overflow-visible">
         {isLoadingInitial ? (
           /* Loading Skeleton */
-          <div className="relative flex h-full max-h-[640px] w-full flex-col justify-between overflow-hidden rounded-[28px] border border-stone-200 bg-[#1e231d] p-6 shadow-xl animate-pulse">
+          <div className="relative flex h-full max-h-[640px] w-full animate-pulse flex-col justify-between overflow-hidden rounded-[28px] border border-stone-200 bg-[#1e231d] p-6 shadow-xl">
             <div className="flex justify-between">
               <div className="h-6 w-24 rounded-full bg-stone-700" />
               <div className="h-6 w-16 rounded-full bg-stone-700" />
@@ -243,10 +246,10 @@ export default function TinderFeed() {
             <h3 className="font-ddin text-2xl font-bold text-gray-900">
               全部瀏覽完畢！
             </h3>
-            <p className="mt-2 font-ddin text-sm text-stone-500 max-w-xs">
+            <p className="mt-2 max-w-xs font-ddin text-sm text-stone-500">
               您已滑過目前所有的推薦貼文，可以點擊下方按鈕重新載入或稍後再回來查看最新分享。
             </p>
-            <div className="mt-6 flex flex-col gap-3 w-full max-w-xs">
+            <div className="mt-6 flex w-full max-w-xs flex-col gap-3">
               <Button
                 onClick={handleReload}
                 className="flex items-center justify-center gap-2 bg-megaweave-forest text-white hover:bg-megaweave-forest-dark"
@@ -289,12 +292,12 @@ export default function TinderFeed() {
       </div>
 
       {/* ─── Bottom Action Control Bar ─── */}
-      <div className="mt-3 flex w-full max-w-xs items-center justify-between px-2 pt-1 pb-0.5">
+      <div className="mt-3 flex w-full max-w-xs items-center justify-between px-2 pb-0.5 pt-1">
         {/* Undo Button */}
         <button
           onClick={handleUndo}
           disabled={history.length === 0 || currentIndex === 0}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-amber-500 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 border border-amber-100"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-100 bg-white text-amber-500 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Undo"
         >
           <RotateCcw className="h-5 w-5 stroke-[2.5]" />
@@ -304,7 +307,7 @@ export default function TinderFeed() {
         <button
           onClick={() => triggerSwipe("left")}
           disabled={isOutOfCards || isLoadingInitial}
-          className="flex h-15 w-15 items-center justify-center rounded-full bg-white text-rose-500 shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 border border-rose-100"
+          className="h-15 w-15 flex items-center justify-center rounded-full border border-rose-100 bg-white text-rose-500 shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Pass / 不加分"
         >
           <X className="h-7 w-7 stroke-[3]" />
@@ -314,7 +317,7 @@ export default function TinderFeed() {
         <button
           onClick={() => currentPost && handleDetail(currentPost)}
           disabled={isOutOfCards || isLoadingInitial}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sky-600 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 border border-sky-100"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-sky-100 bg-white text-sky-600 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Post Info"
         >
           <Info className="h-5 w-5 stroke-[2.5]" />
@@ -324,7 +327,7 @@ export default function TinderFeed() {
         <button
           onClick={() => triggerSwipe("right")}
           disabled={isOutOfCards || isLoadingInitial}
-          className="flex h-15 w-15 items-center justify-center rounded-full bg-white text-emerald-500 shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 border border-emerald-100"
+          className="h-15 w-15 flex items-center justify-center rounded-full border border-emerald-100 bg-white text-emerald-500 shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Like / 加分"
         >
           <Heart className="h-7 w-7 fill-emerald-500 stroke-emerald-500" />
@@ -334,7 +337,7 @@ export default function TinderFeed() {
         <button
           onClick={() => currentPost && handleMessage(currentPost)}
           disabled={isOutOfCards || isLoadingInitial || isMessaging}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-teal-600 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 border border-teal-100"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-teal-100 bg-white text-teal-600 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Message Author"
         >
           <MessageCircle className="h-5 w-5 stroke-[2.5]" />

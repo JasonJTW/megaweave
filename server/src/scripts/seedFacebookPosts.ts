@@ -31,6 +31,21 @@ import { postService } from "../services/postService";
 import type { PostType } from "../types/post";
 import dbPool from "../utils/db";
 import { RowDataPacket } from "mysql2";
+import { connectRedis, disconnectRedis } from "../utils/redis";
+
+interface RawLocation {
+  query?: string;
+  place_id?: string;
+  name?: string | null;
+  url?: string | null;
+  full_address?: string;
+  province?: string | null;
+  city?: string | null;
+  route?: string | null;
+  zip?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
 
 interface RawFacebookPost {
   index: string;
@@ -43,6 +58,7 @@ interface RawFacebookPost {
   type: "share" | "wish" | "commons";
   category: string;
   condition: string;
+  location?: RawLocation | null;
   scraped_at: string;
   posted: boolean;
 }
@@ -183,133 +199,169 @@ async function seedFacebookPosts() {
     process.exit(0);
   }
 
-  // Pre-load category and condition maps from database
-  console.log("🔄 Fetching category and condition metadata from database...");
-  const categoryMap = new Map<number, string>();
-  const [categories] = await dbPool.query<RowDataPacket[]>(
-    "SELECT id, name_en, name FROM categories WHERE status = 'active'",
-  );
-  for (const cat of categories) {
-    categoryMap.set(cat.id, (cat.name_en as string) || (cat.name as string));
-  }
+  // Connect to Redis for hot_score caching and feed updates
+  console.log("🔌 Connecting to Redis...");
+  await connectRedis();
 
-  const conditionMap = new Map<number, string>();
-  const [conditions] = await dbPool.query<RowDataPacket[]>(
-    "SELECT level, name FROM conditions WHERE status = 'active'",
-  );
-  for (const cond of conditions) {
-    conditionMap.set(cond.level, cond.name as string);
-  }
-
-  let successCount = 0;
-  let failCount = 0;
-
-  for (let i = 0; i < pending.length; i++) {
-    const post = pending[i];
-    const postIndex = post.index ?? `${i}`;
-    console.log(`--------------------------------------------------`);
-    console.log(
-      `[${i + 1}/${pending.length}] Processing Post Index: ${postIndex} (Author: ${post.author})`,
+  try {
+    // Pre-load category and condition maps from database
+    console.log("🔄 Fetching category and condition metadata from database...");
+    const categoryMap = new Map<number, string>();
+    const [categories] = await dbPool.query<RowDataPacket[]>(
+      "SELECT id, name_en, name FROM categories WHERE status = 'active'",
     );
+    for (const cat of categories) {
+      categoryMap.set(cat.id, (cat.name_en as string) || (cat.name as string));
+    }
 
-    const title = sanitizeTitle(post);
-    const content = sanitizeContent(post);
-    const parsedCatId = parseInt(post.category, 10);
-    const categoryId = isNaN(parsedCatId) ? 4 : parsedCatId; // Default to 4 (Others)
-    const parsedCondLevel = parseInt(post.condition, 10);
-    const conditionLevel = isNaN(parsedCondLevel) ? 3 : parsedCondLevel; // Default to 3 (Good)
+    const conditionMap = new Map<number, string>();
+    const [conditions] = await dbPool.query<RowDataPacket[]>(
+      "SELECT level, name FROM conditions WHERE status = 'active'",
+    );
+    for (const cond of conditions) {
+      conditionMap.set(cond.level, cond.name as string);
+    }
 
-    const categoryName = categoryMap.get(categoryId) || "Others";
-    const conditionName = conditionMap.get(conditionLevel) || "Good";
+    let successCount = 0;
+    let failCount = 0;
 
-    const type = (
-      ["share", "wish", "commons"].includes(post.type) ? post.type : "share"
-    ) as PostType;
+    for (let i = 0; i < pending.length; i++) {
+      const post = pending[i];
+      const postIndex = post.index ?? `${i}`;
+      console.log(`--------------------------------------------------`);
+      console.log(
+        `[${i + 1}/${pending.length}] Processing Post Index: ${postIndex} (Author: ${post.author})`,
+      );
 
-    // Image handling: Copy to OS temp directory to avoid Worker unlinking the original file after S3 upload
-    const mockFiles: MulterFile[] = [];
-    if (Array.isArray(post.images) && post.images.length > 0) {
-      for (const imgRelPath of post.images) {
-        const srcPath = resolveImagePath(imgRelPath, postsDir);
-        if (!srcPath) {
-          console.warn(`  ⚠️ Image file not found: ${imgRelPath}`);
-          continue;
+      const title = sanitizeTitle(post);
+      const content = sanitizeContent(post);
+      const parsedCatId = parseInt(post.category, 10);
+      const categoryId = isNaN(parsedCatId) ? 4 : parsedCatId; // Default to 4 (Others)
+      const parsedCondLevel = parseInt(post.condition, 10);
+      const conditionLevel = isNaN(parsedCondLevel) ? 3 : parsedCondLevel; // Default to 3 (Good)
+
+      const categoryName = categoryMap.get(categoryId) || "Others";
+      const conditionName = conditionMap.get(conditionLevel) || "Good";
+
+      const type = (
+        ["share", "wish", "commons"].includes(post.type) ? post.type : "share"
+      ) as PostType;
+
+      // Image handling: Copy to OS temp directory to avoid Worker unlinking the original file after S3 upload
+      const mockFiles: MulterFile[] = [];
+      if (Array.isArray(post.images) && post.images.length > 0) {
+        for (const imgRelPath of post.images) {
+          const srcPath = resolveImagePath(imgRelPath, postsDir);
+          if (!srcPath) {
+            console.warn(`  ⚠️ Image file not found: ${imgRelPath}`);
+            continue;
+          }
+
+          try {
+            const tempFileName = `fb_seed_${Date.now()}_${Math.random().toString(36).slice(2)}_${path.basename(srcPath)}`;
+            const tempDestPath = path.join(os.tmpdir(), tempFileName);
+            await fs.promises.copyFile(srcPath, tempDestPath);
+
+            mockFiles.push({
+              fieldname: "images",
+              originalname: path.basename(srcPath),
+              encoding: "7bit",
+              mimetype: "image/jpeg",
+              destination: os.tmpdir(),
+              filename: tempFileName,
+              path: tempDestPath,
+              size: (await fs.promises.stat(tempDestPath)).size,
+            });
+          } catch (copyErr) {
+            console.error(
+              `  ⚠️ Failed to copy image to temp directory (${srcPath}):`,
+              copyErr,
+            );
+          }
+        }
+      }
+
+      // Calculate expiration date (+14 days from execution time)
+      const expiresAt = new Date(
+        Date.now() + 14 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+
+      try {
+        // Extract location data if present
+        const locationData = post.location
+          ? {
+              place_id: post.location.place_id,
+              location_name: post.location.name || undefined,
+              location_url: post.location.url || undefined,
+              full_address: post.location.full_address,
+              province: post.location.province || undefined,
+              city: post.location.city || undefined,
+              route: post.location.route || undefined,
+              zip: post.location.zip || undefined,
+              lat:
+                post.location.lat !== null && post.location.lat !== undefined
+                  ? Number(post.location.lat)
+                  : undefined,
+              lng:
+                post.location.lng !== null && post.location.lng !== undefined
+                  ? Number(post.location.lng)
+                  : undefined,
+            }
+          : {};
+
+        // Directly call postService.createPost
+        const createdPost = await postService.createPost(
+          BOT_USER_ID,
+          {
+            title,
+            content,
+            type,
+            categoryId,
+            conditionLevel,
+            status: "active",
+            expiresAt,
+            ...locationData,
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          mockFiles.length > 0 ? (mockFiles as any[]) : undefined,
+        );
+
+        console.log(`  ✅ Successfully created post ID: ${createdPost.id}`);
+        console.log(`     Title: ${title}`);
+        console.log(
+          `     Category: ${categoryId} (${categoryName}), Condition: ${conditionLevel} (${conditionName}), Images: ${mockFiles.length}`,
+        );
+        if (post.location?.full_address) {
+          console.log(`     Location: ${post.location.full_address}`);
         }
 
-        try {
-          const tempFileName = `fb_seed_${Date.now()}_${Math.random().toString(36).slice(2)}_${path.basename(srcPath)}`;
-          const tempDestPath = path.join(os.tmpdir(), tempFileName);
-          await fs.promises.copyFile(srcPath, tempDestPath);
-
-          mockFiles.push({
-            fieldname: "images",
-            originalname: path.basename(srcPath),
-            encoding: "7bit",
-            mimetype: "image/jpeg",
-            destination: os.tmpdir(),
-            filename: tempFileName,
-            path: tempDestPath,
-            size: (await fs.promises.stat(tempDestPath)).size,
-          });
-        } catch (copyErr) {
-          console.error(
-            `  ⚠️ Failed to copy image to temp directory (${srcPath}):`,
-            copyErr,
+        // Mark as posted in the JSON file immediately after success
+        const postInArray = rawPosts.find((p) => p.index === post.index);
+        if (postInArray) {
+          postInArray.posted = true;
+          fs.writeFileSync(
+            postsDataPath,
+            JSON.stringify(rawPosts, null, 2),
+            "utf-8",
           );
         }
+
+        successCount++;
+      } catch (err) {
+        console.error(`  ❌ Failed to create post:`, err);
+        failCount++;
       }
     }
 
-    // Calculate expiration date (+14 days from execution time)
-    const expiresAt = new Date(
-      Date.now() + 14 * 24 * 60 * 60 * 1000,
-    ).toISOString();
-
-    try {
-      // Directly call postService.createPost
-      const createdPost = await postService.createPost(
-        BOT_USER_ID,
-        {
-          title,
-          content,
-          type,
-          categoryId,
-          conditionLevel,
-          status: "active",
-          expiresAt,
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mockFiles.length > 0 ? (mockFiles as any[]) : undefined,
-      );
-
-      console.log(`  ✅ Successfully created post ID: ${createdPost.id}`);
-      console.log(`     Title: ${title}`);
-      console.log(
-        `     Category: ${categoryId} (${categoryName}), Condition: ${conditionLevel} (${conditionName}), Images: ${mockFiles.length}`,
-      );
-
-      // Mark as posted in the JSON file immediately after success
-      const postInArray = rawPosts.find((p) => p.index === post.index);
-      if (postInArray) {
-        postInArray.posted = true;
-        fs.writeFileSync(
-          postsDataPath,
-          JSON.stringify(rawPosts, null, 2),
-          "utf-8",
-        );
-      }
-
-      successCount++;
-    } catch (err) {
-      console.error(`  ❌ Failed to create post:`, err);
-      failCount++;
-    }
+    console.log(`==================================================`);
+    console.log(
+      `🎉 Import completed! Succeeded: ${successCount}, Failed: ${failCount}`,
+    );
+  } finally {
+    console.log("🔌 Disconnecting from Redis...");
+    await disconnectRedis();
+    await dbPool.end();
   }
-
-  console.log(`==================================================`);
-  console.log(
-    `🎉 Import completed! Succeeded: ${successCount}, Failed: ${failCount}`,
-  );
   process.exit(0);
 }
 

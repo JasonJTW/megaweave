@@ -5,7 +5,12 @@ import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
-import type { Category, Condition, Post } from "../../types/schema";
+import type {
+  Category,
+  Condition,
+  Post,
+  PostLocationField,
+} from "../../types/schema";
 import ClockIcon from "../icons/ClockIcon";
 import EyesIcon from "../icons/EyesIcon";
 import LocationIcon from "../icons/LocationIcon";
@@ -90,10 +95,7 @@ interface PostCardProps {
   isActive?: boolean;
   isFirstVisible?: boolean;
   onCategoryClick?: (categoryId: number) => void;
-  onLocationClick?: (
-    type: "province" | "city" | "route",
-    value: string,
-  ) => void;
+  onLocationClick?: (type: PostLocationField, value: string) => void;
 }
 
 function PostCardInner({
@@ -273,58 +275,55 @@ function PostCardInner({
 
             <div className="mt-[12px] flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
               <div className="min-h-[18px]">
-                {(post.province ||
-                  post.city ||
-                  post.route ||
-                  post.full_address) && (
-                  <div className="flex w-full items-start gap-2 sm:items-center">
-                    <LocationIcon className="mt-[2px] flex-shrink-0 text-primary sm:mt-0" />
-                    <div className="w-full min-w-0 flex-1 truncate text-[16px] text-gray-700">
-                      {post.province && (
-                        <span
-                          className="cursor-pointer transition-colors hover:text-primary hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onLocationClick)
-                              onLocationClick("province", post.province!);
-                          }}
-                        >
-                          {post.province}
-                        </span>
-                      )}
-                      {post.province && (post.city || post.route) && ", "}
-                      {post.city && (
-                        <span
-                          className="cursor-pointer transition-colors hover:text-primary hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onLocationClick)
-                              onLocationClick("city", post.city!);
-                          }}
-                        >
-                          {post.city}
-                        </span>
-                      )}
-                      {post.city && post.route && ", "}
-                      {post.route && (
-                        <span
-                          className="cursor-pointer transition-colors hover:text-primary hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onLocationClick)
-                              onLocationClick("route", post.route!);
-                          }}
-                        >
-                          {post.route}
-                        </span>
-                      )}
-                      {!post.province &&
-                        !post.city &&
-                        !post.route &&
-                        post.full_address && <span>{post.full_address}</span>}
+                {(() => {
+                  const seen = new Set<string>();
+                  const parts: { field: PostLocationField; value: string }[] =
+                    [];
+                  const add = (
+                    field: PostLocationField,
+                    value: string | undefined,
+                  ) => {
+                    if (value && !seen.has(value)) {
+                      seen.add(value);
+                      parts.push({ field, value });
+                      return true;
+                    }
+                    return false;
+                  };
+                  add("province", post.province);
+                  add("city", post.city);
+                  if (!add("location_name", post.location_name)) {
+                    add("route", post.route);
+                  }
+
+                  if (parts.length === 0 && !post.full_address) return null;
+
+                  return (
+                    <div className="flex w-full items-start gap-2 sm:items-center">
+                      <LocationIcon className="mt-[2px] flex-shrink-0 text-primary sm:mt-0" />
+                      <div className="w-full min-w-0 flex-1 truncate text-[16px] text-gray-700">
+                        {parts.length > 0
+                          ? parts.map(({ field, value }, i) => (
+                              <React.Fragment key={field}>
+                                {i > 0 && ", "}
+                                <span
+                                  className="cursor-pointer transition-colors hover:text-primary hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onLocationClick?.(field, value);
+                                  }}
+                                >
+                                  {value}
+                                </span>
+                              </React.Fragment>
+                            ))
+                          : post.full_address && (
+                              <span>{post.full_address}</span>
+                            )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
               {post.expires_at && (
                 <div className="flex items-center gap-2">

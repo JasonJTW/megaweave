@@ -39,6 +39,8 @@ const CreatePostSchema = z.object({
     .max(1000, "Content too long"),
   status: z.enum(["active", "inactive"]).default("active"),
   place_id: z.string().optional(),
+  location_name: z.string().optional(),
+  location_url: z.string().optional(),
   full_address: z.string().optional(),
   province: z.string().optional(),
   city: z.string().optional(),

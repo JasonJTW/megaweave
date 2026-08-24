@@ -44,6 +44,8 @@ export interface PostFormSubmitData {
   expires_at?: Date;
   items: ItemInput[];
   place_id?: string;
+  location_name?: string;
+  location_url?: string;
   province?: string;
   city?: string;
   route?: string;
@@ -96,6 +98,8 @@ export default function PostFormModal({
     }[],
     status: "active" as Post["status"],
     place_id: undefined as string | undefined,
+    location_name: undefined as string | undefined,
+    location_url: undefined as string | undefined,
     province: undefined as string | undefined,
     city: undefined as string | undefined,
     route: undefined as string | undefined,
@@ -158,6 +162,8 @@ export default function PostFormModal({
               }))
             : [{ title: "", quantity: "" }],
         place_id: initialData?.place_id || undefined,
+        location_name: initialData?.location_name || undefined,
+        location_url: initialData?.location_url || undefined,
         province: initialData?.province || undefined,
         city: initialData?.city || undefined,
         route: initialData?.route || undefined,
@@ -199,13 +205,15 @@ export default function PostFormModal({
         const autocomplete = new google.maps.places.Autocomplete(
           locationInputRef.current,
           {
-            types: ["geocode"],
+            // types: ["geocode"],
             componentRestrictions: { country: "tw" },
             fields: [
+              "name",
               "address_components",
               "formatted_address",
               "geometry",
               "place_id",
+              "url",
             ],
           },
         );
@@ -218,6 +226,8 @@ export default function PostFormModal({
             let city = "";
             let route = "";
             let zip = "";
+
+            console.log(place);
 
             if (place.address_components) {
               place.address_components.forEach((comp) => {
@@ -247,8 +257,10 @@ export default function PostFormModal({
 
             setFormData((prev) => ({
               ...prev,
-              location: place.formatted_address || place.name || "",
+              location: place.formatted_address || "",
               place_id: place.place_id,
+              location_name: place.name || undefined,
+              location_url: place.url || undefined,
               province,
               city,
               route,
@@ -525,6 +537,8 @@ export default function PostFormModal({
       expires_at: formData.expires_at,
       items: filteredItems,
       place_id: formData.place_id,
+      location_name: formData.location_name,
+      location_url: formData.location_url,
       province: formData.province,
       city: formData.city,
       route: formData.route,
@@ -855,7 +869,9 @@ export default function PostFormModal({
                         selected={formData.expires_at}
                         onSelect={(date) => {
                           setFormErrors((prev) =>
-                            prev.expires_at ? { ...prev, expires_at: false } : prev,
+                            prev.expires_at
+                              ? { ...prev, expires_at: false }
+                              : prev,
                           );
                           setFormData((prev) => ({
                             ...prev,
@@ -1024,7 +1040,9 @@ export default function PostFormModal({
                   disabled={formData.items.length >= MAX_ITEMS_COUNT}
                   onClick={() => {
                     if (formData.items.length >= MAX_ITEMS_COUNT) {
-                      toast.error(`At most ${MAX_ITEMS_COUNT} items are allowed`);
+                      toast.error(
+                        `At most ${MAX_ITEMS_COUNT} items are allowed`,
+                      );
                       return;
                     }
                     setFormData({

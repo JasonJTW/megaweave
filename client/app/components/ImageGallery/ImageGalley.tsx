@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ImageGalleryProps {
   images: string[]; // medium thumbnails — for gallery & nav strip
@@ -9,23 +10,43 @@ interface ImageGalleryProps {
   mainOverlay?: React.ReactNode;
 }
 
+const slideVariants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? "100%" : "-100%",
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? "-100%" : "100%",
+    opacity: 0,
+  }),
+};
+
 const ImageGallery: React.FC<ImageGalleryProps> = ({
   images,
   fullImages,
   mainOverlay,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [direction, setDirection] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const nextImage = () => {
+    setDirection(1);
     setCurrentIndex((prev) => (prev + 1) % images.length);
   };
 
   const prevImage = () => {
+    setDirection(-1);
     setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
   const goToImage = (index: number) => {
+    if (index === currentIndex) return;
+    setDirection(index > currentIndex ? 1 : -1);
     setCurrentIndex(index);
   };
 
@@ -48,20 +69,35 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
             className="relative h-[420px] cursor-pointer overflow-hidden sm:h-[520px]"
             onClick={openModal}
           >
-            <Image
-              key={images[currentIndex]}
-              src={images[currentIndex]}
-              alt={`圖片 ${currentIndex + 1}`}
-              fill
-              className="object-contain"
-            />
+            <AnimatePresence initial={false} custom={direction}>
+              <motion.div
+                key={currentIndex}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{
+                  x: { type: "spring", stiffness: 280, damping: 30 },
+                  opacity: { duration: 0.2 },
+                }}
+                className="absolute inset-0 h-full w-full"
+              >
+                <Image
+                  src={images[currentIndex]}
+                  alt={`image ${currentIndex + 1}`}
+                  fill
+                  className="object-contain"
+                />
+              </motion.div>
+            </AnimatePresence>
 
             {/* 圖片數量指示器 */}
-            {images.length > 1 && (
-              <div className="absolute right-4 top-4 rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
+            {/* {images.length > 1 && (
+              <div className="absolute left-4 top-4 z-10 rounded bg-black bg-opacity-50 px-2 py-1 text-sm text-white">
                 {currentIndex + 1} / {images.length}
               </div>
-            )}
+            )} */}
 
             {mainOverlay}
 
@@ -104,10 +140,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                   e.stopPropagation();
                   goToImage(index);
                 }}
-                className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 ${
+                className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                   index === currentIndex
-                    ? "border-blue-500"
-                    : "border-gray-200 hover:border-gray-300"
+                    ? "scale-105 border-primary shadow-sm"
+                    : "border-gray-200 opacity-70 hover:border-gray-300 hover:opacity-100"
                 }`}
               >
                 <div className="relative h-full w-full">
@@ -125,61 +161,82 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
       </div>
 
       {/* 全螢幕模態框 */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90">
-          <div className="max-h-4xl relative flex h-full w-full max-w-4xl items-center justify-center">
-            {/* 關閉按鈕 */}
-            <button
-              type="button"
-              onClick={closeModal}
-              className="absolute right-4 top-4 z-10 text-white hover:text-gray-300"
-            >
-              <X className="h-8 w-8" />
-            </button>
+      <AnimatePresence>
+        {isModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90"
+          >
+            <div className="max-h-4xl relative flex h-full w-full max-w-4xl items-center justify-center">
+              {/* 關閉按鈕 */}
+              <button
+                type="button"
+                onClick={closeModal}
+                className="absolute right-4 top-4 z-10 text-white hover:text-gray-300"
+              >
+                <X className="h-8 w-8" />
+              </button>
 
-            {/* 圖片 */}
-            <div className="relative flex h-full w-full items-center justify-center">
-              <div className="relative max-h-full max-w-full">
-                <Image
-                  key={fullImages?.[currentIndex] ?? images[currentIndex]}
-                  src={fullImages?.[currentIndex] ?? images[currentIndex]}
-                  alt={`圖片 ${currentIndex + 1}`}
-                  width={1200}
-                  height={800}
-                  className="max-h-full max-w-full object-contain"
-                />
+              {/* 圖片 */}
+              <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                <AnimatePresence initial={false} custom={direction}>
+                  <motion.div
+                    key={currentIndex}
+                    custom={direction}
+                    variants={slideVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{
+                      x: { type: "spring", stiffness: 280, damping: 30 },
+                      opacity: { duration: 0.2 },
+                    }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <Image
+                      src={fullImages?.[currentIndex] ?? images[currentIndex]}
+                      alt={`圖片 ${currentIndex + 1}`}
+                      width={1200}
+                      height={800}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </motion.div>
+                </AnimatePresence>
               </div>
+
+              {/* 左右箭頭 */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={prevImage}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-3 text-white transition-opacity hover:bg-opacity-75"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={nextImage}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-3 text-white transition-opacity hover:bg-opacity-75"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                </>
+              )}
+
+              {/* 圖片數量指示器 */}
+              {images.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 transform rounded bg-black bg-opacity-50 px-4 py-2 text-sm text-white">
+                  {currentIndex + 1} / {images.length}
+                </div>
+              )}
             </div>
-
-            {/* 左右箭頭 */}
-            {images.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={prevImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-3 text-white transition-opacity hover:bg-opacity-75"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-                <button
-                  type="button"
-                  onClick={nextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 transform rounded-full bg-black bg-opacity-50 p-3 text-white transition-opacity hover:bg-opacity-75"
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </button>
-              </>
-            )}
-
-            {/* 圖片數量指示器 */}
-            {images.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 transform rounded bg-black bg-opacity-50 px-4 py-2 text-sm text-white">
-                {currentIndex + 1} / {images.length}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };

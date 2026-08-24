@@ -110,7 +110,7 @@ const POST_FIELDS_SQL = `
     u.avatar_url,
     c.name_en as category_name_en,
     cond.name as condition_name,
-    l.place_id, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
+    l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
     GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
   FROM posts p
   LEFT JOIN users u ON p.user_id = u.id
@@ -234,9 +234,11 @@ export class FeedService {
       }
     } else if (params.location) {
       whereConditions.push(
-        "(l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
+        "(l.name LIKE ? OR l.route LIKE ? OR l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
       );
       queryParams.push(
+        `%${params.location}%`,
+        `%${params.location}%`,
         `%${params.location}%`,
         `%${params.location}%`,
         `%${params.location}%`,

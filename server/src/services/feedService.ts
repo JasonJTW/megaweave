@@ -123,6 +123,7 @@ const POST_FIELDS_SQL = `
 
 async function fetchPostsByIds(
   postIds: number[],
+  userId?: number,
 ): Promise<Map<number, RowDataPacket>> {
   if (postIds.length === 0) return new Map();
 
@@ -136,9 +137,37 @@ async function fetchPostsByIds(
   const [rows] = await dbPool.execute<RowDataPacket[]>(query, postIds);
   const map = new Map<number, RowDataPacket>();
   for (const row of rows) {
+    row.is_liked = false; // default
     map.set(row.id, row);
   }
+
+  // Batch-stamp is_liked for logged-in users
+  if (userId && map.size > 0) {
+    await stampIsLiked(Array.from(map.values()), userId);
+  }
+
   return map;
+}
+
+/**
+ * Batch-query post_likes and stamp is_liked = true on matching posts.
+ * Mutates the post objects in-place.
+ */
+async function stampIsLiked(
+  posts: RowDataPacket[],
+  userId: number,
+): Promise<void> {
+  if (posts.length === 0) return;
+  const ids = posts.map((p) => p.id as number);
+  const placeholders = ids.map(() => "?").join(",");
+  const [likedRows] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT post_id FROM post_likes WHERE user_id = ? AND post_id IN (${placeholders})`,
+    [userId, ...ids],
+  );
+  const likedSet = new Set<number>(likedRows.map((r) => r.post_id as number));
+  for (const post of posts) {
+    post.is_liked = likedSet.has(post.id as number);
+  }
 }
 
 // ─── 核心 Feed 服務類別 ────────────────────────────────────────────────────────
@@ -391,6 +420,13 @@ export class FeedService {
       .slice(offset, offset + limit)
       .map((s) => s.post);
 
+    // 5. Stamp is_liked for logged-in users
+    if (params.userId && pagePosts.length > 0) {
+      await stampIsLiked(pagePosts, params.userId);
+    } else {
+      for (const p of pagePosts) p.is_liked = false;
+    }
+
     return {
       posts: pagePosts,
       pagination: {
@@ -436,7 +472,7 @@ export class FeedService {
 
     // 2. 若 Redis 取得成功且有 ID，批次 Hydrate DB 詳細資料
     if (postIds.length > 0) {
-      const postMap = await fetchPostsByIds(postIds);
+      const postMap = await fetchPostsByIds(postIds, params.userId);
       // 依照 Redis ZSET 排列順序重組結果
       const orderedPosts = postIds
         .map((id) => postMap.get(id))
@@ -541,7 +577,7 @@ export class FeedService {
 
     // 2. 批次 Hydrate 貼文詳細資料
     const postIds = candidates.map((c) => c.postId);
-    const postMap = await fetchPostsByIds(postIds);
+    const postMap = await fetchPostsByIds(postIds, params.userId);
 
     // 3. 混合重排 (Hybrid Re-ranking)
     let maxHotScore = 1.0;
@@ -644,12 +680,17 @@ export class FeedService {
       return await this.getFilteredFeed(params, userVectorBuffer);
     }
 
-    // 2. 無篩選條件：登入老用戶走 Redis 向量檢索 (KNN) + 混合重排
+    // 2. 無篩選條件：登入老用戶走 Redis 向量檢索 (KNN) + 混合重排（包含地理位置加權）
     if (userVectorBuffer) {
       return await this.getPersonalizedFeed(userVectorBuffer, params);
     }
 
-    // 3. 無篩選條件：新用戶 / 未登入走全站熱門 Trending Feed
+    // 3. 無篩選條件且無向量，但有提供經緯度：走熱門候選召回 + 地理位置加權重排 (Geo Boost)
+    if (params.lat !== undefined && params.lng !== undefined) {
+      return await this.getFilteredFeed(params, null);
+    }
+
+    // 4. 無篩選條件、無向量、無位置資訊：走全站熱門 Trending Feed (Redis 快取)
     return await this.getTrendingFeed(params);
   }
 }

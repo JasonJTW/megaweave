@@ -10,7 +10,7 @@ export default function TinderPage() {
       <div className="fixed inset-0 -z-10 bg-[#F4F5F3]" />
 
       {/* Main Tinder Feed Container: Mobile-first, centered with margins on desktop */}
-      <main className="relative flex min-h-[calc(100dvh-64px)] w-full items-center justify-center overflow-hidden">
+      <main className="relative flex min-h-[calc(100dvh-64px)] w-full items-center justify-center overflow-hidden px-4">
         <TinderFeed />
       </main>
     </>

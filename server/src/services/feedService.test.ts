@@ -38,7 +38,12 @@ describe("FeedService", () => {
         .spyOn(feedService, "getFilteredFeed")
         .mockResolvedValue({
           posts: [],
-          pagination: { currentPage: 1, totalPages: 1, totalPosts: 0, postsPerPage: 20 },
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalPosts: 0,
+            postsPerPage: 20,
+          },
           isPersonalized: false,
         });
 
@@ -57,7 +62,12 @@ describe("FeedService", () => {
         .spyOn(feedService, "getPersonalizedFeed")
         .mockResolvedValue({
           posts: [],
-          pagination: { currentPage: 1, totalPages: 1, totalPosts: 0, postsPerPage: 20 },
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalPosts: 0,
+            postsPerPage: 20,
+          },
           isPersonalized: true,
         });
 
@@ -66,19 +76,47 @@ describe("FeedService", () => {
       expect(getPersonalizedFeedSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("routes to trending feed for cold start (new/guest user without vector)", async () => {
+    it("routes to trending feed for cold start (new/guest user without vector and no coords)", async () => {
       jest.spyOn(feedService, "getUserVector").mockResolvedValue(null);
       const getTrendingFeedSpy = jest
         .spyOn(feedService, "getTrendingFeed")
         .mockResolvedValue({
           posts: [],
-          pagination: { currentPage: 1, totalPages: 1, totalPosts: 0, postsPerPage: 20 },
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalPosts: 0,
+            postsPerPage: 20,
+          },
           isPersonalized: false,
         });
 
       await feedService.getFeed({});
 
       expect(getTrendingFeedSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("routes to filtered feed for guest user with lat/lng coordinates (Geo Boost)", async () => {
+      jest.spyOn(feedService, "getUserVector").mockResolvedValue(null);
+      const getFilteredFeedSpy = jest
+        .spyOn(feedService, "getFilteredFeed")
+        .mockResolvedValue({
+          posts: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalPosts: 0,
+            postsPerPage: 20,
+          },
+          isPersonalized: false,
+        });
+
+      await feedService.getFeed({ lat: 25.033, lng: 121.565 });
+
+      expect(getFilteredFeedSpy).toHaveBeenCalledWith(
+        { lat: 25.033, lng: 121.565 },
+        null,
+      );
     });
   });
 

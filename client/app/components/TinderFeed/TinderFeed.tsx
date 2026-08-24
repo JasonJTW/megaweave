@@ -4,6 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useSWRInfinite from "swr/infinite";
 import { useRouter } from "next/navigation";
 import { useUser } from "../../contexts/UserContext";
+import { useLocation } from "../../contexts/LocationContext";
 import type { Post, PostsResponse } from "../../types/schema";
 import TinderCard from "./TinderCard";
 import {
@@ -28,6 +29,7 @@ export default function TinderFeed() {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const { user } = useUser();
+  const { coords } = useLocation();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [history, setHistory] = useState<SwipeHistoryItem[]>([]);
@@ -35,6 +37,8 @@ export default function TinderFeed() {
     "left" | "right" | null
   >(null);
   const [isMessaging, setIsMessaging] = useState(false);
+  // Track liked post IDs client-side so reload doesn't lose the liked state
+  const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
 
   // SWR Infinite fetcher for personal recommendation feed
   const getKey = useCallback(
@@ -44,9 +48,13 @@ export default function TinderFeed() {
         page: (pageIndex + 1).toString(),
         limit: "12",
       });
+      if (coords?.lat !== undefined && coords?.lng !== undefined) {
+        params.append("lat", coords.lat.toString());
+        params.append("lng", coords.lng.toString());
+      }
       return `${hostName}/api/posts/feed?${params.toString()}`;
     },
-    [hostName],
+    [hostName, coords?.lat, coords?.lng],
   );
 
   const fetcher = (url: string) =>
@@ -97,17 +105,24 @@ export default function TinderFeed() {
 
       const currentPost = posts[currentIndex];
       setHistory((prev) => [...prev, { post: currentPost, direction }]);
+
+      // Update index immediately — callers are responsible for animation timing
       setCurrentIndex((prev) => prev + 1);
       setForcedDirection(null);
 
       // 右滑加分邏輯 (Like API)
+      // 若貼文已 liked（來自 API 或本次操作），跳過 API（防止 toggle endpoint 把讚取消）
       if (direction === "right") {
-        if (user) {
+        const alreadyLiked = currentPost.is_liked || likedIds.has(currentPost.id);
+        if (alreadyLiked) {
+          toast("已加分過囉！", { icon: "💚", duration: 1500 });
+        } else if (user) {
           try {
             await fetch(`${hostName}/api/posts/${currentPost.id}/like`, {
               method: "POST",
               credentials: "include",
             });
+            setLikedIds((prev) => new Set(prev).add(currentPost.id));
             toast.success("加分成功！", {
               icon: "💚",
               duration: 1500,
@@ -123,16 +138,17 @@ export default function TinderFeed() {
         }
       }
     },
-    [currentIndex, posts, user, hostName],
+    [currentIndex, posts, user, hostName, likedIds],
   );
 
-  // Programmatic swipe buttons
+  // Programmatic swipe buttons (button-triggered: set forcedDirection for animation, delay index update)
   const triggerSwipe = (direction: "left" | "right") => {
     if (forcedDirection !== null || currentIndex >= posts.length) return;
     setForcedDirection(direction);
+    // Delay handleSwipe so the exit animation (~380ms) plays before index updates
     setTimeout(() => {
       handleSwipe(direction);
-    }, 280);
+    }, 380);
   };
 
   // Undo last card
@@ -144,16 +160,21 @@ export default function TinderFeed() {
     setCurrentIndex((prev) => Math.max(0, prev - 1));
     setForcedDirection(null);
 
-    // If undone item was liked, optionally revert
-    if (lastItem.direction === "right" && user) {
+    // 若 undo 的是右滑，且該貼文原本未 liked（非 is_liked 且不在 likedIds），才呼叫 unlike toggle
+    if (lastItem.direction === "right" && user && !lastItem.post.is_liked && likedIds.has(lastItem.post.id)) {
       fetch(`${hostName}/api/posts/${lastItem.post.id}/like`, {
         method: "POST",
         credentials: "include",
       }).catch((err) => console.error("Error reverting like:", err));
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(lastItem.post.id);
+        return next;
+      });
     }
 
     toast("已復原上一則貼文", { icon: "↩️", duration: 1500 });
-  }, [history, currentIndex, user, hostName]);
+  }, [history, currentIndex, user, hostName, likedIds]);
 
   // Navigate to post detail
   const handleDetail = useCallback(
@@ -208,6 +229,8 @@ export default function TinderFeed() {
   const handleReload = () => {
     setCurrentIndex(0);
     setHistory([]);
+    setLikedIds(new Set());
+    setForcedDirection(null);
     mutate();
   };
 

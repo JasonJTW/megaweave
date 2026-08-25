@@ -211,6 +211,7 @@ router.get("/feed", async (req: Request, res: Response) => {
     const province = req.query.province as string | undefined;
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const mode = req.query.mode as string | undefined;
 
     const result = await feedService.getFeed({
       userId,
@@ -224,6 +225,7 @@ router.get("/feed", async (req: Request, res: Response) => {
       province,
       lat,
       lng,
+      mode,
     });
 
     res.status(200).json(result);

@@ -61,6 +61,28 @@ export default function TinderCard({
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-260, 260], [-18, 18]);
 
+  // 隨著左右拖曳接近 SWIPE_THRESHOLD (300px) 平滑降低卡片透明度
+  const cardDragOpacity = useTransform(
+    x,
+    [-400, -300, -160, 0, 160, 300, 400],
+    [0.2, 0.5, 0.85, 1, 0.85, 0.5, 0.2],
+  );
+
+  // 隨著左右拖曳接近 SWIPE_THRESHOLD (300px) 平滑降低對比度 (contrast) 並提高亮度 (brightness)
+  const cardDragFilter = useTransform(
+    x,
+    [-400, -300, -160, 0, 160, 300, 400],
+    [
+      "contrast(0.55) brightness(1.35)",
+      "contrast(0.7) brightness(1.22)",
+      "contrast(0.9) brightness(1.08)",
+      "contrast(1) brightness(1)",
+      "contrast(0.9) brightness(1.08)",
+      "contrast(0.7) brightness(1.22)",
+      "contrast(0.55) brightness(1.35)",
+    ],
+  );
+
   // Stamp opacities
   const likeOpacity = useTransform(x, [25, 120], [0, 1]);
   const nopeOpacity = useTransform(x, [-120, -25], [1, 0]);
@@ -219,7 +241,10 @@ export default function TinderCard({
     <motion.div
       style={{
         zIndex,
-        ...(isTop ? { x, y, rotate } : { scale, y: translateY, opacity }),
+        opacity: isTop ? cardDragOpacity : opacity,
+        ...(isTop
+          ? { x, y, rotate, filter: cardDragFilter }
+          : { scale, y: translateY }),
       }}
       drag={isTop && !exitDir}
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
@@ -245,9 +270,9 @@ export default function TinderCard({
             transition: { duration: 0.38, ease: [0.32, 0, 0.67, 0] as const },
           };
         }
-        // Normal resting state
-        if (isTop) return { scale: 1, y: 0, opacity: 1 };
-        return { scale, y: translateY, opacity };
+        // Normal resting state (only animate scale & translateY smoothly across stack layers)
+        if (isTop) return { scale: 1, y: 0 };
+        return { scale, y: translateY };
       })()}
       transition={
         isTop && (forcedDirection || exitDir)

@@ -49,14 +49,20 @@ function getValidCachedCoords(): Coords | null {
 export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [coords, setCoords] = useState<Coords | null>(() =>
-    getValidCachedCoords(),
-  );
+  const [coords, setCoords] = useState<Coords | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<
     PermissionState | "unknown"
   >("unknown");
+
+  // Load cached coords on client mount to prevent SSR hydration mismatch
+  useEffect(() => {
+    const cached = getValidCachedCoords();
+    if (cached) {
+      setCoords(cached);
+    }
+  }, []);
 
   const requestLocation = useCallback((): Promise<Coords | null> => {
     return new Promise((resolve) => {

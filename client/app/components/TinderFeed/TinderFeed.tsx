@@ -8,6 +8,11 @@ import { useLocation } from "../../contexts/LocationContext";
 import type { Post, PostsResponse } from "../../types/schema";
 import TinderCard from "./TinderCard";
 import {
+  rankPostsWithTinderAlgorithm,
+  TinderAlgorithmMode,
+  DistanceRadiusOption,
+} from "@/utils/tinderAlgorithm";
+import {
   X,
   Heart,
   RotateCcw,
@@ -25,13 +30,24 @@ interface SwipeHistoryItem {
   direction: "left" | "right";
 }
 
-export default function TinderFeed() {
+interface TinderFeedProps {
+  algorithmMode?: TinderAlgorithmMode;
+  maxDistanceKm?: DistanceRadiusOption;
+  onPostsLoaded?: (posts: Post[]) => void;
+}
+
+export default function TinderFeed({
+  algorithmMode = "tinder_smart",
+  maxDistanceKm = null,
+  onPostsLoaded,
+}: TinderFeedProps) {
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const { user } = useUser();
   const { coords } = useLocation();
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // 永久紀錄本 session 內已經滑過的貼文 ID，切換距離半徑時絕不重複出現
+  const [swipedIds, setSwipedIds] = useState<Set<number>>(new Set());
   const [history, setHistory] = useState<SwipeHistoryItem[]>([]);
   const [forcedDirection, setForcedDirection] = useState<
     "left" | "right" | null
@@ -47,6 +63,7 @@ export default function TinderFeed() {
       const params = new URLSearchParams({
         page: (pageIndex + 1).toString(),
         limit: "12",
+        mode: "tinder",
       });
       if (coords?.lat !== undefined && coords?.lng !== undefined) {
         params.append("lat", coords.lat.toString());
@@ -68,10 +85,20 @@ export default function TinderFeed() {
     },
   );
 
-  // Flatten posts and deduplicate
-  const posts = useMemo(() => {
+  // When GPS location finishes loading on client, trigger SWR revalidation immediately
+  const prevCoordsRef = React.useRef<typeof coords>(coords);
+  useEffect(() => {
+    const prev = prevCoordsRef.current;
+    if (!prev && coords) {
+      mutate();
+    }
+    prevCoordsRef.current = coords;
+  }, [coords, mutate]);
+
+  // Flatten raw posts and deduplicate
+  const rawPosts = useMemo(() => {
     if (!data) return [];
-    const allPosts: Post[] = [];
+    const all: Post[] = [];
     const seenIds = new Set<number>();
 
     for (const page of data) {
@@ -79,41 +106,60 @@ export default function TinderFeed() {
       for (const p of page.posts) {
         if (!seenIds.has(p.id)) {
           seenIds.add(p.id);
-          allPosts.push(p);
+          all.push(p);
         }
       }
     }
-    return allPosts;
+    return all;
   }, [data]);
+
+  // Notify parent component about newly fetched raw posts to compute dynamic distance tiers
+  useEffect(() => {
+    if (rawPosts.length > 0 && onPostsLoaded) {
+      onPostsLoaded(rawPosts);
+    }
+  }, [rawPosts, onPostsLoaded]);
+
+  // Apply Tinder multi-factor ranking algorithm with distance geofence
+  const rankedPosts = useMemo(() => {
+    return rankPostsWithTinderAlgorithm(rawPosts, coords, {
+      mode: algorithmMode,
+      maxDistanceKm,
+    });
+  }, [rawPosts, coords, algorithmMode, maxDistanceKm]);
+
+  // Filter out swiped posts: unswiped posts available to show in current stack
+  const availablePosts = useMemo(() => {
+    return rankedPosts.filter((p) => !swipedIds.has(p.id));
+  }, [rankedPosts, swipedIds]);
 
   const pagination = data ? data[data.length - 1]?.pagination : null;
   const hasMore = pagination
     ? pagination.currentPage < pagination.totalPages
     : false;
 
-  // Auto-prefetch next batch when remaining cards in queue are few
+  // Auto-prefetch next batch when remaining unswiped cards in queue are few
   useEffect(() => {
-    if (posts.length > 0 && currentIndex >= posts.length - 4 && hasMore) {
+    if (availablePosts.length <= 4 && hasMore && !isValidating) {
       setSize((prev) => prev + 1);
     }
-  }, [currentIndex, posts.length, hasMore, setSize]);
+  }, [availablePosts.length, hasMore, isValidating, setSize]);
 
   // Handle Swipe Action (Left = Pass / 不加分, Right = Like / 加分)
   const handleSwipe = useCallback(
     async (direction: "left" | "right") => {
-      if (currentIndex >= posts.length) return;
+      if (availablePosts.length === 0) return;
 
-      const currentPost = posts[currentIndex];
+      const currentPost = availablePosts[0];
       setHistory((prev) => [...prev, { post: currentPost, direction }]);
-
-      // Update index immediately — callers are responsible for animation timing
-      setCurrentIndex((prev) => prev + 1);
+      // 標記為已滑過，確保切換距離半徑時絕不再度出現
+      setSwipedIds((prev) => new Set(prev).add(currentPost.id));
       setForcedDirection(null);
 
       // 右滑加分邏輯 (Like API)
-      // 若貼文已 liked（來自 API 或本次操作），跳過 API（防止 toggle endpoint 把讚取消）
       if (direction === "right") {
-        const alreadyLiked = currentPost.is_liked || likedIds.has(currentPost.id);
+        const alreadyLiked =
+          currentPost.is_liked || likedIds.has(currentPost.id);
         if (alreadyLiked) {
           toast("已加分過囉！", { icon: "💚", duration: 1500 });
         } else if (user) {
@@ -138,14 +184,14 @@ export default function TinderFeed() {
         }
       }
     },
-    [currentIndex, posts, user, hostName, likedIds],
+    [availablePosts, user, hostName, likedIds],
   );
 
-  // Programmatic swipe buttons (button-triggered: set forcedDirection for animation, delay index update)
+  // Programmatic swipe buttons (button-triggered: set forcedDirection for animation, delay state update)
   const triggerSwipe = (direction: "left" | "right") => {
-    if (forcedDirection !== null || currentIndex >= posts.length) return;
+    if (forcedDirection !== null || availablePosts.length === 0) return;
     setForcedDirection(direction);
-    // Delay handleSwipe so the exit animation (~380ms) plays before index updates
+    // Delay handleSwipe so the exit animation (~380ms) plays before card is removed
     setTimeout(() => {
       handleSwipe(direction);
     }, 380);
@@ -153,15 +199,25 @@ export default function TinderFeed() {
 
   // Undo last card
   const handleUndo = useCallback(() => {
-    if (history.length === 0 || currentIndex === 0) return;
+    if (history.length === 0) return;
 
     const lastItem = history[history.length - 1];
     setHistory((prev) => prev.slice(0, -1));
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
+    // 從已滑過集合中移除，讓它重新回到卡片頂部
+    setSwipedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(lastItem.post.id);
+      return next;
+    });
     setForcedDirection(null);
 
-    // 若 undo 的是右滑，且該貼文原本未 liked（非 is_liked 且不在 likedIds），才呼叫 unlike toggle
-    if (lastItem.direction === "right" && user && !lastItem.post.is_liked && likedIds.has(lastItem.post.id)) {
+    // 若 undo 的是右滑，且該貼文原本未 liked，才呼叫 unlike toggle
+    if (
+      lastItem.direction === "right" &&
+      user &&
+      !lastItem.post.is_liked &&
+      likedIds.has(lastItem.post.id)
+    ) {
       fetch(`${hostName}/api/posts/${lastItem.post.id}/like`, {
         method: "POST",
         credentials: "include",
@@ -174,7 +230,7 @@ export default function TinderFeed() {
     }
 
     toast("已復原上一則貼文", { icon: "↩️", duration: 1500 });
-  }, [history, currentIndex, user, hostName, likedIds]);
+  }, [history, user, hostName, likedIds]);
 
   // Navigate to post detail
   const handleDetail = useCallback(
@@ -227,19 +283,19 @@ export default function TinderFeed() {
 
   // Reload / reset feed
   const handleReload = () => {
-    setCurrentIndex(0);
+    setSwipedIds(new Set());
     setHistory([]);
     setLikedIds(new Set());
     setForcedDirection(null);
     mutate();
   };
 
-  const currentPost = posts[currentIndex];
+  const currentPost = availablePosts[0];
   const isLoadingInitial = isValidating && (!data || data.length === 0);
-  const isOutOfCards = posts.length > 0 && currentIndex >= posts.length;
+  const isOutOfCards = !isLoadingInitial && availablePosts.length === 0;
 
   return (
-    <div className="relative mx-auto flex h-[calc(100dvh-64px)] w-full max-w-md select-none flex-col items-center justify-between px-3 pb-4 pt-2 sm:px-4 sm:pb-6">
+    <div className="relative mx-auto flex h-[calc(100dvh-64px)] w-full max-w-md select-none flex-col items-center justify-between px-3 pb-4 sm:px-4 sm:pb-6">
       {/* ─── Card Stack Deck Area ─── */}
       <div className="relative flex h-full w-full flex-1 items-center justify-center overflow-visible">
         {isLoadingInitial ? (
@@ -270,7 +326,7 @@ export default function TinderFeed() {
               全部瀏覽完畢！
             </h3>
             <p className="mt-2 max-w-xs font-ddin text-sm text-stone-500">
-              您已滑過目前所有的推薦貼文，可以點擊下方按鈕重新載入或稍後再回來查看最新分享。
+              您已滑過目前所有的推薦貼文，可以點擊下方按鈕重新載入或調整搜尋半徑查看更多分享。
             </p>
             <div className="mt-6 flex w-full max-w-xs flex-col gap-3">
               <Button
@@ -291,10 +347,10 @@ export default function TinderFeed() {
             </div>
           </div>
         ) : (
-          /* Card Stack (Render up to 3 cards for depth) */
+          /* Card Stack (Render up to 3 unswiped cards for depth) */
           <div className="relative h-full max-h-[640px] w-full">
-            {posts
-              .slice(currentIndex, currentIndex + 3)
+            {availablePosts
+              .slice(0, 3)
               .map((post, relativeIndex) => {
                 const isTop = relativeIndex === 0;
                 return (
@@ -319,7 +375,7 @@ export default function TinderFeed() {
         {/* Undo Button */}
         <button
           onClick={handleUndo}
-          disabled={history.length === 0 || currentIndex === 0}
+          disabled={history.length === 0}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-100 bg-white text-amber-500 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
           aria-label="Undo"
         >

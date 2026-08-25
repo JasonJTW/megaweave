@@ -18,6 +18,7 @@ export interface FeedParams {
   province?: string;
   lat?: number;
   lng?: number;
+  mode?: string;
 }
 
 export interface FeedResult {
@@ -394,10 +395,22 @@ export class FeedService {
           Number(post.lat),
           Number(post.lng),
         );
-        if (distKm <= 5) {
-          finalScore *= 1.2; // 5 公里內 +20%
-        } else if (distKm <= 15) {
-          finalScore *= 1.1; // 15 公里內 +10%
+        if (params.mode === "tinder") {
+          // 🎯 Tinder 專屬大幅非線性距離加權
+          if (distKm <= 3) {
+            finalScore *= 2.0; // 3 公里內超近生活圈 +100%
+          } else if (distKm <= 7) {
+            finalScore *= 1.5; // 7 公里內 +50%
+          } else if (distKm <= 15) {
+            finalScore *= 1.2; // 15 公里內 +20%
+          }
+        } else {
+          // 🏠 首頁與一般 Feed 維持原樣
+          if (distKm <= 5) {
+            finalScore *= 1.2; // 5 公里內 +20%
+          } else if (distKm <= 15) {
+            finalScore *= 1.1; // 15 公里內 +10%
+          }
         }
       }
 
@@ -617,10 +630,22 @@ export class FeedService {
           Number(post.lat),
           Number(post.lng),
         );
-        if (distKm <= 5) {
-          finalScore *= 1.2; // 5 公里內 +20%
-        } else if (distKm <= 15) {
-          finalScore *= 1.1; // 15 公里內 +10%
+        if (params.mode === "tinder") {
+          // 🎯 Tinder 專屬大幅非線性距離加權
+          if (distKm <= 3) {
+            finalScore *= 2.0; // 3 公里內超近生活圈 +100%
+          } else if (distKm <= 7) {
+            finalScore *= 1.5; // 7 公里內 +50%
+          } else if (distKm <= 15) {
+            finalScore *= 1.2; // 15 公里內 +20%
+          }
+        } else {
+          // 🏠 首頁與一般 Feed 維持原樣
+          if (distKm <= 5) {
+            finalScore *= 1.2; // 5 公里內 +20%
+          } else if (distKm <= 15) {
+            finalScore *= 1.1; // 15 公里內 +10%
+          }
         }
       }
 

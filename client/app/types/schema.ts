@@ -13,6 +13,7 @@ export interface Post {
   expires_at?: string;
   view_count: number;
   likes_count: number;
+  hot_score?: number;
   is_liked?: boolean;
   created_at: string;
   updated_at: string;

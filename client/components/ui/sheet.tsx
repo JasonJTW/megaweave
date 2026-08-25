@@ -65,11 +65,21 @@ const SheetContent = React.forwardRef<
       className={cn(sheetVariants({ side }), className)}
       {...props}
     >
-      <SheetPrimitive.Close className="absolute right-5 top-8 rounded-sm text-white opacity-70 ring-offset-background transition-opacity disabled:pointer-events-none data-[state=open]:bg-secondary">
+      {/* Full-screen hit target: click anywhere outside menu items to close */}
+      <SheetPrimitive.Close asChild>
+        <button
+          type="button"
+          className="absolute inset-0 z-0 cursor-default"
+          aria-label="Close menu"
+        />
+      </SheetPrimitive.Close>
+      <SheetPrimitive.Close className="absolute right-5 top-8 z-20 rounded-sm text-white opacity-70 ring-offset-background transition-opacity disabled:pointer-events-none data-[state=open]:bg-secondary">
         <MenuIcon className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
-      {children}
+      <div className="pointer-events-none relative z-10 h-full [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+        {children}
+      </div>
     </SheetPrimitive.Content>
   </SheetPortal>
 ));

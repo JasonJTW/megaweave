@@ -18,6 +18,7 @@ export interface FeedParams {
   province?: string;
   lat?: number;
   lng?: number;
+  radius?: number;
   mode?: string;
 }
 
@@ -284,6 +285,19 @@ export class FeedService {
         `%${params.search}%`,
         `%${params.search}%`,
       );
+    }
+
+    // 距離半徑篩選 (Radius filter via MySQL ST_Distance_Sphere)
+    if (
+      params.radius !== undefined &&
+      params.radius > 0 &&
+      params.lat !== undefined &&
+      params.lng !== undefined
+    ) {
+      whereConditions.push(
+        "(l.lat IS NULL OR l.lng IS NULL OR ST_Distance_Sphere(point(l.lng, l.lat), point(?, ?)) <= ?)",
+      );
+      queryParams.push(params.lng, params.lat, params.radius * 1000);
     }
 
     return {
@@ -698,6 +712,12 @@ export class FeedService {
     let userVectorBuffer: Buffer | null = null;
     if (params.userId) {
       userVectorBuffer = await this.getUserVector(params.userId);
+    }
+
+    // 🎯 Tinder 模式強制走 getFilteredFeed，確保 radius WHERE 篩選在 SQL 層生效
+    // （getPersonalizedFeed 走 Redis KNN 固定池，不支援 radius 過濾，會有「跨頁插隊」問題）
+    if (params.mode === "tinder") {
+      return await this.getFilteredFeed(params, userVectorBuffer);
     }
 
     // 1. 若有特定篩選條件（分類、Wish/Share、地點、搜尋詞），走「條件召回 + 個人化重排」

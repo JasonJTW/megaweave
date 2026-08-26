@@ -141,7 +141,6 @@ export default function TinderPage() {
 
         {/* Tinder Deck Component */}
         <TinderFeed
-          algorithmMode="tinder_smart"
           maxDistanceKm={maxDistanceKm}
         />
       </main>

@@ -211,6 +211,9 @@ router.get("/feed", async (req: Request, res: Response) => {
     const province = req.query.province as string | undefined;
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const radius = req.query.radius
+      ? parseFloat(req.query.radius as string)
+      : undefined;
     const mode = req.query.mode as string | undefined;
 
     const result = await feedService.getFeed({
@@ -225,6 +228,7 @@ router.get("/feed", async (req: Request, res: Response) => {
       province,
       lat,
       lng,
+      radius,
       mode,
     });
 

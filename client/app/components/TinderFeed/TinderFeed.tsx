@@ -2,16 +2,13 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useSWRInfinite from "swr/infinite";
+import { useMotionValue } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useUser } from "../../contexts/UserContext";
 import { useLocation } from "../../contexts/LocationContext";
 import type { Post, PostsResponse } from "../../types/schema";
 import TinderCard from "./TinderCard";
-import {
-  rankPostsWithTinderAlgorithm,
-  TinderAlgorithmMode,
-  DistanceRadiusOption,
-} from "@/utils/tinderAlgorithm";
+import { DistanceRadiusOption } from "@/utils/tinderAlgorithm";
 import {
   X,
   Heart,
@@ -31,13 +28,11 @@ interface SwipeHistoryItem {
 }
 
 interface TinderFeedProps {
-  algorithmMode?: TinderAlgorithmMode;
   maxDistanceKm?: DistanceRadiusOption;
   onPostsLoaded?: (posts: Post[]) => void;
 }
 
 export default function TinderFeed({
-  algorithmMode = "tinder_smart",
   maxDistanceKm = null,
   onPostsLoaded,
 }: TinderFeedProps) {
@@ -45,6 +40,9 @@ export default function TinderFeed({
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const { user } = useUser();
   const { coords } = useLocation();
+
+  // Shared MotionValue for top card's drag X — passed to all cards so under-cards can scale in sync
+  const topCardX = useMotionValue(0);
 
   // 永久紀錄本 session 內已經滑過的貼文 ID，切換距離半徑時絕不重複出現
   const [swipedIds, setSwipedIds] = useState<Set<number>>(new Set());
@@ -57,21 +55,26 @@ export default function TinderFeed({
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
 
   // SWR Infinite fetcher for personal recommendation feed
+  // SWR key includes maxDistanceKm so changing radius triggers a full fresh fetch
   const getKey = useCallback(
     (pageIndex: number, previousPageData: PostsResponse | null) => {
       if (previousPageData && !previousPageData.posts.length) return null;
       const params = new URLSearchParams({
         page: (pageIndex + 1).toString(),
-        limit: "12",
+        limit: "50", // 大候選池：一次抓 50 筆，大幅減少分頁請求頻率
         mode: "tinder",
       });
       if (coords?.lat !== undefined && coords?.lng !== undefined) {
         params.append("lat", coords.lat.toString());
         params.append("lng", coords.lng.toString());
       }
+      // 將半徑傳給後端，由 MySQL ST_Distance_Sphere 直接過濾，確保排序全域正確
+      if (maxDistanceKm !== null && maxDistanceKm > 0) {
+        params.append("radius", maxDistanceKm.toString());
+      }
       return `${hostName}/api/posts/feed?${params.toString()}`;
     },
-    [hostName, coords?.lat, coords?.lng],
+    [hostName, coords?.lat, coords?.lng, maxDistanceKm],
   );
 
   const fetcher = (url: string) =>
@@ -120,18 +123,11 @@ export default function TinderFeed({
     }
   }, [rawPosts, onPostsLoaded]);
 
-  // Apply Tinder multi-factor ranking algorithm with distance geofence
-  const rankedPosts = useMemo(() => {
-    return rankPostsWithTinderAlgorithm(rawPosts, coords, {
-      mode: algorithmMode,
-      maxDistanceKm,
-    });
-  }, [rawPosts, coords, algorithmMode, maxDistanceKm]);
-
-  // Filter out swiped posts: unswiped posts available to show in current stack
+  // 前端不再重新排序——後端已在 SQL 層完成全域最佳排序（含距離計算）
+  // 前端只負責過濾本 session 已滑過的貼文
   const availablePosts = useMemo(() => {
-    return rankedPosts.filter((p) => !swipedIds.has(p.id));
-  }, [rankedPosts, swipedIds]);
+    return rawPosts.filter((p) => !swipedIds.has(p.id));
+  }, [rawPosts, swipedIds]);
 
   const pagination = data ? data[data.length - 1]?.pagination : null;
   const hasMore = pagination
@@ -148,6 +144,8 @@ export default function TinderFeed({
       // 標記為已滑過，確保切換距離半徑時絕不再度出現
       setSwipedIds((prev) => new Set(prev).add(currentPost.id));
       setForcedDirection(null);
+      // 立即歸零共享 MotionValue，避免新的底層卡片看到舊的 ±900 退出值而短暫 scale 到 1.0 再彈回
+      topCardX.set(0);
 
       // 當使用者實際滑動卡片，且原始候選庫存即將耗盡時，才安全地請求下一頁（避免半徑過小導致無限請求迴圈）
       if (
@@ -361,6 +359,7 @@ export default function TinderFeed({
                     post={post}
                     isTop={isTop}
                     indexInStack={relativeIndex}
+                    dragX={topCardX}
                     onSwipe={handleSwipe}
                     onDetailClick={handleDetail}
                     forcedDirection={isTop ? forcedDirection : null}

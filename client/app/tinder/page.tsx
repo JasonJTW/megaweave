@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useTransition } from "react";
 import TinderFeed from "../components/TinderFeed/TinderFeed";
 import { Slider } from "@/components/ui/slider";
 import { useLocation } from "../contexts/LocationContext";
@@ -10,18 +10,40 @@ import { MapPin, Navigation, Compass } from "lucide-react";
 export default function TinderPage() {
   const { coords, requestLocation, loading: locationLoading } = useLocation();
   const [mounted, setMounted] = useState(false);
+  const [, startTransition] = useTransition();
 
-  // 搜尋半徑級距索引 (0 ~ 4，預設為 4: 不限距離)
-  const [tierIndex, setTierIndex] = useState<number>(4);
+  // 1. 即時 UI 滑桿顯示索引 (0 ~ 4)
+  const [sliderIndex, setSliderIndex] = useState<number>(4);
+  // 2. 實際傳入演算法重排的級距索引 (經過防抖處理，避免手機快速滑動時每秒重算 120 次)
+  const [appliedTierIndex, setAppliedTierIndex] = useState<number>(4);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // 拖曳防抖：手指快速滑過時，延遲 120ms 才進行卡片陣列過濾與重排
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startTransition(() => {
+        setAppliedTierIndex(sliderIndex);
+      });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [sliderIndex]);
+
+  // 點擊刻度按鈕直接切換
+  const handleDirectSelect = (idx: number) => {
+    setSliderIndex(idx);
+    startTransition(() => {
+      setAppliedTierIndex(idx);
+    });
+  };
+
   // 採用固定標準生活圈 5 級距，保證刻度與半徑絕對穩定不隨背景分頁載入而跳動
   const tiers: DistanceTier[] = DISTANCE_TIERS;
-  const currentTier = tiers[tierIndex] || tiers[tiers.length - 1];
-  const maxDistanceKm = currentTier.distanceKm;
+  const currentDisplayTier = tiers[sliderIndex] || tiers[tiers.length - 1];
+  const currentAppliedTier = tiers[appliedTierIndex] || tiers[tiers.length - 1];
+  const maxDistanceKm = currentAppliedTier.distanceKm;
 
   return (
     <>
@@ -42,7 +64,7 @@ export default function TinderPage() {
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20">
                 <MapPin className="h-3 w-3" />
-                {currentTier.badgeLabel}
+                {currentDisplayTier.badgeLabel}
               </span>
             </div>
           </div>
@@ -50,11 +72,17 @@ export default function TinderPage() {
           {/* 5-Step Shadcn UI Slider */}
           <div className="py-1">
             <Slider
-              value={[tierIndex]}
+              value={[sliderIndex]}
               min={0}
               max={4}
               step={1}
-              onValueChange={(val) => setTierIndex(val[0])}
+              onValueChange={(val) => setSliderIndex(val[0])}
+              onValueCommit={(val) => {
+                setSliderIndex(val[0]);
+                startTransition(() => {
+                  setAppliedTierIndex(val[0]);
+                });
+              }}
               className="cursor-pointer"
             />
           </div>
@@ -62,11 +90,11 @@ export default function TinderPage() {
           {/* 5-Tier Scale Ticks & Location Status */}
           <div className="flex items-center justify-between font-ddin text-[11px] text-stone-400">
             {tiers.map((t, idx) => {
-              const isActive = tierIndex === idx;
+              const isActive = sliderIndex === idx;
               return (
                 <button
                   key={idx}
-                  onClick={() => setTierIndex(idx)}
+                  onClick={() => handleDirectSelect(idx)}
                   className={`rounded px-1 py-0.5 transition-all hover:text-stone-800 ${
                     isActive
                       ? "font-extrabold text-megaweave-forest underline underline-offset-4"

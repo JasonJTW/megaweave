@@ -138,13 +138,6 @@ export default function TinderFeed({
     ? pagination.currentPage < pagination.totalPages
     : false;
 
-  // Auto-prefetch next batch when remaining unswiped cards in queue are few
-  useEffect(() => {
-    if (availablePosts.length <= 4 && hasMore && !isValidating) {
-      setSize((prev) => prev + 1);
-    }
-  }, [availablePosts.length, hasMore, isValidating, setSize]);
-
   // Handle Swipe Action (Left = Pass / 不加分, Right = Like / 加分)
   const handleSwipe = useCallback(
     async (direction: "left" | "right") => {
@@ -155,6 +148,15 @@ export default function TinderFeed({
       // 標記為已滑過，確保切換距離半徑時絕不再度出現
       setSwipedIds((prev) => new Set(prev).add(currentPost.id));
       setForcedDirection(null);
+
+      // 當使用者實際滑動卡片，且原始候選庫存即將耗盡時，才安全地請求下一頁（避免半徑過小導致無限請求迴圈）
+      if (
+        rawPosts.length - (history.length + 1) <= 4 &&
+        hasMore &&
+        !isValidating
+      ) {
+        setSize((prev) => prev + 1);
+      }
 
       // 右滑加分邏輯 (Like API)
       if (direction === "right") {

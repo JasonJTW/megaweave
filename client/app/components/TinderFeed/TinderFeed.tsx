@@ -39,7 +39,7 @@ export default function TinderFeed({
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const { user } = useUser();
-  const { coords } = useLocation();
+  const { coords, isReady } = useLocation();
 
   // Shared MotionValue for top card's drag X — passed to all cards so under-cards can scale in sync
   const topCardX = useMotionValue(0);
@@ -58,6 +58,7 @@ export default function TinderFeed({
   // SWR key includes maxDistanceKm so changing radius triggers a full fresh fetch
   const getKey = useCallback(
     (pageIndex: number, previousPageData: PostsResponse | null) => {
+      if (!isReady) return null;
       if (previousPageData && !previousPageData.posts.length) return null;
       const params = new URLSearchParams({
         page: (pageIndex + 1).toString(),
@@ -74,7 +75,7 @@ export default function TinderFeed({
       }
       return `${hostName}/api/posts/feed?${params.toString()}`;
     },
-    [hostName, coords?.lat, coords?.lng, maxDistanceKm],
+    [isReady, hostName, coords?.lat, coords?.lng, maxDistanceKm],
   );
 
   const fetcher = (url: string) =>
@@ -87,16 +88,6 @@ export default function TinderFeed({
       revalidateFirstPage: false,
     },
   );
-
-  // When GPS location finishes loading on client, trigger SWR revalidation immediately
-  const prevCoordsRef = React.useRef<typeof coords>(coords);
-  useEffect(() => {
-    const prev = prevCoordsRef.current;
-    if (!prev && coords) {
-      mutate();
-    }
-    prevCoordsRef.current = coords;
-  }, [coords, mutate]);
 
   // Flatten raw posts and deduplicate
   const rawPosts = useMemo(() => {
@@ -184,7 +175,18 @@ export default function TinderFeed({
         }
       }
     },
-    [availablePosts, user, hostName, likedIds],
+    [
+      availablePosts,
+      user,
+      hostName,
+      likedIds,
+      topCardX,
+      rawPosts.length,
+      history.length,
+      hasMore,
+      isValidating,
+      setSize,
+    ],
   );
 
   // Programmatic swipe buttons (button-triggered: set forcedDirection for animation, delay state update)
@@ -316,7 +318,7 @@ export default function TinderFeed({
               <div className="h-4 w-1/2 rounded bg-stone-800" />
             </div>
           </div>
-        ) : isOutOfCards ? (
+        ) : isOutOfCards && isReady ? (
           /* All Caught Up / Empty State */
           <div className="relative flex h-full max-h-[640px] w-full flex-col items-center justify-center overflow-hidden rounded-[28px] border border-stone-200/60 bg-gradient-to-b from-white to-stone-50 p-8 text-center shadow-xl">
             <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-inner">

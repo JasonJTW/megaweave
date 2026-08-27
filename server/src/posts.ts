@@ -243,10 +243,6 @@ router.get("/feed", async (req: Request, res: Response) => {
       `session;dur=${tSession.toFixed(1)}, feed;dur=${tFeed.toFixed(1)}, total;dur=${tTotal.toFixed(1)}`,
     );
 
-    console.log(
-      `⏱️ [GET /feed] userId=${userId || "guest"} lat=${lat} lng=${lng} -> total=${tTotal.toFixed(1)}ms (session=${tSession.toFixed(1)}ms, feed=${tFeed.toFixed(1)}ms)`,
-    );
-
     res.status(200).json(result);
   } catch (error) {
     console.error("Get feed error:", error);

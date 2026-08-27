@@ -71,22 +71,6 @@ function bufferToFloat32Array(buf: Buffer): Float32Array {
   return new Float32Array(ab, 0, Math.floor(buf.byteLength / 4));
 }
 
-function parseEmbedding(raw: unknown): Float32Array | null {
-  if (!raw) return null;
-  try {
-    if (Buffer.isBuffer(raw)) {
-      return bufferToFloat32Array(raw);
-    }
-    const arr = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(arr) && arr.length > 0) {
-      return new Float32Array(arr);
-    }
-  } catch {
-    // ignore parse error
-  }
-  return null;
-}
-
 function cosineSimilarity(vecA: Float32Array, vecB: Float32Array): number {
   if (vecA.length !== vecB.length || vecA.length === 0) return 0;
   let dot = 0;
@@ -194,14 +178,34 @@ async function stampIsLiked(
 
 // ─── 核心 Feed 服務類別 ────────────────────────────────────────────────────────
 
+// Post Vector 本地記憶體快取（貼文向量生成後即不變，快取於 Node 記憶體避免反覆向 Redis 請求）
+const POST_VECTOR_CACHE_MAX = 2000;
+const postVectorMemoryCache = new Map<number, Float32Array>();
+
+// User Vector 本地記憶體快取（5 分鐘 TTL，避免每次請求都重複花費 300ms+ 連線至遠端 Redis）
+const USER_VECTOR_CACHE_TTL_MS = 5 * 60 * 1000;
+const userVectorMemoryCache = new Map<
+  number,
+  { buf: Buffer; expiresAt: number }
+>();
+
 export class FeedService {
   /**
    * 取得使用者的興趣向量 Buffer
-   * 1. 優先從 Redis user:{userId}:vector 讀取
+   * 0. 優先從本地記憶體快取讀取 (0ms)
+   * 1. 次之從 Redis user:{userId}:vector 讀取
    * 2. 若 Redis 沒有，嘗試從 MySQL user_profiles.interest_vector 讀取並轉換
    */
   async getUserVector(userId: number): Promise<Buffer | null> {
     const t0 = performance.now();
+    const now = Date.now();
+
+    // 0. 本地記憶體快取
+    const cached = userVectorMemoryCache.get(userId);
+    if (cached && cached.expiresAt > now) {
+      return cached.buf;
+    }
+
     const redis = getRedisClient();
 
     // 1. Redis 讀取
@@ -215,7 +219,10 @@ export class FeedService {
         },
       );
       if (raw && Buffer.isBuffer(raw) && raw.length === 1536 * 4) {
-        console.log(`🔍 [getUserVector] from Redis user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`);
+        userVectorMemoryCache.set(userId, {
+          buf: raw,
+          expiresAt: now + USER_VECTOR_CACHE_TTL_MS,
+        });
         return raw;
       }
     } catch (err) {
@@ -241,7 +248,13 @@ export class FeedService {
           for (let i = 0; i < vec.length; i++) {
             buf.writeFloatLE(vec[i], i * 4);
           }
-          console.log(`🔍 [getUserVector] from MySQL user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`);
+          userVectorMemoryCache.set(userId, {
+            buf,
+            expiresAt: now + USER_VECTOR_CACHE_TTL_MS,
+          });
+          console.log(
+            `🔍 [getUserVector] from MySQL user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`,
+          );
           return buf;
         }
       }
@@ -252,7 +265,9 @@ export class FeedService {
       );
     }
 
-    console.log(`🔍 [getUserVector] user #${userId} NOT FOUND (took ${(performance.now() - t0).toFixed(1)}ms)`);
+    console.log(
+      `🔍 [getUserVector] user #${userId} NOT FOUND (took ${(performance.now() - t0).toFixed(1)}ms)`,
+    );
     return null;
   }
 
@@ -345,22 +360,59 @@ export class FeedService {
     const t0 = performance.now();
     const { whereClause, queryParams } = this.buildWhereConditions(params);
 
-    // 1. 計算符合條件的總筆數
-    const tCount0 = performance.now();
-    const countQuery = `
-      SELECT COUNT(DISTINCT p.id) as total 
-      FROM posts p 
+    // 1. 計算符合條件的總筆數 (Tinder 模式為卡片串流瀏覽，省去全表 COUNT 掃描)
+    let dbTotal = 0;
+    let tCount = 0;
+    if (params.mode !== "tinder") {
+      const tCount0 = performance.now();
+      const countQuery = `
+        SELECT COUNT(DISTINCT p.id) as total 
+        FROM posts p 
+        LEFT JOIN locations l ON p.location_id = l.id
+        WHERE ${whereClause}
+      `;
+      const [countResult] = await dbPool.execute<RowDataPacket[]>(
+        countQuery,
+        queryParams,
+      );
+      dbTotal = countResult[0]?.total || 0;
+      tCount = performance.now() - tCount0;
+
+      if (dbTotal === 0) {
+        return {
+          posts: [],
+          pagination: {
+            currentPage: page,
+            totalPages: 1,
+            totalPosts: 0,
+            postsPerPage: limit,
+          },
+          isPersonalized: Boolean(userVectorBuffer),
+        };
+      }
+    }
+
+    // 2. Stage 1: 輕量條件召回 (Candidate Retrieval - 不 SELECT embedding 大欄位，走純索引排序)
+    const tCand0 = performance.now();
+    const CANDIDATE_FETCH_LIMIT = Math.max(60, (page + 1) * limit);
+    const candidateQuery = `
+      SELECT 
+        p.id, p.hot_score, p.expires_at, p.status,
+        l.lat, l.lng
+      FROM posts p
       LEFT JOIN locations l ON p.location_id = l.id
       WHERE ${whereClause}
+      ORDER BY p.hot_score DESC, p.id DESC
+      LIMIT ${CANDIDATE_FETCH_LIMIT}
     `;
-    const [countResult] = await dbPool.execute<RowDataPacket[]>(
-      countQuery,
+
+    const [candidates] = await dbPool.execute<RowDataPacket[]>(
+      candidateQuery,
       queryParams,
     );
-    const dbTotal = countResult[0]?.total || 0;
-    const tCount = performance.now() - tCount0;
+    const tCand = performance.now() - tCand0;
 
-    if (dbTotal === 0) {
+    if (candidates.length === 0) {
       return {
         posts: [],
         pagination: {
@@ -372,27 +424,6 @@ export class FeedService {
         isPersonalized: Boolean(userVectorBuffer),
       };
     }
-
-    // 2. Stage 1: 條件召回 (Candidate Retrieval)
-    const tCand0 = performance.now();
-    const CANDIDATE_FETCH_LIMIT = Math.max(60, (page + 1) * limit);
-    const embeddingSelect = userVectorBuffer ? "p.embedding," : "NULL as embedding,";
-    const candidateQuery = `
-      SELECT 
-        p.id, p.hot_score, ${embeddingSelect} p.expires_at, p.status,
-        l.lat, l.lng
-      FROM posts p
-      LEFT JOIN locations l ON p.location_id = l.id
-      WHERE ${whereClause}
-      ORDER BY (p.expires_at IS NOT NULL AND p.expires_at < NOW()) ASC, p.hot_score DESC, p.created_at DESC
-      LIMIT ${CANDIDATE_FETCH_LIMIT}
-    `;
-
-    const [candidates] = await dbPool.execute<RowDataPacket[]>(
-      candidateQuery,
-      queryParams,
-    );
-    const tCand = performance.now() - tCand0;
 
     // 3. Stage 2: 個人化特徵比對與混合計分 (Hybrid Re-ranking)
     const tScore0 = performance.now();
@@ -406,6 +437,54 @@ export class FeedService {
     const userVec = userVectorBuffer
       ? bufferToFloat32Array(userVectorBuffer)
       : null;
+
+    // 🌟 延遲加載 Embedding (Late Materialization)：記憶體快取 + Redis Pipeline 讀取 Float32 向量
+    const candPostIds = candidates.map((p) => Number(p.id));
+    const embeddingMap = new Map<number, Float32Array>();
+    if (userVec && candPostIds.length > 0) {
+      const missingIds: number[] = [];
+      for (const id of candPostIds) {
+        const cached = postVectorMemoryCache.get(id);
+        if (cached) {
+          embeddingMap.set(id, cached);
+        } else {
+          missingIds.push(id);
+        }
+      }
+
+      if (missingIds.length > 0) {
+        try {
+          const redis = getRedisClient();
+          const rawBuffers = await Promise.all(
+            missingIds.map((id) =>
+              redis
+                .sendCommand<Buffer | null>(["HGET", `post:${id}`, "v"], {
+                  typeMapping: {
+                    [RESP_TYPES.BLOB_STRING]: Buffer,
+                  },
+                })
+                .catch(() => null),
+            ),
+          );
+          for (let i = 0; i < missingIds.length; i++) {
+            const buf = rawBuffers[i];
+            if (buf && Buffer.isBuffer(buf) && buf.length === 1536 * 4) {
+              const vec = bufferToFloat32Array(buf);
+              embeddingMap.set(missingIds[i], vec);
+              if (postVectorMemoryCache.size < POST_VECTOR_CACHE_MAX) {
+                postVectorMemoryCache.set(missingIds[i], vec);
+              }
+            }
+          }
+        } catch (redisErr) {
+          console.warn(
+            "⚠️ Failed to fetch candidate vectors from Redis:",
+            redisErr,
+          );
+        }
+      }
+    }
+
     const now = Date.now();
 
     interface ScoredCandidate {
@@ -415,11 +494,9 @@ export class FeedService {
 
     const scoredCandidates: ScoredCandidate[] = candidates.map((post) => {
       let similarity = 0.5; // 無使用者向量時預設為中立基準
-      if (userVec && post.embedding) {
-        const postVec = parseEmbedding(post.embedding);
-        if (postVec) {
-          similarity = cosineSimilarity(userVec, postVec);
-        }
+      const postVec = embeddingMap.get(Number(post.id));
+      if (userVec && postVec) {
+        similarity = cosineSimilarity(userVec, postVec);
       }
 
       const normalizedHot = Number(post.hot_score || 0) / maxHotScore;
@@ -477,12 +554,19 @@ export class FeedService {
       `📊 [getFilteredFeed] count=${tCount.toFixed(1)}ms, candQuery(${candidates.length})=${tCand.toFixed(1)}ms, scoring=${tScore.toFixed(1)}ms, hydrate(${pagePosts.length})=${tHydrate.toFixed(1)}ms -> total=${(performance.now() - t0).toFixed(1)}ms`,
     );
 
+    const actualTotal =
+      params.mode === "tinder"
+        ? pagePosts.length === limit
+          ? (page + 1) * limit
+          : (page - 1) * limit + pagePosts.length
+        : dbTotal;
+
     return {
       posts: pagePosts,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(dbTotal / limit) || 1,
-        totalPosts: dbTotal,
+        totalPages: Math.ceil(actualTotal / limit) || 1,
+        totalPosts: actualTotal,
         postsPerPage: limit,
       },
       isPersonalized: Boolean(userVectorBuffer),
@@ -550,7 +634,6 @@ export class FeedService {
     userVectorBuffer: Buffer,
     params: FeedParams,
   ): Promise<FeedResult> {
-    const t0 = performance.now();
     const page = Math.max(1, params.page || 1);
     const limit = Math.max(1, Math.min(50, params.limit || 20));
 
@@ -565,7 +648,6 @@ export class FeedService {
     const candidates: CandidateInfo[] = [];
 
     // 1. Redis HNSW 向量檢索召回 (KNN Top-K)
-    const tSearch0 = performance.now();
     try {
       const knnQuery = `*=>[KNN ${CANDIDATE_LIMIT} @v $vec AS vector_distance]`;
       const rawResult = (await redis.sendCommand([
@@ -618,16 +700,13 @@ export class FeedService {
       );
       return await this.getFilteredFeed(params, userVectorBuffer);
     }
-    const tSearch = performance.now() - tSearch0;
 
     // 若向量搜尋無結果（例如貼文尚未建立索引），自動 fallback
     if (candidates.length === 0) {
-      console.log(`⚠️ [getPersonalizedFeed] 0 candidates from Redis, fallback to DB feed`);
       return await this.getFilteredFeed(params, userVectorBuffer);
     }
 
     // 2. 🌟 延遲關聯 (Late Materialization)：先輕量查詢候選 150 篇的打分欄位 (不 JOIN images/users)
-    const tMeta0 = performance.now();
     const postIds = candidates.map((c) => c.postId);
     const placeholders = postIds.map(() => "?").join(",");
     const [candidateMetaRows] = await dbPool.execute<RowDataPacket[]>(
@@ -641,10 +720,8 @@ export class FeedService {
     for (const row of candidateMetaRows) {
       candidateMetaMap.set(row.id, row);
     }
-    const tMeta = performance.now() - tMeta0;
 
     // 3. 混合重排 (Hybrid Re-ranking)
-    const tScore0 = performance.now();
     let maxHotScore = 1.0;
     for (const c of candidates) {
       const meta = candidateMetaMap.get(c.postId);
@@ -705,19 +782,12 @@ export class FeedService {
     const pagePostIds = scoredCandidates
       .slice(offset, offset + limit)
       .map((s) => s.postId);
-    const tScore = performance.now() - tScore0;
 
     // 🌟 延遲關聯 (Late Materialization)：只對當前頁所需貼文 (例如 12 篇) 批次查詢 6 表詳細資料
-    const tHydrate0 = performance.now();
     const postMap = await fetchPostsByIds(pagePostIds, params.userId);
     const pagePosts = pagePostIds
       .map((id) => postMap.get(id))
       .filter((p): p is RowDataPacket => Boolean(p));
-    const tHydrate = performance.now() - tHydrate0;
-
-    console.log(
-      `🎯 [getPersonalizedFeed] ftSearch(${candidates.length})=${tSearch.toFixed(1)}ms, metaQuery=${tMeta.toFixed(1)}ms, scoring=${tScore.toFixed(1)}ms, hydrate(${pagePosts.length})=${tHydrate.toFixed(1)}ms -> total=${(performance.now() - t0).toFixed(1)}ms`,
-    );
 
     return {
       posts: pagePosts,

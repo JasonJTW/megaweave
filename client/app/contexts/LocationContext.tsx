@@ -18,6 +18,7 @@ interface Coords {
 interface LocationContextType {
   coords: Coords | null;
   loading: boolean;
+  isReady: boolean;
   error: string | null;
   permissionStatus: PermissionState | "unknown";
   requestLocation: () => Promise<Coords | null>;
@@ -36,7 +37,11 @@ function getValidCachedCoords(): Coords | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.lat === "number" && typeof parsed.lng === "number") {
+    if (
+      parsed &&
+      typeof parsed.lat === "number" &&
+      typeof parsed.lng === "number"
+    ) {
       // 支援有時間戳與無時間戳格式（30 分鐘內有效）
       if (!parsed.timestamp || Date.now() - parsed.timestamp < CACHE_TTL_MS) {
         return { lat: parsed.lat, lng: parsed.lng };
@@ -51,6 +56,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [coords, setCoords] = useState<Coords | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<
     PermissionState | "unknown"
@@ -62,6 +68,7 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
     if (cached) {
       setCoords(cached);
     }
+    setIsReady(true);
   }, []);
 
   const requestLocation = useCallback((): Promise<Coords | null> => {
@@ -157,11 +164,12 @@ export const LocationProvider: React.FC<{ children: React.ReactNode }> = ({
     () => ({
       coords,
       loading,
+      isReady,
       error,
       permissionStatus,
       requestLocation,
     }),
-    [coords, loading, error, permissionStatus, requestLocation],
+    [coords, loading, isReady, error, permissionStatus, requestLocation],
   );
 
   return (

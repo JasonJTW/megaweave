@@ -195,9 +195,12 @@ router.get("/viewed", requireAuth, async (req: Request, res: Response) => {
 // 🌟 統一推薦 Feed API (Unified Hybrid Feed)
 // GET /api/posts/feed?page=1&limit=20&type=share&category_id=1&lat=25.033&lng=121.565
 router.get("/feed", async (req: Request, res: Response) => {
+  const t0 = performance.now();
   try {
+    const tSessionStart = performance.now();
     const session = await getUserFromCookie(req);
     const userId = session?.userId;
+    const tSession = performance.now() - tSessionStart;
 
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -216,6 +219,7 @@ router.get("/feed", async (req: Request, res: Response) => {
       : undefined;
     const mode = req.query.mode as string | undefined;
 
+    const tFeedStart = performance.now();
     const result = await feedService.getFeed({
       userId,
       page,
@@ -231,6 +235,17 @@ router.get("/feed", async (req: Request, res: Response) => {
       radius,
       mode,
     });
+    const tFeed = performance.now() - tFeedStart;
+    const tTotal = performance.now() - t0;
+
+    res.setHeader(
+      "Server-Timing",
+      `session;dur=${tSession.toFixed(1)}, feed;dur=${tFeed.toFixed(1)}, total;dur=${tTotal.toFixed(1)}`,
+    );
+
+    console.log(
+      `⏱️ [GET /feed] userId=${userId || "guest"} lat=${lat} lng=${lng} -> total=${tTotal.toFixed(1)}ms (session=${tSession.toFixed(1)}ms, feed=${tFeed.toFixed(1)}ms)`,
+    );
 
     res.status(200).json(result);
   } catch (error) {

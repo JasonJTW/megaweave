@@ -124,35 +124,36 @@ describe("FeedService", () => {
     it("correctly ranks posts matching user interest vector higher", async () => {
       const service = new FeedService();
 
+      const candidatePosts = [
+        // Post 1: Orthogonal to user vector ([0, 1])
+        {
+          id: 1,
+          title: "Coffee Mug",
+          status: "active",
+          hot_score: 5,
+          embedding: JSON.stringify([0, 1]),
+          expires_at: null,
+          lat: null,
+          lng: null,
+        },
+        // Post 2: Aligned with user vector ([1, 0])
+        {
+          id: 2,
+          title: "Biology Book",
+          status: "active",
+          hot_score: 5,
+          embedding: JSON.stringify([1, 0]),
+          expires_at: null,
+          lat: null,
+          lng: null,
+        },
+      ];
+
       // Count query: 2 posts found
       (dbPool.execute as jest.Mock)
-        .mockResolvedValueOnce([[{ total: 2 }]]) // count query
-        .mockResolvedValueOnce([
-          [
-            // Post 1: Orthogonal to user vector ([0, 1])
-            {
-              id: 1,
-              title: "Coffee Mug",
-              status: "active",
-              hot_score: 5,
-              embedding: JSON.stringify([0, 1]),
-              expires_at: null,
-              lat: null,
-              lng: null,
-            },
-            // Post 2: Aligned with user vector ([1, 0])
-            {
-              id: 2,
-              title: "Biology Book",
-              status: "active",
-              hot_score: 5,
-              embedding: JSON.stringify([1, 0]),
-              expires_at: null,
-              lat: null,
-              lng: null,
-            },
-          ],
-        ]);
+        .mockResolvedValueOnce([[{ total: 2 }]]) // 1. count query
+        .mockResolvedValueOnce([candidatePosts]) // 2. candidate scoring query
+        .mockResolvedValueOnce([candidatePosts]); // 3. fetchPostsByIds hydration query
 
       // User vector is [1, 0]
       const userVectorBuf = createFloat32Buffer([1, 0]);
@@ -169,34 +170,35 @@ describe("FeedService", () => {
     it("applies geo boost for closer posts when coordinates are supplied", async () => {
       const service = new FeedService();
 
+      const candidatePosts = [
+        // Post 1: 50km away (no boost), equal hot_score
+        {
+          id: 1,
+          title: "Far away desk",
+          status: "active",
+          hot_score: 10,
+          embedding: null,
+          expires_at: null,
+          lat: 25.4,
+          lng: 121.5,
+        },
+        // Post 2: 2km away (<=5km gets 1.2x boost), equal hot_score
+        {
+          id: 2,
+          title: "Nearby desk",
+          status: "active",
+          hot_score: 10,
+          embedding: null,
+          expires_at: null,
+          lat: 25.034,
+          lng: 121.564,
+        },
+      ];
+
       (dbPool.execute as jest.Mock)
-        .mockResolvedValueOnce([[{ total: 2 }]])
-        .mockResolvedValueOnce([
-          [
-            // Post 1: 50km away (no boost), equal hot_score
-            {
-              id: 1,
-              title: "Far away desk",
-              status: "active",
-              hot_score: 10,
-              embedding: null,
-              expires_at: null,
-              lat: 25.4,
-              lng: 121.5,
-            },
-            // Post 2: 2km away (<=5km gets 1.2x boost), equal hot_score
-            {
-              id: 2,
-              title: "Nearby desk",
-              status: "active",
-              hot_score: 10,
-              embedding: null,
-              expires_at: null,
-              lat: 25.034,
-              lng: 121.564,
-            },
-          ],
-        ]);
+        .mockResolvedValueOnce([[{ total: 2 }]]) // 1. count query
+        .mockResolvedValueOnce([candidatePosts]) // 2. candidate scoring query
+        .mockResolvedValueOnce([candidatePosts]); // 3. fetchPostsByIds hydration query
 
       const result = await service.getFilteredFeed(
         { lat: 25.033, lng: 121.565 }, // user location

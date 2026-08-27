@@ -101,11 +101,31 @@ function cosineSimilarity(vecA: Float32Array, vecB: Float32Array): number {
   return Math.max(0, dot / (Math.sqrt(normA) * Math.sqrt(normB)));
 }
 
+/**
+ * 依據距離與模式計算地理位置加權倍率 (Geo Boost Multiplier)
+ */
+function getGeoMultiplier(distKm: number, mode?: string): number {
+  if (mode === "tinder") {
+    //* 🎯 Tinder 專屬大幅非線性距離加權
+    if (distKm <= 3) return 2.0; // 3 公里內超近生活圈 +100%
+    if (distKm <= 7) return 1.5; // 7 公里內 +50%
+    if (distKm <= 15) return 1.2; // 15 公里內 +20%
+    return 1.0;
+  }
+
+  // 🏠 首頁與一般 Feed
+  if (distKm <= 5) return 1.2; // 5 公里內 +20%
+  if (distKm <= 15) return 1.1; // 15 公里內 +10%
+  return 1.0;
+}
+
 // ─── 貼文詳細資料 Hydration (MySQL Batch Query) ───────────────────────────────
 
 const POST_FIELDS_SQL = `
   SELECT 
-    p.*,
+    p.id, p.user_id, p.title, p.content, p.type, p.status, p.tags, 
+    p.category_id, p.condition_level, p.expires_at, p.view_count, 
+    p.likes_count, p.hot_score, p.created_at, p.updated_at, p.deleted_at, p.location_id,
     COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
     u.public_id as author_public_id,
     u.id as author_user_id,
@@ -181,6 +201,7 @@ export class FeedService {
    * 2. 若 Redis 沒有，嘗試從 MySQL user_profiles.interest_vector 讀取並轉換
    */
   async getUserVector(userId: number): Promise<Buffer | null> {
+    const t0 = performance.now();
     const redis = getRedisClient();
 
     // 1. Redis 讀取
@@ -194,6 +215,7 @@ export class FeedService {
         },
       );
       if (raw && Buffer.isBuffer(raw) && raw.length === 1536 * 4) {
+        console.log(`🔍 [getUserVector] from Redis user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`);
         return raw;
       }
     } catch (err) {
@@ -219,6 +241,7 @@ export class FeedService {
           for (let i = 0; i < vec.length; i++) {
             buf.writeFloatLE(vec[i], i * 4);
           }
+          console.log(`🔍 [getUserVector] from MySQL user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`);
           return buf;
         }
       }
@@ -229,6 +252,7 @@ export class FeedService {
       );
     }
 
+    console.log(`🔍 [getUserVector] user #${userId} NOT FOUND (took ${(performance.now() - t0).toFixed(1)}ms)`);
     return null;
   }
 
@@ -318,9 +342,11 @@ export class FeedService {
     const limit = Math.max(1, Math.min(50, params.limit || 20));
     const offset = (page - 1) * limit;
 
+    const t0 = performance.now();
     const { whereClause, queryParams } = this.buildWhereConditions(params);
 
     // 1. 計算符合條件的總筆數
+    const tCount0 = performance.now();
     const countQuery = `
       SELECT COUNT(DISTINCT p.id) as total 
       FROM posts p 
@@ -332,6 +358,7 @@ export class FeedService {
       queryParams,
     );
     const dbTotal = countResult[0]?.total || 0;
+    const tCount = performance.now() - tCount0;
 
     if (dbTotal === 0) {
       return {
@@ -347,12 +374,16 @@ export class FeedService {
     }
 
     // 2. Stage 1: 條件召回 (Candidate Retrieval)
-    // 撈取足以覆蓋當前分頁甚至未來頁面的候選貼文（包含 embedding 與 hot_score）
-    const CANDIDATE_FETCH_LIMIT = Math.max(150, (page + 2) * limit);
+    const tCand0 = performance.now();
+    const CANDIDATE_FETCH_LIMIT = Math.max(60, (page + 1) * limit);
+    const embeddingSelect = userVectorBuffer ? "p.embedding," : "NULL as embedding,";
     const candidateQuery = `
-      ${POST_FIELDS_SQL}
+      SELECT 
+        p.id, p.hot_score, ${embeddingSelect} p.expires_at, p.status,
+        l.lat, l.lng
+      FROM posts p
+      LEFT JOIN locations l ON p.location_id = l.id
       WHERE ${whereClause}
-      GROUP BY p.id
       ORDER BY (p.expires_at IS NOT NULL AND p.expires_at < NOW()) ASC, p.hot_score DESC, p.created_at DESC
       LIMIT ${CANDIDATE_FETCH_LIMIT}
     `;
@@ -361,8 +392,10 @@ export class FeedService {
       candidateQuery,
       queryParams,
     );
+    const tCand = performance.now() - tCand0;
 
     // 3. Stage 2: 個人化特徵比對與混合計分 (Hybrid Re-ranking)
+    const tScore0 = performance.now();
     let maxHotScore = 1.0;
     for (const post of candidates) {
       if (post.hot_score) {
@@ -375,12 +408,12 @@ export class FeedService {
       : null;
     const now = Date.now();
 
-    interface ScoredPost {
-      post: RowDataPacket;
+    interface ScoredCandidate {
+      id: number;
       finalScore: number;
     }
 
-    const scoredPosts: ScoredPost[] = candidates.map((post) => {
+    const scoredCandidates: ScoredCandidate[] = candidates.map((post) => {
       let similarity = 0.5; // 無使用者向量時預設為中立基準
       if (userVec && post.embedding) {
         const postVec = parseEmbedding(post.embedding);
@@ -409,23 +442,7 @@ export class FeedService {
           Number(post.lat),
           Number(post.lng),
         );
-        if (params.mode === "tinder") {
-          // 🎯 Tinder 專屬大幅非線性距離加權
-          if (distKm <= 3) {
-            finalScore *= 2.0; // 3 公里內超近生活圈 +100%
-          } else if (distKm <= 7) {
-            finalScore *= 1.5; // 7 公里內 +50%
-          } else if (distKm <= 15) {
-            finalScore *= 1.2; // 15 公里內 +20%
-          }
-        } else {
-          // 🏠 首頁與一般 Feed 維持原樣
-          if (distKm <= 5) {
-            finalScore *= 1.2; // 5 公里內 +20%
-          } else if (distKm <= 15) {
-            finalScore *= 1.1; // 15 公里內 +10%
-          }
-        }
+        finalScore *= getGeoMultiplier(distKm, params.mode);
       }
 
       // 未過期加權（確保未過期貼文排在過期之前）
@@ -436,23 +453,29 @@ export class FeedService {
         finalScore += 10.0;
       }
 
-      return { post, finalScore };
+      return { id: Number(post.id), finalScore };
     });
 
     // 依 FinalScore 降冪排序
-    scoredPosts.sort((a, b) => b.finalScore - a.finalScore);
+    scoredCandidates.sort((a, b) => b.finalScore - a.finalScore);
 
-    // 4. 分頁切片 (Slice Pagination)
-    const pagePosts = scoredPosts
+    // 4. 分頁切片取得當前頁 post IDs
+    const pagePostIds = scoredCandidates
       .slice(offset, offset + limit)
-      .map((s) => s.post);
+      .map((s) => s.id);
+    const tScore = performance.now() - tScore0;
 
-    // 5. Stamp is_liked for logged-in users
-    if (params.userId && pagePosts.length > 0) {
-      await stampIsLiked(pagePosts, params.userId);
-    } else {
-      for (const p of pagePosts) p.is_liked = false;
-    }
+    // 5. 🌟 延遲關聯 (Late Materialization)：只對當前頁所需的貼文 (例如 12 篇) 批次查詢 6 表詳細資料
+    const tHydrate0 = performance.now();
+    const postMap = await fetchPostsByIds(pagePostIds, params.userId);
+    const pagePosts = pagePostIds
+      .map((id) => postMap.get(id))
+      .filter((p): p is RowDataPacket => Boolean(p));
+    const tHydrate = performance.now() - tHydrate0;
+
+    console.log(
+      `📊 [getFilteredFeed] count=${tCount.toFixed(1)}ms, candQuery(${candidates.length})=${tCand.toFixed(1)}ms, scoring=${tScore.toFixed(1)}ms, hydrate(${pagePosts.length})=${tHydrate.toFixed(1)}ms -> total=${(performance.now() - t0).toFixed(1)}ms`,
+    );
 
     return {
       posts: pagePosts,
@@ -500,15 +523,12 @@ export class FeedService {
     // 2. 若 Redis 取得成功且有 ID，批次 Hydrate DB 詳細資料
     if (postIds.length > 0) {
       const postMap = await fetchPostsByIds(postIds, params.userId);
-      // 依照 Redis ZSET 排列順序重組結果
-      const orderedPosts = postIds
+      const posts = postIds
         .map((id) => postMap.get(id))
-        .filter(
-          (p): p is RowDataPacket => p !== undefined && p.status === "active",
-        );
+        .filter((p): p is RowDataPacket => Boolean(p));
 
       return {
-        posts: orderedPosts,
+        posts,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalPosts / limit) || 1,
@@ -519,33 +539,35 @@ export class FeedService {
       };
     }
 
-    // 3. Fallback: 直接從 MySQL 查詢熱門商品
+    // 3. Fallback: Redis 為空時，降級查 MySQL (無個人化向量)
     return await this.getFilteredFeed(params, null);
   }
 
   /**
-   * 老用戶無篩選時之全站個性化推薦：Redis 向量召回 (FT.SEARCH KNN) + 混合熱門排序 (Hybrid Re-ranking)
+   * 登入老用戶：Redis 向量檢索 (HNSW KNN) + 混合重排 (Hybrid Re-ranking)
    */
   async getPersonalizedFeed(
     userVectorBuffer: Buffer,
     params: FeedParams,
   ): Promise<FeedResult> {
+    const t0 = performance.now();
     const page = Math.max(1, params.page || 1);
     const limit = Math.max(1, Math.min(50, params.limit || 20));
+
     const redis = getRedisClient();
+    const CANDIDATE_LIMIT = Math.max(150, (page + 2) * limit);
 
-    // 1. 向量檢索召回 (KNN 召回 top 60 筆候補商品)
-    const CANDIDATE_LIMIT = 60;
-    const knnQuery = `*=>[KNN ${CANDIDATE_LIMIT} @v $vec AS vector_distance]`;
-
-    interface Candidate {
+    interface CandidateInfo {
       postId: number;
       distance: number;
       similarity: number;
     }
-    const candidates: Candidate[] = [];
+    const candidates: CandidateInfo[] = [];
 
+    // 1. Redis HNSW 向量檢索召回 (KNN Top-K)
+    const tSearch0 = performance.now();
     try {
+      const knnQuery = `*=>[KNN ${CANDIDATE_LIMIT} @v $vec AS vector_distance]`;
       const rawResult = (await redis.sendCommand([
         "FT.SEARCH",
         "idx:posts_v",
@@ -596,37 +618,53 @@ export class FeedService {
       );
       return await this.getFilteredFeed(params, userVectorBuffer);
     }
+    const tSearch = performance.now() - tSearch0;
 
     // 若向量搜尋無結果（例如貼文尚未建立索引），自動 fallback
     if (candidates.length === 0) {
+      console.log(`⚠️ [getPersonalizedFeed] 0 candidates from Redis, fallback to DB feed`);
       return await this.getFilteredFeed(params, userVectorBuffer);
     }
 
-    // 2. 批次 Hydrate 貼文詳細資料
+    // 2. 🌟 延遲關聯 (Late Materialization)：先輕量查詢候選 150 篇的打分欄位 (不 JOIN images/users)
+    const tMeta0 = performance.now();
     const postIds = candidates.map((c) => c.postId);
-    const postMap = await fetchPostsByIds(postIds, params.userId);
+    const placeholders = postIds.map(() => "?").join(",");
+    const [candidateMetaRows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT p.id, p.hot_score, p.expires_at, p.status, l.lat, l.lng
+       FROM posts p
+       LEFT JOIN locations l ON p.location_id = l.id
+       WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL`,
+      postIds,
+    );
+    const candidateMetaMap = new Map<number, RowDataPacket>();
+    for (const row of candidateMetaRows) {
+      candidateMetaMap.set(row.id, row);
+    }
+    const tMeta = performance.now() - tMeta0;
 
     // 3. 混合重排 (Hybrid Re-ranking)
+    const tScore0 = performance.now();
     let maxHotScore = 1.0;
     for (const c of candidates) {
-      const post = postMap.get(c.postId);
-      if (post && post.hot_score) {
-        maxHotScore = Math.max(maxHotScore, Number(post.hot_score));
+      const meta = candidateMetaMap.get(c.postId);
+      if (meta && meta.hot_score) {
+        maxHotScore = Math.max(maxHotScore, Number(meta.hot_score));
       }
     }
 
-    interface ScoredPost {
-      post: RowDataPacket;
+    interface ScoredPostCandidate {
+      postId: number;
       finalScore: number;
     }
-    const scoredPosts: ScoredPost[] = [];
+    const scoredCandidates: ScoredPostCandidate[] = [];
     const now = Date.now();
 
     for (const c of candidates) {
-      const post = postMap.get(c.postId);
-      if (!post || post.status !== "active") continue;
+      const meta = candidateMetaMap.get(c.postId);
+      if (!meta || meta.status !== "active") continue;
 
-      const normalizedHot = Number(post.hot_score || 0) / maxHotScore;
+      const normalizedHot = Number(meta.hot_score || 0) / maxHotScore;
 
       // 混合公式：FinalScore = 0.7 * VectorSimilarity + 0.3 * NormalizedHotScore
       let finalScore = 0.7 * c.similarity + 0.3 * normalizedHot;
@@ -635,54 +673,51 @@ export class FeedService {
       if (
         params.lat !== undefined &&
         params.lng !== undefined &&
-        post.lat !== null &&
-        post.lng !== null
+        meta.lat !== null &&
+        meta.lng !== null
       ) {
         const distKm = calculateDistanceKm(
           params.lat,
           params.lng,
-          Number(post.lat),
-          Number(post.lng),
+          Number(meta.lat),
+          Number(meta.lng),
         );
-        if (params.mode === "tinder") {
-          // 🎯 Tinder 專屬大幅非線性距離加權
-          if (distKm <= 3) {
-            finalScore *= 2.0; // 3 公里內超近生活圈 +100%
-          } else if (distKm <= 7) {
-            finalScore *= 1.5; // 7 公里內 +50%
-          } else if (distKm <= 15) {
-            finalScore *= 1.2; // 15 公里內 +20%
-          }
-        } else {
-          // 🏠 首頁與一般 Feed 維持原樣
-          if (distKm <= 5) {
-            finalScore *= 1.2; // 5 公里內 +20%
-          } else if (distKm <= 15) {
-            finalScore *= 1.1; // 15 公里內 +10%
-          }
-        }
+        finalScore *= getGeoMultiplier(distKm, params.mode);
       }
 
       // 未過期加權
-      const isExpired = post.expires_at
-        ? new Date(post.expires_at).getTime() < now
+      const isExpired = meta.expires_at
+        ? new Date(meta.expires_at).getTime() < now
         : false;
       if (!isExpired) {
         finalScore += 10.0;
       }
 
-      scoredPosts.push({ post, finalScore });
+      scoredCandidates.push({ postId: c.postId, finalScore });
     }
 
     // 依 FinalScore 降冪排序
-    scoredPosts.sort((a, b) => b.finalScore - a.finalScore);
+    scoredCandidates.sort((a, b) => b.finalScore - a.finalScore);
 
-    // 分頁切片
-    const total = scoredPosts.length;
+    // 分頁切片取得當前頁 post IDs
+    const total = scoredCandidates.length;
     const offset = (page - 1) * limit;
-    const pagePosts = scoredPosts
+    const pagePostIds = scoredCandidates
       .slice(offset, offset + limit)
-      .map((s) => s.post);
+      .map((s) => s.postId);
+    const tScore = performance.now() - tScore0;
+
+    // 🌟 延遲關聯 (Late Materialization)：只對當前頁所需貼文 (例如 12 篇) 批次查詢 6 表詳細資料
+    const tHydrate0 = performance.now();
+    const postMap = await fetchPostsByIds(pagePostIds, params.userId);
+    const pagePosts = pagePostIds
+      .map((id) => postMap.get(id))
+      .filter((p): p is RowDataPacket => Boolean(p));
+    const tHydrate = performance.now() - tHydrate0;
+
+    console.log(
+      `🎯 [getPersonalizedFeed] ftSearch(${candidates.length})=${tSearch.toFixed(1)}ms, metaQuery=${tMeta.toFixed(1)}ms, scoring=${tScore.toFixed(1)}ms, hydrate(${pagePosts.length})=${tHydrate.toFixed(1)}ms -> total=${(performance.now() - t0).toFixed(1)}ms`,
+    );
 
     return {
       posts: pagePosts,
@@ -709,34 +744,27 @@ export class FeedService {
       params.search,
     );
 
-    let userVectorBuffer: Buffer | null = null;
-    if (params.userId) {
-      userVectorBuffer = await this.getUserVector(params.userId);
+    const userVectorBuffer: Buffer | null = params.userId
+      ? await this.getUserVector(params.userId)
+      : null;
+
+    let result: FeedResult;
+
+    if (params.mode === "tinder" || hasFilters) {
+      result = await this.getFilteredFeed(params, userVectorBuffer);
+    } else if (userVectorBuffer) {
+      result = await this.getPersonalizedFeed(userVectorBuffer, params);
+    } else if (params.lat !== undefined && params.lng !== undefined) {
+      result = await this.getFilteredFeed(params, null);
+    } else {
+      result = await this.getTrendingFeed(params);
     }
 
-    // 🎯 Tinder 模式強制走 getFilteredFeed，確保 radius WHERE 篩選在 SQL 層生效
-    // （getPersonalizedFeed 走 Redis KNN 固定池，不支援 radius 過濾，會有「跨頁插隊」問題）
-    if (params.mode === "tinder") {
-      return await this.getFilteredFeed(params, userVectorBuffer);
+    for (const post of result.posts) {
+      delete post.embedding;
     }
 
-    // 1. 若有特定篩選條件（分類、Wish/Share、地點、搜尋詞），走「條件召回 + 個人化重排」
-    if (hasFilters) {
-      return await this.getFilteredFeed(params, userVectorBuffer);
-    }
-
-    // 2. 無篩選條件：登入老用戶走 Redis 向量檢索 (KNN) + 混合重排（包含地理位置加權）
-    if (userVectorBuffer) {
-      return await this.getPersonalizedFeed(userVectorBuffer, params);
-    }
-
-    // 3. 無篩選條件且無向量，但有提供經緯度：走熱門候選召回 + 地理位置加權重排 (Geo Boost)
-    if (params.lat !== undefined && params.lng !== undefined) {
-      return await this.getFilteredFeed(params, null);
-    }
-
-    // 4. 無篩選條件、無向量、無位置資訊：走全站熱門 Trending Feed (Redis 快取)
-    return await this.getTrendingFeed(params);
+    return result;
   }
 }
 

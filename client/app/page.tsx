@@ -67,7 +67,7 @@ const PostsApp = () => {
 
   const { categories, conditions } = usePost();
   const { isNavbarVisible } = useNavbar();
-  const { coords } = useLocation();
+  const { coords, isReady } = useLocation();
 
   const [isTourOpen, setIsTourOpen] = useState(false);
   const [isWeavingExpanded, setIsWeavingExpanded] = useState(false);
@@ -171,6 +171,9 @@ const PostsApp = () => {
   const getKey = useCallback(
     (pageIndex: number, previousPageData: PostsResponse | null) => {
       // reached the end
+
+      // Hold until location is ready
+      if (!isReady) return null;
       if (previousPageData && !previousPageData.posts.length) return null;
 
       const params = new URLSearchParams({
@@ -193,6 +196,7 @@ const PostsApp = () => {
       return `${hostName}/api/posts/feed?${params.toString()}`;
     },
     [
+      isReady,
       hostName,
       searchTerm,
       selectedCategory,

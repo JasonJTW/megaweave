@@ -18,6 +18,7 @@ import notificationsAPI from "./notifications";
 import messagesAPI from "./messages";
 import sendAPI from "./send";
 import meAPI from "./me";
+import lalamoveAPI from "./lalamove";
 
 //* Test api
 router.post("/test", (_req, res) => {
@@ -48,5 +49,6 @@ router.use("/notifications", notificationsAPI);
 router.use("/messages", messagesAPI);
 router.use("/send", sendAPI);
 router.use("/me", meAPI);
+router.use("/lalamove", lalamoveAPI);
 
 export default router;

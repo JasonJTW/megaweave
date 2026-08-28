@@ -25,6 +25,7 @@ import PostFormModal, {
 } from "../../components/PostFormModal";
 import PostOwnerSidebar from "../../components/PostOwnerSidebar";
 import PostShareModal from "../../components/PostShareModal";
+import LalamoveQuotation from "@/app/components/Lalamove/LalamoveQuotation";
 import { useNavbar } from "../../contexts/NavBarContext";
 import { useUser } from "../../contexts/UserContext";
 import { Post } from "../../types/schema";
@@ -526,7 +527,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   </div>
                 </>
               )}
-              <h1 className="mb-4 font-ddin text-2xl text-[36px] font-bold text-gray-900">
+              <h1 className="mb-4 font-ddin text-2xl text-[36px] font-bold leading-snug text-gray-900">
                 {post.title}
               </h1>
               {/* 分類和狀況 */}
@@ -631,7 +632,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 )}
               </div>
 
-              {/* 貼文內容 */}
+              {/* Author Avatar */}
               <div
                 className="flex items-center rounded-[30px] bg-[#fafafa] p-[9px]"
                 onClick={handleAvatarClick}
@@ -709,6 +710,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   </div>
                 )}
               </div>
+              {/* Lalamove 即時運費報價 */}
+              {post.lat && post.lng && <LalamoveQuotation post={post} />}
 
               {/* 評論區 */}
               <div id="comments" className="rounded-lg bg-white shadow-sm">

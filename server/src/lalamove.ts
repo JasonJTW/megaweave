@@ -1,7 +1,14 @@
 import express, { Request, Response } from "express";
+import { Server } from "socket.io";
 import {
   requestLalamoveQuotation,
+  createLalamoveOrder,
+  getLalamoveOrderDetail,
+  cancelLalamoveOrder,
+  getLalamoveDriverDetail,
+  verifyLalamoveWebhookSignature,
   GetQuotationParams,
+  CreateOrderParams,
 } from "./services/lalamove";
 
 const router = express.Router();
@@ -48,9 +55,10 @@ router.post("/quotation", async (req: Request, res: Response): Promise<void> => 
     }
 
     // Determine target service types
-    const typesToFetch: string[] = serviceTypes && Array.isArray(serviceTypes) && serviceTypes.length > 0
-      ? serviceTypes
-      : [serviceType || "MOTORCYCLE"];
+    const typesToFetch: string[] =
+      serviceTypes && Array.isArray(serviceTypes) && serviceTypes.length > 0
+        ? serviceTypes
+        : [serviceType || "MOTORCYCLE"];
 
     const quotations = await Promise.all(
       typesToFetch.map(async (st: string) => {
@@ -67,7 +75,7 @@ router.post("/quotation", async (req: Request, res: Response): Promise<void> => 
           serviceName: meta?.name || st,
           serviceDescription: meta?.description || "",
         };
-      })
+      }),
     );
 
     res.json({
@@ -82,6 +90,264 @@ router.post("/quotation", async (req: Request, res: Response): Promise<void> => 
       error: "Failed to get Lalamove quotation",
       message,
     });
+  }
+});
+
+/**
+ * POST /api/lalamove/orders
+ * 下單建立 Lalamove 配送
+ */
+router.post("/orders", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      quotationId,
+      sender,
+      recipients,
+      isPODEnabled,
+      isRecipientSmsEnabled,
+      partner,
+      metadata,
+    } = req.body;
+
+    if (!quotationId) {
+      res.status(400).json({ error: "quotationId is required" });
+      return;
+    }
+
+    if (!sender?.name || !sender?.phone) {
+      res.status(400).json({ error: "Sender name and phone are required" });
+      return;
+    }
+
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      res.status(400).json({ error: "At least one recipient is required" });
+      return;
+    }
+
+    for (const r of recipients) {
+      if (!r.name || !r.phone) {
+        res.status(400).json({ error: "Each recipient must have name and phone" });
+        return;
+      }
+    }
+
+    const orderParams: CreateOrderParams = {
+      quotationId,
+      sender,
+      recipients,
+      isPODEnabled,
+      isRecipientSmsEnabled,
+      partner,
+      metadata,
+    };
+
+    const orderResult = await createLalamoveOrder(orderParams);
+
+    // Broadcast new order event to socket room if available
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io && orderResult.orderId) {
+      io.to(`delivery_${orderResult.orderId}`).emit("delivery_update", orderResult);
+    }
+
+    res.status(201).json({
+      success: true,
+      order: orderResult,
+    });
+  } catch (error: unknown) {
+    const errObj = error as {
+      httpStatus?: number;
+      errors?: Array<{ id?: string; message?: string; detail?: string }>;
+      message?: string;
+    };
+    const detailMsg =
+      errObj.errors && errObj.errors.length > 0
+        ? `${errObj.errors[0].id || ""}: ${errObj.errors[0].message || ""}`
+        : errObj.message || "Failed to create order";
+
+    console.error("Lalamove create order error:", error);
+    res.status(500).json({
+      error: "Failed to create Lalamove order",
+      message: detailMsg,
+      details: errObj.errors,
+    });
+  }
+});
+
+/**
+ * GET /api/lalamove/orders/:orderId
+ * 取得訂單最新狀態、詳細資訊與司機即時座標
+ */
+router.get("/orders/:orderId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "orderId is required" });
+      return;
+    }
+
+    const orderDetail = await getLalamoveOrderDetail(orderId);
+    res.json({
+      success: true,
+      order: orderDetail,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to get order details";
+    console.error(`Lalamove get order ${req.params.orderId} error:`, error);
+    res.status(500).json({
+      error: "Failed to get Lalamove order details",
+      message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/lalamove/orders/:orderId
+ * 取消 Lalamove 訂單
+ */
+router.delete("/orders/:orderId", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "orderId is required" });
+      return;
+    }
+
+    const cancelResult = await cancelLalamoveOrder(orderId);
+
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io) {
+      io.to(`delivery_${orderId}`).emit("delivery_update", {
+        orderId,
+        status: "CANCELED",
+      });
+    }
+
+    res.json({
+      success: true,
+      result: cancelResult,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to cancel order";
+    console.error(`Lalamove cancel order ${req.params.orderId} error:`, error);
+    res.status(500).json({
+      error: "Failed to cancel Lalamove order",
+      message,
+    });
+  }
+});
+
+/**
+ * POST /api/lalamove/orders/:orderId/cancel
+ * 取消訂單 (POST 備援端點)
+ */
+router.post("/orders/:orderId/cancel", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "orderId is required" });
+      return;
+    }
+
+    const cancelResult = await cancelLalamoveOrder(orderId);
+
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io) {
+      io.to(`delivery_${orderId}`).emit("delivery_update", {
+        orderId,
+        status: "CANCELED",
+      });
+    }
+
+    res.json({
+      success: true,
+      result: cancelResult,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to cancel order";
+    console.error(`Lalamove cancel order (POST) ${req.params.orderId} error:`, error);
+    res.status(500).json({
+      error: "Failed to cancel Lalamove order",
+      message,
+    });
+  }
+});
+
+/**
+ * GET /api/lalamove/orders/:orderId/driver
+ * 取得指定訂單司機位置資訊
+ */
+router.get("/orders/:orderId/driver", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { orderId } = req.params;
+    const driverId = req.query.driverId as string;
+
+    if (!orderId || !driverId) {
+      res.status(400).json({ error: "orderId and driverId query param are required" });
+      return;
+    }
+
+    const driver = await getLalamoveDriverDetail(orderId, driverId);
+    res.json({
+      success: true,
+      driver,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to get driver";
+    console.error("Lalamove get driver error:", error);
+    res.status(500).json({
+      error: "Failed to get driver details",
+      message,
+    });
+  }
+});
+
+/**
+ * POST /api/lalamove/webhook
+ * Lalamove Webhook 接收端點 (訂單狀態變化、司機接單、司機位置改變)
+ */
+router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rawSignature = (req.headers["x-llm-signature"] ||
+      req.headers["x-signature"] ||
+      req.headers["x-lalamove-signature"]) as string | undefined;
+    const rawTimestamp = req.headers["x-llm-timestamp"] as string | undefined;
+
+    // Verify signature
+    const isValid = verifyLalamoveWebhookSignature(
+      JSON.stringify(req.body),
+      rawSignature,
+      rawTimestamp,
+    );
+
+    if (!isValid) {
+      console.warn("[Lalamove Webhook] Signature verification failed");
+      // In sandbox/testing we can continue or return 401
+    }
+
+    const payload = req.body;
+    console.log("[Lalamove Webhook] Received webhook event:", JSON.stringify(payload, null, 2));
+
+    const eventType = payload.eventType || payload.event || payload.type;
+    const eventData = payload.data || payload;
+    const orderId = eventData?.order?.id || eventData?.orderId || payload.orderId;
+
+    if (orderId) {
+      const io: Server | undefined = res.locals.io || req.app.get("io");
+      if (io) {
+        io.to(`delivery_${orderId}`).emit("delivery_update", {
+          orderId,
+          eventType,
+          eventData,
+          updatedAt: new Date().toISOString(),
+        });
+        console.log(`[Lalamove Webhook] Broadcasted event ${eventType} to delivery_${orderId}`);
+      }
+    }
+
+    res.status(200).json({ received: true });
+  } catch (error: unknown) {
+    console.error("[Lalamove Webhook] Error processing webhook:", error);
+    res.status(500).json({ error: "Webhook processing error" });
   }
 });
 

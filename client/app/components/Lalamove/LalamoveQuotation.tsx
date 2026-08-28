@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
+import OrderPlacementModal from "./OrderPlacementModal";
+import { useUser } from "@/app/contexts/UserContext";
+import { ArrowRight } from "lucide-react";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -254,6 +257,8 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const { user } = useUser();
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   // Origin info from post
   const originAddress =
@@ -912,6 +917,22 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                           {t.recalculate}
                         </button>
                       </div>
+
+                      {/* 4. Book / Call Lalamove Driver Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsOrderModalOpen(true)}
+                        disabled={timeLeft === 0}
+                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 font-ddin text-sm font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Truck className="h-4 w-4" />
+                        <span>
+                          {locale === "en"
+                            ? `Book Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`
+                            : `立即呼叫 Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`}
+                        </span>
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -920,6 +941,18 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Order Placement Modal */}
+      <OrderPlacementModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        quotation={activeQuotation}
+        post={post}
+        originAddress={originAddress}
+        destinationAddress={destinationAddress}
+        currentUser={user}
+        locale={locale}
+      />
     </div>
   );
 };

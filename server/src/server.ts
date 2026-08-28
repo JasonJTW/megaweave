@@ -126,6 +126,17 @@ async function startServer() {
         socket.join(roomName);
         // console.log(`👤User ${userId} joined room: ${roomName}`);
       });
+      //* 加入特定訂單的配送即時追蹤 Room
+      socket.on("join_delivery", (orderId: string) => {
+        const roomName = `delivery_${orderId}`;
+        socket.join(roomName);
+        console.log(`📦 Socket ${socket.id} joined delivery room: ${roomName}`);
+      });
+      socket.on("leave_delivery", (orderId: string) => {
+        const roomName = `delivery_${orderId}`;
+        socket.leave(roomName);
+        console.log(`📦 Socket ${socket.id} left delivery room: ${roomName}`);
+      });
       socket.on("disconnect", () => {
         console.log(`❌ Client disconnected: ${socket.id}`);
       });

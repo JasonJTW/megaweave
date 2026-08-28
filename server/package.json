@@ -18,6 +18,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@lalamove/lalamove-js": "^1.1.0",
     "@redis/client": "^5.1.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "bullmq": "^6.0.5",

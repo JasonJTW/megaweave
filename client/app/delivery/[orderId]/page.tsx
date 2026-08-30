@@ -16,11 +16,11 @@ import {
   Navigation,
   Ban,
   User,
-  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSocketContext } from "@/app/contexts/SocketContext";
 import * as Dialog from "@radix-ui/react-dialog";
+import SandboxPanel from "@/app/components/Lalamove/SandboxPanel";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
@@ -40,6 +40,7 @@ interface DriverInfo {
 interface OrderDetail {
   orderId: string;
   quotationId: string;
+  serviceType?: string;
   status:
     | "ASSIGNING_DRIVER"
     | "ON_GOING"
@@ -79,13 +80,25 @@ interface OrderDetail {
 }
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.message || errorData.error || "無法載入訂單資料");
   }
   const data = await res.json();
   return data.order as OrderDetail;
+};
+
+// 車型名稱字典
+const VEHICLE_NAMES: Record<string, { name: string; icon: string }> = {
+  MOTORCYCLE: { name: "機車", icon: "🛵" },
+  MOTORCYCLE_LARGELALABAG: { name: "機車大保溫袋", icon: "🛵" },
+  MOTORCYCLE_INTERCITY: { name: "跨區機車", icon: "🏍️" },
+  SUV: { name: "廂型貨車（半車）", icon: "🚙" },
+  VAN: { name: "廂型貨車（全車）", icon: "🚐" },
+  TRUCK175: { name: "1.75噸 貨車", icon: "🚚" },
+  TRUCK330: { name: "3.49噸 貨車", icon: "🚛" },
+  TRUCK500: { name: "5噸 貨車", icon: "🚛" },
 };
 
 // 狀態翻譯與顏色對應
@@ -106,6 +119,13 @@ const STATUS_CONFIG: Record<
     badgeText: "媒合中",
     stepIndex: 1,
   },
+  ASSIGNED: {
+    label: "司機已接單，前往取件中",
+    desc: "司機正在前往寄件地點，請準備好物品",
+    badgeBg: "bg-blue-500/10 border-blue-500/30 text-blue-600",
+    badgeText: "前往取件",
+    stepIndex: 2,
+  },
   ON_GOING: {
     label: "司機已接單，前往取件中",
     desc: "司機正在前往寄件地點，請準備好物品",
@@ -120,7 +140,35 @@ const STATUS_CONFIG: Record<
     badgeText: "運送中",
     stepIndex: 3,
   },
+  IN_DELIVERY: {
+    label: "司機已取件，配送運送中",
+    desc: "物品已在路途中，司機正前往送達地點",
+    badgeBg: "bg-indigo-500/10 border-indigo-500/30 text-indigo-600",
+    badgeText: "運送中",
+    stepIndex: 3,
+  },
   COMPLETED: {
+    label: "配送已順利完成",
+    desc: "感謝使用 Lalamove 即時快遞服務！",
+    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
+    badgeText: "已送達",
+    stepIndex: 4,
+  },
+  FULFILLED: {
+    label: "配送已順利完成",
+    desc: "感謝使用 Lalamove 即時快遞服務！",
+    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
+    badgeText: "已送達",
+    stepIndex: 4,
+  },
+  DELIVERED: {
+    label: "配送已順利完成",
+    desc: "感謝使用 Lalamove 即時快遞服務！",
+    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
+    badgeText: "已送達",
+    stepIndex: 4,
+  },
+  FINISHED: {
     label: "配送已順利完成",
     desc: "感謝使用 Lalamove 即時快遞服務！",
     badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
@@ -165,6 +213,15 @@ export default function DeliveryTrackingPage() {
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [fetchErrorCount, setFetchErrorCount] = useState(0);
+  const [mapReady, setMapReady] = useState(false);
+
+  // 頁面掛載後偵測 Google Maps 是否已就緒
+  useEffect(() => {
+    if (typeof window.google?.maps?.Map === "function") {
+      setMapReady(true);
+    }
+  }, []);
 
   // 地圖相關 Refs
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -172,10 +229,10 @@ export default function DeliveryTrackingPage() {
   const originMarkerRef = useRef<google.maps.Marker | null>(null);
   const destMarkerRef = useRef<google.maps.Marker | null>(null);
   const driverMarkerRef = useRef<google.maps.Marker | null>(null);
-  const directionsRendererRef =
-    useRef<google.maps.DirectionsRenderer | null>(null);
+  const routePolylineRef = useRef<google.maps.Polyline | null>(null);
+  const driverPolylineRef = useRef<google.maps.Polyline | null>(null);
 
-  // SWR 定時輪詢（未完成前每 4 秒輪詢一次）
+  // SWR 定時輪詢（未完成前每 3 秒輪詢一次）
   const {
     data: order,
     error,
@@ -186,10 +243,13 @@ export default function DeliveryTrackingPage() {
     fetcher,
     {
       refreshInterval: (latestData) => {
-        if (!latestData) return 4000;
-        const s = latestData.status;
+        if (!latestData) return 3000;
+        const s = (latestData.status || "").trim().toUpperCase();
         if (
           s === "COMPLETED" ||
+          s === "FULFILLED" ||
+          s === "DELIVERED" ||
+          s === "FINISHED" ||
           s === "CANCELED" ||
           s === "CANCELLED" ||
           s === "EXPIRED" ||
@@ -197,9 +257,16 @@ export default function DeliveryTrackingPage() {
         ) {
           return 0; // 結束後停止輪詢
         }
-        return 4000;
+        return 3000;
       },
       revalidateOnFocus: true,
+      dedupingInterval: 1000,
+      onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
+        // 最多重試 10 次 (約 30 秒)，讓 Lalamove 有時間處理剛建立的訂單
+        if (retryCount >= 10) return;
+        setFetchErrorCount(retryCount + 1);
+        setTimeout(() => revalidate({ retryCount }), 3000);
+      },
     },
   );
 
@@ -226,7 +293,26 @@ export default function DeliveryTrackingPage() {
   useEffect(() => {
     if (!mapContainerRef.current || !order || typeof window === "undefined")
       return;
-    if (!window.google?.maps) return;
+
+    // 等待 Google Maps 完整載入（Map 建構子可用）才執行初始化
+    const isGoogleMapsReady = () =>
+      typeof window.google?.maps?.Map === "function";
+
+    if (!isGoogleMapsReady()) {
+      // 若 Maps API 尚未就緒，每 200ms 重新確認一次，最多等 10 秒
+      let attempts = 0;
+      const poll = setInterval(() => {
+        attempts++;
+        if (isGoogleMapsReady()) {
+          clearInterval(poll);
+          // 重新觸發此 effect（透過 state 更新）
+          setMapReady(true);
+        } else if (attempts >= 50) {
+          clearInterval(poll); // 逾時放棄
+        }
+      }, 200);
+      return () => clearInterval(poll);
+    }
 
     const stops = order.stops || [];
     const origin = stops[0]?.coordinates;
@@ -256,17 +342,6 @@ export default function DeliveryTrackingPage() {
           ],
         },
       );
-
-      directionsRendererRef.current =
-        new window.google.maps.DirectionsRenderer({
-          map: mapInstanceRef.current,
-          suppressMarkers: true,
-          polylineOptions: {
-            strokeColor: "#ea580c",
-            strokeWeight: 5,
-            strokeOpacity: 0.8,
-          },
-        });
     }
 
     const map = mapInstanceRef.current;
@@ -305,21 +380,25 @@ export default function DeliveryTrackingPage() {
       });
     }
 
-    // 4. 規劃路線
-    if (origin && dest && directionsRendererRef.current) {
-      const directionsService = new window.google.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin: { lat: Number(origin.lat), lng: Number(origin.lng) },
-          destination: { lat: Number(dest.lat), lng: Number(dest.lng) },
-          travelMode: window.google.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (status === window.google.maps.DirectionsStatus.OK && result) {
-            directionsRendererRef.current?.setDirections(result);
-          }
-        },
-      );
+    // 4. 繪製起訖點路徑 Polyline (橘色高質感連線)
+    if (origin && dest) {
+      const lineCoordinates = [
+        { lat: Number(origin.lat), lng: Number(origin.lng) },
+        { lat: Number(dest.lat), lng: Number(dest.lng) },
+      ];
+
+      if (!routePolylineRef.current) {
+        routePolylineRef.current = new window.google.maps.Polyline({
+          path: lineCoordinates,
+          geodesic: true,
+          strokeColor: "#ea580c",
+          strokeOpacity: 0.85,
+          strokeWeight: 4,
+          map,
+        });
+      } else {
+        routePolylineRef.current.setPath(lineCoordinates);
+      }
     }
 
     // 5. 司機即時 Marker
@@ -347,21 +426,77 @@ export default function DeliveryTrackingPage() {
       } else {
         driverMarkerRef.current.setPosition(driverPos);
       }
+
+      // 5b. 司機到下一站目標的虛線（媒合/取件中→取件點，運送中→送達點）
+      const targetCoords =
+        normalizedStatus === "PICKED_UP" || normalizedStatus === "IN_DELIVERY"
+          ? dest
+          : origin;
+      if (targetCoords) {
+        const driverLine = [
+          driverPos,
+          { lat: Number(targetCoords.lat), lng: Number(targetCoords.lng) },
+        ];
+        if (!driverPolylineRef.current) {
+          driverPolylineRef.current = new window.google.maps.Polyline({
+            path: driverLine,
+            geodesic: true,
+            strokeColor: "#f97316",
+            strokeOpacity: 0,
+            strokeWeight: 0,
+            icons: [
+              {
+                icon: {
+                  path: "M 0,-1 0,1",
+                  strokeOpacity: 0.7,
+                  strokeColor: "#f97316",
+                  scale: 3,
+                },
+                offset: "0",
+                repeat: "16px",
+              },
+            ],
+            map,
+          });
+        } else {
+          driverPolylineRef.current.setPath(driverLine);
+        }
+      }
     }
 
-    // 6. Fit Bounds 自動縮放視野
+    // 6. Fit Bounds 自動縮放視野（僅在司機位置合理時才納入計算）
     const bounds = new window.google.maps.LatLngBounds();
     if (origin)
       bounds.extend({ lat: Number(origin.lat), lng: Number(origin.lng) });
     if (dest) bounds.extend({ lat: Number(dest.lat), lng: Number(dest.lng) });
+
+    // 只有當司機距離取/送點不超過 1.5 度（約 150km）時才納入 bounds
     if (driverCoords?.lat && driverCoords?.lng) {
-      bounds.extend({
-        lat: Number(driverCoords.lat),
-        lng: Number(driverCoords.lng),
-      });
+      const dLat = Math.abs(
+        Number(driverCoords.lat) - Number(origin?.lat || dest?.lat || 25),
+      );
+      const dLng = Math.abs(
+        Number(driverCoords.lng) - Number(origin?.lng || dest?.lng || 121),
+      );
+      if (dLat < 1.5 && dLng < 1.5) {
+        bounds.extend({
+          lat: Number(driverCoords.lat),
+          lng: Number(driverCoords.lng),
+        });
+      }
     }
-    map.fitBounds(bounds, { top: 40, right: 40, bottom: 40, left: 40 });
-  }, [order]);
+
+    map.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
+    // 確保縮放不低於 11 級（避免世界地圖）
+    const listener = window.google.maps.event.addListenerOnce(
+      map,
+      "bounds_changed",
+      () => {
+        if ((map.getZoom() ?? 15) < 11) map.setZoom(12);
+      },
+    );
+    return () => window.google.maps.event.removeListener(listener);
+  }, [order, mapReady]);
 
   // 取消訂單處理
   const handleCancelOrder = async () => {
@@ -398,11 +533,29 @@ export default function DeliveryTrackingPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-orange-50 text-orange-500 shadow-sm animate-pulse">
+        <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-3xl bg-orange-50 text-orange-500 shadow-sm">
           <Truck className="h-8 w-8" />
         </div>
         <p className="mt-4 font-semibold text-gray-700">
           正在載入配送訂單資訊...
+        </p>
+      </div>
+    );
+  }
+
+  // 若剛下單後短暫查無資料，改顯示載入畫面（最多重試 10 次）
+  if ((error || !order) && fetchErrorCount < 10) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center">
+        <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-3xl bg-orange-50 text-orange-500 shadow-sm">
+          <Truck className="h-8 w-8" />
+        </div>
+        <p className="mt-4 font-semibold text-gray-700">
+          正在連線至 Lalamove 訂單系統...
+        </p>
+        <p className="mt-1 text-xs text-gray-400">
+          首次載入可能需要數秒，請稍候
+          {fetchErrorCount > 0 ? `（第 ${fetchErrorCount} 次重試）` : ""}
         </p>
       </div>
     );
@@ -414,9 +567,7 @@ export default function DeliveryTrackingPage() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-rose-500">
           <AlertCircle className="h-7 w-7" />
         </div>
-        <h2 className="mt-4 text-lg font-bold text-gray-900">
-          查無此配送訂單
-        </h2>
+        <h2 className="mt-4 text-lg font-bold text-gray-900">查無此配送訂單</h2>
         <p className="mt-2 text-xs text-gray-500">
           {error?.message || "請確認訂單編號是否正確或稍後再試。"}
         </p>
@@ -432,10 +583,13 @@ export default function DeliveryTrackingPage() {
     );
   }
 
+  const normalizedStatus = (order.status || "").trim().toUpperCase();
   const currentStatusConfig =
-    STATUS_CONFIG[order.status] || STATUS_CONFIG.ASSIGNING_DRIVER;
+    STATUS_CONFIG[normalizedStatus] || STATUS_CONFIG.ASSIGNING_DRIVER;
   const isCancellable =
-    order.status === "ASSIGNING_DRIVER" || order.status === "ON_GOING";
+    normalizedStatus === "ASSIGNING_DRIVER" ||
+    normalizedStatus === "ON_GOING" ||
+    normalizedStatus === "ASSIGNED";
   const stops = order.stops || [];
   const originStop = stops[0];
   const destStop = stops[stops.length - 1];
@@ -461,6 +615,17 @@ export default function DeliveryTrackingPage() {
                 <span className="font-mono text-xs font-extrabold text-gray-900">
                   #{order.orderId}
                 </span>
+                {order.serviceType && (
+                  <span className="flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-700">
+                    <span>
+                      {VEHICLE_NAMES[order.serviceType]?.icon || "🚛"}
+                    </span>
+                    <span>
+                      {VEHICLE_NAMES[order.serviceType]?.name ||
+                        order.serviceType}
+                    </span>
+                  </span>
+                )}
               </div>
               <h1 className="text-lg font-black text-gray-900 sm:text-xl">
                 Lalamove 即時配送追蹤
@@ -625,7 +790,7 @@ export default function DeliveryTrackingPage() {
                 </span>
                 {order.driver && (
                   <span className="flex items-center gap-1">
-                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-ping" />
+                    <span className="h-2.5 w-2.5 animate-ping rounded-full bg-amber-500" />
                     司機
                   </span>
                 )}
@@ -643,14 +808,22 @@ export default function DeliveryTrackingPage() {
             {/* 司機資訊卡片 (當有司機時) */}
             {order.driver ? (
               <div className="rounded-3xl border border-orange-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                  <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
                     <User className="h-4 w-4 text-orange-500" />
                     配送司機資訊
                   </span>
-                  <span className="rounded-lg bg-orange-50 px-2 py-0.5 font-mono text-[11px] font-bold text-orange-700">
-                    車牌：{order.driver.plateNumber || "接單中"}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {order.serviceType && (
+                      <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700">
+                        {VEHICLE_NAMES[order.serviceType]?.name ||
+                          order.serviceType}
+                      </span>
+                    )}
+                    <span className="rounded-lg bg-orange-50 px-2 py-0.5 font-mono text-[11px] font-bold text-orange-700">
+                      車牌：{order.driver.plateNumber || "接單中"}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-3 flex items-center justify-between">
@@ -710,14 +883,14 @@ export default function DeliveryTrackingPage() {
               <div className="space-y-3">
                 {/* 取件點 */}
                 <div className="flex items-start gap-2.5">
-                  <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white text-[9px] font-bold">
+                  <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">
                     起
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-[11px] font-semibold text-gray-400">
                       取件地址 (寄件)
                     </span>
-                    <p className="text-xs font-medium text-gray-800 break-words">
+                    <p className="break-words text-xs font-medium text-gray-800">
                       {originStop?.address || "寄件地址"}
                     </p>
                     {originStop?.name && (
@@ -737,14 +910,14 @@ export default function DeliveryTrackingPage() {
 
                 {/* 送件點 */}
                 <div className="flex items-start gap-2.5">
-                  <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-[9px] font-bold">
+                  <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">
                     訖
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-[11px] font-semibold text-gray-400">
                       送達地址 (收件)
                     </span>
-                    <p className="text-xs font-medium text-gray-800 break-words">
+                    <p className="break-words text-xs font-medium text-gray-800">
                       {destStop?.address || "收件地址"}
                     </p>
                     {destStop?.name && (
@@ -774,6 +947,16 @@ export default function DeliveryTrackingPage() {
               </div>
 
               <div className="mt-2 space-y-1.5 text-xs text-gray-500">
+                {order.serviceType && (
+                  <div className="flex justify-between border-b border-gray-50 pb-1.5">
+                    <span>配送車型</span>
+                    <span className="font-semibold text-gray-800">
+                      {VEHICLE_NAMES[order.serviceType]?.icon || "🚛"}{" "}
+                      {VEHICLE_NAMES[order.serviceType]?.name ||
+                        order.serviceType}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>基本起跳運費</span>
                   <span>NT$ {order.priceBreakdown?.base || 75}</span>
@@ -795,6 +978,38 @@ export default function DeliveryTrackingPage() {
           </div>
         </div>
       </div>
+
+      {/* 🧪 Sandbox 測試面板（僅開發環境顯示） */}
+      {process.env.NEXT_PUBLIC_APP_ENV !== "production" && (
+        <SandboxPanel
+          orderId={order.orderId}
+          onAction={(opt) => {
+            if (opt) {
+              mutate((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  status: opt.status || prev.status,
+                  driver: opt.driverCoords
+                    ? {
+                        id: prev.driver?.id || "driver_sandbox",
+                        name: prev.driver?.name || "Lalamove 司機",
+                        phone: prev.driver?.phone || "0912345678",
+                        plateNumber: prev.driver?.plateNumber || "ABC-8888",
+                        coordinates: {
+                          lat: opt.driverCoords.lat,
+                          lng: opt.driverCoords.lng,
+                        },
+                      }
+                    : prev.driver,
+                };
+              }, false);
+            } else {
+              mutate();
+            }
+          }}
+        />
+      )}
 
       {/* 取消訂單確認 Dialog */}
       <Dialog.Root

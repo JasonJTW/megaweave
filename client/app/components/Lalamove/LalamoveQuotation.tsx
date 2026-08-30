@@ -6,19 +6,17 @@ import {
   Truck,
   MapPin,
   Navigation,
-  Clock,
   RotateCw,
   ChevronDown,
   Sparkles,
-  Info,
-  CheckCircle2,
   AlertCircle,
-  Car,
+  Van,
   Bike,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import toast from "react-hot-toast";
 import OrderPlacementModal from "./OrderPlacementModal";
+import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
 import { ArrowRight } from "lucide-react";
 
@@ -69,36 +67,48 @@ const SERVICE_OPTIONS: ServiceOption[] = [
   {
     id: "MOTORCYCLE",
     name: { en: "Motorcycle", zh: "機車" },
-    subName: { en: "Small Parcel", zh: "小型包裹" },
+    subName: { en: "Small Parcel", zh: "小型包裹 / 文件" },
     icon: "bike",
     weightLimit: { en: "Max 20kg", zh: "20kg 內" },
     sizeLimit: "40×40×40 cm",
   },
   {
+    id: "SUV",
+    name: { en: "Van (Half)", zh: "廂型貨車（半車）" },
+    subName: { en: "Medium Cargo", zh: "中型物資 / 20-32吋行李" },
+    icon: "van",
+    weightLimit: { en: "Max 200kg", zh: "200kg 內" },
+    sizeLimit: "100×100×100 cm",
+  },
+  {
     id: "VAN",
-    name: { en: "Van", zh: "廂型車" },
-    subName: { en: "Boxes / Medium", zh: "中型/多箱" },
+    name: { en: "Van (Full)", zh: "廂型貨車（全車）" },
+    subName: { en: "Boxes / Moving", zh: "學生搬宿 / 多箱行李" },
     icon: "van",
     weightLimit: { en: "Max 300kg", zh: "300kg 內" },
     sizeLimit: "150×100×100 cm",
   },
   {
-    id: "SUV",
-    name: { en: "SUV / Large Van", zh: "休旅車" },
-    subName: { en: "Large Parcel", zh: "加大空間" },
-    icon: "van",
-    weightLimit: { en: "Max 400kg", zh: "400kg 內" },
-    sizeLimit: "150×120×100 cm",
+    id: "TRUCK175",
+    name: { en: "1.75T Truck", zh: "1.75噸 貨車" },
+    subName: { en: "Moving / Heavy", zh: "租屋搬家 / 大型家具" },
+    icon: "truck",
+    weightLimit: { en: "Max 500kg", zh: "500kg 內" },
+    sizeLimit: "200×120×120 cm",
   },
   {
     id: "TRUCK330",
-    name: { en: "3.49T Truck", zh: "3.49噸貨車" },
-    subName: { en: "Full Move", zh: "全屋搬運" },
+    name: { en: "3.49T Truck", zh: "3.49噸 貨車" },
+    subName: { en: "Full Move / Heavy", zh: "家庭搬遷 / 大件棧板" },
     icon: "truck",
     weightLimit: { en: "Max 1,000kg", zh: "1,000kg 內" },
     sizeLimit: "300×150×150 cm",
   },
 ];
+
+// FIXME: [Lalamove TW API Regional Limitation]
+// FIXME In Taipei (TW_TPE), Lalamove API only supports TRUCK330 (merging 1.75T & 3.49T into 500-1000kg).
+// FIXME Therefore, requesting TRUCK175 in Taipei falls back to TRUCK330 pricing (same price). Waiting for Lalamove support to clarify if 1.75T can be differentiated.
 
 interface TranslationSchema {
   headerTitle: string;
@@ -127,6 +137,7 @@ interface TranslationSchema {
   surchargeFare: string;
   quoteValidCountdown: string;
   quoteExpired: string;
+  quoteExpiredRecalculate: string;
   recalculate: string;
   change: string;
   gpsFallback: (lat: number, lng: number) => string;
@@ -163,6 +174,7 @@ const TRANSLATIONS: Record<LalamoveLocale, TranslationSchema> = {
     surchargeFare: "Surcharge / Peak Fee",
     quoteValidCountdown: "Quote valid for: ",
     quoteExpired: "Quote Expired",
+    quoteExpiredRecalculate: "Quote Expired · Click to Recalculate",
     recalculate: "Recalculate",
     change: "Change",
     gpsFallback: (lat: number, lng: number) =>
@@ -197,6 +209,7 @@ const TRANSLATIONS: Record<LalamoveLocale, TranslationSchema> = {
     surchargeFare: "時段加成費",
     quoteValidCountdown: "報價保留倒數：",
     quoteExpired: "報價已過期",
+    quoteExpiredRecalculate: "報價已過期 · 點此重新試算",
     recalculate: "重新試算",
     change: "變更",
     gpsFallback: (lat: number, lng: number) =>
@@ -206,11 +219,11 @@ const TRANSLATIONS: Record<LalamoveLocale, TranslationSchema> = {
   },
 };
 
-interface QuotationItem {
+export interface QuotationItem {
   quotationId: string;
   serviceType: string;
-  serviceName: string;
-  serviceDescription: string;
+  serviceName?: string;
+  serviceDescription?: string;
   expiresAt: string;
   priceBreakdown: {
     total: string;
@@ -252,16 +265,17 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const [activeQuotation, setActiveQuotation] = useState<QuotationItem | null>(
     null,
   );
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isQuoteExpired, setIsQuoteExpired] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showBreakdown, setShowBreakdown] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const { user } = useUser();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
-  // Origin info from post
+  // Origin info from post (allows overriding from modal)
+  const [customOriginAddress, setCustomOriginAddress] = useState<string | null>(null);
   const originAddress =
+    customOriginAddress ||
     post.full_address ||
     post.location_name ||
     post.city ||
@@ -314,9 +328,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
   // Request quotation function
   const handleFetchQuotation = useCallback(
-    async (
-      serviceTypesToFetch: string[] = ["MOTORCYCLE", "VAN", "SUV", "TRUCK330"],
-    ) => {
+    async (serviceTypesToFetch?: string[], targetServiceToSelect?: string) => {
       if (!destinationAddress.trim()) {
         setErrorMsg(t.inputAddressError);
         return;
@@ -324,6 +336,12 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
       setLoading(true);
       setErrorMsg(null);
+      setIsQuoteExpired(false);
+
+      const targetTypes =
+        serviceTypesToFetch && serviceTypesToFetch.length > 0
+          ? serviceTypesToFetch
+          : SERVICE_OPTIONS.map((s) => s.id);
 
       try {
         const stops = [
@@ -349,7 +367,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            serviceTypes: serviceTypesToFetch,
+            serviceTypes: targetTypes,
             stops,
             language: locale === "en" ? "en_TW" : "zh_TW",
           }),
@@ -367,20 +385,41 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           quotesMap[q.serviceType] = q;
         });
 
-        setQuotations(quotesMap);
-        const current = quotesMap[selectedService] || data.quotations[0];
-        setActiveQuotation(current);
+        // 雙北與中南部的貨車代碼互補（TRUCK330 與 TRUCK175）
+        if (quotesMap["TRUCK330"] && !quotesMap["TRUCK175"]) {
+          quotesMap["TRUCK175"] = {
+            ...quotesMap["TRUCK330"],
+            serviceType: "TRUCK175",
+          };
+        }
+        if (quotesMap["TRUCK175"] && !quotesMap["TRUCK330"]) {
+          quotesMap["TRUCK330"] = {
+            ...quotesMap["TRUCK175"],
+            serviceType: "TRUCK330",
+          };
+        }
 
-        // Set countdown timer based on expiresAt (usually 5 mins)
-        if (current?.expiresAt) {
-          const expTime = new Date(current.expiresAt).getTime();
-          const diffSec = Math.max(
-            0,
-            Math.floor((expTime - Date.now()) / 1000),
+        // 合併現有報價，避免覆蓋其他車型按鈕上的金額
+        setQuotations((prev) => ({
+          ...prev,
+          ...quotesMap,
+        }));
+
+        const activeServiceId = targetServiceToSelect || selectedService;
+        const current =
+          quotesMap[activeServiceId] ||
+          (activeServiceId === "TRUCK175"
+            ? quotesMap["TRUCK330"]
+            : undefined) ||
+          (activeServiceId === "TRUCK330"
+            ? quotesMap["TRUCK175"]
+            : undefined) ||
+          data.quotations[0];
+        if (current) {
+          setActiveQuotation(current);
+          toast.success(
+            locale === "en" ? "Fare quote updated" : "運費報價已更新",
           );
-          setTimeLeft(diffSec > 0 ? diffSec : 300);
-        } else {
-          setTimeLeft(300);
         }
       } catch (err: unknown) {
         console.error("Fetch quotation error:", err);
@@ -404,32 +443,26 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     ],
   );
 
+  // Expired callback from QuoteCountdown
+  const handleExpireChange = useCallback((expired: boolean) => {
+    setIsQuoteExpired(expired);
+  }, []);
+
   // Update active quote when user switches service type
   const handleSelectService = (serviceId: string) => {
     setSelectedService(serviceId);
-    if (quotations[serviceId]) {
-      setActiveQuotation(quotations[serviceId]);
+    const existing =
+      quotations[serviceId] ||
+      (serviceId === "TRUCK175" ? quotations["TRUCK330"] : undefined) ||
+      (serviceId === "TRUCK330" ? quotations["TRUCK175"] : undefined);
+
+    if (existing) {
+      setActiveQuotation(existing);
     } else if (destinationAddress) {
-      handleFetchQuotation([serviceId]);
+      // 點擊任何車型按鈕皆批量請求所有車型報價，確保所有按鈕同時顯示金額
+      handleFetchQuotation(undefined, serviceId);
     }
   };
-
-  // Timer countdown
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft]);
 
   // Use current GPS location
   const handleGetCurrentLocation = () => {
@@ -494,19 +527,12 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     );
   };
 
-  // Format countdown mm:ss
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
-  };
-
   const renderServiceIcon = (iconType: string, className = "h-5 w-5") => {
     switch (iconType) {
       case "bike":
         return <Bike className={className} />;
       case "van":
-        return <Car className={className} />;
+        return <Van className={className} />;
       case "truck":
       default:
         return <Truck className={className} />;
@@ -674,7 +700,14 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {SERVICE_OPTIONS.map((opt) => {
                     const isSelected = selectedService === opt.id;
-                    const quote = quotations[opt.id];
+                    const quote =
+                      quotations[opt.id] ||
+                      (opt.id === "TRUCK175"
+                        ? quotations["TRUCK330"]
+                        : undefined) ||
+                      (opt.id === "TRUCK330"
+                        ? quotations["TRUCK175"]
+                        : undefined);
 
                     return (
                       <button
@@ -765,7 +798,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                 </div>
               )}
 
-              {/* 3. Quotation Result Card */}
+              {/* 3. Quotation Result Card (Shared Component) */}
               <AnimatePresence initial={false}>
                 {activeQuotation && (
                   <motion.div
@@ -776,164 +809,46 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                     transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-3 rounded-xl border border-orange-200/80 bg-white p-4 shadow-sm">
-                      <div className="flex items-end justify-between gap-3 border-b border-gray-100 pb-3">
-                        <div className="min-w-0 flex-1">
-                          <span className="text-xs font-medium text-gray-500">
-                            {t.estimatedFare}
-                          </span>
-                          <div className="mt-0.5 flex items-baseline gap-1">
-                            <span className="text-xs font-bold text-orange-600">
-                              NT$
-                            </span>
-                            <span className="font-ddin text-3xl font-extrabold tracking-tight text-orange-600">
-                              {activeQuotation.priceBreakdown?.total || 0}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex shrink-0 flex-col items-end pb-0.5 text-xs text-gray-600">
-                          <div className="flex items-center gap-1.5 whitespace-nowrap font-medium text-gray-700">
-                            <Clock className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                            <span>
-                              {t.approxDeliveryTime(
-                                activeQuotation.durationMins || 15,
-                              )}
-                            </span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[11px] text-gray-500">
-                            <Navigation className="h-3 w-3 shrink-0 text-gray-400" />
-                            <span>
-                              {t.distanceLabel(
-                                (
-                                  Number(activeQuotation.distance?.value || 0) /
-                                  1000
-                                ).toFixed(1),
-                              )}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Price Breakdown Toggle */}
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setShowBreakdown(!showBreakdown)}
-                          className="flex w-full items-center justify-between text-xs font-medium text-gray-500 hover:text-gray-700"
-                        >
-                          <span className="flex items-center gap-1">
-                            <Info className="h-3.5 w-3.5" />
-                            {t.priceBreakdown}
-                          </span>
-                          <motion.div
-                            animate={{ rotate: showBreakdown ? 180 : 0 }}
-                            transition={{ duration: 0.2 }}
+                    <QuotationSummaryCard
+                      quotation={activeQuotation}
+                      locale={locale}
+                      originAddress={originAddress}
+                      destinationAddress={destinationAddress}
+                      onExpireChange={handleExpireChange}
+                      actionButton={
+                        isQuoteExpired ? (
+                          <button
+                            type="button"
+                            onClick={() => handleFetchQuotation()}
+                            disabled={loading}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 font-ddin text-sm font-bold text-white shadow-md shadow-orange-500/20 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </motion.div>
-                        </button>
-
-                        <AnimatePresence>
-                          {showBreakdown && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.2, ease: "easeInOut" }}
-                              className="overflow-hidden"
-                            >
-                              <div className="mt-2 space-y-1 rounded-lg bg-gray-50 p-2.5 text-xs text-gray-600">
-                                <div className="flex justify-between">
-                                  <span>{t.baseFare}</span>
-                                  <span>
-                                    NT${" "}
-                                    {activeQuotation.priceBreakdown?.base || 75}
-                                  </span>
-                                </div>
-                                {Number(
-                                  activeQuotation.priceBreakdown
-                                    ?.extraMileage || 0,
-                                ) > 0 && (
-                                  <div className="flex justify-between">
-                                    <span>{t.extraMileageFare}</span>
-                                    <span>
-                                      NT${" "}
-                                      {
-                                        activeQuotation.priceBreakdown
-                                          ?.extraMileage
-                                      }
-                                    </span>
-                                  </div>
-                                )}
-                                {Number(
-                                  activeQuotation.priceBreakdown?.surcharge ||
-                                    0,
-                                ) > 0 && (
-                                  <div className="flex justify-between">
-                                    <span>{t.surchargeFare}</span>
-                                    <span>
-                                      NT${" "}
-                                      {
-                                        activeQuotation.priceBreakdown
-                                          ?.surcharge
-                                      }
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-
-                      {/* Validity Countdown & Re-calculate */}
-                      <div className="flex items-center justify-between pt-1 text-xs">
-                        <div className="flex items-center gap-1.5 text-gray-500">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                          {timeLeft !== null && timeLeft > 0 ? (
+                            <RotateCw
+                              className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                            />
                             <span>
-                              {t.quoteValidCountdown}
-                              <span className="font-mono font-bold text-orange-600">
-                                {formatTimer(timeLeft)}
-                              </span>
+                              {loading
+                                ? t.calculating
+                                : t.quoteExpiredRecalculate}
                             </span>
-                          ) : (
-                            <span className="font-medium text-red-500">
-                              {t.quoteExpired}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsOrderModalOpen(true)}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 font-ddin text-sm font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Truck className="h-4 w-4" />
+                            <span>
+                              {locale === "en"
+                                ? `Book Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`
+                                : `立即呼叫 Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`}
                             </span>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleFetchQuotation()}
-                          disabled={loading}
-                          className="flex items-center gap-1 font-semibold text-orange-600 hover:text-orange-700 disabled:opacity-50"
-                        >
-                          <RotateCw
-                            className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-                          />
-                          {t.recalculate}
-                        </button>
-                      </div>
-
-                      {/* 4. Book / Call Lalamove Driver Button */}
-                      <button
-                        type="button"
-                        onClick={() => setIsOrderModalOpen(true)}
-                        disabled={timeLeft === 0}
-                        className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 font-ddin text-sm font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Truck className="h-4 w-4" />
-                        <span>
-                          {locale === "en"
-                            ? `Book Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`
-                            : `立即呼叫 Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`}
-                        </span>
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    </div>
+                            <ArrowRight className="h-4 w-4" />
+                          </button>
+                        )
+                      }
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -947,6 +862,16 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         isOpen={isOrderModalOpen}
         onClose={() => setIsOrderModalOpen(false)}
         quotation={activeQuotation}
+        allQuotations={quotations}
+        onQuotationsUpdate={(quotes, active, newOrigin, newDest) => {
+          setQuotations(quotes);
+          if (active) {
+            setActiveQuotation(active);
+            setSelectedService(active.serviceType);
+          }
+          if (newOrigin) setCustomOriginAddress(newOrigin);
+          if (newDest) setDestinationAddress(newDest);
+        }}
         post={post}
         originAddress={originAddress}
         destinationAddress={destinationAddress}
@@ -956,5 +881,5 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     </div>
   );
 };
-
-export default LalamoveQuotation;
+export const LalamoveQuotationMemo = React.memo(LalamoveQuotation);
+export default LalamoveQuotationMemo;

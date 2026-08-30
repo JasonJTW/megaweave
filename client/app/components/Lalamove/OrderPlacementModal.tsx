@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Post } from "@/app/types/schema";
@@ -17,13 +15,56 @@ import {
   X,
   Edit3,
   Check,
+  Bike,
+  Car,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import QuotationSummaryCard from "./QuotationSummaryCard";
+
+// FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
+export const VEHICLE_OPTIONS = [
+  {
+    id: "MOTORCYCLE",
+    name: "機車",
+    nameEn: "Motorcycle",
+    desc: "40×40×40 cm / 20kg 內（文件、小型包裹、餐點）",
+    icon: "bike",
+  },
+  {
+    id: "SUV",
+    name: "廂型貨車（半車）",
+    nameEn: "Van (Half)",
+    desc: "100×100×100 cm / 200kg 內（中型物資、行李箱）",
+    icon: "car",
+  },
+  {
+    id: "VAN",
+    name: "廂型貨車（全車）",
+    nameEn: "Van (Full)",
+    desc: "150×100×100 cm / 300kg 內（學生搬宿、多箱行李）",
+    icon: "van",
+  },
+  {
+    id: "TRUCK175",
+    name: "1.75噸 貨車",
+    nameEn: "1.75T Truck",
+    desc: "200×120×120 cm / 500kg 內（小家庭、租屋搬家）",
+    icon: "truck",
+  },
+  {
+    id: "TRUCK330",
+    name: "3.49噸 貨車",
+    nameEn: "3.49T Truck",
+    desc: "300×150×150 cm / 1,000kg 內（家庭搬遷、辦公室大件）",
+    icon: "truck",
+  },
+];
 
 export interface QuotationItem {
   quotationId: string;
   serviceType: string;
   serviceName?: string;
+  serviceDescription?: string;
   expiresAt: string;
   priceBreakdown: {
     total: string;
@@ -51,6 +92,13 @@ interface OrderPlacementModalProps {
   isOpen: boolean;
   onClose: () => void;
   quotation: QuotationItem | null;
+  allQuotations?: Record<string, QuotationItem>;
+  onQuotationsUpdate?: (
+    quotes: Record<string, QuotationItem>,
+    activeQuote: QuotationItem,
+    newOriginAddress?: string,
+    newDestAddress?: string,
+  ) => void;
   post: Post;
   originAddress: string;
   destinationAddress: string;
@@ -73,10 +121,37 @@ function sanitizeTwAddress(address: string): string {
     .trim();
 }
 
+/**
+ * 透過 Google Geocoder 將使用者輸入的地址字串解析為經緯度 (lat, lng)
+ */
+const geocodeAddress = async (
+  address: string,
+): Promise<{ lat: number; lng: number } | null> => {
+  if (typeof window === "undefined" || !window.google?.maps?.Geocoder) {
+    return null;
+  }
+  return new Promise((resolve) => {
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode(
+      { address, componentRestrictions: { country: "tw" } },
+      (results, status) => {
+        if (status === "OK" && results?.[0]?.geometry?.location) {
+          const loc = results[0].geometry.location;
+          resolve({ lat: loc.lat(), lng: loc.lng() });
+        } else {
+          resolve(null);
+        }
+      },
+    );
+  });
+};
+
 export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   isOpen,
   onClose,
   quotation: initialQuotation,
+  allQuotations,
+  onQuotationsUpdate,
   post,
   originAddress: initialOriginAddress,
   destinationAddress: initialDestinationAddress,
@@ -88,10 +163,29 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
   const [currentQuotation, setCurrentQuotation] =
     useState<QuotationItem | null>(initialQuotation);
+  const [quotesMap, setQuotesMap] = useState<Record<string, QuotationItem>>(
+    allQuotations || {},
+  );
+  const [isQuoteExpired, setIsQuoteExpired] = useState(false);
 
   // 地址狀態
   const [originAddr, setOriginAddr] = useState(initialOriginAddress);
   const [destAddr, setDestAddr] = useState(initialDestinationAddress);
+  const [originCoords, setOriginCoords] = useState<{
+    lat: number;
+    lng: number;
+  }>({
+    lat: Number(
+      initialQuotation?.stops?.[0]?.coordinates?.lat ?? post.lat ?? 25.0831,
+    ),
+    lng: Number(
+      initialQuotation?.stops?.[0]?.coordinates?.lng ?? post.lng ?? 121.5452,
+    ),
+  });
+  const [destCoords, setDestCoords] = useState<{ lat: number; lng: number }>({
+    lat: Number(initialQuotation?.stops?.[1]?.coordinates?.lat ?? 24.9924),
+    lng: Number(initialQuotation?.stops?.[1]?.coordinates?.lng ?? 121.5203),
+  });
   const [isEditingAddresses, setIsEditingAddresses] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
 
@@ -114,20 +208,63 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   const originInputRef = useRef<HTMLInputElement | null>(null);
   const destInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 同步 props 變更
+  const handleExpireChange = useCallback((expired: boolean) => {
+    setIsQuoteExpired(expired);
+  }, []);
+
+  // 當彈窗開啟瞬間初始化表單資料（避免在彈窗內部重算時被重新覆蓋）
+  const prevIsOpenRef = useRef(isOpen);
   useEffect(() => {
-    setCurrentQuotation(initialQuotation);
-    setOriginAddr(initialOriginAddress);
-    setDestAddr(initialDestinationAddress);
-  }, [initialQuotation, initialOriginAddress, initialDestinationAddress]);
+    const wasJustOpened = !prevIsOpenRef.current && isOpen;
+    prevIsOpenRef.current = isOpen;
+
+    if (wasJustOpened) {
+      setCurrentQuotation(initialQuotation);
+      if (allQuotations && Object.keys(allQuotations).length > 0) {
+        setQuotesMap(allQuotations);
+      } else if (initialQuotation) {
+        setQuotesMap({ [initialQuotation.serviceType]: initialQuotation });
+      }
+      setOriginAddr(initialOriginAddress);
+      setDestAddr(initialDestinationAddress);
+      setOriginCoords({
+        lat: Number(
+          initialQuotation?.stops?.[0]?.coordinates?.lat ?? post.lat ?? 25.0831,
+        ),
+        lng: Number(
+          initialQuotation?.stops?.[0]?.coordinates?.lng ??
+            post.lng ??
+            121.5452,
+        ),
+      });
+      setDestCoords({
+        lat: Number(initialQuotation?.stops?.[1]?.coordinates?.lat ?? 24.9924),
+        lng: Number(initialQuotation?.stops?.[1]?.coordinates?.lng ?? 121.5203),
+      });
+      setIsQuoteExpired(false);
+      setIsEditingAddresses(false);
+      setErrorMessage("");
+    }
+  }, [
+    isOpen,
+    initialQuotation,
+    allQuotations,
+    initialOriginAddress,
+    initialDestinationAddress,
+    post.lat,
+    post.lng,
+  ]);
 
   // Google Places Autocomplete 綁定
   useEffect(() => {
     if (!isOpen || !isEditingAddresses || typeof window === "undefined") return;
     if (!window.google?.maps?.places) return;
 
+    let autoOrigin: google.maps.places.Autocomplete | null = null;
+    let autoDest: google.maps.places.Autocomplete | null = null;
+
     if (originInputRef.current) {
-      const autoOrigin = new window.google.maps.places.Autocomplete(
+      autoOrigin = new window.google.maps.places.Autocomplete(
         originInputRef.current,
         {
           componentRestrictions: { country: "tw" },
@@ -135,15 +272,22 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         },
       );
       autoOrigin.addListener("place_changed", () => {
-        const place = autoOrigin.getPlace();
-        if (place.formatted_address) {
-          setOriginAddr(place.formatted_address);
+        const place = autoOrigin?.getPlace();
+        const addr = place?.formatted_address || place?.name;
+        if (addr) {
+          setOriginAddr(addr);
+        }
+        if (place?.geometry?.location) {
+          setOriginCoords({
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
         }
       });
     }
 
     if (destInputRef.current) {
-      const autoDest = new window.google.maps.places.Autocomplete(
+      autoDest = new window.google.maps.places.Autocomplete(
         destInputRef.current,
         {
           componentRestrictions: { country: "tw" },
@@ -151,16 +295,31 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         },
       );
       autoDest.addListener("place_changed", () => {
-        const place = autoDest.getPlace();
-        if (place.formatted_address) {
-          setDestAddr(place.formatted_address);
+        const place = autoDest?.getPlace();
+        const addr = place?.formatted_address || place?.name;
+        if (addr) {
+          setDestAddr(addr);
+        }
+        if (place?.geometry?.location) {
+          setDestCoords({
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
         }
       });
     }
+
+    return () => {
+      if (window.google?.maps?.event) {
+        if (autoOrigin)
+          window.google.maps.event.clearInstanceListeners(autoOrigin);
+        if (autoDest) window.google.maps.event.clearInstanceListeners(autoDest);
+      }
+    };
   }, [isOpen, isEditingAddresses]);
 
-  // 重新試算運費
-  const handleRecalculate = async () => {
+  // 批量重新試算所有車型運費（並更新 quotesMap 與 currentQuotation）
+  const handleBatchRecalculate = async (targetServiceType?: string) => {
     if (!originAddr.trim() || !destAddr.trim()) {
       setErrorMessage("取件與送達地址皆不能為空");
       return;
@@ -170,19 +329,37 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       setIsRecalculating(true);
       setErrorMessage("");
 
-      const serviceType = currentQuotation?.serviceType || "MOTORCYCLE";
+      // 檢查使用者是否手動修改了地址字串，若是則透過 Geocoder 解析最新的經緯度
+      let finalOriginLat = originCoords.lat;
+      let finalOriginLng = originCoords.lng;
+      const geocodedOrigin = await geocodeAddress(originAddr);
+      if (geocodedOrigin) {
+        finalOriginLat = geocodedOrigin.lat;
+        finalOriginLng = geocodedOrigin.lng;
+        setOriginCoords(geocodedOrigin);
+      }
+
+      let finalDestLat = destCoords.lat;
+      let finalDestLng = destCoords.lng;
+      const geocodedDest = await geocodeAddress(destAddr);
+      if (geocodedDest) {
+        finalDestLat = geocodedDest.lat;
+        finalDestLng = geocodedDest.lng;
+        setDestCoords(geocodedDest);
+      }
+
       const stops = [
         {
           coordinates: {
-            lat: post.lat || 25.033,
-            lng: post.lng || 121.5654,
+            lat: Number(finalOriginLat).toFixed(6),
+            lng: Number(finalOriginLng).toFixed(6),
           },
           address: sanitizeTwAddress(originAddr),
         },
         {
           coordinates: {
-            lat: (post.lat || 25.033) + 0.02,
-            lng: (post.lng || 121.5654) + 0.02,
+            lat: Number(finalDestLat).toFixed(6),
+            lng: Number(finalDestLng).toFixed(6),
           },
           address: sanitizeTwAddress(destAddr),
         },
@@ -192,26 +369,91 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          serviceType,
+          serviceTypes: ["MOTORCYCLE", "SUV", "VAN", "TRUCK175", "TRUCK330"],
           stops,
           language: locale === "en" ? "en_TW" : "zh_TW",
         }),
       });
 
       const data = await res.json();
-      if (!res.ok || !data.success || !data.primary) {
-        throw new Error(data.message || data.error || "地址重新計算報價失敗");
+      if (
+        !res.ok ||
+        !data.success ||
+        !data.quotations ||
+        data.quotations.length === 0
+      ) {
+        throw new Error(data.message || data.error || "重新計算報價失敗");
       }
 
-      setCurrentQuotation(data.primary);
+      const quotesMapNew: Record<string, QuotationItem> = {};
+      data.quotations.forEach((q: QuotationItem) => {
+        quotesMapNew[q.serviceType] = q;
+      });
+
+      // 雙北與中南部 TRUCK330/TRUCK175 互補
+      if (quotesMapNew["TRUCK330"] && !quotesMapNew["TRUCK175"]) {
+        quotesMapNew["TRUCK175"] = {
+          ...quotesMapNew["TRUCK330"],
+          serviceType: "TRUCK175",
+        };
+      }
+      if (quotesMapNew["TRUCK175"] && !quotesMapNew["TRUCK330"]) {
+        quotesMapNew["TRUCK330"] = {
+          ...quotesMapNew["TRUCK175"],
+          serviceType: "TRUCK330",
+        };
+      }
+
+      setQuotesMap(quotesMapNew);
+      setIsQuoteExpired(false);
       setIsEditingAddresses(false);
-      toast.success("運費與路線已依新地址重新計算！");
+
+      const activeType =
+        targetServiceType || currentQuotation?.serviceType || "MOTORCYCLE";
+      const activeQuote =
+        quotesMapNew[activeType] ||
+        (activeType === "TRUCK175" ? quotesMapNew["TRUCK330"] : undefined) ||
+        (activeType === "TRUCK330" ? quotesMapNew["TRUCK175"] : undefined) ||
+        data.quotations[0];
+
+      if (activeQuote) {
+        setCurrentQuotation(activeQuote);
+        onQuotationsUpdate?.(quotesMapNew, activeQuote);
+      }
+
+      toast.success(
+        locale === "en"
+          ? "Fare quotes updated for all vehicles!"
+          : "所有車型運費報價已更新！",
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "重新計算報價失敗";
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
       setIsRecalculating(false);
+    }
+  };
+
+  // 切換配送車型：未過期時 0 秒無縫切換，過期或無快取時觸發批量請求
+  const handleSwitchVehicle = (targetServiceType: string) => {
+    if (targetServiceType === currentQuotation?.serviceType) return;
+    const existing =
+      quotesMap[targetServiceType] ||
+      (targetServiceType === "TRUCK175" ? quotesMap["TRUCK330"] : undefined) ||
+      (targetServiceType === "TRUCK330" ? quotesMap["TRUCK175"] : undefined);
+
+    if (!isQuoteExpired && existing) {
+      // 0ms 無縫切換
+      setCurrentQuotation(existing);
+      onQuotationsUpdate?.(quotesMap, existing);
+      // const vehicleObj = VEHICLE_OPTIONS.find(
+      //   (v) => v.id === targetServiceType,
+      // );
+      // toast.success(`已切換為 ${vehicleObj?.name || targetServiceType}`);
+    } else {
+      // 已過期或無快取 -> 批量重新請求所有車種
+      handleBatchRecalculate(targetServiceType);
     }
   };
 
@@ -235,6 +477,19 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       setErrorMessage("請先取得有效報價");
       return;
     }
+    if (
+      isQuoteExpired ||
+      (currentQuotation.expiresAt &&
+        new Date(currentQuotation.expiresAt).getTime() <= Date.now())
+    ) {
+      setErrorMessage(
+        locale === "en"
+          ? "Fare quotation has expired. Please recalculate."
+          : "運費報價已過期，請點擊「重新試算」更新報價後再送出",
+      );
+      setIsQuoteExpired(true);
+      return;
+    }
     if (!senderName.trim()) {
       setErrorMessage(
         locale === "en" ? "Sender name is required" : "請填寫寄件人姓名",
@@ -255,7 +510,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     }
     if (!recipientPhone.trim()) {
       setErrorMessage(
-        locale === "en" ? "Recipient phone is required" : "請填寫收件人手機電話",
+        locale === "en"
+          ? "Recipient phone is required"
+          : "請填寫收件人手機電話",
       );
       return;
     }
@@ -299,6 +556,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         metadata: {
           postId: post.id,
           postTitle: post.title,
+          serviceType: currentQuotation.serviceType,
         },
       };
 
@@ -324,6 +582,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       onClose();
 
       const orderId = data.order.orderId;
+      // 等待 2 秒讓 Lalamove 系統處理訂單，再導向追蹤頁
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       router.push(`/delivery/${orderId}`);
     } catch (err: unknown) {
       console.error("Create order failed:", err);
@@ -344,7 +604,28 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-[201] max-h-[92vh] w-[94vw] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl focus:outline-none sm:p-6">
+        <Dialog.Content
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target?.closest?.(".pac-container")) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target?.closest?.(".pac-container")) {
+              e.preventDefault();
+            }
+          }}
+          className="fixed left-1/2 top-1/2 z-[201] max-h-[92vh] w-[94vw] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl focus:outline-none sm:p-6"
+        >
+          {/* Ensure Google Autocomplete suggestions stay on top of the dialog and accept clicks */}
+          <style>{`
+            .pac-container {
+              z-index: 999999 !important;
+              pointer-events: auto !important;
+            }
+          `}</style>
           <div className="flex items-start justify-between pb-2">
             <div className="flex items-center gap-2.5 text-orange-600">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
@@ -358,8 +639,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                 </Dialog.Title>
                 <Dialog.Description className="text-xs text-gray-500">
                   {locale === "en"
-                    ? "Confirm details, edit addresses or add remarks."
-                    : "可在此修改地址、樓層門牌與聯絡人資訊。"}
+                    ? "Confirm details, vehicle type, edit addresses or remarks."
+                    : "可在此切換車型、修改地址與聯絡人資訊。"}
                 </Dialog.Description>
               </div>
             </div>
@@ -371,28 +652,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
             </Dialog.Close>
           </div>
 
-          {/* Order Summary Pill */}
-          <div className="my-2.5 rounded-2xl border border-orange-200/80 bg-orange-50/50 p-3.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-orange-800">
-                  {currentQuotation.serviceName || currentQuotation.serviceType}{" "}
-                  配送
-                </span>
-                <p className="mt-0.5 text-xs text-gray-600 line-clamp-1">
-                  物品：{post.title}
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-xs text-gray-500">預估運費</span>
-                <div className="font-ddin text-xl font-bold text-orange-600">
-                  NT$ {currentQuotation.priceBreakdown.total}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmitOrder} className="space-y-4">
+          <form onSubmit={handleSubmitOrder} className="mt-2 space-y-3.5">
             {/* 1. 取件 / 寄件人資訊 */}
             <div className="rounded-2xl border border-gray-200 p-3.5">
               <div className="mb-2.5 flex items-center justify-between">
@@ -421,7 +681,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
               {/* 地址區塊（支援直接編輯與重新試算） */}
               {isEditingAddresses ? (
-                <div className="mb-3 space-y-2 rounded-xl bg-orange-50/50 p-2.5 border border-orange-200/60">
+                <div className="mb-3 space-y-2 rounded-xl border border-orange-200/60 bg-orange-50/50 p-2.5">
                   <label className="block text-[11px] font-semibold text-orange-800">
                     修改取件地址：
                   </label>
@@ -435,7 +695,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   />
                 </div>
               ) : (
-                <p className="mb-3 text-xs text-gray-600 bg-gray-50 p-2 rounded-xl">
+                <p className="mb-3 rounded-xl bg-gray-50 p-2 text-xs text-gray-600">
                   <span className="font-semibold text-gray-700">
                     取件地址：
                   </span>
@@ -445,7 +705,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     寄件人姓名 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -462,7 +722,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     寄件人電話 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -481,7 +741,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
               <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     取件樓層 / 門牌 (選填)
                   </label>
                   <input
@@ -489,12 +749,12 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     value={senderFloorUnit}
                     onChange={(e) => setSenderFloorUnit(e.target.value)}
                     placeholder="例：3樓之1、A棟"
-                    className="w-full rounded-xl border border-gray-200 py-1.5 px-3 text-xs focus:border-orange-500 focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-xs focus:border-orange-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     取件備註給司機 (選填)
                   </label>
                   <div className="relative">
@@ -539,7 +799,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
               {/* 地址區塊（支援直接編輯與重新試算） */}
               {isEditingAddresses ? (
-                <div className="mb-3 space-y-2 rounded-xl bg-orange-50/50 p-2.5 border border-orange-200/60">
+                <div className="mb-3 space-y-2 rounded-xl border border-orange-200/60 bg-orange-50/50 p-2.5">
                   <label className="block text-[11px] font-semibold text-orange-800">
                     修改送達地址：
                   </label>
@@ -553,7 +813,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   />
                 </div>
               ) : (
-                <p className="mb-3 text-xs text-gray-600 bg-gray-50 p-2 rounded-xl">
+                <p className="mb-3 rounded-xl bg-gray-50 p-2 text-xs text-gray-600">
                   <span className="font-semibold text-gray-700">
                     送達地址：
                   </span>
@@ -563,7 +823,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     收件人姓名 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -580,7 +840,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     收件人電話 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -599,7 +859,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
               <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     送達樓層 / 門牌 (選填)
                   </label>
                   <input
@@ -607,12 +867,12 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     value={recipientFloorUnit}
                     onChange={(e) => setRecipientFloorUnit(e.target.value)}
                     placeholder="例：5樓之2、管理室"
-                    className="w-full rounded-xl border border-gray-200 py-1.5 px-3 text-xs focus:border-orange-500 focus:outline-none"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-xs focus:border-orange-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-600 mb-1">
+                  <label className="mb-1 block text-[11px] font-medium text-gray-600">
                     送件備註給司機 (選填)
                   </label>
                   <div className="relative">
@@ -641,7 +901,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={handleRecalculate}
+                  onClick={() => handleBatchRecalculate()}
                   disabled={isRecalculating}
                   className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
                 >
@@ -660,6 +920,90 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               </div>
             )}
 
+            {/* 3. 配送車型切換 (Vehicle Selector) */}
+            <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800">
+                  {locale === "en" ? "Select Vehicle Type" : "選擇配送車型"}
+                </span>
+                {isRecalculating && (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-orange-600">
+                    <RotateCw className="h-3 w-3 animate-spin" />
+                    重新計算中...
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {VEHICLE_OPTIONS.map((v) => {
+                  const isSelected = currentQuotation.serviceType === v.id;
+                  const quoteForVehicle =
+                    quotesMap[v.id] ||
+                    (v.id === "TRUCK175" ? quotesMap["TRUCK330"] : undefined) ||
+                    (v.id === "TRUCK330" ? quotesMap["TRUCK175"] : undefined);
+
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      disabled={isRecalculating}
+                      onClick={() => handleSwitchVehicle(v.id)}
+                      className={`flex flex-col items-center justify-center rounded-xl border p-2.5 text-center transition-all ${
+                        isSelected
+                          ? "border-orange-500 bg-orange-50/90 text-orange-700 shadow-sm ring-2 ring-orange-400/30"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                      } disabled:opacity-50`}
+                    >
+                      <div
+                        className={`mb-1 flex h-7 w-7 items-center justify-center rounded-lg ${
+                          isSelected
+                            ? "bg-orange-500 text-white"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {v.icon === "bike" && <Bike className="h-4 w-4" />}
+                        {v.icon === "van" && <Truck className="h-4 w-4" />}
+                        {v.icon === "car" && <Car className="h-4 w-4" />}
+                        {v.icon === "truck" && <Truck className="h-4 w-4" />}
+                      </div>
+                      <span className="text-xs font-bold">{v.name}</span>
+                      <span className="mt-0.5 text-[10px] text-gray-400">
+                        {v.desc.split("(")[1]?.replace(")", "") || v.desc}
+                      </span>
+                      {quoteForVehicle && (
+                        <span className="mt-1 font-ddin text-[11px] font-extrabold text-orange-600">
+                          NT$ {quoteForVehicle.priceBreakdown?.total || 0}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 4. 運費摘要卡片 (Order Summary Pill - Shared Component) */}
+            <QuotationSummaryCard
+              variant="pill"
+              quotation={currentQuotation}
+              locale={locale}
+              vehicleName={
+                VEHICLE_OPTIONS.find(
+                  (v) => v.id === currentQuotation.serviceType,
+                )?.name ||
+                currentQuotation.serviceName ||
+                currentQuotation.serviceType
+              }
+              postTitle={post.title}
+              originAddress={originAddr}
+              destinationAddress={destAddr}
+              onExpireChange={handleExpireChange}
+              onRecalculate={() => handleBatchRecalculate()}
+              isRecalculating={isRecalculating}
+              showSmallRecalculateButton={true}
+              showBreakdownToggle={true}
+            />
+
+            {/* 5. 錯誤訊息與送出 / 取消按鈕 */}
             {errorMessage && (
               <div className="flex items-center gap-2 rounded-2xl bg-red-50 p-2.5 text-xs text-red-600">
                 <AlertCircle className="h-4 w-4 shrink-0" />
@@ -683,23 +1027,41 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   取消
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isEditingAddresses}
-                  className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RotateCw className="h-3.5 w-3.5 animate-spin" />
-                      正在建立訂單...
-                    </>
-                  ) : (
-                    <>
-                      確認叫車 (NT$ {currentQuotation.priceBreakdown.total})
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </>
-                  )}
-                </button>
+                {isQuoteExpired ? (
+                  <button
+                    type="button"
+                    onClick={() => handleBatchRecalculate()}
+                    disabled={isRecalculating}
+                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-2 text-xs font-bold text-white shadow-md shadow-orange-500/20 transition-all hover:from-amber-600 hover:to-orange-600 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    <RotateCw
+                      className={`h-3.5 w-3.5 ${isRecalculating ? "animate-spin" : ""}`}
+                    />
+                    {isRecalculating
+                      ? "重新計算中..."
+                      : locale === "en"
+                        ? "Quote Expired · Recalculate"
+                        : "報價已過期 · 點此重新試算"}
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || isEditingAddresses}
+                    className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RotateCw className="h-3.5 w-3.5 animate-spin" />
+                        正在建立訂單...
+                      </>
+                    ) : (
+                      <>
+                        確認叫車 (NT$ {currentQuotation.priceBreakdown.total})
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </form>

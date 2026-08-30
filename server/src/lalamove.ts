@@ -7,28 +7,54 @@ import {
   cancelLalamoveOrder,
   getLalamoveDriverDetail,
   verifyLalamoveWebhookSignature,
+  sandboxUpdateDriverLocation,
+  sandboxPickup,
+  sandboxDeliver,
   GetQuotationParams,
   CreateOrderParams,
+  getLalamoveMarketInfo,
 } from "./services/lalamove";
 
 const router = express.Router();
 
-const SUPPORTED_SERVICE_TYPES = [
-  { id: "MOTORCYCLE", name: "機車", description: "小型包裹、文件 (40×40×40 cm / 20kg 內)" },
-  { id: "VAN", name: "廂型車", description: "中型包裹、多箱物資 (150×100×100 cm / 300kg 內)" },
-  { id: "SUV", name: "休旅車", description: "加大空間、中大型物資 (150×120×100 cm / 400kg 內)" },
-  { id: "TRUCK330", name: "3.49噸 貨車", description: "家庭搬家、超大件棧板 (300×150×150 cm / 1,000kg 內)" },
+export const ALL_SUPPORTED_SERVICE_TYPES = [
+  "MOTORCYCLE",
+  "MOTORCYCLE_INTERCITY",
+  "MOTORCYCLE_LARGELALABAG",
+  "VAN",
+  "SUV",
+  "TRUCK175",
+  "TRUCK330",
+  "TRUCK500",
 ];
 
 /**
  * GET /api/lalamove/service-types
- * Returns available vehicle types in Taiwan
+ * Returns official available vehicle types and special requests in Taiwan (Source of Truth)
  */
-router.get("/service-types", (_req: Request, res: Response) => {
-  res.json({
-    market: "TW",
-    services: SUPPORTED_SERVICE_TYPES,
-  });
+router.get("/service-types", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const market = await getLalamoveMarketInfo(req.query.refresh === "true");
+    const requestedCity = req.query.city as string | undefined;
+
+    let cities = market?.cities || [];
+    if (requestedCity) {
+      cities = cities.filter((c: { id: string; name: string }) =>
+        c.id.toLowerCase().includes(requestedCity.toLowerCase()) ||
+        c.name.includes(requestedCity)
+      );
+    }
+
+    res.json({
+      success: true,
+      market: "TW",
+      cities,
+      allSupportedTypes: ALL_SUPPORTED_SERVICE_TYPES,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "取得車型資料失敗";
+    res.status(500).json({ error: "Failed to retrieve market info", message });
+  }
 });
 
 /**
@@ -69,11 +95,9 @@ router.post("/quotation", async (req: Request, res: Response): Promise<void> => 
           scheduleAt,
         };
         const result = await requestLalamoveQuotation(params);
-        const meta = SUPPORTED_SERVICE_TYPES.find((s) => s.id === st);
         return {
           ...result,
-          serviceName: meta?.name || st,
-          serviceDescription: meta?.description || "",
+          serviceName: st,
         };
       }),
     );
@@ -348,6 +372,115 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
   } catch (error: unknown) {
     console.error("[Lalamove Webhook] Error processing webhook:", error);
     res.status(500).json({ error: "Webhook processing error" });
+  }
+});
+
+/**
+ * Sandbox 测試面板（僅從 NODE_ENV=development 時開放）
+ */
+const isSandboxMode =
+  (process.env.LALAMOVE_ENV || "sandbox").toLowerCase() === "sandbox" &&
+  process.env.NODE_ENV !== "production";
+
+/**
+ * PUT /api/lalamove/sandbox/driver-location
+ * [Sandbox only] 更新司機 GPS 座標
+ */
+router.put("/sandbox/driver-location", async (req: Request, res: Response): Promise<void> => {
+  if (!isSandboxMode) {
+    res.status(403).json({ error: "Sandbox endpoints are only available in development mode" });
+    return;
+  }
+  try {
+    const { orderId, lat, lng } = req.body as { orderId: string; lat: string; lng: string };
+    if (!orderId || !lat || !lng) {
+      res.status(400).json({ error: "orderId, lat and lng are required" });
+      return;
+    }
+    const result = await sandboxUpdateDriverLocation(orderId, lat, lng);
+
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io) {
+      io.to(`delivery_${orderId}`).emit("delivery_update", {
+        orderId,
+        driver: { coordinates: { lat, lng } },
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Sandbox error";
+    console.error("[Sandbox] driver-location error:", error);
+    res.status(500).json({ error: "Sandbox driver location update failed", message });
+  }
+});
+
+/**
+ * PUT /api/lalamove/sandbox/pickup
+ * [Sandbox only] 模擬司機已取件
+ */
+router.put("/sandbox/pickup", async (req: Request, res: Response): Promise<void> => {
+  if (!isSandboxMode) {
+    res.status(403).json({ error: "Sandbox endpoints are only available in development mode" });
+    return;
+  }
+  try {
+    const { orderId } = req.body as { orderId: string };
+    if (!orderId) {
+      res.status(400).json({ error: "orderId is required" });
+      return;
+    }
+    const result = await sandboxPickup(orderId);
+
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io) {
+      io.to(`delivery_${orderId}`).emit("delivery_update", {
+        orderId,
+        status: "PICKED_UP",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Sandbox error";
+    console.error("[Sandbox] pickup error:", error);
+    res.status(500).json({ error: "Sandbox pickup failed", message });
+  }
+});
+
+/**
+ * PUT /api/lalamove/sandbox/deliver
+ * [Sandbox only] 模擬送達完成
+ */
+router.put("/sandbox/deliver", async (req: Request, res: Response): Promise<void> => {
+  if (!isSandboxMode) {
+    res.status(403).json({ error: "Sandbox endpoints are only available in development mode" });
+    return;
+  }
+  try {
+    const { orderId } = req.body as { orderId: string };
+    if (!orderId) {
+      res.status(400).json({ error: "orderId is required" });
+      return;
+    }
+    const result = await sandboxDeliver(orderId);
+
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io) {
+      io.to(`delivery_${orderId}`).emit("delivery_update", {
+        orderId,
+        status: "COMPLETED",
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    res.json({ success: true, result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Sandbox error";
+    console.error("[Sandbox] deliver error:", error);
+    res.status(500).json({ error: "Sandbox deliver failed", message });
   }
 });
 

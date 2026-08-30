@@ -7,6 +7,7 @@ import React, {
   useState,
   ReactNode,
   useCallback,
+  useMemo,
 } from "react";
 import { Category, Condition } from "@/app/types/schema";
 
@@ -61,13 +62,16 @@ export const PostProvider: React.FC<MetaProviderProps> = ({ children }) => {
     fetchPostContext();
   }, [fetchPostContext]);
 
-  const value: PostContextType = {
-    categories,
-    conditions,
-    loading,
-    error,
-    refetchPostContext: fetchPostContext,
-  };
+  const value: PostContextType = useMemo(
+    () => ({
+      categories,
+      conditions,
+      loading,
+      error,
+      refetchPostContext: fetchPostContext,
+    }),
+    [categories, conditions, loading, error, fetchPostContext],
+  );
 
   return <PostContext.Provider value={value}>{children}</PostContext.Provider>;
 };

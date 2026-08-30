@@ -77,6 +77,7 @@ export interface DriverInfo {
 export interface OrderDetailResult {
   orderId: string;
   quotationId: string;
+  serviceType?: string;
   status: string; // "ASSIGNING_DRIVER" | "ON_GOING" | "PICKED_UP" | "COMPLETED" | "CANCELED" | "EXPIRED" | "REJECTED"
   shareLink?: string;
   driverId?: string;
@@ -130,6 +131,50 @@ function getClient(): InstanceType<typeof ClientModule> {
   return clientInstance;
 }
 
+export interface LalamoveMarketInfo {
+  cities: Array<{
+    id: string;
+    name: string;
+    services: Array<{
+      key: string;
+      description: string;
+      load?: { value: string; unit: string };
+      dimensions?: {
+        length?: { value: string; unit: string };
+        width?: { value: string; unit: string };
+        height?: { value: string; unit: string };
+      };
+      specialRequests?: Array<{ name: string; description: string }>;
+    }>;
+  }>;
+}
+
+let cachedMarketInfo: LalamoveMarketInfo | null = null;
+let marketCacheTimestamp = 0;
+
+/**
+ * 取得 Lalamove 官方 Market / City Info（Source of Truth）
+ */
+export async function getLalamoveMarketInfo(
+  forceRefresh = false,
+): Promise<LalamoveMarketInfo> {
+  const now = Date.now();
+  if (
+    !forceRefresh &&
+    cachedMarketInfo &&
+    now - marketCacheTimestamp < 30 * 60 * 1000
+  ) {
+    return cachedMarketInfo;
+  }
+  const client = getClient();
+  const market = (await client.Market.retrieve(
+    LALAMOVE_MARKET,
+  )) as unknown as LalamoveMarketInfo;
+  cachedMarketInfo = market;
+  marketCacheTimestamp = now;
+  return market;
+}
+
 interface LalamoveRawQuotationResponse {
   quotationId?: string;
   id?: string;
@@ -160,6 +205,7 @@ interface LalamoveRawOrderResponse {
   id?: string;
   orderId?: string;
   quotationId?: string;
+  serviceType?: string;
   status?: string;
   shareLink?: string;
   driverId?: string;
@@ -206,6 +252,18 @@ interface LalamoveRawDriverResponse {
   updatedAt?: string | Date;
 }
 
+function formatLat(val: string | number | undefined): string {
+  const n = typeof val === "number" ? val : parseFloat(String(val || "25.033"));
+  if (isNaN(n)) return "25.033000";
+  return n.toFixed(6);
+}
+
+function formatLng(val: string | number | undefined): string {
+  const n = typeof val === "number" ? val : parseFloat(String(val || "121.5654"));
+  if (isNaN(n)) return "121.565400";
+  return n.toFixed(6);
+}
+
 /**
  * 試算運費報價
  */
@@ -216,8 +274,8 @@ export async function requestLalamoveQuotation(
 
   const formattedStops = params.stops.map((stop) => ({
     coordinates: {
-      lat: String(stop.coordinates.lat),
-      lng: String(stop.coordinates.lng),
+      lat: formatLat(stop.coordinates.lat),
+      lng: formatLng(stop.coordinates.lng),
     },
     address: stop.address,
   }));
@@ -236,8 +294,45 @@ export async function requestLalamoveQuotation(
   const payload = payloadBuilder.build();
   console.log(`[Lalamove Service] Requesting ${params.serviceType} quotation with payload:`, JSON.stringify(payload, null, 2));
 
-  const rawResponse = await client.Quotation.create(LALAMOVE_MARKET, payload);
-  console.log(`[Lalamove Service] SUCCESS quotation response for ${params.serviceType}:`, JSON.stringify(rawResponse, null, 2));
+  let rawResponse: unknown;
+  let resolvedServiceType = params.serviceType;
+  try {
+    rawResponse = await client.Quotation.create(LALAMOVE_MARKET, payload);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    // FIXME: [Lalamove TW API Regional Limitation]
+    // In Taipei (TW_TPE), Lalamove API only accepts TRUCK330 (and merges 1.75T & 3.49T into 500-1000kg).
+    // In Central/South Taiwan (TW_TXG, TW_TNN, TW_KHH), it only accepts TRUCK175.
+    // In Taipei, TRUCK175 and TRUCK330 yield identical quotation pricing until Lalamove support clarifies tonnage differentiation parameters.
+    if (params.serviceType === "TRUCK175" && errMsg.includes("TRUCK330")) {
+      console.log("[Lalamove Service] TRUCK175 not available in this region, falling back to TRUCK330");
+      let fallbackBuilder = QuotationPayloadBuilder.quotationPayload()
+        .withLanguage(params.language || "zh_TW")
+        .withServiceType("TRUCK330")
+        .withStops(formattedStops);
+      if (params.scheduleAt) {
+        fallbackBuilder = fallbackBuilder.withScheduleAt(new Date(params.scheduleAt));
+      }
+      rawResponse = await client.Quotation.create(LALAMOVE_MARKET, fallbackBuilder.build());
+      resolvedServiceType = "TRUCK330";
+    } else if (params.serviceType === "TRUCK330" && errMsg.includes("TRUCK175")) {
+      // 中南部地區 TRUCK330 自動回退至 TRUCK175
+      console.log("[Lalamove Service] TRUCK330 not available in this region, falling back to TRUCK175");
+      let fallbackBuilder = QuotationPayloadBuilder.quotationPayload()
+        .withLanguage(params.language || "zh_TW")
+        .withServiceType("TRUCK175")
+        .withStops(formattedStops);
+      if (params.scheduleAt) {
+        fallbackBuilder = fallbackBuilder.withScheduleAt(new Date(params.scheduleAt));
+      }
+      rawResponse = await client.Quotation.create(LALAMOVE_MARKET, fallbackBuilder.build());
+      resolvedServiceType = "TRUCK175";
+    } else {
+      throw err;
+    }
+  }
+
+  console.log(`[Lalamove Service] SUCCESS quotation response for ${resolvedServiceType}:`, JSON.stringify(rawResponse, null, 2));
 
   const response = rawResponse as unknown as LalamoveRawQuotationResponse;
 
@@ -247,7 +342,7 @@ export async function requestLalamoveQuotation(
 
   return {
     quotationId: response.quotationId || response.id || `quote_${Date.now()}`,
-    serviceType: params.serviceType,
+    serviceType: resolvedServiceType,
     expiresAt:
       response.expiresAt ||
       new Date(Date.now() + 5 * 60 * 1000).toISOString(),
@@ -381,6 +476,7 @@ export async function createLalamoveOrder(
   return {
     orderId,
     quotationId: response.quotationId || params.quotationId,
+    serviceType: response.serviceType || "",
     status: response.status || "ASSIGNING_DRIVER",
     shareLink: response.shareLink || "",
     driverId: response.driverId || "",
@@ -421,6 +517,13 @@ export async function getLalamoveOrderDetail(
   const rawOrder = await client.Order.retrieve(LALAMOVE_MARKET, orderId);
   const response = rawOrder as unknown as LalamoveRawOrderResponse;
 
+  console.log(
+    `[Lalamove Service] Retrieved order ${orderId} latest status:`,
+    response.status,
+    `raw:`,
+    JSON.stringify(rawOrder, null, 2),
+  );
+
   let driver: DriverInfo | null = null;
   const driverId = response.driverId;
 
@@ -438,21 +541,65 @@ export async function getLalamoveOrderDetail(
         phone: driverRes.contact?.phone || driverRes.phone || "",
         plateNumber: driverRes.plateNumber || "",
         photo: driverRes.photo || "",
-        coordinates: driverRes.coordinates ? {
-          lat: driverRes.coordinates.lat,
-          lng: driverRes.coordinates.lng,
-        } : undefined,
+        coordinates: driverRes.coordinates
+          ? {
+              lat: driverRes.coordinates.lat,
+              lng: driverRes.coordinates.lng,
+            }
+          : undefined,
         updatedAt: driverRes.updatedAt,
       };
     } catch (driverErr) {
-      console.warn(`[Lalamove Service] Could not fetch driver ${driverId}:`, driverErr);
+      console.warn(
+        `[Lalamove Service] Could not fetch driver ${driverId}:`,
+        driverErr,
+      );
     }
   }
+
+  let serviceType =
+    response.serviceType ||
+    (response.metadata?.serviceType as string) ||
+    "";
+
+  if (!serviceType && response.quotationId) {
+    try {
+      const rawQuotation = await client.Quotation.retrieve(
+        LALAMOVE_MARKET,
+        response.quotationId,
+      );
+      const qRes = rawQuotation as unknown as { serviceType?: string };
+      serviceType = qRes.serviceType || "";
+    } catch (qErr) {
+      console.warn(`[Lalamove Service] Could not fetch quotation for serviceType:`, qErr);
+    }
+  }
+
+  // 若有 Sandbox 自訂司機座標，優先套用
+  const customDriverCoords = sandboxDriverCoordinates.get(orderId);
+  if (customDriverCoords) {
+    if (driver) {
+      driver.coordinates = customDriverCoords;
+    } else {
+      driver = {
+        id: driverId || "sandbox_driver",
+        name: "Lalamove 司機 (測試)",
+        phone: "+886912345678",
+        plateNumber: "TEST-8888",
+        coordinates: customDriverCoords,
+      };
+    }
+  }
+
+  // 若有 Sandbox 模擬狀態，優先套用
+  const customStatus = sandboxOrderStatus.get(orderId);
+  const finalStatus = (customStatus || response.status || "ASSIGNING_DRIVER").toUpperCase();
 
   return {
     orderId: response.id || response.orderId || orderId,
     quotationId: response.quotationId || "",
-    status: response.status || "ASSIGNING_DRIVER",
+    serviceType,
+    status: finalStatus,
     shareLink: response.shareLink || "",
     driverId: response.driverId || "",
     driver,
@@ -569,4 +716,162 @@ export function verifyLalamoveWebhookSignature(
     console.error("[Lalamove Service] Webhook signature verification error:", e);
     return false;
   }
+}
+
+// ─────────────────────────────────────────────
+// Sandbox 模擬控制 API（僅供開發測試用）
+// ─────────────────────────────────────────────
+
+const sandboxDriverCoordinates = new Map<string, { lat: string; lng: string }>();
+const sandboxOrderStatus = new Map<string, string>();
+
+function sandboxSign(
+  method: string,
+  path: string,
+  body: string,
+  timestamp: string,
+): string {
+  const secret = process.env.LALAMOVE_API_SECRET || LALAMOVE_API_SECRET;
+  const rawSignature = `${timestamp}\r\n${method}\r\n${path}\r\n\r\n${body}`;
+  return crypto.createHmac("sha256", secret).update(rawSignature).digest("hex");
+}
+
+async function sandboxFetch(
+  method: string,
+  path: string,
+  bodyObj?: Record<string, unknown>,
+): Promise<unknown> {
+  const https = await import("https");
+  const apiKey = process.env.LALAMOVE_API_KEY || LALAMOVE_API_KEY;
+  const market = LALAMOVE_MARKET;
+  const timestamp = Date.now().toString();
+  const body = bodyObj ? JSON.stringify(bodyObj) : "";
+  const signature = sandboxSign(method, path, body, timestamp);
+  const token = `${apiKey}:${timestamp}:${signature}`;
+
+  return new Promise((resolve, reject) => {
+    const options: import("https").RequestOptions = {
+      hostname: "rest.sandbox.lalamove.com",
+      path,
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `hmac ${token}`,
+        Market: market,
+        ...(body ? { "Content-Length": String(Buffer.byteLength(body)) } : {}),
+      },
+    };
+
+    const req = https.default.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk: Buffer) => (data += chunk.toString()));
+      res.on("end", () => {
+        console.log(`[Lalamove Sandbox] ${method} ${path} => HTTP ${res.statusCode}`);
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve(data);
+        }
+      });
+    });
+
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * [Sandbox] 更新司機 GPS 位置
+ */
+export async function sandboxUpdateDriverLocation(
+  orderId: string,
+  lat: string,
+  lng: string,
+): Promise<{ success: boolean; lat: string; lng: string }> {
+  const formattedLat = formatLat(lat);
+  const formattedLng = formatLng(lng);
+
+  // 儲存於伺服器記憶體，確保後續任何 API 查詢、SWR 輪詢皆取得最新座標
+  sandboxDriverCoordinates.set(orderId, {
+    lat: formattedLat,
+    lng: formattedLng,
+  });
+
+  // 嘗試同步發送至 Lalamove 官方 Sandbox 端點
+  let driverId = "";
+  try {
+    const client = getClient();
+    const rawOrder = await client.Order.retrieve(LALAMOVE_MARKET, orderId);
+    const orderRes = rawOrder as unknown as LalamoveRawOrderResponse;
+    driverId = orderRes.driverId || "";
+  } catch (e) {
+    console.warn("[Sandbox] Could not retrieve driverId for order:", e);
+  }
+
+  if (driverId) {
+    try {
+      await sandboxFetch(
+        "PUT",
+        `/v3/orders/${orderId}/drivers/${driverId}/location`,
+        {
+          data: {
+            location: {
+              lat: formattedLat,
+              lng: formattedLng,
+            },
+          },
+        },
+      );
+    } catch (e) {
+      console.warn("[Sandbox] Endpoint /drivers/location error:", e);
+    }
+  }
+
+  try {
+    await sandboxFetch("PUT", `/v3/orders/${orderId}/driver-location`, {
+      data: {
+        location: {
+          lat: formattedLat,
+          lng: formattedLng,
+        },
+        coordinates: {
+          lat: formattedLat,
+          lng: formattedLng,
+        },
+        lat: formattedLat,
+        lng: formattedLng,
+      },
+    });
+  } catch (e) {
+    console.warn("[Sandbox] Endpoint /driver-location error:", e);
+  }
+
+  return { success: true, lat: formattedLat, lng: formattedLng };
+}
+
+/**
+ * [Sandbox] 模擬司機已取件
+ */
+export async function sandboxPickup(orderId: string): Promise<unknown> {
+  sandboxOrderStatus.set(orderId, "PICKED_UP");
+  try {
+    await sandboxFetch("PUT", `/v3/orders/${orderId}/pickup`, { data: {} });
+  } catch (e) {
+    console.warn("[Sandbox] pickup error:", e);
+  }
+  return { success: true, status: "PICKED_UP" };
+}
+
+/**
+ * [Sandbox] 模擬送達完成
+ */
+export async function sandboxDeliver(orderId: string): Promise<unknown> {
+  sandboxOrderStatus.set(orderId, "COMPLETED");
+  try {
+    await sandboxFetch("PUT", `/v3/orders/${orderId}/deliver`, { data: {} });
+  } catch (e) {
+    console.warn("[Sandbox] deliver error:", e);
+  }
+  return { success: true, status: "COMPLETED" };
 }

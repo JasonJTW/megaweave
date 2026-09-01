@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, AlertCircle, RotateCw, ArrowRight } from "lucide-react";
 
@@ -14,15 +14,7 @@ interface PaymentStatusResponse {
   error?: string;
 }
 
-/**
- * /delivery/payment-result
- *
- * 綠界付款跳轉後的結果驗證頁面。
- * 🔒 安全設計：不依賴前端傳入的 query params 判斷付款結果，
- * 一律向後端資料庫查詢經由 CheckMacValue 簽名驗證後的真實驗證狀態，
- * 並取得 Lalamove 即時派單訂單號後，自動精準跳轉到 /delivery/[orderId] 即時追蹤頁。
- */
-export default function PaymentResultPage() {
+function PaymentResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
@@ -223,5 +215,32 @@ export default function PaymentResultPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * /delivery/payment-result
+ *
+ * 綠界付款跳轉後的結果驗證頁面。
+ * 🔒 安全設計：不依賴前端傳入的 query params 判斷付款結果，
+ * 一律向後端資料庫查詢經由 CheckMacValue 簽名驗證後的真實驗證狀態，
+ * 並取得 Lalamove 即時派單訂單號後，自動精準跳轉到 /delivery/[orderId] 即時追蹤頁。
+ */
+export default function PaymentResultPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+          <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-3xl bg-white p-8 text-center shadow-xl">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-orange-600">
+              <RotateCw className="h-8 w-8 animate-spin" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">載入中...</h2>
+          </div>
+        </div>
+      }
+    >
+      <PaymentResultContent />
+    </Suspense>
   );
 }

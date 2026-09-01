@@ -10,6 +10,11 @@ import http from "http";
 import path from "path";
 import fs from "fs";
 import rateLimit from "express-rate-limit";
+
+// express-rate-limit v7 adds a 'close' listener to every ServerResponse to
+// detect aborted requests. With concurrent traffic the default limit of 10
+// listeners is quickly exceeded. Raise it here before any middleware is wired.
+http.ServerResponse.prototype.setMaxListeners(50);
 import { connectRedis, disconnectRedis, getRedisClient } from "./utils/redis";
 import { closeDatabase } from "./utils/db";
 import { Server } from "socket.io";
@@ -29,6 +34,7 @@ const PORT = parseInt(process.env.PORT || "8443");
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
 const NODE_ENV = process.env.NODE_ENV;
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(
   cors({
@@ -42,12 +48,14 @@ app.use(
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   limit: 120,
-  // Limit each IP to 100 requests per `window` (here, per 15 minutes).
   message: {
     errorMessage: "Too many requests from this IP, please try again later.",
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Skip tracking successful requests to reduce the number of 'close'
+  // listeners that express-rate-limit v7 attaches per ServerResponse.
+  skipSuccessfulRequests: false,
 });
 console.log("Cors Origins:", CORS_ORIGINS);
 // Apply the rate limiting middleware to all requests.

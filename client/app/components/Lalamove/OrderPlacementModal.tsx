@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import QuotationSummaryCard from "./QuotationSummaryCard";
+import { useUser } from "@/app/contexts/UserContext";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
 export const VEHICLE_OPTIONS = [
@@ -102,6 +103,9 @@ interface OrderPlacementModalProps {
   post: Post;
   originAddress: string;
   destinationAddress: string;
+  originPlaceId?: string;
+  destinationPlaceId?: string;
+  destinationCoords?: { lat: number; lng: number };
   currentUser?: {
     username?: string;
     email?: string;
@@ -155,6 +159,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   post,
   originAddress: initialOriginAddress,
   destinationAddress: initialDestinationAddress,
+  originPlaceId: initialOriginPlaceId,
+  destinationPlaceId: initialDestinationPlaceId,
+  destinationCoords: initialDestinationCoords,
   currentUser,
   locale = "zh",
 }) => {
@@ -171,6 +178,14 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   // 地址狀態
   const [originAddr, setOriginAddr] = useState(initialOriginAddress);
   const [destAddr, setDestAddr] = useState(initialDestinationAddress);
+  // 取件地點的 Google place_id（初始來自 props 或 post，使用者若重新選取會更新）
+  const [originPlaceId, setOriginPlaceId] = useState<string | undefined>(
+    initialOriginPlaceId || post.place_id || undefined,
+  );
+  // 送達地點的 Google place_id（由外部 autocomplete 或 GPS 取得，或在 modal 內選取時更新）
+  const [destPlaceId, setDestPlaceId] = useState<string | undefined>(
+    initialDestinationPlaceId,
+  );
   const [originCoords, setOriginCoords] = useState<{
     lat: number;
     lng: number;
@@ -183,8 +198,16 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     ),
   });
   const [destCoords, setDestCoords] = useState<{ lat: number; lng: number }>({
-    lat: Number(initialQuotation?.stops?.[1]?.coordinates?.lat ?? 24.9924),
-    lng: Number(initialQuotation?.stops?.[1]?.coordinates?.lng ?? 121.5203),
+    lat: Number(
+      initialDestinationCoords?.lat ??
+        initialQuotation?.stops?.[1]?.coordinates?.lat ??
+        24.9924,
+    ),
+    lng: Number(
+      initialDestinationCoords?.lng ??
+        initialQuotation?.stops?.[1]?.coordinates?.lng ??
+        121.5203,
+    ),
   });
   const [isEditingAddresses, setIsEditingAddresses] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -227,6 +250,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       }
       setOriginAddr(initialOriginAddress);
       setDestAddr(initialDestinationAddress);
+      setOriginPlaceId(initialOriginPlaceId || post.place_id || undefined);
+      setDestPlaceId(initialDestinationPlaceId);
       setOriginCoords({
         lat: Number(
           initialQuotation?.stops?.[0]?.coordinates?.lat ?? post.lat ?? 25.0831,
@@ -238,8 +263,16 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         ),
       });
       setDestCoords({
-        lat: Number(initialQuotation?.stops?.[1]?.coordinates?.lat ?? 24.9924),
-        lng: Number(initialQuotation?.stops?.[1]?.coordinates?.lng ?? 121.5203),
+        lat: Number(
+          initialDestinationCoords?.lat ??
+            initialQuotation?.stops?.[1]?.coordinates?.lat ??
+            24.9924,
+        ),
+        lng: Number(
+          initialDestinationCoords?.lng ??
+            initialQuotation?.stops?.[1]?.coordinates?.lng ??
+            121.5203,
+        ),
       });
       setIsQuoteExpired(false);
       setIsEditingAddresses(false);
@@ -251,8 +284,12 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     allQuotations,
     initialOriginAddress,
     initialDestinationAddress,
+    initialOriginPlaceId,
+    initialDestinationPlaceId,
+    initialDestinationCoords,
     post.lat,
     post.lng,
+    post.place_id,
   ]);
 
   // Google Places Autocomplete 綁定
@@ -268,7 +305,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         originInputRef.current,
         {
           componentRestrictions: { country: "tw" },
-          fields: ["formatted_address", "name", "geometry"],
+          fields: ["formatted_address", "name", "geometry", "place_id"],
         },
       );
       autoOrigin.addListener("place_changed", () => {
@@ -276,6 +313,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         const addr = place?.formatted_address || place?.name;
         if (addr) {
           setOriginAddr(addr);
+        }
+        if (place?.place_id) {
+          setOriginPlaceId(place.place_id);
         }
         if (place?.geometry?.location) {
           setOriginCoords({
@@ -291,7 +331,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         destInputRef.current,
         {
           componentRestrictions: { country: "tw" },
-          fields: ["formatted_address", "name", "geometry"],
+          fields: ["formatted_address", "name", "geometry", "place_id"],
         },
       );
       autoDest.addListener("place_changed", () => {
@@ -299,6 +339,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         const addr = place?.formatted_address || place?.name;
         if (addr) {
           setDestAddr(addr);
+        }
+        if (place?.place_id) {
+          setDestPlaceId(place.place_id);
         }
         if (place?.geometry?.location) {
           setDestCoords({
@@ -469,9 +512,27 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     return p;
   };
 
+  const { user: contextUser } = useUser();
+  const effectiveUser = currentUser || contextUser;
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
+
+    // 檢查登入狀態，未登入則引導至登入頁面並記錄 returnTo
+    if (!effectiveUser) {
+      const currentPath =
+        typeof window !== "undefined"
+          ? window.location.pathname + window.location.search
+          : "/";
+      toast.error(
+        locale === "en"
+          ? "Please sign in before checking out."
+          : "請先登入後再進行結帳付款",
+      );
+      router.push(`/signin?returnTo=${encodeURIComponent(currentPath)}`);
+      return;
+    }
 
     if (!currentQuotation) {
       setErrorMessage("請先取得有效報價");
@@ -534,59 +595,94 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         .filter(Boolean)
         .join("，");
 
-      const senderStopId = currentQuotation.stops?.[0]?.id || "";
-      const recipientStopId = currentQuotation.stops?.[1]?.id || "";
-
-      const orderPayload = {
+      // 呼叫金流結帳 API
+      const checkoutPayload = {
+        postId: post.id,
+        serviceType: currentQuotation.serviceType,
         quotationId: currentQuotation.quotationId,
-        sender: {
-          stopId: senderStopId,
-          name: senderName.trim(),
-          phone: formatPhone(senderPhone),
-          remarks: senderFullRemarks,
+        feeTotal: Number(currentQuotation.priceBreakdown.total),
+        expiresAt: currentQuotation.expiresAt,
+        // 取件地點：附帶 place_id（來自 post 或使用者重新選取後更新）
+        pickup: {
+          fullAddress: sanitizeTwAddress(originAddr),
+          lat: originCoords.lat,
+          lng: originCoords.lng,
+          placeId: originPlaceId,
         },
-        recipients: [
-          {
-            stopId: recipientStopId,
-            name: recipientName.trim(),
-            phone: formatPhone(recipientPhone),
-            remarks: recipientFullRemarks,
-          },
-        ],
-        metadata: {
-          postId: post.id,
-          postTitle: post.title,
-          serviceType: currentQuotation.serviceType,
+        pickupRemarks: senderFullRemarks || undefined,
+        // 送達地點：附帶 place_id（由 Google Places Autocomplete 取得）
+        dropoff: {
+          fullAddress: sanitizeTwAddress(destAddr),
+          lat: destCoords.lat,
+          lng: destCoords.lng,
+          placeId: destPlaceId,
         },
+        dropoffRemarks: recipientFullRemarks || undefined,
+        senderName: senderName.trim(),
+        senderPhone: formatPhone(senderPhone),
+        recipientName: recipientName.trim(),
+        recipientPhone: formatPhone(recipientPhone),
       };
 
-      const response = await fetch(`${hostName}/api/lalamove/orders`, {
+      const response = await fetch(`${hostName}/api/payments/checkout`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(orderPayload),
+        credentials: "include",
+        body: JSON.stringify(checkoutPayload),
       });
+
+      // 若未登入或 Session 過期，自動跳轉至登入頁面並帶上 returnTo
+      if (response.status === 401) {
+        const currentPath =
+          typeof window !== "undefined"
+            ? window.location.pathname + window.location.search
+            : "/";
+        toast.error(
+          locale === "en"
+            ? "Session expired. Please sign in again."
+            : "登入已逾期，請重新登入",
+        );
+        router.push(`/signin?returnTo=${encodeURIComponent(currentPath)}`);
+        return;
+      }
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || data.error || "建立訂單失敗");
+        throw new Error(data.message || data.error || "建立結帳訂單失敗");
+      }
+
+      // 儲存 MerchantTradeNo 與當前貼文網址到 sessionStorage，供付款後查詢與返回
+      const tradeNo = data.session?.formData?.MerchantTradeNo;
+      if (typeof window !== "undefined") {
+        if (tradeNo) sessionStorage.setItem("lastMerchantTradeNo", tradeNo);
+        sessionStorage.setItem("lastPostUrl", window.location.pathname + window.location.search);
       }
 
       toast.success(
         locale === "en"
-          ? "Lalamove order placed successfully!"
-          : "Lalamove 訂單建立成功，正在為您媒合司機！",
+          ? "Redirecting to secure payment..."
+          : "正在跳轉至綠界安全結帳頁面...",
       );
-      onClose();
 
-      const orderId = data.order.orderId;
-      // 等待 2 秒讓 Lalamove 系統處理訂單，再導向追蹤頁
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      router.push(`/delivery/${orderId}`);
+      // 注入綠界自動跳轉 Form 並送出，瀏覽器將被導向綠界付款頁
+      const htmlForm = data.session?.htmlForm as string | undefined;
+      if (htmlForm) {
+        const container = document.createElement("div");
+        container.innerHTML = htmlForm;
+        document.body.appendChild(container);
+        const form = container.querySelector("form");
+        if (form) {
+          form.submit();
+          return; // 頁面即將跳轉，不需再執行後續程式
+        }
+      }
+
+      throw new Error("未收到有效的付款表單，請重試");
     } catch (err: unknown) {
-      console.error("Create order failed:", err);
+      console.error("Checkout failed:", err);
       const msg = err instanceof Error ? err.message : "下單失敗，請稍後再試";
       setErrorMessage(msg);
       toast.error(msg);
@@ -1047,16 +1143,21 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   <button
                     type="submit"
                     disabled={isSubmitting || isEditingAddresses}
-                    className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] disabled:opacity-50"
+                    className="flex items-center gap-1.5 rounded-xl bg-green-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-green-600/25 transition-all hover:bg-green-700 active:scale-[0.99] disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <>
                         <RotateCw className="h-3.5 w-3.5 animate-spin" />
-                        正在建立訂單...
+                        {locale === "en"
+                          ? "Connecting to payment..."
+                          : "正在建立安全交易通道..."}
                       </>
                     ) : (
                       <>
-                        確認叫車 (NT$ {currentQuotation.priceBreakdown.total})
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {locale === "en"
+                          ? `Pay Securely (NT$ ${currentQuotation.priceBreakdown.total})`
+                          : `前往安全付款 (NT$ ${currentQuotation.priceBreakdown.total})`}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </>
                     )}
@@ -1072,3 +1173,4 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 };
 
 export default OrderPlacementModal;
+

@@ -19,6 +19,7 @@ import OrderPlacementModal from "./OrderPlacementModal";
 import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
 import { ArrowRight } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -245,10 +246,15 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const t = TRANSLATIONS[locale] || TRANSLATIONS.en;
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Destination input
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [destinationPlaceId, setDestinationPlaceId] = useState<string | undefined>(
+    undefined,
+  );
   const [destinationCoords, setDestinationCoords] = useState<{
     lat: number;
     lng: number;
@@ -266,7 +272,10 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     null,
   );
   const [isQuoteExpired, setIsQuoteExpired] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Auto-expand when returning from /signin with ?expand=1
+  const [isExpanded, setIsExpanded] = useState(
+    () => searchParams.get("expand") === "1",
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const { user } = useUser();
@@ -294,7 +303,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         destinationInputRef.current,
         {
           componentRestrictions: { country: "tw" },
-          fields: ["formatted_address", "geometry", "name"],
+          fields: ["formatted_address", "geometry", "name", "place_id"],
         },
       );
 
@@ -306,6 +315,10 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         } else if (place.name) {
           setDestinationAddress(place.name);
           setErrorMsg(null);
+        }
+
+        if (place.place_id) {
+          setDestinationPlaceId(place.place_id);
         }
 
         if (place.geometry?.location) {
@@ -495,6 +508,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   setDestinationAddress(
                     sanitizeTwAddress(results[0].formatted_address),
                   );
+                  if (results[0].place_id) {
+                    setDestinationPlaceId(results[0].place_id);
+                  }
                 } else {
                   // Geocoding API disabled or no results — use coordinates directly
                   setDestinationAddress(fallbackLabel);
@@ -564,7 +580,29 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
         <button
           type="button"
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+            // 嘗試展開時先確認已登入；未登入則導向登入頁並帶 returnTo + expand=1
+            if (!isExpanded && !user) {
+              const currentPath =
+                typeof window !== "undefined"
+                  ? window.location.pathname + window.location.search
+                  : "/";
+              // 在 returnTo 的 URL 裡附加 ?expand=1，登入後自動展開
+              const separator = currentPath.includes("?") ? "&" : "?";
+              const returnTo = encodeURIComponent(
+                `${currentPath}${separator}expand=1`,
+              );
+              toast(
+                locale === "en"
+                  ? "Please sign in to get a delivery quote."
+                  : "請先登入以使用外送叫車服務",
+                { icon: "🔑" },
+              );
+              router.push(`/signin?returnTo=${returnTo}`);
+              return;
+            }
+            setIsExpanded(!isExpanded);
+          }}
           className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-orange-600 transition-colors hover:bg-orange-100/60 sm:text-[13px]"
         >
           <span>{isExpanded ? t.collapse : t.expand}</span>
@@ -875,6 +913,8 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         post={post}
         originAddress={originAddress}
         destinationAddress={destinationAddress}
+        destinationPlaceId={destinationPlaceId}
+        destinationCoords={destinationCoords || undefined}
         currentUser={user}
         locale={locale}
       />

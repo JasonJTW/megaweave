@@ -116,7 +116,7 @@ let clientInstance: InstanceType<typeof ClientModule> | null = null;
 function getClient(): InstanceType<typeof ClientModule> {
   const apiKey = process.env.LALAMOVE_API_KEY || LALAMOVE_API_KEY;
   const apiSecret = process.env.LALAMOVE_API_SECRET || LALAMOVE_API_SECRET;
-  const env = ((process.env.LALAMOVE_ENV || LALAMOVE_ENV).toLowerCase()) as
+  const env = (process.env.LALAMOVE_ENV || LALAMOVE_ENV).toLowerCase() as
     | "sandbox"
     | "production";
 
@@ -259,7 +259,8 @@ function formatLat(val: string | number | undefined): string {
 }
 
 function formatLng(val: string | number | undefined): string {
-  const n = typeof val === "number" ? val : parseFloat(String(val || "121.5654"));
+  const n =
+    typeof val === "number" ? val : parseFloat(String(val || "121.5654"));
   if (isNaN(n)) return "121.565400";
   return n.toFixed(6);
 }
@@ -286,13 +287,14 @@ export async function requestLalamoveQuotation(
     .withStops(formattedStops);
 
   if (params.scheduleAt) {
-    payloadBuilder = payloadBuilder.withScheduleAt(
-      new Date(params.scheduleAt),
-    );
+    payloadBuilder = payloadBuilder.withScheduleAt(new Date(params.scheduleAt));
   }
 
   const payload = payloadBuilder.build();
-  console.log(`[Lalamove Service] Requesting ${params.serviceType} quotation with payload:`, JSON.stringify(payload, null, 2));
+  console.log(
+    `[Lalamove Service] Requesting ${params.serviceType} quotation with payload:`,
+    JSON.stringify(payload, null, 2),
+  );
 
   let rawResponse: unknown;
   let resolvedServiceType = params.serviceType;
@@ -305,34 +307,54 @@ export async function requestLalamoveQuotation(
     // In Central/South Taiwan (TW_TXG, TW_TNN, TW_KHH), it only accepts TRUCK175.
     // In Taipei, TRUCK175 and TRUCK330 yield identical quotation pricing until Lalamove support clarifies tonnage differentiation parameters.
     if (params.serviceType === "TRUCK175" && errMsg.includes("TRUCK330")) {
-      console.log("[Lalamove Service] TRUCK175 not available in this region, falling back to TRUCK330");
+      console.log(
+        "[Lalamove Service] TRUCK175 not available in this region, falling back to TRUCK330",
+      );
       let fallbackBuilder = QuotationPayloadBuilder.quotationPayload()
         .withLanguage(params.language || "zh_TW")
         .withServiceType("TRUCK330")
         .withStops(formattedStops);
       if (params.scheduleAt) {
-        fallbackBuilder = fallbackBuilder.withScheduleAt(new Date(params.scheduleAt));
+        fallbackBuilder = fallbackBuilder.withScheduleAt(
+          new Date(params.scheduleAt),
+        );
       }
-      rawResponse = await client.Quotation.create(LALAMOVE_MARKET, fallbackBuilder.build());
+      rawResponse = await client.Quotation.create(
+        LALAMOVE_MARKET,
+        fallbackBuilder.build(),
+      );
       resolvedServiceType = "TRUCK330";
-    } else if (params.serviceType === "TRUCK330" && errMsg.includes("TRUCK175")) {
+    } else if (
+      params.serviceType === "TRUCK330" &&
+      errMsg.includes("TRUCK175")
+    ) {
       // 中南部地區 TRUCK330 自動回退至 TRUCK175
-      console.log("[Lalamove Service] TRUCK330 not available in this region, falling back to TRUCK175");
+      console.log(
+        "[Lalamove Service] TRUCK330 not available in this region, falling back to TRUCK175",
+      );
       let fallbackBuilder = QuotationPayloadBuilder.quotationPayload()
         .withLanguage(params.language || "zh_TW")
         .withServiceType("TRUCK175")
         .withStops(formattedStops);
       if (params.scheduleAt) {
-        fallbackBuilder = fallbackBuilder.withScheduleAt(new Date(params.scheduleAt));
+        fallbackBuilder = fallbackBuilder.withScheduleAt(
+          new Date(params.scheduleAt),
+        );
       }
-      rawResponse = await client.Quotation.create(LALAMOVE_MARKET, fallbackBuilder.build());
+      rawResponse = await client.Quotation.create(
+        LALAMOVE_MARKET,
+        fallbackBuilder.build(),
+      );
       resolvedServiceType = "TRUCK175";
     } else {
       throw err;
     }
   }
 
-  console.log(`[Lalamove Service] SUCCESS quotation response for ${resolvedServiceType}:`, JSON.stringify(rawResponse, null, 2));
+  console.log(
+    `[Lalamove Service] SUCCESS quotation response for ${resolvedServiceType}:`,
+    JSON.stringify(rawResponse, null, 2),
+  );
 
   const response = rawResponse as unknown as LalamoveRawQuotationResponse;
 
@@ -344,8 +366,7 @@ export async function requestLalamoveQuotation(
     quotationId: response.quotationId || response.id || `quote_${Date.now()}`,
     serviceType: resolvedServiceType,
     expiresAt:
-      response.expiresAt ||
-      new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      response.expiresAt || new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     priceBreakdown: {
       total: response.priceBreakdown?.total || response.totalFee || "0",
       currency: response.priceBreakdown?.currency || "TWD",
@@ -488,21 +509,25 @@ export async function createLalamoveOrder(
       extraMileage: response.priceBreakdown?.extraMileage,
       surcharge: response.priceBreakdown?.surcharge,
     },
-    distance: response.distance ? {
-      value: response.distance.value || "0",
-      unit: response.distance.unit || "m",
-    } : undefined,
-    stops: response.stops ? response.stops.map((s) => ({
-      id: s.id,
-      coordinates: {
-        lat: s.coordinates.lat,
-        lng: s.coordinates.lng,
-      },
-      address: s.address,
-      name: s.name,
-      phone: s.phone,
-      remarks: s.remarks,
-    })) : [],
+    distance: response.distance
+      ? {
+          value: response.distance.value || "0",
+          unit: response.distance.unit || "m",
+        }
+      : undefined,
+    stops: response.stops
+      ? response.stops.map((s) => ({
+          id: s.id,
+          coordinates: {
+            lat: s.coordinates.lat,
+            lng: s.coordinates.lng,
+          },
+          address: s.address,
+          name: s.name,
+          phone: s.phone,
+          remarks: s.remarks,
+        }))
+      : [],
     metadata: response.metadata,
   };
 }
@@ -517,12 +542,12 @@ export async function getLalamoveOrderDetail(
   const rawOrder = await client.Order.retrieve(LALAMOVE_MARKET, orderId);
   const response = rawOrder as unknown as LalamoveRawOrderResponse;
 
-  console.log(
-    `[Lalamove Service] Retrieved order ${orderId} latest status:`,
-    response.status,
-    `raw:`,
-    JSON.stringify(rawOrder, null, 2),
-  );
+  // console.log(
+  //   `[Lalamove Service] Retrieved order ${orderId} latest status:`,
+  //   response.status,
+  //   `raw:`,
+  //   JSON.stringify(rawOrder, null, 2),
+  // );
 
   let driver: DriverInfo | null = null;
   const driverId = response.driverId;
@@ -558,9 +583,7 @@ export async function getLalamoveOrderDetail(
   }
 
   let serviceType =
-    response.serviceType ||
-    (response.metadata?.serviceType as string) ||
-    "";
+    response.serviceType || (response.metadata?.serviceType as string) || "";
 
   if (!serviceType && response.quotationId) {
     try {
@@ -571,7 +594,10 @@ export async function getLalamoveOrderDetail(
       const qRes = rawQuotation as unknown as { serviceType?: string };
       serviceType = qRes.serviceType || "";
     } catch (qErr) {
-      console.warn(`[Lalamove Service] Could not fetch quotation for serviceType:`, qErr);
+      console.warn(
+        `[Lalamove Service] Could not fetch quotation for serviceType:`,
+        qErr,
+      );
     }
   }
 
@@ -593,7 +619,11 @@ export async function getLalamoveOrderDetail(
 
   // 若有 Sandbox 模擬狀態，優先套用
   const customStatus = sandboxOrderStatus.get(orderId);
-  const finalStatus = (customStatus || response.status || "ASSIGNING_DRIVER").toUpperCase();
+  const finalStatus = (
+    customStatus ||
+    response.status ||
+    "ASSIGNING_DRIVER"
+  ).toUpperCase();
 
   return {
     orderId: response.id || response.orderId || orderId,
@@ -610,21 +640,25 @@ export async function getLalamoveOrderDetail(
       extraMileage: response.priceBreakdown?.extraMileage,
       surcharge: response.priceBreakdown?.surcharge,
     },
-    distance: response.distance ? {
-      value: response.distance.value || "0",
-      unit: response.distance.unit || "m",
-    } : undefined,
-    stops: response.stops ? response.stops.map((s) => ({
-      id: s.id,
-      coordinates: {
-        lat: s.coordinates.lat,
-        lng: s.coordinates.lng,
-      },
-      address: s.address,
-      name: s.name,
-      phone: s.phone,
-      remarks: s.remarks,
-    })) : [],
+    distance: response.distance
+      ? {
+          value: response.distance.value || "0",
+          unit: response.distance.unit || "m",
+        }
+      : undefined,
+    stops: response.stops
+      ? response.stops.map((s) => ({
+          id: s.id,
+          coordinates: {
+            lat: s.coordinates.lat,
+            lng: s.coordinates.lng,
+          },
+          address: s.address,
+          name: s.name,
+          phone: s.phone,
+          remarks: s.remarks,
+        }))
+      : [],
     metadata: response.metadata,
   };
 }
@@ -664,10 +698,12 @@ export async function getLalamoveDriverDetail(
       phone: driverRes.contact?.phone || driverRes.phone || "",
       plateNumber: driverRes.plateNumber || "",
       photo: driverRes.photo || "",
-      coordinates: driverRes.coordinates ? {
-        lat: driverRes.coordinates.lat,
-        lng: driverRes.coordinates.lng,
-      } : undefined,
+      coordinates: driverRes.coordinates
+        ? {
+            lat: driverRes.coordinates.lat,
+            lng: driverRes.coordinates.lng,
+          }
+        : undefined,
       updatedAt: driverRes.updatedAt,
     };
   } catch (error) {
@@ -713,7 +749,10 @@ export function verifyLalamoveWebhookSignature(
       Buffer.from(expectedSignature),
     );
   } catch (e) {
-    console.error("[Lalamove Service] Webhook signature verification error:", e);
+    console.error(
+      "[Lalamove Service] Webhook signature verification error:",
+      e,
+    );
     return false;
   }
 }
@@ -722,7 +761,10 @@ export function verifyLalamoveWebhookSignature(
 // Sandbox 模擬控制 API（僅供開發測試用）
 // ─────────────────────────────────────────────
 
-const sandboxDriverCoordinates = new Map<string, { lat: string; lng: string }>();
+const sandboxDriverCoordinates = new Map<
+  string,
+  { lat: string; lng: string }
+>();
 const sandboxOrderStatus = new Map<string, string>();
 
 function sandboxSign(
@@ -766,7 +808,9 @@ async function sandboxFetch(
       let data = "";
       res.on("data", (chunk: Buffer) => (data += chunk.toString()));
       res.on("end", () => {
-        console.log(`[Lalamove Sandbox] ${method} ${path} => HTTP ${res.statusCode}`);
+        console.log(
+          `[Lalamove Sandbox] ${method} ${path} => HTTP ${res.statusCode}`,
+        );
         try {
           resolve(JSON.parse(data));
         } catch {

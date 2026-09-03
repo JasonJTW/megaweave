@@ -243,7 +243,7 @@ export default function DeliveryTrackingPage() {
     fetcher,
     {
       refreshInterval: (latestData) => {
-        if (!latestData) return 3000;
+        if (!latestData) return 10000;
         const s = (latestData.status || "").trim().toUpperCase();
         if (
           s === "COMPLETED" ||
@@ -257,7 +257,8 @@ export default function DeliveryTrackingPage() {
         ) {
           return 0; // 結束後停止輪詢
         }
-        return 3000;
+        // 有 Webhook + Socket.IO 即時推播，輪詢僅作為背景備援（10 秒一次），避免轟炸 API
+        return 10000;
       },
       revalidateOnFocus: true,
       dedupingInterval: 1000,
@@ -270,6 +271,17 @@ export default function DeliveryTrackingPage() {
     },
   );
 
+  // 提前計算 normalizedStatus，供 useEffect 與 JSX 共用（必須在任何使用它的 useEffect 之前宣告）
+  const normalizedStatus = (order?.status || "").trim().toUpperCase();
+
+  // 使用 Ref 記住最新的 order 與 normalizedStatus，供 Socket 回呼存取，避免每次 order 變動重新綁定 Socket 監聽器
+  const latestOrderRef = useRef(order);
+  const latestStatusRef = useRef(normalizedStatus);
+  useEffect(() => {
+    latestOrderRef.current = order;
+    latestStatusRef.current = normalizedStatus;
+  }, [order, normalizedStatus]);
+
   // 監聽 Socket.IO 即時更新事件
   useEffect(() => {
     if (!socket || !orderId) return;
@@ -278,7 +290,87 @@ export default function DeliveryTrackingPage() {
 
     const handleDeliveryUpdate = (updateData: unknown) => {
       console.log("⚡ [Socket] Received delivery_update:", updateData);
-      mutate();
+      const update = updateData as {
+        status?: string;
+        driver?: {
+          name?: string;
+          phone?: string;
+          plateNumber?: string;
+          coordinates?: { lat: string | number; lng: string | number };
+        };
+        coordinates?: { lat: string | number; lng: string | number };
+      };
+
+      // 1. 若收到即時座標更新，直接在 Google Maps 上平滑移動 Marker，零延遲
+      const rawCoords = update.coordinates || update.driver?.coordinates;
+      if (rawCoords && driverMarkerRef.current && window.google?.maps) {
+        const newPos = {
+          lat: Number(rawCoords.lat),
+          lng: Number(rawCoords.lng),
+        };
+        driverMarkerRef.current.setPosition(newPos);
+
+        // 同步移動前往下一個目標站點的虛線
+        if (driverPolylineRef.current) {
+          const currentOrder = latestOrderRef.current;
+          const currentStatus = latestStatusRef.current;
+          const stops = currentOrder?.stops || [];
+          const origin = stops[0]?.coordinates;
+          const dest = stops[stops.length - 1]?.coordinates;
+          const targetCoords =
+            currentStatus === "PICKED_UP" || currentStatus === "IN_DELIVERY"
+              ? dest
+              : origin;
+          if (targetCoords) {
+            driverPolylineRef.current.setPath([
+              newPos,
+              { lat: Number(targetCoords.lat), lng: Number(targetCoords.lng) },
+            ]);
+          }
+        }
+      }
+
+      // 2. 樂觀同步至 SWR 快取，供 UI 狀態文字與卡片即時顯示，不發起網路請求
+      if (update.status || update.driver || update.coordinates) {
+        mutate(
+          (current) => {
+            if (!current) return current;
+            const updatedDriver =
+              update.driver || (update.coordinates ? { coordinates: update.coordinates } : null);
+
+            return {
+              ...current,
+              ...(update.status ? { status: update.status } : {}),
+              ...(updatedDriver
+                ? {
+                    driver: {
+                      ...(current.driver ?? {
+                        id: "",
+                        name: "",
+                        phone: "",
+                        plateNumber: "",
+                      }),
+                      ...(updatedDriver.name ? { name: updatedDriver.name } : {}),
+                      ...(updatedDriver.phone ? { phone: updatedDriver.phone } : {}),
+                      ...(updatedDriver.plateNumber ? { plateNumber: updatedDriver.plateNumber } : {}),
+                      ...(updatedDriver.coordinates
+                        ? {
+                            coordinates: {
+                              lat: String(updatedDriver.coordinates.lat),
+                              lng: String(updatedDriver.coordinates.lng),
+                            },
+                          }
+                        : {}),
+                    },
+                  }
+                : {}),
+            };
+          },
+          { revalidate: false },
+        );
+      } else {
+        mutate();
+      }
     };
 
     socket.on("delivery_update", handleDeliveryUpdate);
@@ -496,7 +588,7 @@ export default function DeliveryTrackingPage() {
       },
     );
     return () => window.google.maps.event.removeListener(listener);
-  }, [order, mapReady]);
+  }, [order, mapReady, normalizedStatus]);
 
   // 取消訂單處理
   const handleCancelOrder = async () => {
@@ -583,7 +675,6 @@ export default function DeliveryTrackingPage() {
     );
   }
 
-  const normalizedStatus = (order.status || "").trim().toUpperCase();
   const currentStatusConfig =
     STATUS_CONFIG[normalizedStatus] || STATUS_CONFIG.ASSIGNING_DRIVER;
   const isCancellable =

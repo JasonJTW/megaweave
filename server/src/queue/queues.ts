@@ -235,4 +235,37 @@ export async function initHotScoreCron(): Promise<void> {
   console.log("⏱️ HotScore Cron Scheduler initialized (runs every 15 mins)");
 }
 
+/**
+ * 外送訂單定時對帳 Queue
+ */
+export const deliveryReconcileQueue = new Queue("delivery-reconcile", {
+  connection: bullmqConnection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: {
+      type: "exponential",
+      delay: 5000,
+    },
+    removeOnComplete: { count: 50 },
+    removeOnFail: { count: 50 },
+  },
+});
+
+/**
+ * 初始化外送訂單對帳排程 (每 5 分鐘執行一次)
+ */
+export async function initDeliveryReconcileCron(): Promise<void> {
+  await deliveryReconcileQueue.upsertJobScheduler(
+    "cron-delivery-reconcile",
+    {
+      pattern: "*/5 * * * *",
+    },
+    {
+      name: "reconcile-orders",
+    },
+  );
+
+  console.log("⏱️ Delivery Reconcile Cron Scheduler initialized (runs every 5 mins)");
+}
+
 

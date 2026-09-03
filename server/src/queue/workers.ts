@@ -18,7 +18,8 @@ import {
 } from "./jobs/userVector";
 import { processUserVectorFlush } from "./jobs/userVectorFlush";
 import { processCalculateHotScore } from "./jobs/hotScore";
-import { initUserVectorFlushCron } from "./queues";
+import { processDeliveryReconciliation } from "./jobs/deliveryReconcile";
+import { initUserVectorFlushCron, initDeliveryReconcileCron } from "./queues";
 
 
 export async function startWorkers(): Promise<void> {
@@ -165,6 +166,37 @@ export async function startWorkers(): Promise<void> {
 
   // 啟動 Write-Back flush cron 排程（每 10 分鐘把 Redis dirty set 批次寫回 MySQL）
   await initUserVectorFlushCron();
+
+  // ─── Delivery Reconcile Worker (每 5 分鐘主動檢查遺失的 Webhook) ───────
+  const deliveryReconcileWorker = new Worker(
+    "delivery-reconcile",
+    async (job: Job) => {
+      if (job.name === "reconcile-orders") {
+        return await processDeliveryReconciliation(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: 1 },
+  );
+
+  deliveryReconcileWorker.on("completed", (_job, result) => {
+    const timeStr = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+    const res = result as { checkedCount?: number; reconciledCount?: number; expiredCount?: number } | undefined;
+    const stats =
+      res && typeof res.checkedCount === "number"
+        ? ` (Checked: ${res.checkedCount}, Reconciled: ${res.reconciledCount}, Expired: ${res.expiredCount ?? 0})`
+        : "";
+    console.log(`🎉 [delivery-reconcile] Reconcile finished at ${timeStr}${stats}`);
+  });
+
+  deliveryReconcileWorker.on("failed", (_job, err) => {
+    const timeStr = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+    console.error(
+      `❌ [delivery-reconcile] Reconcile failed at ${timeStr}: ${err.message}`,
+    );
+  });
+
+  // 啟動外送訂單對帳排程 (每 5 分鐘一次)
+  await initDeliveryReconcileCron();
 
   console.log("🚀 All workers started");
 }

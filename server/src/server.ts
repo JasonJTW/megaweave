@@ -22,6 +22,7 @@ import { createAdapter } from "@socket.io/redis-adapter";
 import { startWorkers } from "./queue/workers";
 import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
+import { setSocketIO } from "./utils/socket";
 
 dotenv.config();
 
@@ -151,6 +152,7 @@ async function startServer() {
     });
     //* 5.將 io 實例存入 app，讓以後的 API Route 可以透過 req.app.get("io") 取得
     app.set("io", io);
+    setSocketIO(io);
 
     //* 6. Add middleware to inject io into res.locals for all routes
     app.use((_req, res, next) => {

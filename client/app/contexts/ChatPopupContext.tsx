@@ -12,7 +12,6 @@ import { Post } from "../types/schema";
 import {
   WeaveDraft,
   createInitialDraft,
-  getDraftBannerInfo,
 } from "../types/weaveDraft";
 
 interface ChatPopupOtherUser {
@@ -21,8 +20,8 @@ interface ChatPopupOtherUser {
   avatar_url?: string;
 }
 
-// Represents an unconfirmed weaving intent (not yet written to DB)
-export interface PendingItem {
+/** Minimal shape needed to seed the initial WeaveDraft when opening a chat. */
+export interface InitialItem {
   id: string | number;
   title: string;
 }
@@ -34,13 +33,11 @@ interface ChatPopupContextType {
   post: Post | null;
   draft: WeaveDraft | null;
   setDraft: (draft: WeaveDraft | null) => void;
-  pendingItem: PendingItem | null;
-  setPendingItem: (item: PendingItem | null) => void;
   openChat: (
     conversationId: number,
     otherUser: ChatPopupOtherUser,
     post?: Post,
-    pendingItem?: PendingItem,
+    item?: InitialItem,
   ) => void;
   closeChat: () => void;
 }
@@ -57,34 +54,12 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
   const [otherUser, setOtherUser] = useState<ChatPopupOtherUser | null>(null);
   const [post, setPost] = useState<Post | null>(null);
   const [draft, setDraftState] = useState<WeaveDraft | null>(null);
-  // pendingItem: kept synchronized with draft for backward-compatibility with ChatWindow / system messages
-  const [pendingItem, setPendingItemState] = useState<PendingItem | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   // Ref to track the pending closeChat timeout so we can cancel it on re-open
   const closeChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setDraft = (newDraft: WeaveDraft | null) => {
     setDraftState(newDraft);
-    if (!newDraft) {
-      setPendingItemState(null);
-    } else {
-      const banner = getDraftBannerInfo(newDraft);
-      if (banner.isAll) {
-        setPendingItemState({ id: "all", title: "All" });
-      } else {
-        const selected = newDraft.items.filter((it) => it.selected);
-        const id =
-          selected.length === 1 ? selected[0].itemId : "custom";
-        setPendingItemState({ id, title: banner.displayTitle || "Items" });
-      }
-    }
-  };
-
-  const setPendingItem = (item: PendingItem | null) => {
-    setPendingItemState(item);
-    if (!item) {
-      setDraftState(null);
-    }
   };
 
   useEffect(() => {
@@ -97,7 +72,6 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
           setOtherUser(parsed.otherUser);
           if (parsed.post) setPost(parsed.post);
           if (parsed.draft) setDraftState(parsed.draft);
-          if (parsed.pendingItem) setPendingItemState(parsed.pendingItem);
           setIsOpen(true);
         }
       } catch (e) {
@@ -118,20 +92,19 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
             otherUser,
             post,
             draft,
-            pendingItem,
           }),
         );
       } else {
         sessionStorage.removeItem("chatPopupState");
       }
     }
-  }, [isOpen, conversationId, otherUser, post, draft, pendingItem, isInitialized]);
+  }, [isOpen, conversationId, otherUser, post, draft, isInitialized]);
 
   const openChat = (
     id: number,
     user: ChatPopupOtherUser,
     currentPost?: Post,
-    item?: PendingItem,
+    item?: InitialItem,
   ) => {
     // Cancel any pending closeChat cleanup to avoid a race condition where
     // closeChat's delayed setPost(null) would overwrite the post we're about
@@ -147,11 +120,9 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
     setPost(currentPost ?? null);
 
     if (currentPost) {
-      const initialDraft = createInitialDraft(currentPost, item);
-      setDraft(initialDraft);
+      setDraft(createInitialDraft(currentPost, item));
     } else {
       setDraft(null);
-      setPendingItem(item ?? null);
     }
 
     setIsOpen(true);
@@ -168,7 +139,6 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
           setOtherUser(null);
           setPost(null);
           setDraft(null);
-          setPendingItem(null);
         }
         return latestIsOpen;
       });
@@ -184,8 +154,6 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
         post,
         draft,
         setDraft,
-        pendingItem,
-        setPendingItem,
         openChat,
         closeChat,
       }}

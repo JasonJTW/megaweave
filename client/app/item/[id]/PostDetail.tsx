@@ -634,7 +634,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
               {/* Author Avatar */}
               <div
-                className="flex items-center rounded-[30px] bg-[#fafafa] p-[9px]"
+                className="flex items-center rounded-[30px] bg-[#fafafa] p-[9px] transition-all lg:cursor-pointer lg:hover:bg-primary-5"
                 onClick={handleAvatarClick}
               >
                 <div className="relative h-[50px] w-[50px] items-center justify-center">

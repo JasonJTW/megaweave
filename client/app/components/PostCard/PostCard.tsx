@@ -226,7 +226,7 @@ function PostCardInner({
               )}
 
               <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
-                <Avatar size="sm" className="ring-2 ring-white">
+                <Avatar size="sm" className="ring-[3px] ring-white">
                   <AvatarImage src={post.avatar_url} />
                   <AvatarFallback>
                     {post.username?.charAt(0).toUpperCase()}

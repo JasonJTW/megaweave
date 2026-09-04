@@ -28,6 +28,11 @@ import toast from "react-hot-toast";
 import { safeCompressImage } from "@/utils/imageProcessor";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import WeavingCard from "@/app/components/WeavingCard";
+import {
+  getDraftBannerInfo,
+  getDraftSendPayload,
+  WeaveDraft,
+} from "@/app/types/weaveDraft";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -122,16 +127,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
-  // Consume pendingItem from global context — represents the weaving intent
-  // before the user sends their first real message.
-  const {
-    pendingItem,
-    setPendingItem,
-    post,
-    conversationId: popupConvId,
-  } = useChatPopup();
+  // Read draft (weaving intent) from global context.
+  const { draft, setDraft, post, conversationId: popupConvId } = useChatPopup();
   // ponytail: activePost only used for optimistic banner, same conv check
   const activePost = popupConvId === conversationId ? post : null;
+
+  // Captures the draft at the moment the user hits send so we can keep
+  // the optimistic banner alive until system_start_weaving arrives.
+  const sentDraftRef = useRef<WeaveDraft | null>(null);
 
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -155,6 +158,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     return () => observer.disconnect();
   }, [hasMore, isLoading, isFetchingMore, fetchMore]);
+
+  // Once the server-side system_start_weaving message for the sent draft
+  // appears in the messages list, clear the optimistic draft banner.
+  useEffect(() => {
+    if (!sentDraftRef.current || !draft) return;
+    const sentPayload = getDraftSendPayload(sentDraftRef.current);
+    if (!sentPayload) return;
+    const sentId = sentPayload.item_id;
+    const found = messages.some((m) => {
+      if (m.message_type !== "system_start_weaving") return false;
+      try {
+        const meta =
+          typeof m.metadata === "string" ? JSON.parse(m.metadata) : m.metadata;
+        const msgItemId = String(meta?.item_id ?? "");
+        // "all" item uses item_id null/"all" on the server side
+        if (sentId.toLowerCase() === "all") {
+          return !meta?.item_id || msgItemId.toLowerCase() === "all";
+        }
+        return msgItemId === sentId;
+      } catch {
+        return false;
+      }
+    });
+    if (found) {
+      sentDraftRef.current = null;
+      setDraft(null);
+    }
+  }, [messages, draft, setDraft]);
 
   // Use prop if available (from list), otherwise fallback to fetched conversation details
   const otherUser =
@@ -473,10 +504,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     const content = inputValue;
     const filesToSend = [...selectedFiles];
     const previewUrls = [...previews];
-    // Capture and immediately clear the pending intent so the banner disappears
-    // once the user sends their first message.
-    const itemToSend = pendingItem;
-    setPendingItem(null);
+    // Capture the current draft. We do NOT clear it immediately — instead we
+    // keep the optimistic banner visible until the server-side
+    // system_start_weaving message arrives in the messages list.
+    const draftToSend = draft;
+    if (draftToSend) {
+      sentDraftRef.current = draftToSend;
+    }
 
     setInputValue(""); // Clear input immediately
     setSelectedFiles([]);
@@ -517,9 +551,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       // If there is a pending weaving intent, include it so the backend
       // can persist the system message in the same request.
-      if (itemToSend) {
-        formData.append("item_id", String(itemToSend.id));
-        formData.append("item_title", itemToSend.title);
+      const sendPayload = getDraftSendPayload(draftToSend);
+      if (sendPayload) {
+        formData.append("item_id", sendPayload.item_id);
+        formData.append("item_title", sendPayload.item_title);
         if (post && post.id) {
           formData.append("post_id", String(post.id));
         }
@@ -563,9 +598,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       toast.error(
         error instanceof Error ? error.message : "Failed to send message.",
       );
-      // Restore the pending item if the send failed so the user doesn't
+      // Restore the draft if the send failed so the user doesn't
       // lose their weaving context.
-      if (itemToSend) setPendingItem(itemToSend);
+      if (draftToSend) setDraft(draftToSend);
+      sentDraftRef.current = null;
       // If an error occurred, and the optimistic update was not reverted by !res.ok,
       // ensure it's removed here. This handles network errors or other exceptions.
       mutate((currentData) => {
@@ -611,7 +647,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       {/* Messages */}
       <div
         className={cn(
-          "flex min-w-0 flex-1 flex-col-reverse gap-4 overflow-y-auto bg-slate-50 p-4",
+          "flex min-w-0 flex-1 flex-col-reverse gap-4 overflow-y-auto bg-secondary p-4",
         )}
       >
         {/* Anchor point for scrolling to bottom */}
@@ -619,9 +655,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
         {/* Optimistic "Start weaving" banner — shows at the visual bottom of the
             chat (near the input box) while the user is composing their first
-            message. Disappears once the message is sent. */}
-        {pendingItem &&
+            message. Disappears once system_start_weaving arrives. */}
+        {draft &&
           (() => {
+            const { isAll, displayTitle } = getDraftBannerInfo(draft);
             let optimisticIsGiver = false;
             if (activePost && currentUser) {
               const isPostAuthor =
@@ -631,24 +668,22 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   ? isPostAuthor
                   : !isPostAuthor;
             }
-            const isOptimisticAll =
-              !pendingItem || String(pendingItem.id).toLowerCase() === "all";
 
             const optimisticBannerText = activePost
               ? optimisticIsGiver
                 ? activePost.type === "wish"
-                  ? isOptimisticAll
+                  ? isAll
                     ? "Start weaving to offer all items"
-                    : `Start weaving to offer for ${pendingItem.title}`.trim()
-                  : isOptimisticAll
+                    : `Start weaving to offer for ${displayTitle}`.trim()
+                  : isAll
                     ? "Start weaving to give all items"
-                    : `Start weaving to give for ${pendingItem.title}`.trim()
-                : isOptimisticAll
+                    : `Start weaving to give for ${displayTitle}`.trim()
+                : isAll
                   ? "Start weaving to request all items"
-                  : `Start weaving to request for ${pendingItem.title}`.trim()
-              : isOptimisticAll
+                  : `Start weaving to request for ${displayTitle}`.trim()
+              : isAll
                 ? "Start weaving for all items"
-                : `Start weaving for ${pendingItem.title}`;
+                : `Start weaving for ${displayTitle}`;
             return (
               <div className="my-2 flex w-full min-w-0 items-center justify-center gap-4 py-4">
                 <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
@@ -716,7 +751,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   key={`date-${msg.created_at}`}
                   className="my-4 flex justify-center"
                 >
-                  <span className="rounded-full bg-gray-200 px-2 py-1 text-xs uppercase text-gray-500">
+                  <span className="rounded-full bg-gray-50 px-2 py-1 text-xs uppercase text-gray-500">
                     {isToday(msgDate)
                       ? "Today"
                       : isYesterday(msgDate)
@@ -791,23 +826,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     ? "Start weaving for all items"
                     : `Start weaving ${itemTitle ? `for ${itemTitle}` : "!"}`;
 
-                // Only show banner for the first occurrence per item
-                const hasOlderStartWeaving = messages
-                  .slice(index + 1)
-                  .some((m) => {
-                    if (m.message_type !== "system_start_weaving") return false;
-                    try {
-                      const mMeta =
-                        typeof m.metadata === "string"
-                          ? JSON.parse(m.metadata)
-                          : m.metadata;
-                      return String(mMeta?.item_id) === String(currentItemId);
-                    } catch {
-                      return false;
-                    }
-                  });
-
-                const shouldShowBanner = !weaveId || !hasOlderStartWeaving;
+                const shouldShowBanner = true;
                 const shouldShowCard = !!weaveId;
 
                 return (
@@ -1046,14 +1065,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={
-              isPopup
-                ? "Hi! I'd like to request this item."
-                : "Type a message..."
-            }
+            placeholder={isPopup ? "Hi! I'd like to ..." : "Type a message..."}
             className={cn(
               "flex-1",
-              isPopup && "rounded-full border-none bg-[#F2F2F2] px-6",
+              isPopup && "rounded-full border-none bg-[#F2F2F2]",
             )}
             disabled={isSending}
           />

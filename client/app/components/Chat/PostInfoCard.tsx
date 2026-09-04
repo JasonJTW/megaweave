@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { Post } from "@/app/types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { PendingItem, useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import User from "@/app/types/user";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -23,14 +24,12 @@ export type { SelectedWeaveItem };
 
 interface PostInfoCardProps {
   post: Post;
-  item?: PendingItem | null;
   user?: User | null;
   onWeavingSubmit?: (items: SelectedWeaveItem[]) => void;
 }
 
 const PostInfoCard: React.FC<PostInfoCardProps> = ({
   post,
-  item,
   onWeavingSubmit,
 }) => {
   const { draft: contextDraft, setDraft } = useChatPopup();
@@ -38,14 +37,14 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   // If context has draft for this post, use it as single source of truth.
   // Otherwise fallback to local state (e.g. if rendered outside provider).
   const [localDraft, setLocalDraft] = useState<WeaveDraft>(() =>
-    createInitialDraft(post, item),
+    createInitialDraft(post),
   );
 
   // Sync draft if post.id changes during render (React recommended pattern without useEffect)
   const [prevPostId, setPrevPostId] = useState(post.id);
   if (prevPostId !== post.id) {
     setPrevPostId(post.id);
-    const next = createInitialDraft(post, item);
+    const next = createInitialDraft(post);
     setLocalDraft(next);
   }
 
@@ -63,7 +62,9 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
     : null;
 
   const hasSubItems = draft.items.length > 0;
-  const selectedItems = draft.items.filter((it) => it.selected);
+  const selectedItems = draft.items.filter(
+    (it) => it.selected && it.quantity > 0,
+  );
   const selectedCount = selectedItems.length;
 
   const handleToggleItem = (itemId: number) => {
@@ -117,7 +118,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
             <div className="line-clamp-1 text-[14px] font-bold leading-tight text-gray-800">
               {post.title}
             </div>
-            <div className="mt-1 flex items-center gap-2 text-[11px] leading-none text-gray-500">
+            <div className="mt-1 flex items-center gap-2 text-[13px] leading-none text-gray-500">
               <span>{getDraftSelectedLabel(draft)}</span>
               {hasSubItems && (
                 <button
@@ -157,56 +158,79 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
       </div>
 
       {/* 下半部 (只在點擊 Choose items 展開時才顯示)：包含該 Post 下所有 Items 勾選與數量步進器 */}
-      {isExpanded && hasSubItems && (
-        <div className="flex max-h-[160px] flex-col gap-1.5 overflow-y-auto border-t border-primary-30/40 bg-white/80 px-3 py-2">
-          {draft.items.map((it) => {
-            const isChecked = it.selected;
-            const currentQty = it.quantity;
-            const quantityLeft = it.quantityLeft;
+      <AnimatePresence initial={false}>
+        {isExpanded && hasSubItems && (
+          <motion.div
+            key="items-panel"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="flex max-h-[200px] flex-col gap-2 overflow-y-auto border-t border-primary-30/40 bg-primary-15 px-3 py-4">
+              {draft.items.map((it) => {
+                const hasStock = it.quantityLeft > 0;
+                const isChecked = it.selected && hasStock;
+                const currentQty = it.quantity;
+                const quantityLeft = it.quantityLeft;
 
-            return (
-              <div
-                key={it.id}
-                className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                  isChecked
-                    ? "border border-primary/20 bg-primary/10"
-                    : "border border-gray-100 bg-gray-50 hover:bg-gray-100"
-                }`}
-              >
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => handleToggleItem(it.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <span className="truncate text-[13px] font-semibold text-gray-800">
-                    {it.title}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-gray-400">
-                    (Left: {it.quantityLeft})
-                  </span>
-                </label>
+                return (
+                  <div
+                    key={it.id}
+                    className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
+                      !hasStock
+                        ? "border border-gray-100 bg-gray-50 opacity-60"
+                        : isChecked
+                          ? "border border-primary/20 bg-primary/10"
+                          : "border border-gray-100 bg-gray-50 hover:bg-gray-100"
+                    }`}
+                  >
+                    <label
+                      className={`flex min-w-0 flex-1 items-center gap-2 ${
+                        hasStock ? "cursor-pointer" : "cursor-not-allowed"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleItem(it.id)}
+                        disabled={!hasStock}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-40"
+                      />
+                      <span
+                        className={`truncate text-[13px] font-semibold ${
+                          hasStock ? "text-gray-800" : "text-gray-400"
+                        }`}
+                      >
+                        {it.title}
+                      </span>
+                      <span className="shrink-0 text-[11px] text-gray-400">
+                        (Left: {it.quantityLeft})
+                      </span>
+                    </label>
 
-                {isChecked && (
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-[11px] font-medium text-gray-500">
-                      Qty:
-                    </span>
-                    <QuantityStepper
-                      value={currentQty}
-                      min={1}
-                      max={quantityLeft}
-                      onChange={(qty) => handleQuantityChange(it.id, qty)}
-                      disabled={!isChecked}
-                    />
+                    {isChecked && (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="text-[11px] font-medium text-gray-500">
+                          Qty:
+                        </span>
+                        <QuantityStepper
+                          value={currentQty}
+                          min={1}
+                          max={quantityLeft}
+                          onChange={(qty) => handleQuantityChange(it.id, qty)}
+                          disabled={!isChecked}
+                        />
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

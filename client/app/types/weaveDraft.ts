@@ -54,14 +54,15 @@ export function createInitialDraft(
       postId: post.id,
       postTitle: post.title,
       items: postItems.map((it) => {
-        const qty = Math.max(1, it.quantity ?? 1);
+        const left = it.quantity ?? 0;
+        const hasStock = left > 0;
         return {
           id: it.id,
           itemId: it.id,
           title: it.title,
-          quantity: qty,
-          quantityLeft: qty,
-          selected: true,
+          quantity: hasStock ? left : 0,
+          quantityLeft: left,
+          selected: hasStock,
         };
       }),
     };
@@ -74,13 +75,13 @@ export function createInitialDraft(
     postId: post.id,
     postTitle: post.title,
     items: postItems.map((it) => {
-      const isTarget = it.id === targetId;
-      const left = Math.max(1, it.quantity ?? 1);
+      const left = it.quantity ?? 0;
+      const isTarget = it.id === targetId && left > 0;
       return {
         id: it.id,
         itemId: it.id,
         title: it.title,
-        quantity: isTarget ? 1 : left,
+        quantity: isTarget ? 1 : 0,
         quantityLeft: left,
         selected: isTarget,
       };
@@ -92,8 +93,9 @@ export function createInitialDraft(
  * 檢查當前選取狀態是否符合「全品項選滿（all_items）」
  */
 export function isAllItemsSelected(items: WeaveDraftItem[]): boolean {
-  if (items.length === 0) return false;
-  return items.every((it) => it.selected && it.quantity === it.quantityLeft);
+  const availableItems = items.filter((it) => it.quantityLeft > 0);
+  if (availableItems.length === 0) return false;
+  return availableItems.every((it) => it.selected && it.quantity === it.quantityLeft);
 }
 
 /**
@@ -106,13 +108,13 @@ export function toggleDraftItem(
   if (draft.mode === "all_post") return draft;
 
   const nextItems = draft.items.map((it) => {
-    if (it.id !== itemId) return it;
+    if (it.id !== itemId || it.quantityLeft <= 0) return it;
     const nextSelected = !it.selected;
     return {
       ...it,
       selected: nextSelected,
-      // 重新勾選時，重設為最大可用量
-      quantity: nextSelected ? it.quantityLeft : it.quantity,
+      // 重新勾選時，重設為最大可用庫存量
+      quantity: nextSelected ? it.quantityLeft : 0,
     };
   });
 
@@ -135,7 +137,7 @@ export function updateDraftItemQuantity(
   if (draft.mode === "all_post") return draft;
 
   const nextItems = draft.items.map((it) => {
-    if (it.id !== itemId) return it;
+    if (it.id !== itemId || it.quantityLeft <= 0) return it;
     const clampedQty = Math.max(1, Math.min(it.quantityLeft, quantity));
     return {
       ...it,
@@ -155,7 +157,7 @@ export function updateDraftItemQuantity(
 /**
  * 匯出給 API (createWeave) 的 payload
  * - all_post: 送出 itemId: null 代表整篇貼文
- * - all_items: 完整映射所有真實 sub-items (已選取且為全量)
+ * - all_items: 完整映射所有真實 sub-items (已選取且有數量)
  * - custom: 映射使用者自選的真實 sub-items
  */
 export function getWeaveSubmitPayload(
@@ -165,7 +167,7 @@ export function getWeaveSubmitPayload(
     return [{ itemId: null, quantity: 1, title: draft.postTitle }];
   }
 
-  const selected = draft.items.filter((it) => it.selected);
+  const selected = draft.items.filter((it) => it.selected && it.quantity > 0);
   if (selected.length === 0) {
     return [{ itemId: null, quantity: 1, title: draft.postTitle }];
   }
@@ -185,7 +187,7 @@ export function getDraftSelectedLabel(draft: WeaveDraft): string {
     return "Selected: All";
   }
 
-  const count = draft.items.filter((it) => it.selected).length;
+  const count = draft.items.filter((it) => it.selected && it.quantity > 0).length;
   const suffix = count === 1 ? "item" : "items";
   return `Selected: ${count} ${suffix}`;
 }
@@ -203,7 +205,7 @@ export function getDraftBannerInfo(draft: WeaveDraft | null): {
     return { isAll: true };
   }
 
-  const selected = draft.items.filter((it) => it.selected);
+  const selected = draft.items.filter((it) => it.selected && it.quantity > 0);
   if (selected.length === 1) {
     return { isAll: false, displayTitle: selected[0].title };
   }
@@ -213,4 +215,32 @@ export function getDraftBannerInfo(draft: WeaveDraft | null): {
   }
 
   return { isAll: true };
+}
+
+/**
+ * 從 WeaveDraft 推導出後端 /api/messages 所需的 item_id 和 item_title。
+ * 回傳 null 表示不需要附帶 weaving intent（無 draft）。
+ */
+export function getDraftSendPayload(
+  draft: WeaveDraft | null,
+): { item_id: string; item_title: string } | null {
+  if (!draft) return null;
+
+  if (draft.mode === "all_post" || draft.mode === "all_items") {
+    return { item_id: "all", item_title: draft.postTitle };
+  }
+
+  // custom mode
+  const selected = draft.items.filter((it) => it.selected && it.quantity > 0);
+  if (selected.length === 0) return null;
+
+  if (selected.length === 1) {
+    return {
+      item_id: String(selected[0].itemId),
+      item_title: selected[0].title,
+    };
+  }
+
+  // 多選：統一送 "all"，後端以 post_id 為準
+  return { item_id: "all", item_title: draft.postTitle };
 }

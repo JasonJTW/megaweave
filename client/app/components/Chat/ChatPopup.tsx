@@ -10,8 +10,10 @@ import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
 import { createWeave } from "@/services/weaveService";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { useSWRConfig } from "swr";
 
 export const ChatPopup = () => {
+  const { mutate: globalMutate } = useSWRConfig();
   const {
     isOpen,
     conversationId,
@@ -19,19 +21,10 @@ export const ChatPopup = () => {
     post,
     draft,
     setDraft,
-    pendingItem,
-    setPendingItem,
     closeChat,
   } = useChatPopup();
   const { user: currentUser } = useUser();
   const router = useRouter();
-
-  // Keep the last non-null pendingItem so PostInfoCard doesn't lose its item
-  // title when setPendingItem(null) is called after the user sends a message.
-  const [displayedItem, setDisplayedItem] = React.useState(pendingItem);
-  React.useEffect(() => {
-    if (pendingItem) setDisplayedItem(pendingItem);
-  }, [pendingItem]);
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
   const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
@@ -64,10 +57,17 @@ export const ChatPopup = () => {
       });
       void newWeave;
 
-      // Clear all UI state after a successful weave
-      setDraft?.(null);
-      setPendingItem(null);
-      setDisplayedItem(null);
+      // draft is the single source of truth — clearing it collapses the PostInfoCard
+      setDraft(null);
+
+      const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+      if (conversationId) {
+        globalMutate(
+          `${hostName}/api/messages/conversations/${conversationId}`,
+        );
+      }
+      globalMutate(`${hostName}/api/messages/conversations`);
+      globalMutate(`${hostName}/api/weaves`);
 
       toast.success("Request sent successfully!");
     } catch (err: unknown) {
@@ -114,12 +114,11 @@ export const ChatPopup = () => {
               </button>
             </div>
 
-            {/* PostInfoCard — 在 flex-col 文件流中，自然佔用高度並繼承父層寬度 */}
-            {post && (displayedItem || draft) && (
+            {/* PostInfoCard — draft 是唯一的顯示條件，不再需要 pendingItem */}
+            {post && draft && (
               <PostInfoCard
                 key={post.id}
                 post={post}
-                item={displayedItem}
                 user={currentUser}
                 onWeavingSubmit={handleWeavingSubmit}
               />

@@ -60,6 +60,7 @@ export interface PostImage {
 /** 完整貼文詳情資料結構 (含作者、分類、地點、物品、圖片關聯) */
 export interface PostDetail {
   id: number;
+  public_id: string;
   user_id: number;
   title: string;
   content: string;

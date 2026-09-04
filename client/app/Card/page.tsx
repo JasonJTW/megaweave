@@ -49,7 +49,7 @@ const CardPage = () => {
               key={index}
               i={index}
               post={post}
-              onPostClick={(post) => router.push(`/item/${post.id}`)}
+              onPostClick={(post) => router.push(`/item/${post.public_id}`)}
               conditions={conditions}
               categories={categories}
               progress={scrollYProgress}

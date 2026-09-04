@@ -220,7 +220,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
                               `/messages/${weave.conversation_id}?highlightWeaveId=${weave.id}`,
                             );
                           } else {
-                            router.push(`/item/${post.id}`);
+                            router.push(`/item/${post.public_id}`);
                           }
                         }}
                         onWeaveStatusChange={onWeaveStatusChange}

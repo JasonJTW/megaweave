@@ -155,7 +155,7 @@ export default function TinderFeed({
           toast("已加分過囉！", { icon: "💚", duration: 1500 });
         } else if (user) {
           try {
-            await fetch(`${hostName}/api/posts/${currentPost.id}/like`, {
+            await fetch(`${hostName}/api/posts/${currentPost.public_id}/like`, {
               method: "POST",
               credentials: "include",
             });
@@ -220,7 +220,7 @@ export default function TinderFeed({
       !lastItem.post.is_liked &&
       likedIds.has(lastItem.post.id)
     ) {
-      fetch(`${hostName}/api/posts/${lastItem.post.id}/like`, {
+      fetch(`${hostName}/api/posts/${lastItem.post.public_id}/like`, {
         method: "POST",
         credentials: "include",
       }).catch((err) => console.error("Error reverting like:", err));
@@ -237,7 +237,7 @@ export default function TinderFeed({
   // Navigate to post detail
   const handleDetail = useCallback(
     (post: Post) => {
-      router.push(`/item/${post.id}`);
+      router.push(`/item/${post.public_id}`);
     },
     [router],
   );

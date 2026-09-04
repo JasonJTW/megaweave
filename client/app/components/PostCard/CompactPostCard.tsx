@@ -48,7 +48,7 @@ export default function CompactPostCard({
     if (onClick) {
       onClick();
     } else {
-      router.push(`/item/${post.id}`);
+      router.push(`/item/${post.public_id}`);
     }
   };
 

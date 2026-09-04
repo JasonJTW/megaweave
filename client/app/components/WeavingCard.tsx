@@ -362,7 +362,7 @@ const WeavingCard = ({
               </span>
               <Link
                 // href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
-                href={`/item/${activeWeave?.post_id}`}
+                href={`/item/${activeWeave?.post?.public_id || activeWeave?.post_id}`}
                 onClick={(e) => e.stopPropagation()}
                 className="text-xs font-bold text-primary hover:underline"
               >

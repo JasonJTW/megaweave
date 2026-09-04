@@ -20,6 +20,7 @@ import SeekBadgeExpiredIcon from "../icons/SeekBadgeExpiredIcon";
 import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
 import ShareBadgeIcon from "../icons/ShareBadgeIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // ─── Image Retry Hook (Exponential Backoff) ───────────────────────────────────
 const MAX_RETRIES = 4; // 最多重試 4 次
@@ -225,6 +226,12 @@ function PostCardInner({
               )}
 
               <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
+                <Avatar size="sm" className="ring-2 ring-white">
+                  <AvatarImage src={post.avatar_url} />
+                  <AvatarFallback>
+                    {post.username?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 {post.view_count > 0 && (
                   <div className="flex items-center">
                     <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">

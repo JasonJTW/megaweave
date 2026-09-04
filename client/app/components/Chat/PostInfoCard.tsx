@@ -4,25 +4,22 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { Post } from "@/app/types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { PendingItem } from "@/app/contexts/ChatPopupContext";
+import { PendingItem, useChatPopup } from "@/app/contexts/ChatPopupContext";
 import User from "@/app/types/user";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  WeaveDraft,
+  SelectedWeaveItem,
+  createInitialDraft,
+  toggleDraftItem,
+  updateDraftItemQuantity,
+  getWeaveSubmitPayload,
+  getDraftSelectedLabel,
+} from "@/app/types/weaveDraft";
+import { QuantityStepper } from "@/app/components/ui/QuantityStepper";
 
-const MAX_WEAVING_QUANTITY = 20;
-
-export interface SelectedWeaveItem {
-  itemId: number | null;
-  quantity: number;
-  title: string;
-}
+export type { SelectedWeaveItem };
 
 interface PostInfoCardProps {
   post: Post;
@@ -36,21 +33,24 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   item,
   onWeavingSubmit,
 }) => {
-  const [selectedQuantities, setSelectedQuantities] = useState<
-    Record<number, number>
-  >(() => {
-    // 預設將傳入的 pendingItem 勾選數量 1
-    const initial: Record<number, number> = {};
-    if (item && item.id !== "all") {
-      initial[Number(item.id)] = 1;
-    } else if (post.items && post.items.length > 0) {
-      // 若為 all 或無特定 item，預設全選或選第一個
-      post.items.forEach((it) => {
-        initial[it.id] = 1;
-      });
-    }
-    return initial;
-  });
+  const { draft: contextDraft, setDraft } = useChatPopup();
+
+  // If context has draft for this post, use it as single source of truth.
+  // Otherwise fallback to local state (e.g. if rendered outside provider).
+  const [localDraft, setLocalDraft] = useState<WeaveDraft>(() =>
+    createInitialDraft(post, item),
+  );
+
+  // Sync draft if post.id changes during render (React recommended pattern without useEffect)
+  const [prevPostId, setPrevPostId] = useState(post.id);
+  if (prevPostId !== post.id) {
+    setPrevPostId(post.id);
+    const next = createInitialDraft(post, item);
+    setLocalDraft(next);
+  }
+
+  const draft =
+    contextDraft && contextDraft.postId === post.id ? contextDraft : localDraft;
 
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -62,59 +62,37 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
       : getImageUrl(firstKey, "thumb")
     : null;
 
-  const postItems = post.items || [];
-  const hasMultipleItems = postItems.length > 1;
+  const hasSubItems = draft.items.length > 0;
+  const selectedItems = draft.items.filter((it) => it.selected);
+  const selectedCount = selectedItems.length;
 
   const handleToggleItem = (itemId: number) => {
-    setSelectedQuantities((prev) => {
-      const next = { ...prev };
-      if (next[itemId]) {
-        delete next[itemId];
-      } else {
-        next[itemId] = 1;
-      }
-      return next;
-    });
+    const next = toggleDraftItem(draft, itemId);
+    if (contextDraft && contextDraft.postId === post.id) {
+      setDraft?.(next);
+    } else {
+      setLocalDraft(next);
+      setDraft?.(next);
+    }
   };
 
   const handleQuantityChange = (itemId: number, qty: number) => {
-    setSelectedQuantities((prev) => ({
-      ...prev,
-      [itemId]: qty,
-    }));
+    const next = updateDraftItemQuantity(draft, itemId, qty);
+    if (contextDraft && contextDraft.postId === post.id) {
+      setDraft?.(next);
+    } else {
+      setLocalDraft(next);
+      setDraft?.(next);
+    }
   };
-
-  const selectedCount = Object.keys(selectedQuantities).length;
 
   const handleSubmit = () => {
     if (!onWeavingSubmit) return;
-
-    // "All" intent: always submit as null itemId, regardless of post sub-items.
-    if (!item || item.id === "all") {
-      onWeavingSubmit([{ itemId: null, quantity: 1, title: post.title }]);
-      return;
-    }
-
-    // If no sub-items are selected (e.g. post has no items, or user picked none),
-    // treat it as "all items" with itemId null.
-    if (Object.keys(selectedQuantities).length === 0) {
-      onWeavingSubmit([{ itemId: null, quantity: 1, title: post.title }]);
-      return;
-    }
-
-    const resultItems: SelectedWeaveItem[] = Object.entries(
-      selectedQuantities,
-    ).map(([itemIdStr, qty]) => {
-      const id = Number(itemIdStr);
-      const matched = postItems.find((i) => i.id === id);
-      return {
-        itemId: id,
-        quantity: qty,
-        title: matched?.title || "Item",
-      };
-    });
-    onWeavingSubmit(resultItems);
+    const payload = getWeaveSubmitPayload(draft);
+    onWeavingSubmit(payload);
   };
+
+  const isSubmitDisabled = draft.mode === "custom" && selectedCount === 0;
 
   return (
     <div className="flex w-full flex-shrink-0 flex-col border-b border-primary-30 bg-primary-15 font-ddin transition-all">
@@ -140,8 +118,8 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
               {post.title}
             </div>
             <div className="mt-1 flex items-center gap-2 text-[11px] leading-none text-gray-500">
-              <span>Selected: {selectedCount} items</span>
-              {hasMultipleItems && (
+              <span>{getDraftSelectedLabel(draft)}</span>
+              {hasSubItems && (
                 <button
                   type="button"
                   onClick={() => setIsExpanded(!isExpanded)}
@@ -153,7 +131,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                     </>
                   ) : (
                     <>
-                      Choose items ({postItems.length}){" "}
+                      Choose items ({draft.items.length}){" "}
                       <ChevronDown className="h-3 w-3" />
                     </>
                   )}
@@ -168,32 +146,23 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
           <div className="flex flex-shrink-0 items-center gap-2">
             <Button
               onClick={handleSubmit}
-              disabled={postItems.length > 0 && selectedCount === 0}
+              disabled={isSubmitDisabled}
               className="h-[34px] w-auto flex-shrink-0 rounded-full bg-primary px-3.5 text-[13px] font-bold text-white hover:bg-primary/90 disabled:opacity-50"
             >
               {post.type === "wish" ? "Offer" : "Request"}
-              {postItems.length > 0 ? ` (${selectedCount})` : ""}
+              {draft.mode === "custom" ? ` (${selectedCount})` : ""}
             </Button>
           </div>
         )}
       </div>
 
-      {/* 下半部 (只在點擊 Choose items 展開時才顯示)：包含該 Post 下所有 Items 勾選與數量選單 */}
-      {isExpanded && postItems.length > 0 && (
+      {/* 下半部 (只在點擊 Choose items 展開時才顯示)：包含該 Post 下所有 Items 勾選與數量步進器 */}
+      {isExpanded && hasSubItems && (
         <div className="flex max-h-[160px] flex-col gap-1.5 overflow-y-auto border-t border-primary-30/40 bg-white/80 px-3 py-2">
-          {postItems.map((it) => {
-            const isChecked = Boolean(selectedQuantities[it.id]);
-            const currentQty = selectedQuantities[it.id] || 1;
-            const quantityLeft = it.quantity ?? 1;
-            const availableQuantities = Array.from(
-              {
-                length:
-                  quantityLeft > 0
-                    ? Math.min(quantityLeft, MAX_WEAVING_QUANTITY)
-                    : 1,
-              },
-              (_, i) => i + 1,
-            );
+          {draft.items.map((it) => {
+            const isChecked = it.selected;
+            const currentQty = it.quantity;
+            const quantityLeft = it.quantityLeft;
 
             return (
               <div
@@ -215,40 +184,22 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                     {it.title}
                   </span>
                   <span className="shrink-0 text-[11px] text-gray-400">
-                    (Left: {it.quantity})
+                    (Left: {it.quantityLeft})
                   </span>
                 </label>
 
                 {isChecked && (
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     <span className="text-[11px] font-medium text-gray-500">
                       Qty:
                     </span>
-                    <Select
-                      value={String(currentQty)}
-                      onValueChange={(val) =>
-                        handleQuantityChange(it.id, Number(val))
-                      }
-                    >
-                      <SelectTrigger className="h-[26px] w-[54px] rounded-md border-gray-300 bg-white px-2 py-0 text-[12px] font-bold text-gray-800 focus:ring-primary/20">
-                        <SelectValue placeholder={currentQty} />
-                      </SelectTrigger>
-                      <SelectContent
-                        className="z-[200] max-h-[160px] w-[54px] min-w-[54px] rounded-[10px] bg-white p-0 shadow-lg"
-                        position="popper"
-                        align="end"
-                      >
-                        {availableQuantities.map((q) => (
-                          <SelectItem
-                            key={q}
-                            value={String(q)}
-                            className="cursor-pointer justify-center px-1 py-1 text-center text-[13px] font-medium text-gray-800 focus:bg-primary-15"
-                          >
-                            {q}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <QuantityStepper
+                      value={currentQty}
+                      min={1}
+                      max={quantityLeft}
+                      onChange={(qty) => handleQuantityChange(it.id, qty)}
+                      disabled={!isChecked}
+                    />
                   </div>
                 )}
               </div>

@@ -17,6 +17,8 @@ export const ChatPopup = () => {
     conversationId,
     otherUser,
     post,
+    draft,
+    setDraft,
     pendingItem,
     setPendingItem,
     closeChat,
@@ -63,6 +65,7 @@ export const ChatPopup = () => {
       void newWeave;
 
       // Clear all UI state after a successful weave
+      setDraft?.(null);
       setPendingItem(null);
       setDisplayedItem(null);
 
@@ -112,8 +115,9 @@ export const ChatPopup = () => {
             </div>
 
             {/* PostInfoCard — 在 flex-col 文件流中，自然佔用高度並繼承父層寬度 */}
-            {post && displayedItem && (
+            {post && (displayedItem || draft) && (
               <PostInfoCard
+                key={post.id}
                 post={post}
                 item={displayedItem}
                 user={currentUser}

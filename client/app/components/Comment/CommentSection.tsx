@@ -72,9 +72,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
           avatar_url: post.avatar_url,
         },
         post,
-        item.key !== "all"
-          ? { id: item.key, title: item.title }
-          : { id: "all", title: "all" },
+        { id: item.key, title: item.title },
       );
     } catch (error) {
       console.error("Message error:", error);

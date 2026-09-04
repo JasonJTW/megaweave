@@ -527,7 +527,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       // Compress and append images
       for (const file of filesToSend) {
-        const { blob: blobToUpload } = await safeCompressImage(file, 1200, 1200, 0.85);
+        const { blob: blobToUpload } = await safeCompressImage(
+          file,
+          1200,
+          1200,
+          0.85,
+        );
         formData.append("images", blobToUpload, "image.webp");
       }
 
@@ -626,13 +631,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   ? isPostAuthor
                   : !isPostAuthor;
             }
+            const isOptimisticAll =
+              !pendingItem || String(pendingItem.id).toLowerCase() === "all";
+
             const optimisticBannerText = activePost
               ? optimisticIsGiver
                 ? activePost.type === "wish"
-                  ? `Start weaving to offer ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
-                  : `Start weaving to give ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
-                : `Start weaving to request ${pendingItem.title ? `for ${pendingItem.title}` : ""}`.trim()
-              : `Start weaving for ${pendingItem.title}`;
+                  ? isOptimisticAll
+                    ? "Start weaving to offer all items"
+                    : `Start weaving to offer for ${pendingItem.title}`.trim()
+                  : isOptimisticAll
+                    ? "Start weaving to give all items"
+                    : `Start weaving to give for ${pendingItem.title}`.trim()
+                : isOptimisticAll
+                  ? "Start weaving to request all items"
+                  : `Start weaving to request for ${pendingItem.title}`.trim()
+              : isOptimisticAll
+                ? "Start weaving for all items"
+                : `Start weaving for ${pendingItem.title}`;
             return (
               <div className="my-2 flex w-full min-w-0 items-center justify-center gap-4 py-4">
                 <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
@@ -753,13 +769,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                     : !isPostAuthor
                   : false;
 
+                const isMessageAll =
+                  !itemTitle ||
+                  itemTitle.toLowerCase() === "all" ||
+                  currentItemId === null ||
+                  String(currentItemId).toLowerCase() === "all";
+
                 const bannerText = postType
                   ? isGiver
                     ? postType === "wish"
-                      ? `Start weaving to offer for ${itemTitle}`.trim()
-                      : `Start weaving to give for ${itemTitle}`.trim()
-                    : `Start weaving to request for ${itemTitle}`.trim()
-                  : `Start weaving ${itemTitle ? `for ${itemTitle}` : "!"}`;
+                      ? isMessageAll
+                        ? "Start weaving to offer all items"
+                        : `Start weaving to offer for ${itemTitle}`.trim()
+                      : isMessageAll
+                        ? "Start weaving to give all items"
+                        : `Start weaving to give for ${itemTitle}`.trim()
+                    : isMessageAll
+                      ? "Start weaving to request all items"
+                      : `Start weaving to request for ${itemTitle}`.trim()
+                  : isMessageAll
+                    ? "Start weaving for all items"
+                    : `Start weaving ${itemTitle ? `for ${itemTitle}` : "!"}`;
 
                 // Only show banner for the first occurrence per item
                 const hasOlderStartWeaving = messages

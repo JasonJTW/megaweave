@@ -9,6 +9,11 @@ import React, {
   ReactNode,
 } from "react";
 import { Post } from "../types/schema";
+import {
+  WeaveDraft,
+  createInitialDraft,
+  getDraftBannerInfo,
+} from "../types/weaveDraft";
 
 interface ChatPopupOtherUser {
   public_id: string;
@@ -27,6 +32,8 @@ interface ChatPopupContextType {
   conversationId: number | null;
   otherUser: ChatPopupOtherUser | null;
   post: Post | null;
+  draft: WeaveDraft | null;
+  setDraft: (draft: WeaveDraft | null) => void;
   pendingItem: PendingItem | null;
   setPendingItem: (item: PendingItem | null) => void;
   openChat: (
@@ -49,12 +56,36 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [otherUser, setOtherUser] = useState<ChatPopupOtherUser | null>(null);
   const [post, setPost] = useState<Post | null>(null);
-  // pendingItem: stores unconfirmed weaving intent in memory only.
-  // It is written to the DB only when the user sends their first real message.
-  const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
+  const [draft, setDraftState] = useState<WeaveDraft | null>(null);
+  // pendingItem: kept synchronized with draft for backward-compatibility with ChatWindow / system messages
+  const [pendingItem, setPendingItemState] = useState<PendingItem | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   // Ref to track the pending closeChat timeout so we can cancel it on re-open
   const closeChatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const setDraft = (newDraft: WeaveDraft | null) => {
+    setDraftState(newDraft);
+    if (!newDraft) {
+      setPendingItemState(null);
+    } else {
+      const banner = getDraftBannerInfo(newDraft);
+      if (banner.isAll) {
+        setPendingItemState({ id: "all", title: "All" });
+      } else {
+        const selected = newDraft.items.filter((it) => it.selected);
+        const id =
+          selected.length === 1 ? selected[0].itemId : "custom";
+        setPendingItemState({ id, title: banner.displayTitle || "Items" });
+      }
+    }
+  };
+
+  const setPendingItem = (item: PendingItem | null) => {
+    setPendingItemState(item);
+    if (!item) {
+      setDraftState(null);
+    }
+  };
 
   useEffect(() => {
     const storedState = sessionStorage.getItem("chatPopupState");
@@ -65,7 +96,8 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
           setConversationId(parsed.conversationId);
           setOtherUser(parsed.otherUser);
           if (parsed.post) setPost(parsed.post);
-          if (parsed.pendingItem) setPendingItem(parsed.pendingItem);
+          if (parsed.draft) setDraftState(parsed.draft);
+          if (parsed.pendingItem) setPendingItemState(parsed.pendingItem);
           setIsOpen(true);
         }
       } catch (e) {
@@ -85,6 +117,7 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
             conversationId,
             otherUser,
             post,
+            draft,
             pendingItem,
           }),
         );
@@ -92,7 +125,7 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
         sessionStorage.removeItem("chatPopupState");
       }
     }
-  }, [isOpen, conversationId, otherUser, post, pendingItem, isInitialized]);
+  }, [isOpen, conversationId, otherUser, post, draft, pendingItem, isInitialized]);
 
   const openChat = (
     id: number,
@@ -112,17 +145,21 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
     // Always update post (even to null) so switching conversations never
     // leaves stale post data from the previous chat.
     setPost(currentPost ?? null);
-    // Always update pendingItem (even to null) so switching items always reflects correctly
-    setPendingItem(item ?? null);
+
+    if (currentPost) {
+      const initialDraft = createInitialDraft(currentPost, item);
+      setDraft(initialDraft);
+    } else {
+      setDraft(null);
+      setPendingItem(item ?? null);
+    }
+
     setIsOpen(true);
   };
 
   const closeChat = () => {
     setIsOpen(false);
     // Clear data after the exit animation finishes (300ms).
-    // Store the timer ID so openChat can cancel it if the popup is re-opened
-    // before the timeout fires — otherwise the delayed setPost(null) would
-    // wipe out the new post that openChat just set.
     closeChatTimerRef.current = setTimeout(() => {
       closeChatTimerRef.current = null;
       setIsOpen((latestIsOpen) => {
@@ -130,6 +167,7 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
           setConversationId(null);
           setOtherUser(null);
           setPost(null);
+          setDraft(null);
           setPendingItem(null);
         }
         return latestIsOpen;
@@ -144,6 +182,8 @@ export const ChatPopupProvider: React.FC<{ children: ReactNode }> = ({
         conversationId,
         otherUser,
         post,
+        draft,
+        setDraft,
         pendingItem,
         setPendingItem,
         openChat,

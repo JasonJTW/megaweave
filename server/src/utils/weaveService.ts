@@ -119,25 +119,33 @@ async function buildSystemMessageMeta(
   postType: string,
   postOwnerId: number,
 ) {
-  const first = items[0];
-  let itemTitle = "All Items";
+  const [postItems] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT id, title FROM items WHERE post_id = ?`,
+    [postId],
+  );
 
-  if (first?.itemId) {
-    const [itemRows] = await dbPool.execute<RowDataPacket[]>(
-      `SELECT title FROM items WHERE id = ?`,
-      [first.itemId],
-    );
-    if (itemRows.length > 0) {
-      itemTitle = itemRows[0].title as string;
-      if (items.length > 1) itemTitle += ` +${items.length - 1} more`;
-    }
-  } else {
-    const [postRows] = await dbPool.execute<RowDataPacket[]>(
-      `SELECT title FROM posts WHERE id = ?`,
-      [postId],
-    );
-    if (postRows.length > 0)
-      itemTitle = `All Items - ${postRows[0].title as string}`;
+  const isAll =
+    items.length === 0 ||
+    items[0]?.itemId === null ||
+    (postItems.length > 0 &&
+      items.length === postItems.length &&
+      items.every((it) => postItems.some((pi) => pi.id === it.itemId)));
+
+  let itemTitle = "All";
+  let firstItemId: number | null = null;
+
+  if (isAll) {
+    itemTitle = "All";
+    firstItemId = null;
+  } else if (items.length === 1 && items[0]?.itemId) {
+    const matched = postItems.find((pi) => pi.id === items[0].itemId);
+    itemTitle = (matched?.title as string) || "Item";
+    firstItemId = items[0].itemId;
+  } else if (items.length > 1) {
+    const matched = postItems.find((pi) => pi.id === items[0].itemId);
+    const baseTitle = (matched?.title as string) || "Item";
+    itemTitle = `${baseTitle} +${items.length - 1} more`;
+    firstItemId = items[0].itemId;
   }
 
   const [imgRows] = await dbPool.execute<RowDataPacket[]>(
@@ -149,14 +157,15 @@ async function buildSystemMessageMeta(
     await messageService.getPublicIdByUserId(postOwnerId);
 
   return {
-    item_id: first?.itemId ?? null,
+    item_id: firstItemId,
     item_title: itemTitle,
-    quantity: first?.quantity ?? 1,
+    quantity: items[0]?.quantity ?? 1,
     weave_id: weaveId,
     post_id: postId,
     image_s3_key: imageS3Key,
     post_type: postType,
     post_author_public_id: postAuthorPublicId,
+    is_all: isAll,
   };
 }
 
@@ -242,6 +251,8 @@ async function getWeaveItemsList(
       );
       if (itemRows.length > 0) {
         result.push({ title: itemRows[0].title as string, quantity: qty });
+      } else {
+        result.push({ title: "Item", quantity: qty });
       }
     }
   }

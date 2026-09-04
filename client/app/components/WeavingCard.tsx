@@ -211,7 +211,10 @@ const WeavingCard = ({
     : null;
 
   const cardTitle = isInChatWindow
-    ? inChatWindow.itemTitle
+    ? activeWeave?.post_title ||
+      (inChatWindow.itemTitle && inChatWindow.itemTitle.toLowerCase() !== "all"
+        ? inChatWindow.itemTitle
+        : post?.title || "Weave Request")
     : post
       ? post.title
       : "";
@@ -225,7 +228,7 @@ const WeavingCard = ({
     activeWeave?.items && activeWeave.items.length > 0
       ? activeWeave.items.map((it, idx) => ({
           id: it.id || idx,
-          title: it.title || "Item",
+          title: it.title || (it.item_id === null ? "All items" : "Item"),
           quantity: it.quantity,
         }))
       : post?.items || [];
@@ -344,20 +347,27 @@ const WeavingCard = ({
                     0,
                   );
 
-                  if (
-                    inChatWindow.itemTitle === "all" ||
-                    inChatWindow.itemTitle.startsWith("All Items - ")
-                  ) {
-                    return "Request all items";
+                  const lowerTitle =
+                    inChatWindow.itemTitle?.toLowerCase() || "";
+                  const isAll =
+                    lowerTitle === "all" ||
+                    lowerTitle.startsWith("all items") ||
+                    (weaveItems.length > 0 &&
+                      weaveItems.every((it) => it.item_id === null));
+
+                  const action = inChatWindow.isGiver ? "Offer" : "Request";
+
+                  if (isAll) {
+                    return `${action} all items`;
                   }
 
                   if (totalTypes > 1) {
-                    return `Request: ${totalTypes} items (${totalQuantity} total)`;
+                    return `${action}: ${totalTypes} items (${totalQuantity} total)`;
                   }
 
                   const singleQty =
                     totalQuantity > 0 ? totalQuantity : inChatWindow.quantity;
-                  return `Request Qty: ${singleQty}`;
+                  return `${action} Qty: ${singleQty}`;
                 })()}
               </span>
               <Link

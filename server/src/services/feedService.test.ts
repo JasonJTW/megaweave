@@ -1,4 +1,8 @@
-import { FeedService, feedService } from "./feedService";
+import {
+  FeedService,
+  feedService,
+  clearVectorMemoryCachesForTest,
+} from "./feedService";
 import { getRedisClient } from "../utils/redis";
 import dbPool from "../utils/db";
 
@@ -16,8 +20,9 @@ describe("FeedService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    clearVectorMemoryCachesForTest();
     mockRedis = {
-      sendCommand: jest.fn(),
+      sendCommand: jest.fn().mockResolvedValue(null),
       zCard: jest.fn().mockResolvedValue(0),
       zRange: jest.fn().mockResolvedValue([]),
     };
@@ -125,24 +130,22 @@ describe("FeedService", () => {
       const service = new FeedService();
 
       const candidatePosts = [
-        // Post 1: Orthogonal to user vector ([0, 1])
+        // Post 1: Orthogonal to user vector
         {
           id: 1,
           title: "Coffee Mug",
           status: "active",
           hot_score: 5,
-          embedding: JSON.stringify([0, 1]),
           expires_at: null,
           lat: null,
           lng: null,
         },
-        // Post 2: Aligned with user vector ([1, 0])
+        // Post 2: Aligned with user vector
         {
           id: 2,
           title: "Biology Book",
           status: "active",
           hot_score: 5,
-          embedding: JSON.stringify([1, 0]),
           expires_at: null,
           lat: null,
           lng: null,
@@ -155,8 +158,30 @@ describe("FeedService", () => {
         .mockResolvedValueOnce([candidatePosts]) // 2. candidate scoring query
         .mockResolvedValueOnce([candidatePosts]); // 3. fetchPostsByIds hydration query
 
-      // User vector is [1, 0]
-      const userVectorBuf = createFloat32Buffer([1, 0]);
+      // Realistic 1536-dimensional Float32 vectors
+      const userVec = new Array(1536).fill(0);
+      userVec[0] = 1.0;
+      const userVectorBuf = createFloat32Buffer(userVec);
+
+      // Post 1: Orthogonal vector (dimension 1 = 1.0 -> dot product 0.0)
+      const post1Vec = new Array(1536).fill(0);
+      post1Vec[1] = 1.0;
+      const post1Buf = createFloat32Buffer(post1Vec);
+
+      // Post 2: Aligned vector (dimension 0 = 1.0 -> dot product 1.0)
+      const post2Vec = new Array(1536).fill(0);
+      post2Vec[0] = 1.0;
+      const post2Buf = createFloat32Buffer(post2Vec);
+
+      // Mock Redis Pipeline returning candidate Float32 buffers
+      mockRedis.sendCommand.mockImplementation((args: unknown) => {
+        const cmd = args as string[];
+        if (Array.isArray(cmd) && cmd[0] === "HGET") {
+          if (cmd[1] === "post:1") return Promise.resolve(post1Buf);
+          if (cmd[1] === "post:2") return Promise.resolve(post2Buf);
+        }
+        return Promise.resolve(null);
+      });
 
       const result = await service.getFilteredFeed({}, userVectorBuf);
 
@@ -164,6 +189,40 @@ describe("FeedService", () => {
       // Post 2 should be ranked 1st because of higher vector similarity (1.0 vs 0.0)
       expect(result.posts[0].id).toBe(2);
       expect(result.posts[1].id).toBe(1);
+      expect(result.isPersonalized).toBe(true);
+    });
+
+    it("gracefully falls back to neutral similarity when candidate vector is not found in Redis", async () => {
+      const service = new FeedService();
+
+      const candidatePosts = [
+        {
+          id: 1,
+          title: "Post without vector",
+          status: "active",
+          hot_score: 10,
+          expires_at: null,
+          lat: null,
+          lng: null,
+        },
+      ];
+
+      (dbPool.execute as jest.Mock)
+        .mockResolvedValueOnce([[{ total: 1 }]])
+        .mockResolvedValueOnce([candidatePosts])
+        .mockResolvedValueOnce([candidatePosts]);
+
+      // User vector provided, but Redis returns null for post:1
+      const userVec = new Array(1536).fill(0);
+      userVec[0] = 1.0;
+      const userVectorBuf = createFloat32Buffer(userVec);
+
+      mockRedis.sendCommand.mockResolvedValue(null);
+
+      const result = await service.getFilteredFeed({}, userVectorBuf);
+
+      expect(result.posts).toHaveLength(1);
+      expect(result.posts[0].id).toBe(1);
       expect(result.isPersonalized).toBe(true);
     });
 

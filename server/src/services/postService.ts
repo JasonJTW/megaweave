@@ -167,14 +167,16 @@ export class PostService {
         });
       }
 
+      const publicId = randomUUID();
       const postInsertQuery = `
         INSERT INTO posts (
-          user_id, title, content, status, type, location_id, tags, 
+          public_id, user_id, title, content, status, type, location_id, tags, 
           category_id, condition_level, expires_at, created_at, updated_at, view_count, likes_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 0)
       `;
 
       const postValues = [
+        publicId,
         userId,
         input.title,
         input.content,
@@ -295,6 +297,40 @@ export class PostService {
   }
 
   /** 取得單一貼文詳情與處理觀看計數 */
+  /** 取得單一貼文詳情（對外 API，使用 public_id）與處理觀看計數 */
+  async getPostByPublicId(
+    publicId: string,
+    options?: { currentUserId?: number; viewerIp?: string },
+  ): Promise<PostDetail | null> {
+    const postQuery = `
+      SELECT 
+        p.*,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
+        u.public_id as author_public_id,
+        u.id as author_user_id,
+        u.email,
+        u.avatar_url,
+        c.name_en as category_name_en,
+        cond.name as condition_name,
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.province, l.city, l.lat, l.lng, l.route, l.zip_code
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN conditions cond ON p.condition_level = cond.level
+      LEFT JOIN locations l ON p.location_id = l.id
+      WHERE p.public_id = ? AND p.deleted_at IS NULL
+    `;
+
+    const [rows] = await dbPool.execute<RowDataPacket[]>(postQuery, [publicId]);
+    if (rows.length === 0) {
+      return null;
+    }
+
+    return await this.hydratePostDetails(rows[0], options);
+  }
+
+  /** 內部使用：根據數字 ID 取得單一貼文詳情與處理觀看計數 */
   async getPostById(
     postId: number,
     options?: { currentUserId?: number; viewerIp?: string },
@@ -324,7 +360,25 @@ export class PostService {
       return null;
     }
 
-    const postData = { ...rows[0] };
+    return await this.hydratePostDetails(rows[0], options);
+  }
+
+  /** 輔助方法：將 public_id 解析為內部 post_id */
+  async getPostIdByPublicId(publicId: string): Promise<number | null> {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      "SELECT id FROM posts WHERE public_id = ? AND deleted_at IS NULL",
+      [publicId],
+    );
+    return rows.length > 0 ? (rows[0].id as number) : null;
+  }
+
+  /** 內部組裝貼文詳細資料、圖片、物品與處理觀看計數 */
+  private async hydratePostDetails(
+    row: RowDataPacket,
+    options?: { currentUserId?: number; viewerIp?: string },
+  ): Promise<PostDetail> {
+    const postData = { ...row };
+    const postId = postData.id;
 
     if (options) {
       try {
@@ -340,18 +394,12 @@ export class PostService {
             viewerIdentifier,
           );
           if (shouldCount) {
-            // FIXME: 同步寫入 MySQL 在高並發下可能造成 row-level lock 競爭成為瓶頸。
-            // 未來考慮改為透過 post_views 明細表 + BullMQ batch worker 非同步處理，
-            // 並將 view_count 改為由 batch job 定期彙總更新，而非每次請求同步寫入。
             await dbPool.execute(
               "UPDATE posts SET view_count = view_count + 1 WHERE id = ?",
               [postId],
             );
             postData.view_count += 1;
 
-            // TODO: 目前直接單筆寫入 post_views（開發階段使用者少，暫不批次處理）。
-            // 未來流量增加後，應改為：Express 丟 BullMQ → Worker 累積 100 筆或 5 分鐘後
-            // 批次 INSERT INTO post_views，避免每次請求都直接打 DB。
             if (currentUserId) {
               dbPool
                 .execute(
@@ -616,16 +664,16 @@ export class PostService {
     };
   }
 
-  /** 編輯貼文 */
+  /** 編輯貼文（使用 public_id） */
   async updatePost(
-    postId: number,
+    publicId: string,
     userId: number,
     incoming: EditPostInput,
     files?: Express.Multer.File[],
   ): Promise<RowDataPacket> {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
-      "SELECT * FROM posts WHERE id = ? AND deleted_at IS NULL",
-      [postId],
+      "SELECT * FROM posts WHERE public_id = ? AND deleted_at IS NULL",
+      [publicId],
     );
 
     if (rows.length === 0) {
@@ -633,6 +681,7 @@ export class PostService {
     }
 
     const existing = rows[0];
+    const postId = existing.id;
     if (existing.user_id !== userId) {
       throw new Error("FORBIDDEN");
     }
@@ -792,11 +841,11 @@ export class PostService {
     }
   }
 
-  /** 刪除貼文 (Soft Delete) */
-  async deletePost(postId: number, userId: number): Promise<void> {
+  /** 刪除貼文 (Soft Delete，使用 public_id) */
+  async deletePost(publicId: string, userId: number): Promise<void> {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
-      "SELECT user_id FROM posts WHERE id = ? AND deleted_at IS NULL",
-      [postId],
+      "SELECT id, user_id FROM posts WHERE public_id = ? AND deleted_at IS NULL",
+      [publicId],
     );
 
     if (rows.length === 0) {
@@ -807,6 +856,7 @@ export class PostService {
       throw new Error("FORBIDDEN");
     }
 
+    const postId = rows[0].id;
     await dbPool.execute("UPDATE posts SET deleted_at = NOW() WHERE id = ?", [
       postId,
     ]);

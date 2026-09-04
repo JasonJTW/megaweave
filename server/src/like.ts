@@ -9,11 +9,10 @@ const router = Router({ mergeParams: true });
 
 //* check user's like status
 router.get("/", requireAuth, async (req: Request, res: Response) => {
-  const postIdStr = req.params.postId || req.params.id;
-  const postId = parseInt(postIdStr, 10);
+  const publicId = req.params.publicId || req.params.postId || req.params.id;
   const userId = req.user?.userId;
 
-  if (!postIdStr || isNaN(postId)) {
+  if (!publicId) {
     return res.status(400).json({ errorMessage: "Invalid post ID" });
   }
 
@@ -22,8 +21,10 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
   try {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
-      "SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?",
-      [userId, postId]
+      `SELECT 1 FROM post_likes pl 
+       JOIN posts p ON pl.post_id = p.id 
+       WHERE pl.user_id = ? AND p.public_id = ? AND p.deleted_at IS NULL`,
+      [userId, publicId]
     );
     const liked = rows.length > 0;
     return res.status(200).json({ liked: liked });
@@ -35,12 +36,11 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
 //* like / unlike
 router.post("/", requireAuth, async (req: Request, res: Response) => {
-  const postIdStr = req.params.postId || req.params.id;
-  const postId = parseInt(postIdStr, 10);
+  const publicId = req.params.publicId || req.params.postId || req.params.id;
   const userId = req.user?.userId;
   const username = req.user?.username;
 
-  if (!postIdStr || isNaN(postId)) {
+  if (!publicId) {
     return res.status(400).json({ errorMessage: "Invalid post ID" });
   }
 
@@ -51,6 +51,20 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
   const connection = await dbPool.getConnection();
   try {
     await connection.beginTransaction();
+
+    const [postRows] = await connection.execute<RowDataPacket[]>(
+      "SELECT id, user_id, title FROM posts WHERE public_id = ? AND deleted_at IS NULL",
+      [publicId]
+    );
+
+    if (postRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ errorMessage: "Post not found" });
+    }
+
+    const postId = postRows[0].id as number;
+    const postOwnerId = postRows[0].user_id as number;
+    const postTitle = postRows[0].title as string;
 
     // check if user liked already
     const [rows] = await connection.execute<RowDataPacket[]>(
@@ -84,47 +98,41 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         [postId]
       );
 
-      // Fetch post details for notification
-      const [postRows] = await connection.execute<RowDataPacket[]>(
-        "SELECT user_id, title FROM posts WHERE id = ?",
-        [postId]
-      );
-
       await connection.commit();
 
       // Trigger notification & user-vector update if liker is not the owner
-      if (postRows.length > 0) {
-        const post = postRows[0];
-        if (post.user_id !== userId) {
-          const io = res.locals.io;
-          if (io) {
-            createNotification(io, {
-              recipient_id: post.user_id,
-              sender_id: userId,
-              type: "LIKE",
-              title: "New Like",
-              content: `${username} liked your post "${post.title}"`,
-              link: `/item/${postId}`,
-            }).catch((err) =>
-              console.error("Failed to create like notification:", err)
-            );
-          }
-
-          // 🧠 非作者按讚 → 觸發使用者興趣向量更新（fire-and-forget）
-          enqueueUserVectorUpdate({ userId: userId!, postId, action: "like" }).catch(
-            (err) => console.error("Failed to enqueue user-vector (like):", err),
+      if (postOwnerId !== userId) {
+        const io = res.locals.io;
+        if (io) {
+          createNotification(io, {
+            recipient_id: postOwnerId,
+            sender_id: userId,
+            type: "LIKE",
+            title: "New Like",
+            content: `${username} liked your post "${postTitle}"`,
+            link: `/item/${publicId}`,
+          }).catch((err) =>
+            console.error("Failed to create like notification:", err)
           );
         }
+
+        enqueueUserVectorUpdate({
+          userId,
+          postId,
+          action: "like",
+        }).catch((err) =>
+          console.error("Failed to enqueue user-vector (like):", err)
+        );
       }
 
       return res.json({ liked: true });
     }
   } catch (error) {
-    if (connection) await connection.rollback();
-    console.error(error);
-    res.status(500).json({ errorMessage: "Server error" });
+    await connection.rollback();
+    console.error("Error liking/unliking post: ", error);
+    return res.status(500).json({ errorMessage: "Internal server error" });
   } finally {
-    if (connection) connection.release();
+    connection.release();
   }
 });
 

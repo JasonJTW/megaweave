@@ -475,7 +475,7 @@ const PostsApp = () => {
   const handleFeedPostClick = useCallback(
     (post: Post) => {
       if (categoryInteractionLockRef.current) return;
-      router.push(`/item/${post.id}`);
+      router.push(`/item/${post.public_id}`);
     },
     [router],
   );

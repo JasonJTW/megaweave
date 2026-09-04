@@ -33,6 +33,7 @@ export interface WeaveOutput extends RowDataPacket {
   created_at: Date;
   updated_at: Date;
   post_id_original: number;
+  post_public_id: string;
   post_user_id: number;
   post_title: string;
   post_content: string;
@@ -61,6 +62,7 @@ const WEAVE_QUERY_BASE = `
   SELECT 
       w.*,
       p.id AS post_id_original,
+      p.public_id AS post_public_id,
       p.user_id AS post_user_id,
       p.title AS post_title,
       p.content AS post_content,
@@ -110,6 +112,7 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
   return weaveRows.map((row) => {
     const post = {
       id: row.post_id_original,
+      public_id: row.post_public_id,
       user_id: row.post_user_id,
       title: row.post_title,
       content: row.post_content,

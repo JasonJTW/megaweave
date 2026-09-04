@@ -62,7 +62,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
                   post={p}
                   conditions={conditions}
                   categories={categories}
-                  onPostClick={() => router.push(`/item/${p.id}`)}
+                  onPostClick={() => router.push(`/item/${p.public_id}`)}
                   isExpanded={true}
                   isFirstVisible={i === 0}
                   currentUserId={currentUserId}

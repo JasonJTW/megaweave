@@ -107,7 +107,7 @@ function getGeoMultiplier(distKm: number, mode?: string): number {
 
 const POST_FIELDS_SQL = `
   SELECT 
-    p.id, p.user_id, p.title, p.content, p.type, p.status, p.tags, 
+    p.id, p.public_id, p.user_id, p.title, p.content, p.type, p.status, p.tags, 
     p.category_id, p.condition_level, p.expires_at, p.view_count, 
     p.likes_count, p.hot_score, p.created_at, p.updated_at, p.deleted_at, p.location_id,
     COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
@@ -457,13 +457,13 @@ export class FeedService {
           const redis = getRedisClient();
           const rawBuffers = await Promise.all(
             missingIds.map((id) =>
-              redis
-                .sendCommand<Buffer | null>(["HGET", `post:${id}`, "v"], {
+              Promise.resolve(
+                redis.sendCommand<Buffer | null>(["HGET", `post:${id}`, "v"], {
                   typeMapping: {
                     [RESP_TYPES.BLOB_STRING]: Buffer,
                   },
-                })
-                .catch(() => null),
+                }),
+              ).catch(() => null),
             ),
           );
           for (let i = 0; i < missingIds.length; i++) {
@@ -839,3 +839,9 @@ export class FeedService {
 }
 
 export const feedService = new FeedService();
+
+/** 測試輔助函式：清空記憶體向量快取以保證單元測試隔離 */
+export function clearVectorMemoryCachesForTest(): void {
+  postVectorMemoryCache.clear();
+  userVectorMemoryCache.clear();
+}

@@ -151,7 +151,7 @@ const Drawer: React.FC<DrawerProps> = ({
               <Feed
                 posts={postsToRender}
                 conditions={conditions}
-                onPostClick={(post) => router.push(`/item/${post.id}`)}
+                onPostClick={(post) => router.push(`/item/${post.public_id}`)}
                 weaves={weaves}
                 highlightWeaveId={highlightWeaveId}
               />

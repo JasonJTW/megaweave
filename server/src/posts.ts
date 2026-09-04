@@ -250,11 +250,11 @@ router.get("/feed", async (req: Request, res: Response) => {
   }
 });
 
-//* Get post details api
+//* Get post details api (using public_id)
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const postId = parseInt(req.params.id);
-    if (isNaN(postId)) {
+    const publicId = req.params.id;
+    if (!publicId) {
       return res.status(400).json({ errorMessage: "Invalid post ID" });
     }
 
@@ -263,7 +263,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     const viewerIp =
       (req.headers["x-forwarded-for"] as string) || req.ip || "unknown_ip";
 
-    const post = await postService.getPostById(postId, {
+    const post = await postService.getPostByPublicId(publicId, {
       currentUserId,
       viewerIp,
     });
@@ -276,7 +276,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     if (currentUserId && post.user_id !== currentUserId) {
       enqueueUserVectorUpdate({
         userId: currentUserId,
-        postId,
+        postId: post.id,
         action: "view",
       }).catch((err) =>
         console.error("Failed to enqueue user-vector (view):", err),
@@ -290,7 +290,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-//* Edit post API (PUT /:id)
+//* Edit post API (PUT /:id using public_id)
 const EditPostSchema = CreatePostSchema.partial().extend({
   expiresAt: z.string().datetime().optional().nullable(),
   deleteImageIds: z.array(z.number().int().positive()).optional(),
@@ -303,11 +303,11 @@ router.put(
   requireAuth,
   diskUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
   async (req: AuthenticatedRequest, res: Response) => {
-    const postId = parseInt(req.params.id);
+    const publicId = req.params.id;
     const userId = req.user!.userId;
     const files = req.files as Express.Multer.File[];
 
-    if (isNaN(postId)) {
+    if (!publicId) {
       return res.status(400).json({ errorMessage: "Invalid post ID" });
     }
 
@@ -337,7 +337,7 @@ router.put(
 
     try {
       const updatedPost = await postService.updatePost(
-        postId,
+        publicId,
         userId,
         incoming,
         files,
@@ -367,20 +367,20 @@ router.put(
   },
 );
 
-//* Delete post api (Soft Delete)
+//* Delete post api (Soft Delete using public_id)
 router.delete(
   "/:id",
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const postId = parseInt(req.params.id);
+      const publicId = req.params.id;
       const userId = req.user!.userId;
 
-      if (isNaN(postId)) {
+      if (!publicId) {
         return res.status(400).json({ errorMessage: "Invalid post ID" });
       }
 
-      await postService.deletePost(postId, userId);
+      await postService.deletePost(publicId, userId);
       res.status(200).json({ message: "Post deleted successfully" });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -407,10 +407,14 @@ router.post(
   requireRole("admin"),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const postId = parseInt(req.params.id);
-
+      const idOrPublicId = req.params.id;
+      let postId = parseInt(idOrPublicId);
       if (isNaN(postId)) {
-        return res.status(400).json({ errorMessage: "Invalid post ID" });
+        const resolved = await postService.getPostIdByPublicId(idOrPublicId);
+        if (!resolved) {
+          return res.status(404).json({ errorMessage: "Post not found" });
+        }
+        postId = resolved;
       }
 
       const result = await postService.generatePostEmbeddingSync(postId);

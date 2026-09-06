@@ -198,7 +198,7 @@ export class FeedService {
    * 2. 若 Redis 沒有，嘗試從 MySQL user_profiles.interest_vector 讀取並轉換
    */
   async getUserVector(userId: number): Promise<Buffer | null> {
-    const t0 = performance.now();
+    // const t0 = performance.now();
     const now = Date.now();
 
     // 0. 本地記憶體快取
@@ -253,9 +253,9 @@ export class FeedService {
             buf,
             expiresAt: now + USER_VECTOR_CACHE_TTL_MS,
           });
-          console.log(
-            `🔍 [getUserVector] from MySQL user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`,
-          );
+          // console.log(
+          //   `🔍 [getUserVector] from MySQL user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`,
+          // );
           return buf;
         }
       }
@@ -266,9 +266,9 @@ export class FeedService {
       );
     }
 
-    console.log(
-      `🔍 [getUserVector] user #${userId} NOT FOUND (took ${(performance.now() - t0).toFixed(1)}ms)`,
-    );
+    // console.log(
+    //   `🔍 [getUserVector] user #${userId} NOT FOUND (took ${(performance.now() - t0).toFixed(1)}ms)`,
+    // );
     return null;
   }
 
@@ -304,7 +304,9 @@ export class FeedService {
         queryParams.push(params.city);
       }
     } else if (params.location) {
-      const condition = locationService.buildLocationSearchCondition(params.location);
+      const condition = locationService.buildLocationSearchCondition(
+        params.location,
+      );
       whereConditions.push(condition.sql);
       queryParams.push(...condition.params);
     }
@@ -351,14 +353,14 @@ export class FeedService {
     const limit = Math.max(1, Math.min(50, params.limit || 20));
     const offset = (page - 1) * limit;
 
-    const t0 = performance.now();
+    // const t0 = performance.now();
     const { whereClause, queryParams } = this.buildWhereConditions(params);
 
-    // 1. 計算符合條件的總筆數 (Tinder 模式為卡片串流瀏覽，省去全表 COUNT 掃描)
+    //* 1. 計算符合條件的總筆數 (Tinder 模式為卡片串流瀏覽，省去全表 COUNT 掃描)
     let dbTotal = 0;
-    let tCount = 0;
+    // let tCount = 0;
     if (params.mode !== "tinder") {
-      const tCount0 = performance.now();
+      // const tCount0 = performance.now();
       const countQuery = `
         SELECT COUNT(DISTINCT p.id) as total 
         FROM posts p 
@@ -370,7 +372,7 @@ export class FeedService {
         queryParams,
       );
       dbTotal = countResult[0]?.total || 0;
-      tCount = performance.now() - tCount0;
+      // tCount = performance.now() - tCount0;
 
       if (dbTotal === 0) {
         return {
@@ -386,8 +388,8 @@ export class FeedService {
       }
     }
 
-    // 2. Stage 1: 輕量條件召回 (Candidate Retrieval - 不 SELECT embedding 大欄位，走純索引排序)
-    const tCand0 = performance.now();
+    //* 2. Stage 1: 輕量條件召回 (Candidate Retrieval - 不 SELECT embedding 大欄位，走純索引排序)
+    // const tCand0 = performance.now();
     const CANDIDATE_FETCH_LIMIT = Math.max(60, (page + 1) * limit);
     const candidateQuery = `
       SELECT 
@@ -404,7 +406,7 @@ export class FeedService {
       candidateQuery,
       queryParams,
     );
-    const tCand = performance.now() - tCand0;
+    // const tCand = performance.now() - tCand0;
 
     if (candidates.length === 0) {
       return {
@@ -420,7 +422,7 @@ export class FeedService {
     }
 
     // 3. Stage 2: 個人化特徵比對與混合計分 (Hybrid Re-ranking)
-    const tScore0 = performance.now();
+    // const tScore0 = performance.now();
     let maxHotScore = 1.0;
     for (const post of candidates) {
       if (post.hot_score) {
@@ -534,19 +536,19 @@ export class FeedService {
     const pagePostIds = scoredCandidates
       .slice(offset, offset + limit)
       .map((s) => s.id);
-    const tScore = performance.now() - tScore0;
+    // const tScore = performance.now() - tScore0;
 
     // 5. 🌟 延遲關聯 (Late Materialization)：只對當前頁所需的貼文 (例如 12 篇) 批次查詢 6 表詳細資料
-    const tHydrate0 = performance.now();
+    // const tHydrate0 = performance.now();
     const postMap = await fetchPostsByIds(pagePostIds, params.userId);
     const pagePosts = pagePostIds
       .map((id) => postMap.get(id))
       .filter((p): p is RowDataPacket => Boolean(p));
-    const tHydrate = performance.now() - tHydrate0;
+    // const tHydrate = performance.now() - tHydrate0;
 
-    console.log(
-      `📊 [getFilteredFeed] count=${tCount.toFixed(1)}ms, candQuery(${candidates.length})=${tCand.toFixed(1)}ms, scoring=${tScore.toFixed(1)}ms, hydrate(${pagePosts.length})=${tHydrate.toFixed(1)}ms -> total=${(performance.now() - t0).toFixed(1)}ms`,
-    );
+    // console.log(
+    //   `📊 [getFilteredFeed] count=${tCount.toFixed(1)}ms, candQuery(${candidates.length})=${tCand.toFixed(1)}ms, scoring=${tScore.toFixed(1)}ms, hydrate(${pagePosts.length})=${tHydrate.toFixed(1)}ms -> total=${(performance.now() - t0).toFixed(1)}ms`,
+    // );
 
     const actualTotal =
       params.mode === "tinder"

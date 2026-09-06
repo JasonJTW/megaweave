@@ -61,10 +61,11 @@ async function fetchUserVectorFromRedis(
  * 3. 批次 INSERT ... ON DUPLICATE KEY UPDATE 寫入 MySQL
  * 4. 若個別 userId 在 Redis 找不到向量，記錄警告並跳過（不影響其他人）
  */
-export async function processUserVectorFlush(job: Job): Promise<void> {
+export async function processUserVectorFlush(
+  job: Job,
+): Promise<{ flushedCount: number }> {
   const logPrefix = "🗄️ [vector-flush]";
   await job.log(`${logPrefix} start`);
-  console.log(`${logPrefix} – start`);
 
   const redis = getRedisClient();
 
@@ -74,14 +75,11 @@ export async function processUserVectorFlush(job: Job): Promise<void> {
     ["SPOP", DIRTY_SET_KEY, String(FLUSH_BATCH_SIZE)],
   );
   if (!members || members.length === 0) {
-    console.log(`${logPrefix} – dirty set is empty, nothing to flush`);
     await job.log(`${logPrefix} – skip: dirty set empty`);
-    return;
+    return { flushedCount: 0 };
   }
 
   const userIds: number[] = members.map((m) => Number(m));
-
-  console.log(`${logPrefix} – flushing ${userIds.length} users to MySQL`);
   await job.log(`${logPrefix} – flushing ${userIds.length} users`);
 
   // 2. 並行讀取 Redis 向量（各自獨立，失敗不影響他人）
@@ -102,7 +100,7 @@ export async function processUserVectorFlush(job: Job): Promise<void> {
   if (rows.length === 0) {
     console.warn(`${logPrefix} – no valid vectors to write`);
     await job.log(`${logPrefix} – skip: no valid vectors`);
-    return;
+    return { flushedCount: 0 };
   }
 
   // 3. 批次 INSERT ... ON DUPLICATE KEY UPDATE（單一 SQL，減少 round-trips）
@@ -124,6 +122,6 @@ export async function processUserVectorFlush(job: Job): Promise<void> {
     values,
   );
 
-  console.log(`${logPrefix} – MySQL batch write done (${rows.length} rows)`);
   await job.log(`${logPrefix} done ✅ (${rows.length} rows flushed)`);
+  return { flushedCount: rows.length };
 }

@@ -2,10 +2,10 @@ import express, { Request, Response } from "express";
 import { Server } from "socket.io";
 import dbPool from "./utils/db";
 import { RowDataPacket } from "mysql2/promise";
+import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import {
   requestLalamoveQuotation,
   createLalamoveOrder,
-  getLalamoveOrderDetail,
   cancelLalamoveOrder,
   getLalamoveDriverDetail,
   verifyLalamoveWebhookSignature,
@@ -179,7 +179,10 @@ router.post(
  * POST /api/lalamove/orders
  * 下單建立 Lalamove 配送
  */
-router.post("/orders", async (req: Request, res: Response): Promise<void> => {
+router.post(
+  "/orders",
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       quotationId,
@@ -262,140 +265,109 @@ router.post("/orders", async (req: Request, res: Response): Promise<void> => {
 
 /**
  * GET /api/lalamove/orders/:orderId
- * 取得訂單最新狀態、詳細資訊與司機即時座標 (並同步更新至資料庫)
+ * 取得訂單最新狀態、詳細資訊與司機即時座標 (限定買方、賣方或管理員可查)
  */
 router.get(
   "/orders/:orderId",
+  requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     try {
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user?.userId;
+      const userRole = authReq.user?.role;
+
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
       const { orderId } = req.params;
       if (!orderId) {
         res.status(400).json({ error: "orderId is required" });
         return;
       }
 
-      // ─── 先從本地 DB 讀取（不打 Lalamove API，避免 rate limit）───
-      // Webhook 已負責即時更新 DB，輪詢只需讀 DB 即可
+      // ─── 檢查本地 DB 關聯與權限（限買方 d.user_id、賣方 p.user_id 或管理員）───
       const [dbRows] = await dbPool.query<RowDataPacket[]>(
-        `SELECT d.status, d.driver_name, d.driver_phone, d.driver_plate_number,
+        `SELECT d.id, d.status, d.driver_name, d.driver_phone, d.driver_plate_number,
                 d.lalamove_order_id, d.share_link, d.service_type, d.fee_total,
                 d.updated_at, d.version,
                 d.pickup_address_snapshot, d.dropoff_address_snapshot,
                 d.sender_name, d.sender_phone, d.recipient_name, d.recipient_phone,
+                d.user_id,
+                p.user_id AS seller_user_id,
                 pu.full_address AS pickup_full_address, pu.lat AS pickup_lat, pu.lng AS pickup_lng,
                 dr.full_address AS dropoff_full_address, dr.lat AS dropoff_lat, dr.lng AS dropoff_lng
          FROM delivery_orders d
          LEFT JOIN locations pu ON d.pickup_location_id = pu.id
          LEFT JOIN locations dr ON d.dropoff_location_id = dr.id
-         WHERE d.lalamove_order_id = ?
+         LEFT JOIN posts p ON d.post_id = p.id
+         WHERE d.lalamove_order_id = ? OR d.id = ?
          LIMIT 1`,
-        [orderId],
+        [orderId, orderId],
       );
 
-      if (dbRows && dbRows.length > 0) {
-        const row = dbRows[0];
-
-        // 從 DB 組裝回前端需要的 OrderDetail 格式
-        const orderFromDb = {
-          orderId,
-          status: row.status,
-          serviceType: row.service_type,
-          shareLink: row.share_link,
-          priceBreakdown: {
-            total: String(row.fee_total ?? 0),
-            currency: "TWD",
-          },
-          driver: row.driver_name
-            ? {
-                id: "",
-                name: row.driver_name,
-                phone: row.driver_phone ?? "",
-                plateNumber: row.driver_plate_number ?? "",
-              }
-            : null,
-          stops: [
-            {
-              // 優先用 locations 表的 full_address，fallback 到 snapshot
-              address: row.pickup_full_address ?? row.pickup_address_snapshot ?? "",
-              coordinates: {
-                lat: String(row.pickup_lat ?? ""),
-                lng: String(row.pickup_lng ?? ""),
-              },
-              name: row.sender_name,
-              phone: row.sender_phone,
-            },
-            {
-              address: row.dropoff_full_address ?? row.dropoff_address_snapshot ?? "",
-              coordinates: {
-                lat: String(row.dropoff_lat ?? ""),
-                lng: String(row.dropoff_lng ?? ""),
-              },
-              name: row.recipient_name,
-              phone: row.recipient_phone,
-            },
-          ],
-          updatedAt: row.updated_at,
-          _source: "db", // 方便 debug 確認資料來源
-        };
-
-        res.json({ success: true, order: orderFromDb });
+      if (!dbRows || dbRows.length === 0) {
+        res.status(404).json({ error: "Delivery order not found" });
         return;
       }
 
-      // ─── DB 無資料時才 fallback 打 Lalamove API ───
-      // （例如剛建單、DB 尚未有此 orderId 的情境）
-      console.log(
-        `[Lalamove GET] orderId=${orderId} not in DB, falling back to Lalamove API`,
-      );
-      const orderDetail = await getLalamoveOrderDetail(orderId);
-      const rawStatus = (orderDetail as { status?: string }).status;
-      const dbStatus = mapLalamoveStatusToDbStatus(rawStatus);
-      const driver =
-        (
-          orderDetail as {
-            driverDetails?: {
-              name?: string;
-              phone?: string;
-              plateNumber?: string;
-            };
-          }
-        ).driverDetails ||
-        (
-          orderDetail as {
-            driver?: { name?: string; phone?: string; plateNumber?: string };
-          }
-        ).driver;
+      const row = dbRows[0];
+      const isOwner = row.user_id === userId;
+      const isSeller = row.seller_user_id === userId;
+      const isAdmin = userRole === "admin";
 
-      if (dbStatus) {
-        await dbPool
-          .query(
-            `UPDATE delivery_orders 
-             SET status = ?,
-                 driver_name = COALESCE(?, driver_name),
-                 driver_phone = COALESCE(?, driver_phone),
-                 driver_plate_number = COALESCE(?, driver_plate_number),
-                 version = version + 1
-             WHERE lalamove_order_id = ?
-               AND (status != ? OR (driver_name IS NULL AND ? IS NOT NULL))`,
-            [
-              dbStatus,
-              driver?.name || null,
-              driver?.phone || null,
-              driver?.plateNumber || null,
-              orderId,
-              dbStatus,
-              driver?.name || null,
-            ],
-          )
-          .catch((e) =>
-            console.warn("[Lalamove] Sync order status to DB error:", e),
-          );
+      if (!isOwner && !isSeller && !isAdmin) {
+        res.status(403).json({
+          error: "Forbidden: You do not have permission to view this order",
+        });
+        return;
       }
 
-      res.json({
-        success: true,
-        order: { ...orderDetail, _source: "lalamove_api" },
-      });
+      // 從 DB 組裝回前端需要的 OrderDetail 格式
+      const orderFromDb = {
+        orderId,
+        status: row.status,
+        serviceType: row.service_type,
+        shareLink: row.share_link,
+        priceBreakdown: {
+          total: String(row.fee_total ?? 0),
+          currency: "TWD",
+        },
+        driver: row.driver_name
+          ? {
+              id: "",
+              name: row.driver_name,
+              phone: row.driver_phone ?? "",
+              plateNumber: row.driver_plate_number ?? "",
+            }
+          : null,
+        stops: [
+          {
+            // 優先用 locations 表的 full_address，fallback 到 snapshot
+            address: row.pickup_full_address ?? row.pickup_address_snapshot ?? "",
+            coordinates: {
+              lat: String(row.pickup_lat ?? ""),
+              lng: String(row.pickup_lng ?? ""),
+            },
+            name: row.sender_name,
+            phone: row.sender_phone,
+          },
+          {
+            address: row.dropoff_full_address ?? row.dropoff_address_snapshot ?? "",
+            coordinates: {
+              lat: String(row.dropoff_lat ?? ""),
+              lng: String(row.dropoff_lng ?? ""),
+            },
+            name: row.recipient_name,
+            phone: row.recipient_phone,
+          },
+        ],
+        updatedAt: row.updated_at,
+        _source: "db",
+      };
+
+      res.json({ success: true, order: orderFromDb });
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to get order details";
@@ -409,119 +381,125 @@ router.get(
 );
 
 /**
- * DELETE /api/lalamove/orders/:orderId
- * 取消 Lalamove 訂單
+ * 共用取消訂單業務邏輯 (僅訂單建立者 d.user_id 或管理員可執行)
  */
-router.delete(
-  "/orders/:orderId",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { orderId } = req.params;
-      if (!orderId) {
-        res.status(400).json({ error: "orderId is required" });
-        return;
-      }
+async function handleCancelOrder(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user?.userId;
+    const userRole = authReq.user?.role;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
-      const cancelResult = await cancelLalamoveOrder(orderId);
+    const { orderId } = req.params;
+    if (!orderId) {
+      res.status(400).json({ error: "orderId is required" });
+      return;
+    }
 
-      // 更新資料庫 delivery_orders 狀態為 CANCELLED
-      await dbPool
-        .query(
-          "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ?",
-          [orderId],
-        )
-        .catch((e) =>
-          console.warn("[Lalamove] Update cancel status to DB error:", e),
-        );
+    // 檢查訂單歸屬與目前狀態
+    const [orderRows] = await dbPool.query<RowDataPacket[]>(
+      "SELECT id, status, user_id, lalamove_order_id FROM delivery_orders WHERE lalamove_order_id = ? OR id = ? LIMIT 1",
+      [orderId, orderId],
+    );
 
-      const io: Server | undefined = res.locals.io || req.app.get("io");
-      if (io) {
-        io.to(`delivery_${orderId}`).emit("delivery_update", {
-          orderId,
-          status: "CANCELLED",
-        });
-      }
+    if (!orderRows || orderRows.length === 0) {
+      res.status(404).json({ error: "Delivery order not found" });
+      return;
+    }
 
-      res.json({
-        success: true,
-        result: cancelResult,
+    const orderRecord = orderRows[0];
+    if (orderRecord.user_id !== userId && userRole !== "admin") {
+      res
+        .status(403)
+        .json({ error: "Forbidden: You cannot cancel this order" });
+      return;
+    }
+
+    // 已送達、司機已取件或已終止狀態不可取消
+    const nonCancellableStatuses = [
+      "PICKED_UP",
+      "COMPLETED",
+      "CANCELLED",
+      "EXPIRED",
+      "FAILED",
+    ];
+    if (nonCancellableStatuses.includes(orderRecord.status)) {
+      res.status(400).json({
+        error: `Cannot cancel order with current status: ${orderRecord.status}`,
       });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to cancel order";
-      console.error(
-        `Lalamove cancel order ${req.params.orderId} error:`,
-        error,
+      return;
+    }
+
+    const cancelResult = await cancelLalamoveOrder(orderId);
+
+    // 更新資料庫 delivery_orders 狀態為 CANCELLED
+    await dbPool
+      .query(
+        "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ?",
+        [orderId],
+      )
+      .catch((e) =>
+        console.warn("[Lalamove] Update cancel status to DB error:", e),
       );
-      res.status(500).json({
-        error: "Failed to cancel Lalamove order",
-        message,
+
+    const io: Server | undefined = res.locals.io || req.app.get("io");
+    if (io) {
+      io.to(`delivery_${orderId}`).emit("delivery_update", {
+        orderId,
+        status: "CANCELLED",
       });
     }
-  },
-);
+
+    res.json({
+      success: true,
+      result: cancelResult,
+    });
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to cancel order";
+    console.error(`Lalamove cancel order ${req.params.orderId} error:`, error);
+    res.status(500).json({
+      error: "Failed to cancel Lalamove order",
+      message,
+    });
+  }
+}
+
+/**
+ * DELETE /api/lalamove/orders/:orderId
+ * 取消 Lalamove 訂單 (需授權)
+ */
+router.delete("/orders/:orderId", requireAuth, handleCancelOrder);
 
 /**
  * POST /api/lalamove/orders/:orderId/cancel
- * 取消訂單 (POST 備援端點)
+ * 取消訂單 (POST 備援端點，需授權)
  */
-router.post(
-  "/orders/:orderId/cancel",
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { orderId } = req.params;
-      if (!orderId) {
-        res.status(400).json({ error: "orderId is required" });
-        return;
-      }
-
-      const cancelResult = await cancelLalamoveOrder(orderId);
-
-      // 更新資料庫 delivery_orders 狀態為 CANCELLED
-      await dbPool
-        .query(
-          "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ?",
-          [orderId],
-        )
-        .catch((e) =>
-          console.warn("[Lalamove] Update cancel status to DB error:", e),
-        );
-
-      const io: Server | undefined = res.locals.io || req.app.get("io");
-      if (io) {
-        io.to(`delivery_${orderId}`).emit("delivery_update", {
-          orderId,
-          status: "CANCELLED",
-        });
-      }
-
-      res.json({
-        success: true,
-        result: cancelResult,
-      });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to cancel order";
-      console.error(
-        `Lalamove cancel order (POST) ${req.params.orderId} error:`,
-        error,
-      );
-      res.status(500).json({
-        error: "Failed to cancel Lalamove order",
-        message,
-      });
-    }
-  },
-);
+router.post("/orders/:orderId/cancel", requireAuth, handleCancelOrder);
 
 /**
  * GET /api/lalamove/orders/:orderId/driver
- * 取得指定訂單司機位置資訊
+ * 取得指定訂單司機位置資訊 (限定買方、賣方或管理員可查)
  */
 router.get(
   "/orders/:orderId/driver",
+  requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     try {
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user?.userId;
+      const userRole = authReq.user?.role;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+
       const { orderId } = req.params;
       const driverId = req.query.driverId as string;
 
@@ -532,7 +510,35 @@ router.get(
         return;
       }
 
-      const driver = await getLalamoveDriverDetail(orderId, driverId);
+      // 驗證是否有權限查看此訂單（買方、賣方或管理員）
+      const [orderRows] = await dbPool.query<RowDataPacket[]>(
+        `SELECT d.id, d.user_id, p.user_id AS seller_user_id, d.lalamove_order_id
+         FROM delivery_orders d
+         LEFT JOIN posts p ON d.post_id = p.id
+         WHERE d.lalamove_order_id = ? OR d.id = ?
+         LIMIT 1`,
+        [orderId, orderId],
+      );
+
+      if (!orderRows || orderRows.length === 0) {
+        res.status(404).json({ error: "Delivery order not found" });
+        return;
+      }
+
+      const orderRecord = orderRows[0];
+      if (
+        orderRecord.user_id !== userId &&
+        orderRecord.seller_user_id !== userId &&
+        userRole !== "admin"
+      ) {
+        res
+          .status(403)
+          .json({ error: "Forbidden: You do not have permission to view this order" });
+        return;
+      }
+
+      const realLalamoveOrderId = orderRecord.lalamove_order_id || orderId;
+      const driver = await getLalamoveDriverDetail(realLalamoveOrderId, driverId);
       res.json({
         success: true,
         driver,

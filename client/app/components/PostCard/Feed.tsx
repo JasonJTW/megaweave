@@ -305,7 +305,7 @@ export default function Feed({
             </div>
 
             {/* Desktop-only Sprite Injection */}
-            {i === 1 && (
+            {i === 0 && (
               <button
                 type="button"
                 onClick={() =>

@@ -23,6 +23,7 @@ import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
 import { Post, PostsResponse, PostLocationField } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImagesParallel } from "@/utils/imageProcessor";
+import { parseGooglePlace } from "@/utils/locationUtils";
 import OverlayTour, { TourStep } from "./components/OverlayTour";
 
 import { useRouter } from "next/navigation";
@@ -266,39 +267,6 @@ const PostsApp = () => {
   const desktopAutocompleteSearchInstanceRef =
     useRef<google.maps.places.Autocomplete | null>(null); // Desktop search autocomplete
 
-  const extractAddress = (place: google.maps.places.PlaceResult) => {
-    const components = place.address_components || [];
-    let province = "";
-    let city = "";
-    let route = ""; // 新增 route
-    let zip = "";
-
-    components.forEach((comp) => {
-      const types = comp.types;
-      // 縣市
-      if (types.includes("administrative_area_level_1")) {
-        province = comp.long_name;
-      }
-      // 鄉鎮市區
-      if (
-        types.includes("sublocality_level_1") ||
-        types.includes("administrative_area_level_2")
-      ) {
-        city = comp.long_name;
-      }
-      // 街道名稱
-      if (types.includes("route")) {
-        route = comp.long_name;
-      }
-      // 郵遞區號
-      if (types.includes("postal_code")) {
-        zip = comp.long_name;
-      }
-    });
-
-    return { province, city, route, zip };
-  };
-
   // Add useEffect for Search Autocomplete (Desktop)
   useEffect(() => {
     if (
@@ -339,8 +307,8 @@ const PostsApp = () => {
         autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
           if (place && place.address_components) {
-            const { province, city } = extractAddress(place);
-            const address = place.name || place.formatted_address || "";
+            const { province, city, full_address } = parseGooglePlace(place);
+            const address = place.name || full_address;
             setLocationInput(address);
             setSelectedLocation(address);
             setSearchCity(city);
@@ -417,10 +385,8 @@ const PostsApp = () => {
       autocomplete.addListener("place_changed", () => {
         const place = autocomplete.getPlace();
         if (place && place.address_components) {
-          const { province, city } = extractAddress(place);
-          console.log("Search Place:", { province, city });
-
-          const address = place.name || place.formatted_address || "";
+          const { province, city, full_address } = parseGooglePlace(place);
+          const address = place.name || full_address;
           setLocationInput(address);
           setSelectedLocation(address);
           setSearchCity(city);
@@ -532,7 +498,8 @@ const PostsApp = () => {
       if (data.province) formData.append("province", data.province);
       if (data.city) formData.append("city", data.city);
       if (data.route) formData.append("route", data.route);
-      if (data.zip) formData.append("zip", data.zip);
+      if (data.zip_code || data.zip)
+        formData.append("zip", (data.zip_code || data.zip)!);
       if (data.lat !== undefined && data.lat !== null)
         formData.append("lat", data.lat.toString());
       if (data.lng !== undefined && data.lng !== null)
@@ -780,7 +747,7 @@ const PostsApp = () => {
                       isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       postFilterType === "wish"
-                        ? "border-[#fbe9e7] bg-[#fbe9e7] text-megaweave-forest-dark"
+                        ? "border-megaweave-red-light bg-megaweave-red-light/35 text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() =>
@@ -797,7 +764,7 @@ const PostsApp = () => {
                       isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       postFilterType === "share"
-                        ? "border-[#fff3e0] bg-[#fff3e0] text-megaweave-forest-dark"
+                        ? "border-megaweave-gold bg-megaweave-gold/35 text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() =>
@@ -814,7 +781,7 @@ const PostsApp = () => {
                       isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       hideOverdue
-                        ? "border-[#ffebee] bg-[#ffebee] text-megaweave-red-dark"
+                        ? "border-megaweave-red-dark bg-megaweave-red-light/35 text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() => setHideOverdue((prev) => !prev)}

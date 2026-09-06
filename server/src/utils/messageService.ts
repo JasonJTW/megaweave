@@ -165,7 +165,7 @@ export const messageService = {
       SELECT 
         c.*,
         u.public_id as other_public_id,
-        u.username as other_username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) as other_username,
         u.avatar_url as other_avatar_url,
         u.id as other_user_id,
         m.content as last_message_content,
@@ -186,6 +186,7 @@ export const messageService = {
       JOIN conversations c ON cu1.conversation_id = c.id
       JOIN conversation_users cu2 ON c.id = cu2.conversation_id AND cu2.user_id != cu1.user_id
       JOIN users u ON cu2.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN messages m ON m.id = c.last_message_id
       WHERE cu1.user_id = ?
       ORDER BY c.last_message_at DESC
@@ -205,9 +206,10 @@ export const messageService = {
       SELECT 
         m.id, m.conversation_id, m.sender_id, m.content, m.message_type, m.metadata, m.created_at,
         IF(m.id <= cu.last_read_message_id, 1, 0) as is_read,
-        u.username as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
       FROM messages m
       JOIN users u ON m.sender_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       LEFT JOIN conversation_users cu 
         ON cu.conversation_id = m.conversation_id 
         AND cu.user_id != m.sender_id
@@ -275,13 +277,14 @@ export const messageService = {
       SELECT 
         c.*,
         u.public_id as other_public_id,
-        u.username as other_username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) as other_username,
         u.avatar_url as other_avatar_url,
         u.id as other_user_id
       FROM conversation_users cu1
       JOIN conversations c ON cu1.conversation_id = c.id
       JOIN conversation_users cu2 ON c.id = cu2.conversation_id AND cu2.user_id != cu1.user_id
       JOIN users u ON cu2.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       WHERE c.id = ? AND cu1.user_id = ?
     `;
     

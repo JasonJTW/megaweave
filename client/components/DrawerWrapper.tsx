@@ -37,7 +37,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
 
   return (
     <>
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr] sm:gap-6">
+      <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-[3fr_2fr] lg:grid-cols-[4fr_5fr]">
         <div className="min-w-0">
           <DrawerList
             title="Weaving"
@@ -55,7 +55,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
             <div>Posts</div>
           </div>
 
-          <div className="grid grid-cols-2 justify-items-center gap-5 px-4 sm:grid-cols-2 sm:px-0 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 justify-items-center gap-4 px-4 sm:grid-cols-2 sm:px-0 lg:grid-cols-3 xl:grid-cols-4">
             {userPosts.map((p, i) => (
               <div key={`post-${p.id}`}>
                 <UserPostCard

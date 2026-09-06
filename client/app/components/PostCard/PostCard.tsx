@@ -2,7 +2,7 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { getPostDistance } from "@/utils/locationUtils";
+import { getPostDistance, buildLocationDisplayParts } from "@/utils/locationUtils";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import React from "react";
@@ -288,25 +288,7 @@ function PostCardInner({
             <div className="mt-[12px] flex flex-col gap-[6px] text-[16px] font-medium leading-[18px]">
               <div className="min-h-[18px]">
                 {(() => {
-                  const seen = new Set<string>();
-                  const parts: { field: PostLocationField; value: string }[] =
-                    [];
-                  const add = (
-                    field: PostLocationField,
-                    value: string | undefined,
-                  ) => {
-                    if (value && !seen.has(value)) {
-                      seen.add(value);
-                      parts.push({ field, value });
-                      return true;
-                    }
-                    return false;
-                  };
-                  add("province", post.province);
-                  add("city", post.city);
-                  if (!add("location_name", post.location_name)) {
-                    add("route", post.route);
-                  }
+                  const parts = buildLocationDisplayParts(post);
 
                   if (parts.length === 0 && !post.full_address) return null;
 

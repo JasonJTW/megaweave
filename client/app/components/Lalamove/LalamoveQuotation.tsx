@@ -20,6 +20,11 @@ import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
 import { ArrowRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  parseGooglePlace,
+  GOOGLE_AUTOCOMPLETE_FIELDS,
+  ParsedGooglePlace,
+} from "@/utils/locationUtils";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -259,6 +264,8 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     lat: number;
     lng: number;
   } | null>(null);
+  const [destinationDetails, setDestinationDetails] =
+    useState<ParsedGooglePlace | null>(null);
 
   // Selected Service
   const [selectedService, setSelectedService] = useState<string>("MOTORCYCLE");
@@ -303,28 +310,28 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         destinationInputRef.current,
         {
           componentRestrictions: { country: "tw" },
-          fields: ["formatted_address", "geometry", "name", "place_id"],
+          fields: GOOGLE_AUTOCOMPLETE_FIELDS,
         },
       );
 
       const listener = autocomplete.addListener("place_changed", () => {
         const place = autocomplete.getPlace();
-        if (place.formatted_address) {
-          setDestinationAddress(place.formatted_address);
-          setErrorMsg(null);
-        } else if (place.name) {
-          setDestinationAddress(place.name);
+        const parsed = parseGooglePlace(place);
+        setDestinationDetails(parsed);
+
+        if (parsed.full_address) {
+          setDestinationAddress(parsed.full_address);
           setErrorMsg(null);
         }
 
-        if (place.place_id) {
-          setDestinationPlaceId(place.place_id);
+        if (parsed.place_id) {
+          setDestinationPlaceId(parsed.place_id);
         }
 
-        if (place.geometry?.location) {
+        if (parsed.lat !== undefined && parsed.lng !== undefined) {
           setDestinationCoords({
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
+            lat: parsed.lat,
+            lng: parsed.lng,
           });
         }
       });
@@ -505,13 +512,18 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
               (results, status) => {
                 setIsLocating(false);
                 if (status === "OK" && results?.[0]) {
+                  const parsed = parseGooglePlace(
+                    results[0] as unknown as google.maps.places.PlaceResult,
+                  );
+                  setDestinationDetails(parsed);
                   setDestinationAddress(
-                    sanitizeTwAddress(results[0].formatted_address),
+                    sanitizeTwAddress(parsed.full_address || results[0].formatted_address),
                   );
                   if (results[0].place_id) {
                     setDestinationPlaceId(results[0].place_id);
                   }
                 } else {
+                  setDestinationDetails(null);
                   // Geocoding API disabled or no results — use coordinates directly
                   setDestinationAddress(fallbackLabel);
                 }
@@ -915,6 +927,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         destinationAddress={destinationAddress}
         destinationPlaceId={destinationPlaceId}
         destinationCoords={destinationCoords || undefined}
+        initialDestinationDetails={destinationDetails || undefined}
         currentUser={user}
         locale={locale}
       />

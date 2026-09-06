@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { FC } from "react";
 import WeavingIcon from "./icons/WeavingIcon";
-import { useNavbar } from "../contexts/NavBarContext";
+// import { useNavbar } from "../contexts/NavBarContext";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 
 const Footer: FC = () => {
-  const { isNavbarVisible } = useNavbar();
+  // const { isNavbarVisible } = useNavbar();
   const pathname = usePathname();
   if (pathname.startsWith("/messages") || pathname.startsWith("/tinder")) {
     return null;
@@ -17,7 +17,7 @@ const Footer: FC = () => {
     <footer
       className={cn(
         "z-40 max-w-full overflow-hidden bg-[#f4f5f3] font-ddin text-[#14321f] transition-transform duration-300 ease-in-out",
-        isNavbarVisible ? "translate-y-0" : "translate-y-full",
+        // isNavbarVisible ? "translate-y-0" : "translate-y-full",
       )}
     >
       {/* 頂端細線（幾乎不可見） */}

@@ -119,8 +119,12 @@ const Navbar = () => {
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
     { href: "/tinder", label: "Tinder", icon: Flame },
-    { href: "/messages", label: "Messages", icon: DirectMessageIcon },
-    { href: "/notifications", label: "Notifications", icon: NotificationIcon },
+    ...(user
+      ? [
+          { href: "/messages", label: "Messages", icon: DirectMessageIcon },
+          { href: "/notifications", label: "Notifications", icon: NotificationIcon },
+        ]
+      : []),
     { href: "/user", label: "Profile", icon: UserIcon },
   ];
 

@@ -21,6 +21,11 @@ import {
 import toast from "react-hot-toast";
 import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
+import {
+  parseGooglePlace,
+  GOOGLE_AUTOCOMPLETE_FIELDS,
+  ParsedGooglePlace,
+} from "@/utils/locationUtils";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
 export const VEHICLE_OPTIONS = [
@@ -106,6 +111,7 @@ interface OrderPlacementModalProps {
   originPlaceId?: string;
   destinationPlaceId?: string;
   destinationCoords?: { lat: number; lng: number };
+  initialDestinationDetails?: ParsedGooglePlace;
   currentUser?: {
     username?: string;
     email?: string;
@@ -126,11 +132,14 @@ function sanitizeTwAddress(address: string): string {
 }
 
 /**
- * 透過 Google Geocoder 將使用者輸入的地址字串解析為經緯度 (lat, lng)
+ * 透過 Google Geocoder 將使用者輸入的地址字串解析為經緯度 (lat, lng) 與結構化地址
  */
 const geocodeAddress = async (
   address: string,
-): Promise<{ lat: number; lng: number } | null> => {
+): Promise<{
+  coords: { lat: number; lng: number };
+  parsed: ParsedGooglePlace;
+} | null> => {
   if (typeof window === "undefined" || !window.google?.maps?.Geocoder) {
     return null;
   }
@@ -141,7 +150,13 @@ const geocodeAddress = async (
       (results, status) => {
         if (status === "OK" && results?.[0]?.geometry?.location) {
           const loc = results[0].geometry.location;
-          resolve({ lat: loc.lat(), lng: loc.lng() });
+          const parsed = parseGooglePlace(
+            results[0] as unknown as google.maps.places.PlaceResult,
+          );
+          resolve({
+            coords: { lat: loc.lat(), lng: loc.lng() },
+            parsed,
+          });
         } else {
           resolve(null);
         }
@@ -162,6 +177,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   originPlaceId: initialOriginPlaceId,
   destinationPlaceId: initialDestinationPlaceId,
   destinationCoords: initialDestinationCoords,
+  initialDestinationDetails,
   currentUser,
   locale = "zh",
 }) => {
@@ -178,6 +194,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   // 地址狀態
   const [originAddr, setOriginAddr] = useState(initialOriginAddress);
   const [destAddr, setDestAddr] = useState(initialDestinationAddress);
+  const [originDetails, setOriginDetails] = useState<ParsedGooglePlace | null>(null);
+  const [destDetails, setDestDetails] = useState<ParsedGooglePlace | null>(
+    initialDestinationDetails || null,
+  );
   // 取件地點的 Google place_id（初始來自 props 或 post，使用者若重新選取會更新）
   const [originPlaceId, setOriginPlaceId] = useState<string | undefined>(
     initialOriginPlaceId || post.place_id || undefined,
@@ -252,6 +272,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       setDestAddr(initialDestinationAddress);
       setOriginPlaceId(initialOriginPlaceId || post.place_id || undefined);
       setDestPlaceId(initialDestinationPlaceId);
+      setDestDetails(initialDestinationDetails || null);
+      setOriginDetails(null);
       setOriginCoords({
         lat: Number(
           initialQuotation?.stops?.[0]?.coordinates?.lat ?? post.lat ?? 25.0831,
@@ -287,6 +309,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     initialOriginPlaceId,
     initialDestinationPlaceId,
     initialDestinationCoords,
+    initialDestinationDetails,
     post.lat,
     post.lng,
     post.place_id,
@@ -305,22 +328,23 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         originInputRef.current,
         {
           componentRestrictions: { country: "tw" },
-          fields: ["formatted_address", "name", "geometry", "place_id"],
+          fields: GOOGLE_AUTOCOMPLETE_FIELDS,
         },
       );
       autoOrigin.addListener("place_changed", () => {
         const place = autoOrigin?.getPlace();
-        const addr = place?.formatted_address || place?.name;
-        if (addr) {
-          setOriginAddr(addr);
+        const parsed = parseGooglePlace(place);
+        setOriginDetails(parsed);
+        if (parsed.full_address) {
+          setOriginAddr(parsed.full_address);
         }
-        if (place?.place_id) {
-          setOriginPlaceId(place.place_id);
+        if (parsed.place_id) {
+          setOriginPlaceId(parsed.place_id);
         }
-        if (place?.geometry?.location) {
+        if (parsed.lat !== undefined && parsed.lng !== undefined) {
           setOriginCoords({
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
+            lat: parsed.lat,
+            lng: parsed.lng,
           });
         }
       });
@@ -331,22 +355,23 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         destInputRef.current,
         {
           componentRestrictions: { country: "tw" },
-          fields: ["formatted_address", "name", "geometry", "place_id"],
+          fields: GOOGLE_AUTOCOMPLETE_FIELDS,
         },
       );
       autoDest.addListener("place_changed", () => {
         const place = autoDest?.getPlace();
-        const addr = place?.formatted_address || place?.name;
-        if (addr) {
-          setDestAddr(addr);
+        const parsed = parseGooglePlace(place);
+        setDestDetails(parsed);
+        if (parsed.full_address) {
+          setDestAddr(parsed.full_address);
         }
-        if (place?.place_id) {
-          setDestPlaceId(place.place_id);
+        if (parsed.place_id) {
+          setDestPlaceId(parsed.place_id);
         }
-        if (place?.geometry?.location) {
+        if (parsed.lat !== undefined && parsed.lng !== undefined) {
           setDestCoords({
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
+            lat: parsed.lat,
+            lng: parsed.lng,
           });
         }
       });
@@ -377,18 +402,26 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       let finalOriginLng = originCoords.lng;
       const geocodedOrigin = await geocodeAddress(originAddr);
       if (geocodedOrigin) {
-        finalOriginLat = geocodedOrigin.lat;
-        finalOriginLng = geocodedOrigin.lng;
-        setOriginCoords(geocodedOrigin);
+        finalOriginLat = geocodedOrigin.coords.lat;
+        finalOriginLng = geocodedOrigin.coords.lng;
+        setOriginCoords(geocodedOrigin.coords);
+        setOriginDetails(geocodedOrigin.parsed);
+        if (geocodedOrigin.parsed.place_id) {
+          setOriginPlaceId(geocodedOrigin.parsed.place_id);
+        }
       }
 
       let finalDestLat = destCoords.lat;
       let finalDestLng = destCoords.lng;
       const geocodedDest = await geocodeAddress(destAddr);
       if (geocodedDest) {
-        finalDestLat = geocodedDest.lat;
-        finalDestLng = geocodedDest.lng;
-        setDestCoords(geocodedDest);
+        finalDestLat = geocodedDest.coords.lat;
+        finalDestLng = geocodedDest.coords.lng;
+        setDestCoords(geocodedDest.coords);
+        setDestDetails(geocodedDest.parsed);
+        if (geocodedDest.parsed.place_id) {
+          setDestPlaceId(geocodedDest.parsed.place_id);
+        }
       }
 
       const stops = [
@@ -602,20 +635,39 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         quotationId: currentQuotation.quotationId,
         feeTotal: Number(currentQuotation.priceBreakdown.total),
         expiresAt: currentQuotation.expiresAt,
-        // 取件地點：附帶 place_id（來自 post 或使用者重新選取後更新）
+        // 取件地點：附帶 place_id 與結構化地址
         pickup: {
           fullAddress: sanitizeTwAddress(originAddr),
           lat: originCoords.lat,
           lng: originCoords.lng,
-          placeId: originPlaceId,
+          placeId:
+            originPlaceId ||
+            originDetails?.place_id ||
+            post.place_id ||
+            undefined,
+          name: originDetails?.name || post.location_name || undefined,
+          province: originDetails?.province || post.province || undefined,
+          city: originDetails?.city || post.city || undefined,
+          route: originDetails?.route || post.route || undefined,
+          zipCode:
+            originDetails?.zip_code ||
+            post.zip_code ||
+            undefined,
+          url: originDetails?.url || post.location_url || undefined,
         },
         pickupRemarks: senderFullRemarks || undefined,
-        // 送達地點：附帶 place_id（由 Google Places Autocomplete 取得）
+        // 送達地點：附帶 place_id 與結構化地址（由 Google Places Autocomplete 取得）
         dropoff: {
           fullAddress: sanitizeTwAddress(destAddr),
           lat: destCoords.lat,
           lng: destCoords.lng,
-          placeId: destPlaceId,
+          placeId: destPlaceId || destDetails?.place_id || undefined,
+          name: destDetails?.name || undefined,
+          province: destDetails?.province || undefined,
+          city: destDetails?.city || undefined,
+          route: destDetails?.route || undefined,
+          zipCode: destDetails?.zip_code || undefined,
+          url: destDetails?.url || undefined,
         },
         dropoffRemarks: recipientFullRemarks || undefined,
         senderName: senderName.trim(),

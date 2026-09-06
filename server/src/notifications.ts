@@ -15,10 +15,11 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const [notifications] = await dbPool.execute<RowDataPacket[]>(
       `SELECT n.*, 
-              s.username as sender_name, 
+              COALESCE(NULLIF(TRIM(up.custom_name), ''), s.username) as sender_name, 
               s.avatar_url as sender_avatar
        FROM notifications n
        LEFT JOIN users s ON n.sender_id = s.id
+       LEFT JOIN user_profiles up ON s.id = up.user_id
        WHERE n.recipient_id = ?
        ORDER BY n.created_at DESC
        LIMIT ? OFFSET ?`,

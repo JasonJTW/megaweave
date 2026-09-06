@@ -20,41 +20,21 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { usePost } from "../contexts/PostContext";
-import { CreatePostFormData, ItemInput, Post } from "../types/schema";
-
+import { CreatePostFormData, ItemInput, Post, PostFormSubmitData } from "../types/schema";
+import { parseGooglePlace, GOOGLE_AUTOCOMPLETE_FIELDS } from "@/utils/locationUtils";
 import AddIcon from "./icons/AddIcon";
 import DeleteIcon from "./icons/DeleteIcon";
 import TagIcon from "./icons/TagIcon";
 import LocationIcon from "./icons/LocationIcon";
 import ClockIcon from "./icons/ClockIcon";
 import toast from "react-hot-toast";
+
 const MAX_CONTENT_LENGTH = 1000;
 const MIN_CONTENT_LENGTH = 3;
 const MAX_ITEMS_COUNT = 20;
 const MAX_ITEM_TITLE_LENGTH = 20;
 
-export interface PostFormSubmitData {
-  title: string;
-  content: string;
-  location: string;
-  tags: string;
-  categoryId: number;
-  conditionLevel: number;
-  status: Post["status"];
-  expires_at?: Date;
-  items: ItemInput[];
-  place_id?: string;
-  location_name?: string;
-  location_url?: string;
-  province?: string;
-  city?: string;
-  route?: string;
-  zip?: string;
-  lat?: number;
-  lng?: number;
-  newImages: File[];
-  deletedImageIds: number[];
-}
+export type { PostFormSubmitData };
 
 interface PostFormModalProps {
   isOpen: boolean;
@@ -205,50 +185,15 @@ export default function PostFormModal({
         const autocomplete = new google.maps.places.Autocomplete(
           locationInputRef.current,
           {
-            // types: ["geocode"],
             componentRestrictions: { country: "tw" },
-            fields: [
-              "name",
-              "address_components",
-              "formatted_address",
-              "geometry",
-              "place_id",
-              "url",
-            ],
+            fields: GOOGLE_AUTOCOMPLETE_FIELDS,
           },
         );
 
         autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
           if (place && place.geometry && place.geometry.location) {
-            // Extract address details
-            let province = "";
-            let city = "";
-            let route = "";
-            let zip = "";
-
-            console.log(place);
-
-            if (place.address_components) {
-              place.address_components.forEach((comp) => {
-                const types = comp.types;
-                if (types.includes("administrative_area_level_1")) {
-                  province = comp.long_name;
-                }
-                if (
-                  types.includes("sublocality_level_1") ||
-                  types.includes("administrative_area_level_2")
-                ) {
-                  city = comp.long_name;
-                }
-                if (types.includes("route")) {
-                  route = comp.long_name;
-                }
-                if (types.includes("postal_code")) {
-                  zip = comp.long_name;
-                }
-              });
-            }
+            const parsed = parseGooglePlace(place);
 
             setFormErrors((prev) => ({
               ...prev,
@@ -257,16 +202,17 @@ export default function PostFormModal({
 
             setFormData((prev) => ({
               ...prev,
-              location: place.formatted_address || "",
-              place_id: place.place_id,
-              location_name: place.name || undefined,
-              location_url: place.url || undefined,
-              province,
-              city,
-              route,
-              zip,
-              lat: place.geometry?.location?.lat(),
-              lng: place.geometry?.location?.lng(),
+              location: parsed.full_address,
+              place_id: parsed.place_id,
+              location_name: parsed.name,
+              location_url: parsed.url,
+              province: parsed.province,
+              city: parsed.city,
+              route: parsed.route,
+              zip: parsed.zip,
+              zip_code: parsed.zip_code,
+              lat: parsed.lat,
+              lng: parsed.lng,
             }));
           }
         });

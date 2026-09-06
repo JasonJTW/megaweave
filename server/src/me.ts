@@ -60,6 +60,15 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
             p.type AS post_type,
             p.status AS post_status_original,
             l.full_address AS post_location,
+            l.place_id AS post_place_id,
+            l.name AS post_location_name,
+            l.url AS post_location_url,
+            l.province AS post_province,
+            l.city AS post_city,
+            l.route AS post_route,
+            l.zip_code AS post_zip_code,
+            l.lat AS post_lat,
+            l.lng AS post_lng,
             p.tags AS post_tags,
             p.category_id AS post_category_id,
             p.condition_level AS post_condition_level,
@@ -69,16 +78,18 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
             p.created_at AS post_created_at,
             p.updated_at AS post_updated_at,
             p.comment_count AS post_comment_count,
-            giver.username AS giver_name,
+            COALESCE(NULLIF(TRIM(g_up.custom_name), ''), giver.username) AS giver_name,
             giver.avatar_url AS giver_avatar,
-            receiver.username AS receiver_name,
+            COALESCE(NULLIF(TRIM(r_up.custom_name), ''), receiver.username) AS receiver_name,
             receiver.avatar_url AS receiver_avatar,
             GROUP_CONCAT(img.s3_key ORDER BY img.id ASC) AS s3_keys
          FROM weaves w
          JOIN posts p ON w.post_id = p.id
          LEFT JOIN locations l ON p.location_id = l.id
          JOIN users giver ON w.giver_id = giver.id
+         LEFT JOIN user_profiles g_up ON giver.id = g_up.user_id
          JOIN users receiver ON w.receiver_id = receiver.id
+         LEFT JOIN user_profiles r_up ON receiver.id = r_up.user_id
          LEFT JOIN images img ON p.id = img.post_id
          WHERE (w.giver_id = ? OR w.receiver_id = ?)
          GROUP BY w.id
@@ -104,7 +115,9 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.status(200).json({
       profile: {
         bio: profile.bio ?? "",
-        custom_name: profile.custom_name ?? req.user!.username,
+        custom_name:
+          (profile.custom_name && profile.custom_name.trim()) ||
+          req.user!.username,
         contact_email: profile.contact_email ?? null,
         contact_phone: profile.contact_phone ?? null,
       },

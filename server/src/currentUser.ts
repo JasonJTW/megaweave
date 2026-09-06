@@ -8,6 +8,8 @@ import {
 import { requireAuth } from "./middleware/auth";
 import _ from "lodash";
 import Router from "express";
+import dbPool from "./utils/db";
+import { RowDataPacket } from "mysql2";
 
 const router = Router();
 
@@ -19,6 +21,24 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         errorMessage: "Please login first",
       });
     }
+
+    // Ensure req.user.username is in sync with user_profiles.custom_name
+    try {
+      const [profiles] = await dbPool.execute<RowDataPacket[]>(
+        "SELECT custom_name FROM user_profiles WHERE user_id = ?",
+        [req.user.userId],
+      );
+      const customName = profiles[0]?.custom_name?.trim();
+      if (customName && req.user.username !== customName) {
+        req.user.username = customName;
+        updateUserSession(req, { username: customName }).catch((err) =>
+          console.error("Failed to sync updated custom_name to session:", err),
+        );
+      }
+    } catch (dbErr) {
+      console.error("Error checking custom_name in currentUser:", dbErr);
+    }
+
     console.log("Current user:", req.user);
     return res.status(200).json({ user: req.user });
   } catch (error) {

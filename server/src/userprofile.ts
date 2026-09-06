@@ -5,6 +5,7 @@ dotenv.config();
 
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
+import { updateUserSession } from "./session";
 const router = Router();
 
 //* public get profile api
@@ -63,7 +64,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     // 3. 組合回傳資料
     const responseData = {
       public_id: user.public_id, // 🔥 返回 public_id (UUID)
-      username: profile.custom_name || user.username,
+      username: (profile.custom_name && profile.custom_name.trim()) || user.username,
       email: user.email, // 可選：是否要公開 email
       avatar_url: user.avatar_url,
       avatar_key: user.avatar_key,
@@ -173,6 +174,11 @@ router.post(
     try {
       query = `Insert into user_profiles (user_id, custom_name) values (?, ?) on duplicate key update custom_name = values(custom_name)`;
       const updateResult = await dbPool.query(query, [userId, newCustomName]);
+      if (newCustomName) {
+        await updateUserSession(req, { username: newCustomName }).catch(
+          (err) => console.error("Failed to update user session with new custom_name:", err)
+        );
+      }
       res
         .status(200)
         .json({ message: "Profile update successfully", data: updateResult });

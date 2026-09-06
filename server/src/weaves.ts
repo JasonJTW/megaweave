@@ -40,6 +40,15 @@ export interface WeaveOutput extends RowDataPacket {
   post_type: "wish" | "share" | "commons";
   post_status_original: "active" | "inactive" | "expired";
   post_location: string | null;
+  post_place_id?: string | null;
+  post_location_name?: string | null;
+  post_location_url?: string | null;
+  post_province?: string | null;
+  post_city?: string | null;
+  post_route?: string | null;
+  post_zip_code?: string | null;
+  post_lat?: number | null;
+  post_lng?: number | null;
   post_tags: string | null;
   post_category_id: number;
   post_condition_level: number;
@@ -50,15 +59,15 @@ export interface WeaveOutput extends RowDataPacket {
   post_updated_at: Date;
   post_comment_count: number;
   giver_name: string;
-  giver_avatar: string;
+  giver_avatar: string | null;
   receiver_name: string;
-  receiver_avatar: string;
-  s3_keys: string;
+  receiver_avatar: string | null;
+  s3_keys: string | null;
 }
 
 // ─── Shared SQL ───────────────────────────────────────────────────────────────
 
-const WEAVE_QUERY_BASE = `
+export const WEAVE_QUERY_BASE = `
   SELECT 
       w.*,
       p.id AS post_id_original,
@@ -69,6 +78,15 @@ const WEAVE_QUERY_BASE = `
       p.type AS post_type,
       p.status AS post_status_original,
       l.full_address AS post_location, 
+      l.place_id AS post_place_id,
+      l.name AS post_location_name,
+      l.url AS post_location_url,
+      l.province AS post_province,
+      l.city AS post_city,
+      l.route AS post_route,
+      l.zip_code AS post_zip_code,
+      l.lat AS post_lat,
+      l.lng AS post_lng,
       p.tags AS post_tags,
       p.category_id AS post_category_id,
       p.condition_level AS post_condition_level,
@@ -78,16 +96,18 @@ const WEAVE_QUERY_BASE = `
       p.created_at AS post_created_at,
       p.updated_at AS post_updated_at,
       p.comment_count AS post_comment_count,
-      giver.username AS giver_name,
+      COALESCE(NULLIF(TRIM(g_up.custom_name), ''), giver.username) AS giver_name,
       giver.avatar_url AS giver_avatar,
-      receiver.username AS receiver_name,
+      COALESCE(NULLIF(TRIM(r_up.custom_name), ''), receiver.username) AS receiver_name,
       receiver.avatar_url AS receiver_avatar,
       GROUP_CONCAT(img.s3_key ORDER BY img.id ASC) AS s3_keys
   FROM weaves w
   JOIN posts p ON w.post_id = p.id
   LEFT JOIN locations l ON p.location_id = l.id
   JOIN users giver ON w.giver_id = giver.id
+  LEFT JOIN user_profiles g_up ON giver.id = g_up.user_id
   JOIN users receiver ON w.receiver_id = receiver.id
+  LEFT JOIN user_profiles r_up ON receiver.id = r_up.user_id
   LEFT JOIN images img ON p.id = img.post_id
 `;
 
@@ -119,6 +139,15 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
       type: row.post_type,
       status: row.post_status_original,
       location: row.post_location,
+      place_id: row.post_place_id,
+      location_name: row.post_location_name,
+      location_url: row.post_location_url,
+      province: row.post_province,
+      city: row.post_city,
+      route: row.post_route,
+      zip_code: row.post_zip_code,
+      lat: row.post_lat,
+      lng: row.post_lng,
       tags: row.post_tags,
       category_id: row.post_category_id,
       condition_level: row.post_condition_level,

@@ -61,7 +61,12 @@ async function findOrCreateUser(
   },
 ): Promise<RowDataPacket> {
   // 1. 先查找是否已存在相同 email 的用戶
-  const findQuery = "SELECT * FROM users WHERE email = ?";
+  const findQuery = `
+    SELECT u.*, up.custom_name 
+    FROM users u 
+    LEFT JOIN user_profiles up ON u.id = up.user_id 
+    WHERE u.email = ?
+  `;
   const [existingUsers] = await dbPool.execute<RowDataPacket[]>(findQuery, [
     email,
   ]);
@@ -133,7 +138,11 @@ async function findOrCreateUser(
     if (updatedUsers.length === 0) {
       throw new Error("User not found after update");
     }
-    return updatedUsers[0];
+    const retUser = updatedUsers[0];
+    if (retUser.custom_name && retUser.custom_name.trim()) {
+      retUser.username = retUser.custom_name.trim();
+    }
+    return retUser;
   } else {
     // 4. 用戶不存在，創建新用戶
     const insertUsersQuery = `
@@ -175,11 +184,18 @@ async function findOrCreateUser(
       );
       // 返回新創建的用戶
       const [newUsers] = await connection.execute<RowDataPacket[]>(
-        "SELECT * FROM users WHERE id = ?",
+        `SELECT u.*, up.custom_name 
+         FROM users u 
+         LEFT JOIN user_profiles up ON u.id = up.user_id 
+         WHERE u.id = ?`,
         [userId],
       );
       await connection.commit();
-      return newUsers[0];
+      const retUser = newUsers[0];
+      if (retUser.custom_name && retUser.custom_name.trim()) {
+        retUser.username = retUser.custom_name.trim();
+      }
+      return retUser;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -212,7 +228,12 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     // 2. 查找用戶
-    const query = "SELECT * FROM users WHERE email = ?";
+    const query = `
+      SELECT u.*, up.custom_name 
+      FROM users u 
+      LEFT JOIN user_profiles up ON u.id = up.user_id 
+      WHERE u.email = ?
+    `;
     const [rows] = await dbPool.execute<RowDataPacket[]>(query, [user.email]);
 
     if (rows.length === 0) {
@@ -253,7 +274,9 @@ router.post("/", async (req: Request, res: Response) => {
 
     // 5. 創建 session
     const validUser: UserSession = {
-      username: foundUser.username,
+      username:
+        (foundUser.custom_name && foundUser.custom_name.trim()) ||
+        foundUser.username,
       email: foundUser.email,
       role: foundUser.role,
       userId: Number(foundUser.id),

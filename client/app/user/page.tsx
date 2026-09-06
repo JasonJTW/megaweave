@@ -13,7 +13,15 @@ import { safeCompressImage } from "@/utils/imageProcessor";
 import renderTextWithUrls from "@/utils/renderTextWithUrl";
 import { googleLogout } from "@react-oauth/google";
 import { motion } from "framer-motion";
-import { History, LogOut, Save, Share, User as UserIcon, Users, X } from "lucide-react";
+import {
+  History,
+  LogOut,
+  Save,
+  Share,
+  User as UserIcon,
+  Users,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";

@@ -308,7 +308,12 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
   // 2. 站外 Email (Queue)
   try {
     const [userRows] = await dbPool.execute<RowDataPacket[]>(
-      "SELECT username, email FROM users WHERE id = ?",
+      `SELECT 
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username, 
+        u.email 
+      FROM users u 
+      LEFT JOIN user_profiles up ON u.id = up.user_id 
+      WHERE u.id = ?`,
       [recipientId],
     );
 

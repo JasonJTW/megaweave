@@ -5,7 +5,9 @@ import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import dbPool from "./utils/db";
 import { ECPayAioProvider } from "./services/payment/ecpay/ECPayAioProvider";
 import * as lalamoveService from "./services/lalamove";
-import { RowDataPacket, ResultSetHeader } from "mysql2/promise";
+import { RowDataPacket } from "mysql2/promise";
+
+import { locationService } from "./services/locationService";
 
 // 地點可以用已存在的 ID（後端 locations 表），或在結帳時即時傳入地址物件（後端自動建立）
 const LocationByIdSchema = z.object({ locationId: z.number().int().positive() });
@@ -15,6 +17,12 @@ const LocationByDataSchema = z.object({
   lng: z.number(),
   placeId: z.string().optional(),
   name: z.string().optional(),
+  province: z.string().optional(),
+  city: z.string().optional(),
+  route: z.string().optional(),
+  zipCode: z.string().optional(),
+  zip: z.string().optional(),
+  url: z.string().optional(),
 });
 
 const CheckoutSchema = z.object({
@@ -46,54 +54,25 @@ type LocationInput =
   | z.infer<typeof LocationByDataSchema>;
 
 /**
- * 取得或建立地點 ID（upsert into `locations` table by place_id or full_address）
+ * 取得或建立地點 ID（透過 locationService 統一處理查重、補齊與插入）
  */
 async function resolveLocationId(location: LocationInput): Promise<number> {
   if ("locationId" in location) {
     return location.locationId;
   }
 
-  // 若有 placeId，先嘗試查詢已存在的記錄
-  if (location.placeId) {
-    const [rows] = await dbPool.query<RowDataPacket[]>(
-      "SELECT id FROM locations WHERE place_id = ?",
-      [location.placeId]
-    );
-    if (rows && rows.length > 0) return rows[0].id as number;
-  }
-
-  // 若無 placeId 則嘗試用精確地址查詢（避免重複建立）
-  const [addrRows] = await dbPool.query<RowDataPacket[]>(
-    "SELECT id FROM locations WHERE full_address = ? AND lat = ? AND lng = ?",
-    [location.fullAddress, location.lat, location.lng]
-  );
-  if (addrRows && addrRows.length > 0) return addrRows[0].id as number;
-
-  // place_id 欄位為 NOT NULL，若無真實 Google Place ID
-  // 以「manual:lat,lng」作為穩定的合成識別碼（精確到小數後 7 位確保唯一性）
-  const effectivePlaceId =
-    location.placeId ||
-    `manual:${location.lat.toFixed(7)},${location.lng.toFixed(7)}`;
-
-  // 以 INSERT IGNORE 方式寫入（若其他并發請求已搶先插入相同 place_id，不報錯並重新查詢）
-  await dbPool.query<ResultSetHeader>(
-    `INSERT IGNORE INTO locations (place_id, name, full_address, lat, lng)
-     VALUES (?, ?, ?, ?, ?)`,
-    [
-      effectivePlaceId,
-      location.name || null,
-      location.fullAddress,
-      location.lat,
-      location.lng,
-    ]
-  );
-
-  // 取回剛插入（或已存在）的 id
-  const [finalRows] = await dbPool.query<RowDataPacket[]>(
-    "SELECT id FROM locations WHERE place_id = ?",
-    [effectivePlaceId]
-  );
-  return finalRows[0].id as number;
+  return locationService.findOrCreateLocation(dbPool, {
+    place_id: location.placeId,
+    name: location.name,
+    full_address: location.fullAddress,
+    province: location.province,
+    city: location.city,
+    route: location.route,
+    zip_code: location.zipCode || location.zip,
+    lat: location.lat,
+    lng: location.lng,
+    url: location.url,
+  });
 }
 
 export function createPaymentRouter(options?: PaymentRouterOptions): Router {

@@ -46,6 +46,7 @@ const CreatePostSchema = z.object({
   city: z.string().optional(),
   route: z.string().optional(),
   zip: z.string().optional(),
+  zip_code: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
   type: z.enum(["wish", "share", "commons"] as [PostType, ...PostType[]]),

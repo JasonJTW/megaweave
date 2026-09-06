@@ -146,11 +146,12 @@ router.post("/", async (req: Request, res: Response) => {
     const [newCommentRows] = await connection.execute<CommentRow[]>(
       `SELECT 
         c.*,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         u.avatar_url,
         u.public_id
       FROM comments c
       LEFT JOIN users u ON c.user_id = u.id
+      LEFT JOIN user_profiles up ON c.user_id = up.user_id
       WHERE c.id = ?`,
       [insertedId]
     );
@@ -255,11 +256,12 @@ router.get("/", async (req: Request, res: Response) => {
     let query = `
       SELECT 
         c.*,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         u.avatar_url,
         u.public_id
       FROM comments c
       LEFT JOIN users u ON c.user_id = u.id
+      LEFT JOIN user_profiles up ON c.user_id = up.user_id
       WHERE c.post_id = ? AND c.is_deleted = 0
     `;
     const params: (number | string)[] = [postId];

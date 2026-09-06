@@ -451,7 +451,7 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
+                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                     />
                   </div>
                   <div className="space-y-2">
@@ -469,7 +469,7 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
+                        className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                       />
                       <button
                         type="button"
@@ -536,7 +536,7 @@ function SigninForm() {
                       onChange={(e) => setUserName(e.target.value)}
                       required
                       placeholder="Enter your username"
-                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
+                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                     />
                   </div>
 
@@ -554,7 +554,7 @@ function SigninForm() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="Enter your email"
-                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
+                      className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                     />
                   </div>
                   <div className="space-y-2">
@@ -572,7 +572,7 @@ function SigninForm() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="Enter your password"
-                        className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100 md:px-6"
+                        className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                       />
                       <button
                         type="button"

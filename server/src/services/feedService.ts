@@ -5,6 +5,7 @@ import { RowDataPacket } from "mysql2";
 import { RESP_TYPES } from "@redis/client";
 import dbPool from "../utils/db";
 import { getRedisClient } from "../utils/redis";
+import { locationService } from "./locationService";
 
 export interface FeedParams {
   userId?: number;
@@ -303,16 +304,9 @@ export class FeedService {
         queryParams.push(params.city);
       }
     } else if (params.location) {
-      whereConditions.push(
-        "(l.name LIKE ? OR l.route LIKE ? OR l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
-      );
-      queryParams.push(
-        `%${params.location}%`,
-        `%${params.location}%`,
-        `%${params.location}%`,
-        `%${params.location}%`,
-        `%${params.location}%`,
-      );
+      const condition = locationService.buildLocationSearchCondition(params.location);
+      whereConditions.push(condition.sql);
+      queryParams.push(...condition.params);
     }
 
     if (params.search) {

@@ -291,7 +291,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
     const query = `
       SELECT 
         u.id,
-        u.username,
+        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         u.avatar_url,
         u.public_id,
         us.post_count,
@@ -303,6 +303,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
         us.give_success_rate
       FROM user_stats us
       INNER JOIN users u ON us.user_id = u.id
+      LEFT JOIN user_profiles up ON u.id = up.user_id
       WHERE us.${orderBy} > 0
       ORDER BY us.${orderBy} DESC
       LIMIT ?

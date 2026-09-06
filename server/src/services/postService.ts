@@ -21,20 +21,10 @@ import { generatePostText } from "../utils/generatePostText";
 import { fetchEmbedding } from "../queue/jobs/postEmbedding";
 import { calculatePostHotScore } from "../queue/jobs/hotScore";
 import { getRedisClient } from "../utils/redis";
+import { LocationInputData } from "../types/location";
+import { locationService } from "./locationService";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
-
-export interface LocationData {
-  place_id: string;
-  name?: string;
-  url?: string;
-  full_address: string;
-  province?: string;
-  city?: string;
-  route?: string;
-  zip?: string;
-  lat: number;
-  lng: number;
-}
+export type LocationData = LocationInputData;
 
 export interface CreatePostInput {
   title: string;
@@ -53,6 +43,7 @@ export interface CreatePostInput {
   city?: string;
   route?: string;
   zip?: string;
+  zip_code?: string;
   lat?: number;
   lng?: number;
   items?: PostItemData[];
@@ -92,43 +83,7 @@ export class PostService {
     connection: PoolConnection,
     locationData: LocationData,
   ): Promise<number> {
-    const checkQuery = "SELECT id, name, url FROM locations WHERE place_id = ?";
-    const [rows] = await connection.execute<RowDataPacket[]>(checkQuery, [
-      locationData.place_id,
-    ]);
-
-    if (rows.length > 0) {
-      const existing = rows[0] as { id: number; name?: string | null; url?: string | null };
-      if ((!existing.name && locationData.name) || (!existing.url && locationData.url)) {
-        await connection.execute(
-          "UPDATE locations SET name = COALESCE(name, ?), url = COALESCE(url, ?) WHERE id = ?",
-          [locationData.name || null, locationData.url || null, existing.id],
-        );
-      }
-      return existing.id;
-    }
-
-    const insertQuery = `
-      INSERT INTO locations (
-        place_id, name, full_address, province, city, 
-        route, zip_code, lat, lng, url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const [result] = await connection.execute<ResultSetHeader>(insertQuery, [
-      locationData.place_id,
-      locationData.name || null,
-      locationData.full_address,
-      locationData.province || null,
-      locationData.city || null,
-      locationData.route || null,
-      locationData.zip || null,
-      locationData.lat,
-      locationData.lng,
-      locationData.url || null,
-    ]);
-
-    return result.insertId;
+    return locationService.findOrCreateLocation(connection, locationData);
   }
 
   /** 建立貼文 */
@@ -161,7 +116,7 @@ export class PostService {
           province: input.province,
           city: input.city,
           route: input.route,
-          zip: input.zip,
+          zip_code: input.zip_code || input.zip,
           lat: input.lat,
           lng: input.lng,
         });
@@ -476,16 +431,9 @@ export class PostService {
         queryParams.push(params.city);
       }
     } else if (params.location) {
-      whereConditions.push(
-        "(l.name LIKE ? OR l.route LIKE ? OR l.full_address LIKE ? OR l.city LIKE ? OR l.province LIKE ?)",
-      );
-      queryParams.push(
-        `%${params.location}%`,
-        `%${params.location}%`,
-        `%${params.location}%`,
-        `%${params.location}%`,
-        `%${params.location}%`,
-      );
+      const condition = locationService.buildLocationSearchCondition(params.location);
+      whereConditions.push(condition.sql);
+      queryParams.push(...condition.params);
     }
 
     if (params.search) {
@@ -712,7 +660,7 @@ export class PostService {
           province: incoming.province,
           city: incoming.city,
           route: incoming.route,
-          zip: incoming.zip,
+          zip_code: incoming.zip_code || incoming.zip,
           lat: incoming.lat,
           lng: incoming.lng,
         });
@@ -967,7 +915,7 @@ export class PostService {
         COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
         c.name_en as category_name_en,
         cond.name as condition_name,
-        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.province, l.city, l.lat, l.lng,
+        l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id

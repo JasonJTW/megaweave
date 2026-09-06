@@ -7,6 +7,7 @@ import Image from "next/image";
 import { motion, MotionValue, useTransform } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import TagIcon from "../icons/TagIcon";
+import { formatLocationText } from "@/utils/locationUtils";
 import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
 
@@ -127,18 +128,10 @@ const CardV2 = ({
             )}
           </div>
           <div className="mt-[6px] flex flex-col gap-[6px]">
-            {(post.location_name ||
-              post.province ||
-              post.city ||
-              post.route ||
-              post.full_address) && (
+            {formatLocationText(post) && (
               <div className="flex items-center gap-2 text-[16px] leading-[18px]">
                 <LocationIcon className="text-primary" />
-                {post.location_name ||
-                  [post.province, post.city, post.route]
-                    .filter(Boolean)
-                    .join("") ||
-                  post.full_address}
+                {formatLocationText(post)}
               </div>
             )}
             {post.created_at && (

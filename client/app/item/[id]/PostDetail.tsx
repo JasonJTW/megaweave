@@ -29,6 +29,8 @@ import LalamoveQuotation from "@/app/components/Lalamove/LalamoveQuotation";
 import { useNavbar } from "../../contexts/NavBarContext";
 import { useUser } from "../../contexts/UserContext";
 import { Post } from "../../types/schema";
+// 地點工具函式
+import { formatLocationText } from "@/utils/locationUtils";
 
 interface OwnerProfile {
   username: string;
@@ -182,7 +184,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       if (data.province) formData.append("province", data.province);
       if (data.city) formData.append("city", data.city);
       if (data.route) formData.append("route", data.route);
-      if (data.zip) formData.append("zip", data.zip);
+      if (data.zip_code || data.zip)
+        formData.append("zip", (data.zip_code || data.zip)!);
       if (data.lat !== undefined && data.lat !== null)
         formData.append("lat", data.lat.toString());
       if (data.lng !== undefined && data.lng !== null)
@@ -402,27 +405,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     key.startsWith("http") ? key : getImageUrl(key, "original"),
   );
 
-  const locationText = (() => {
-    const parts: string[] = [];
-    const add = (value: string | undefined) => {
-      if (value && !parts.includes(value)) {
-        parts.push(value);
-        return true;
-      }
-      return false;
-    };
-    add(post.province);
-    add(post.city);
-    if (!add(post.location_name)) {
-      add(post.route);
-    }
-    return parts.length > 0 ? parts.join("") : post.full_address || "";
-  })();
+  const locationText = formatLocationText(post);
 
   const initialFormData = {
     title: post.title,
     content: post.content,
-    location: locationText || post.full_address || "",
+    location: post.full_address || locationText || "",
     tags: post.tags || "",
     categoryId: post.category_id,
     conditionLevel: post.condition_level,
@@ -442,6 +430,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     city: post.city,
     route: post.route,
     zip: post.zip_code,
+    zip_code: post.zip_code,
     lat: post.lat,
     lng: post.lng,
   };

@@ -5,7 +5,7 @@ import { motion, useMotionValue, useTransform, PanInfo, MotionValue } from "fram
 import Image from "next/image";
 import type { Post } from "../../types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { getPostDistance } from "@/utils/locationUtils";
+import { getPostDistance, formatLocationText } from "@/utils/locationUtils";
 import { useLocation } from "../../contexts/LocationContext";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -498,30 +498,21 @@ export default function TinderCard({
           )}
 
           <div className="mt-3 flex items-center justify-between border-t border-white/15 pt-2.5 text-xs text-stone-300">
-            {(post.location_name ||
-              post.city ||
-              post.province ||
-              post.full_address ||
-              distanceStr) && (
-              <div className="flex max-w-[58%] items-center gap-1.5 truncate">
-                <LocationIcon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                <span className="truncate">
-                  {post.location_name ||
-                    [post.province, post.city].filter(Boolean).join(" ") ||
-                    post.full_address}
-                </span>
-                {distanceStr && (
-                  <span className="shrink-0 font-semibold text-emerald-300">
-                    {post.location_name ||
-                    post.city ||
-                    post.province ||
-                    post.full_address
-                      ? `• ${distanceStr}`
-                      : distanceStr}
-                  </span>
-                )}
-              </div>
-            )}
+            {(() => {
+              const locText = formatLocationText(post);
+              if (!locText && !distanceStr) return null;
+              return (
+                <div className="flex max-w-[58%] items-center gap-1.5 truncate">
+                  <LocationIcon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                  {locText && <span className="truncate">{locText}</span>}
+                  {distanceStr && (
+                    <span className="shrink-0 font-semibold text-emerald-300">
+                      {locText ? `• ${distanceStr}` : distanceStr}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <Avatar className="h-5 w-5 border border-white/20">

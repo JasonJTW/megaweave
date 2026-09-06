@@ -1,6 +1,19 @@
 //* schema.ts
 
-export interface Post {
+export interface LocationData {
+  place_id?: string;
+  location_name?: string;
+  location_url?: string;
+  province?: string;
+  city?: string;
+  route?: string;
+  full_address?: string;
+  zip_code?: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface Post extends LocationData {
   id: number;
   public_id: string;
   user_id: number;
@@ -28,19 +41,9 @@ export interface Post {
   images?: { id: number; s3_key?: string; alt_text?: string }[];
   author_public_id: string;
   author_user_id: number;
-  place_id?: string;
-  location_name?: string;
-  location_url?: string;
-  province?: string;
-  city?: string;
-  route?: string;
-  full_address?: string;
-  zip_code?: string;
-  lat?: number;
-  lng?: number;
 }
 
-export interface CreatePostFormData {
+export interface CreatePostFormData extends Partial<LocationData> {
   title: string;
   content: string;
   location: string;
@@ -50,16 +53,15 @@ export interface CreatePostFormData {
   type: Post["type"];
   status: Post["status"];
   items?: ItemInput[];
-  place_id?: string;
-  location_name?: string;
-  location_url?: string;
-  province?: string;
-  city?: string;
-  route?: string;
-  zip?: string;
-  lat?: number;
-  lng?: number;
+  zip?: string; // 相容別名
   expires_at?: Date;
+}
+
+export interface PostFormSubmitData extends Omit<CreatePostFormData, "type"> {
+  categoryId: number;
+  conditionLevel: number;
+  newImages?: File[];
+  deletedImageIds?: number[];
 }
 
 export interface Item {

@@ -29,12 +29,27 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  *   掃描超過 3 分鐘未更新的 ASSIGNING_DRIVER / ON_GOING / PICKED_UP 訂單，
  *   主動查詢 Lalamove API，若發現狀態不一致則自動補正 DB 並發送 Socket.IO 即時推播。
  */
-export async function processDeliveryReconciliation(_job?: Job): Promise<{
+export async function processDeliveryReconciliation(job?: Job): Promise<{
   checkedCount: number;
   reconciledCount: number;
   expiredCount: number;
 }> {
-  console.log("🔍 [Delivery Reconcile] Starting background reconciliation job...");
+  const logPrefix = "[Delivery Reconcile]";
+  const log = async (msg: string) => {
+    if (job) await job.log(`${logPrefix} ${msg}`);
+  };
+  const logWarn = async (msg: string) => {
+    console.warn(`${logPrefix} ${msg}`);
+    if (job) await job.log(`⚠️ ${logPrefix} ${msg}`);
+  };
+  const logError = async (msg: string, err?: unknown) => {
+    console.error(`${logPrefix} ${msg}`, err);
+    const errText =
+      err instanceof Error ? err.stack || err.message : String(err);
+    if (job) await job.log(`❌ ${logPrefix} ${msg}: ${errText}`);
+  };
+
+  await log("🔍 Starting background reconciliation job...");
 
   // ── Phase 1: 將過期的 PAYMENT_PENDING 訂單標為 EXPIRED ──────────────────────
   const [expiredRows] = await dbPool.query<RowDataPacket[]>(
@@ -81,13 +96,13 @@ export async function processDeliveryReconciliation(_job?: Job): Promise<{
         ],
       );
 
-      console.log(
-        `⏰ [Delivery Reconcile] Marked delivery_order #${row.delivery_order_id} as EXPIRED (payment_id=${row.payment_id})`,
+      await log(
+        `⏰ Marked delivery_order #${row.delivery_order_id} as EXPIRED (payment_id=${row.payment_id})`,
       );
       expiredCount++;
     } catch (expireErr) {
-      console.error(
-        `❌ [Delivery Reconcile] Failed to expire delivery_order #${row.delivery_order_id}:`,
+      await logError(
+        `Failed to expire delivery_order #${row.delivery_order_id}`,
         expireErr,
       );
     }
@@ -106,12 +121,12 @@ export async function processDeliveryReconciliation(_job?: Job): Promise<{
 
   if (!rows || rows.length === 0) {
     if (expiredCount === 0) {
-      console.log("✅ [Delivery Reconcile] No stale in-progress orders found.");
+      await log("✅ No stale in-progress orders found.");
     }
     return { checkedCount: 0, reconciledCount: 0, expiredCount };
   }
 
-  console.log(`📦 [Delivery Reconcile] Found ${rows.length} potentially stale orders to verify.`);
+  await log(`📦 Found ${rows.length} potentially stale orders to verify.`);
   let reconciledCount = 0;
   const io = getSocketIO();
 
@@ -129,8 +144,8 @@ export async function processDeliveryReconciliation(_job?: Job): Promise<{
       const isDriverNewlyFound = !row.driver_name && remoteDriver?.name;
 
       if (isStatusChanged || isDriverNewlyFound) {
-        console.warn(
-          `⚠️ [Delivery Reconcile] Discrepancy detected for order ${row.lalamove_order_id}: local status='${row.status}' vs remote='${remoteDbStatus}'`,
+        await logWarn(
+          `Discrepancy detected for order ${row.lalamove_order_id}: local status='${row.status}' vs remote='${remoteDbStatus}'`,
         );
 
         const newStatus = remoteDbStatus || row.status;
@@ -174,23 +189,23 @@ export async function processDeliveryReconciliation(_job?: Job): Promise<{
             driver: remoteDriver,
             updatedAt: new Date().toISOString(),
           });
-          console.log(
-            `📢 [Delivery Reconcile] Emitted reconciled status update for delivery_${row.lalamove_order_id}`,
+          await log(
+            `📢 Emitted reconciled status update for delivery_${row.lalamove_order_id}`,
           );
         }
 
         reconciledCount++;
       }
     } catch (orderErr) {
-      console.error(
-        `❌ [Delivery Reconcile] Error verifying order ${row.lalamove_order_id}:`,
+      await logError(
+        `Error verifying order ${row.lalamove_order_id}`,
         orderErr,
       );
     }
   }
 
-  console.log(
-    `🎉 [Delivery Reconcile] Finished. Verified: ${rows.length}, Reconciled: ${reconciledCount}, Expired: ${expiredCount}`,
+  await log(
+    `🎉 Finished. Verified: ${rows.length}, Reconciled: ${reconciledCount}, Expired: ${expiredCount}`,
   );
   return { checkedCount: rows.length, reconciledCount, expiredCount };
 }

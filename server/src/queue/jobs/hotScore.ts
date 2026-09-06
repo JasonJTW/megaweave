@@ -62,10 +62,25 @@ export function calculatePostHotScore(post: {
  * 3. 原子更新 Redis ZSET feed:trending
  * 4. 批次更新 MySQL posts.hot_score
  */
-export async function processCalculateHotScore(job?: Job): Promise<void> {
+export async function processCalculateHotScore(
+  job?: Job,
+): Promise<{ postCount: number; trendingCount: number }> {
   const logPrefix = "🔥 [hot-score-worker]";
-  if (job) await job.log(`${logPrefix} start calculation`);
-  console.log(`${logPrefix} – start calculating hot scores for all posts...`);
+
+  const log = async (msg: string) => {
+    if (job) await job.log(`${logPrefix} ${msg}`);
+  };
+  const logWarn = async (msg: string, err?: unknown) => {
+    console.warn(`${logPrefix} – ${msg}`, err);
+    if (job) await job.log(`⚠️ ${logPrefix} ${msg}: ${String(err)}`);
+  };
+  const logError = async (msg: string, err?: unknown) => {
+    console.error(`${logPrefix} – ${msg}`, err);
+    const errText = err instanceof Error ? err.stack || err.message : String(err);
+    if (job) await job.log(`❌ ${logPrefix} ${msg}: ${errText}`);
+  };
+
+  await log("start calculating hot scores for all posts...");
 
   // 1. 查詢所有未刪除的貼文及其最新互動數據
   const query = `
@@ -82,11 +97,11 @@ export async function processCalculateHotScore(job?: Job): Promise<void> {
   `;
 
   const [posts] = await dbPool.execute<PostScoreRow[]>(query);
-  console.log(`${logPrefix} – fetched ${posts.length} posts from database`);
+  await log(`fetched ${posts.length} posts from database`);
 
   if (posts.length === 0) {
-    console.log(`${logPrefix} – no posts to calculate, finished`);
-    return;
+    await log("no posts to calculate, finished");
+    return { postCount: 0, trendingCount: 0 };
   }
 
   // 2. 計算每篇貼文的分數
@@ -116,16 +131,16 @@ export async function processCalculateHotScore(job?: Job): Promise<void> {
       await redis.zAdd(tempKey, zsetMembers);
       // 原子置換成正式 feed:trending
       await redis.rename(tempKey, "feed:trending");
-      console.log(
-        `${logPrefix} – Redis ZSET feed:trending updated with ${zsetMembers.length} active posts`,
+      await log(
+        `Redis ZSET feed:trending updated with ${zsetMembers.length} active posts`,
       );
     } else {
       // 若全站無 active 貼文，清空 trending
       await redis.del("feed:trending");
-      console.log(`${logPrefix} – Redis ZSET feed:trending cleared (no active posts)`);
+      await log("Redis ZSET feed:trending cleared (no active posts)");
     }
   } catch (redisErr) {
-    console.error(`${logPrefix} – Redis update error:`, redisErr);
+    await logError("Redis update error", redisErr);
     // 清理臨時 key
     await redis.del(tempKey).catch(() => {});
   }
@@ -153,20 +168,23 @@ export async function processCalculateHotScore(job?: Job): Promise<void> {
 
       await dbPool.execute(updateSql, params);
     }
-    console.log(`${logPrefix} – MySQL posts.hot_score updated for ${scores.length} posts`);
+    await log(`MySQL posts.hot_score updated for ${scores.length} posts`);
   } catch (dbErr) {
-    console.error(`${logPrefix} – MySQL batch update error:`, dbErr);
+    await logError("MySQL batch update error", dbErr);
   }
 
-  if (job) await job.log(`${logPrefix} completed successfully`);
-  console.log(`${logPrefix} – calculation completed ✅`);
+  await log("calculation completed ✅");
 
   // 記錄本次執行時間，供啟動時防抖判斷（TTL 1 小時，防止 key 永久殘留）
   try {
     const redis = getRedisClient();
     await redis.set("hot-score:last-run", String(Date.now()), { EX: 60 * 60 });
   } catch (err) {
-    console.warn(`${logPrefix} – failed to write last-run timestamp:`, err);
+    await logWarn("failed to write last-run timestamp", err);
   }
-}
 
+  return {
+    postCount: scores.length,
+    trendingCount: zsetMembers.length,
+  };
+}

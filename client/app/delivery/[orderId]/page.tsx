@@ -80,10 +80,14 @@ interface OrderDetail {
 }
 
 const fetcher = async (url: string) => {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { cache: "no-store", credentials: "include" });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.message || errorData.error || "無法載入訂單資料");
+    const err = new Error(
+      errorData.message || errorData.error || "無法載入訂單資料",
+    ) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   const data = await res.json();
   return data.order as OrderDetail;
@@ -213,7 +217,6 @@ export default function DeliveryTrackingPage() {
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [fetchErrorCount, setFetchErrorCount] = useState(0);
   const [mapReady, setMapReady] = useState(false);
 
   // 頁面掛載後偵測 Google Maps 是否已就緒
@@ -263,9 +266,9 @@ export default function DeliveryTrackingPage() {
       revalidateOnFocus: true,
       dedupingInterval: 1000,
       onErrorRetry: (err, _key, _config, revalidate, { retryCount }) => {
-        // 最多重試 10 次 (約 30 秒)，讓 Lalamove 有時間處理剛建立的訂單
-        if (retryCount >= 10) return;
-        setFetchErrorCount(retryCount + 1);
+        const status = (err as { status?: number })?.status;
+        if (status === 401 || status === 403 || status === 404) return;
+        if (retryCount >= 5) return;
         setTimeout(() => revalidate({ retryCount }), 3000);
       },
     },
@@ -597,6 +600,7 @@ export default function DeliveryTrackingPage() {
       setIsCancelling(true);
       const res = await fetch(`${hostName}/api/lalamove/orders/${orderId}`, {
         method: "DELETE",
+        credentials: "include",
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -613,16 +617,22 @@ export default function DeliveryTrackingPage() {
     }
   };
 
-  // 複製連結
+  // 複製連結（優先複製 Lalamove 官方免登入的 shareLink）
   const copyTrackingLink = () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
-      toast.success("已複製即時追蹤連結！");
+    const targetUrl =
+      order?.shareLink ||
+      (typeof window !== "undefined" ? window.location.href : "");
+    if (navigator.clipboard && targetUrl) {
+      navigator.clipboard.writeText(targetUrl);
+      if (order?.shareLink) {
+        toast.success("已複製公開即時追蹤連結！");
+      } else {
+        toast.success("已複製追蹤連結（需登入訂單帳號檢視）");
+      }
     }
   };
 
-  if (isLoading) {
+  if (isLoading || (!order && !error)) {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center">
         <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-3xl bg-orange-50 text-orange-500 shadow-sm">
@@ -635,42 +645,50 @@ export default function DeliveryTrackingPage() {
     );
   }
 
-  // 若剛下單後短暫查無資料，改顯示載入畫面（最多重試 10 次）
-  if ((error || !order) && fetchErrorCount < 10) {
-    return (
-      <div className="flex min-h-[70vh] flex-col items-center justify-center">
-        <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-3xl bg-orange-50 text-orange-500 shadow-sm">
-          <Truck className="h-8 w-8" />
-        </div>
-        <p className="mt-4 font-semibold text-gray-700">
-          正在連線至 Lalamove 訂單系統...
-        </p>
-        <p className="mt-1 text-xs text-gray-400">
-          首次載入可能需要數秒，請稍候
-          {fetchErrorCount > 0 ? `（第 ${fetchErrorCount} 次重試）` : ""}
-        </p>
-      </div>
-    );
-  }
-
   if (error || !order) {
+    const status = (error as { status?: number })?.status;
+    const isAuthError = status === 401;
+    const isForbidden = status === 403;
+
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-50 text-rose-500">
           <AlertCircle className="h-7 w-7" />
         </div>
-        <h2 className="mt-4 text-lg font-bold text-gray-900">查無此配送訂單</h2>
+        <h2 className="mt-4 text-lg font-bold text-gray-900">
+          {isAuthError
+            ? "請先登入帳號"
+            : isForbidden
+              ? "無權限檢視此訂單"
+              : "查無此配送訂單"}
+        </h2>
         <p className="mt-2 text-xs text-gray-500">
-          {error?.message || "請確認訂單編號是否正確或稍後再試。"}
+          {isAuthError
+            ? "此配送訂單需要登入才能檢視，請先登入買家或賣家帳號。"
+            : isForbidden
+              ? "您並非此筆外送訂單的買家、賣家或管理員，無法查看詳細資訊。"
+              : error?.message || "請確認訂單編號是否正確或稍後再試。"}
         </p>
-        <button
-          type="button"
-          onClick={() => router.push("/")}
-          className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-600"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          返回首頁
-        </button>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          {isAuthError ? (
+            <button
+              type="button"
+              onClick={() => router.push("/signin")}
+              className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-600"
+            >
+              前往登入
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              返回首頁
+            </button>
+          )}
+        </div>
       </div>
     );
   }

@@ -747,7 +747,7 @@ const PostsApp = () => {
                       isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       postFilterType === "wish"
-                        ? "border-megaweave-red-light bg-megaweave-red-light/35 text-megaweave-forest-dark"
+                        ? "border-megaweave-red-light bg-megaweave-red-light/60 text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() =>
@@ -764,7 +764,7 @@ const PostsApp = () => {
                       isStuck ? "px-2 py-1.5 lg:px-3" : "px-4 py-2 lg:px-6"
                     } ${
                       postFilterType === "share"
-                        ? "border-megaweave-gold bg-megaweave-gold/35 text-megaweave-forest-dark"
+                        ? "border-megaweave-gold bg-megaweave-gold/30 text-megaweave-forest-dark"
                         : "border-gray-300 text-[#333]"
                     }`}
                     onClick={() =>

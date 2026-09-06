@@ -22,6 +22,38 @@ import { processDeliveryReconciliation } from "./jobs/deliveryReconcile";
 import { initUserVectorFlushCron, initDeliveryReconcileCron } from "./queues";
 
 
+/**
+ * 格式化時間為 YYYY-MM-DD HH:mm:ss
+ */
+function formatDateTime(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const y = date.getFullYear();
+  const m = pad(date.getMonth() + 1);
+  const d = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+  return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+}
+
+/**
+ * 將 BullMQ repeatable job ID（例如 repeat:cron-flush-user-vectors:1788696600000）
+ * 中的毫秒時間戳轉為好讀的時間格式：
+ * "repeat:cron-flush-user-vectors (2026-09-06 20:10:00)"
+ */
+function formatJobId(jobId?: string): string {
+  if (!jobId) return "unknown";
+  const match = jobId.match(/^(repeat:[^:]+):(\d{10,13})$/);
+  if (match) {
+    const [, name, timestampStr] = match;
+    const date = new Date(Number(timestampStr));
+    if (!isNaN(date.getTime())) {
+      return `${name} (${formatDateTime(date)})`;
+    }
+  }
+  return jobId;
+}
+
 export async function startWorkers(): Promise<void> {
   const postImageWorker = new Worker(
     "post-image",
@@ -37,13 +69,13 @@ export async function startWorkers(): Promise<void> {
 
   postImageWorker.on("completed", (job) => {
     console.log(
-      `🎉 [post-image] Job ${job.id} (${job.name}) finished successfully`,
+      `🎉 [post-image] Job ${formatJobId(job.id)} (${job.name}) finished successfully`,
     );
   });
 
   postImageWorker.on("failed", (job, err) => {
     console.error(
-      `❌ [post-image] Job ${job?.id} (${job?.name}) failed:`,
+      `❌ [post-image] Job ${formatJobId(job?.id)} (${job?.name}) failed:`,
       err.message,
     );
   });
@@ -60,13 +92,13 @@ export async function startWorkers(): Promise<void> {
 
   emailWorker.on("completed", (job) => {
     console.log(
-      `🎉 [email-wroker] Job ${job.id} (${job.name}) finished successfully`,
+      `🎉 [email-worker] Job ${formatJobId(job.id)} (${job.name}) finished successfully`,
     );
   });
 
   emailWorker.on("failed", (job, err) => {
     console.error(
-      `❌ [email-wroker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+      `❌ [email-worker] Job ${formatJobId(job?.id)} (${job?.name}) failed: ${err.message}`,
     );
   });
 
@@ -83,13 +115,13 @@ export async function startWorkers(): Promise<void> {
 
   embeddingWorker.on("completed", (job) => {
     console.log(
-      `🎉 [embedding-worker] Job ${job.id} (${job.name}) finished successfully`,
+      `🎉 [embedding-worker] Job ${formatJobId(job.id)} (${job.name}) finished successfully`,
     );
   });
 
   embeddingWorker.on("failed", (job, err) => {
     console.error(
-      `❌ [embedding-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+      `❌ [embedding-worker] Job ${formatJobId(job?.id)} (${job?.name}) failed: ${err.message}`,
     );
   });
 
@@ -106,13 +138,13 @@ export async function startWorkers(): Promise<void> {
 
   userVectorWorker.on("completed", (job) => {
     console.log(
-      `🎉 [user-vector-worker] Job ${job.id} (${job.name}) finished successfully`,
+      `🎉 [user-vector-worker] Job ${formatJobId(job.id)} (${job.name}) finished successfully`,
     );
   });
 
   userVectorWorker.on("failed", (job, err) => {
     console.error(
-      `❌ [user-vector-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+      `❌ [user-vector-worker] Job ${formatJobId(job?.id)} (${job?.name}) failed: ${err.message}`,
     );
   });
 
@@ -121,21 +153,28 @@ export async function startWorkers(): Promise<void> {
     "hot-score",
     async (job: Job) => {
       if (job.name === "calculate-hot-score") {
-        await processCalculateHotScore(job);
+        return await processCalculateHotScore(job);
       }
     },
     { connection: bullmqConnection, concurrency: 1 },
   );
 
-  hotScoreWorker.on("completed", (job) => {
+  hotScoreWorker.on("completed", (job, result) => {
+    const timeStr = formatDateTime();
+    const res = result as { postCount?: number; trendingCount?: number } | undefined;
+    const stats =
+      res && typeof res.postCount === "number"
+        ? ` (Posts: ${res.postCount}, Trending: ${res.trendingCount})`
+        : "";
     console.log(
-      `🎉 [hot-score-worker] Job ${job.id} (${job.name}) finished successfully`,
+      `🎉 [hot-score-worker] Job ${formatJobId(job.id)} (${job.name}) finished at ${timeStr}${stats}`,
     );
   });
 
   hotScoreWorker.on("failed", (job, err) => {
+    const timeStr = formatDateTime();
     console.error(
-      `❌ [hot-score-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+      `❌ [hot-score-worker] Job ${formatJobId(job?.id)} (${job?.name}) failed at ${timeStr}: ${err.message}`,
     );
   });
 
@@ -144,7 +183,7 @@ export async function startWorkers(): Promise<void> {
     "user-vector-flush",
     async (job: Job) => {
       if (job.name === "flush-user-vectors") {
-        await processUserVectorFlush(job);
+        return await processUserVectorFlush(job);
       }
     },
     // concurrency: 1 — 確保同一時間只有一個 flush job 操作 dirty set，
@@ -152,15 +191,22 @@ export async function startWorkers(): Promise<void> {
     { connection: bullmqConnection, concurrency: 1 },
   );
 
-  userVectorFlushWorker.on("completed", (job) => {
-    console.log(
-      `🎉 [vector-flush-worker] Job ${job.id} (${job.name}) finished successfully`,
-    );
+  userVectorFlushWorker.on("completed", (job, result) => {
+    const res = result as { flushedCount?: number } | undefined;
+    // 只有在真正有向量寫入 MySQL (flushedCount > 0) 時才輸出到 terminal
+    // 若為 0 件，保持安靜，詳細紀錄保留在 BullMQ job.log
+    if (res && (res.flushedCount ?? 0) > 0) {
+      const timeStr = formatDateTime();
+      console.log(
+        `🎉 [vector-flush-worker] Job ${formatJobId(job.id)} (${job.name}) finished at ${timeStr} (Flushed: ${res.flushedCount})`,
+      );
+    }
   });
 
   userVectorFlushWorker.on("failed", (job, err) => {
+    const timeStr = formatDateTime();
     console.error(
-      `❌ [vector-flush-worker] Job ${job?.id} (${job?.name}) failed: ${err.message}`,
+      `❌ [vector-flush-worker] Job ${formatJobId(job?.id)} (${job?.name}) failed at ${timeStr}: ${err.message}`,
     );
   });
 
@@ -178,20 +224,22 @@ export async function startWorkers(): Promise<void> {
     { connection: bullmqConnection, concurrency: 1 },
   );
 
-  deliveryReconcileWorker.on("completed", (_job, result) => {
-    const timeStr = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+  deliveryReconcileWorker.on("completed", (job, result) => {
     const res = result as { checkedCount?: number; reconciledCount?: number; expiredCount?: number } | undefined;
-    const stats =
-      res && typeof res.checkedCount === "number"
-        ? ` (Checked: ${res.checkedCount}, Reconciled: ${res.reconciledCount}, Expired: ${res.expiredCount ?? 0})`
-        : "";
-    console.log(`🎉 [delivery-reconcile] Reconcile finished at ${timeStr}${stats}`);
+    // 只有在真正有訂單對帳更新或過期時才輸出到 terminal
+    // 平常 0 件時完全安靜，詳細紀錄保留在 BullMQ job.log
+    if (res && ((res.reconciledCount ?? 0) > 0 || (res.expiredCount ?? 0) > 0)) {
+      const timeStr = formatDateTime();
+      console.log(
+        `🎉 [delivery-reconcile] Job ${formatJobId(job.id)} finished at ${timeStr} (Checked: ${res.checkedCount}, Reconciled: ${res.reconciledCount}, Expired: ${res.expiredCount ?? 0})`,
+      );
+    }
   });
 
-  deliveryReconcileWorker.on("failed", (_job, err) => {
-    const timeStr = new Date().toLocaleTimeString("zh-TW", { hour12: false });
+  deliveryReconcileWorker.on("failed", (job, err) => {
+    const timeStr = formatDateTime();
     console.error(
-      `❌ [delivery-reconcile] Reconcile failed at ${timeStr}: ${err.message}`,
+      `❌ [delivery-reconcile] Job ${formatJobId(job?.id)} failed at ${timeStr}: ${err.message}`,
     );
   });
 

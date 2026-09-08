@@ -595,6 +595,7 @@ const PostsApp = () => {
             {/* Right Column: Stacked Action Buttons */}
             <div className="flex max-h-[640px] w-[35%] flex-col gap-8 py-8">
               <Button
+                id="tour-wish-desktop"
                 className="relative flex max-h-[160px] w-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 py-0 pl-8 pr-0 shadow-none hover:border-white"
                 onClick={() => handleCreatePostButtonClick("wish")}
               >
@@ -607,6 +608,7 @@ const PostsApp = () => {
               </Button>
 
               <Button
+                id="tour-share-desktop"
                 className="relative flex max-h-[160px] w-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 py-0 pl-8 pr-0 shadow-none hover:border-white"
                 onClick={() => handleCreatePostButtonClick("share")}
               >

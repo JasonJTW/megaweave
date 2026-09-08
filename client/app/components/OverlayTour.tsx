@@ -36,7 +36,12 @@ export default function OverlayTour({
 }: OverlayTourProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [targetBorderRadius, setTargetBorderRadius] = useState<string>("50px");
   const [showMockDetail, setShowMockDetail] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 375,
+  );
+  const [badgeAnchorRect, setBadgeAnchorRect] = useState<DOMRect | null>(null);
 
   // --- SWIPE State ---
   const touchStartX = useRef<number | null>(null);
@@ -50,9 +55,19 @@ export default function OverlayTour({
     if (!isOpen || !step || isTransitioning.current) return;
 
     if (step.targetId) {
-      const el = document.getElementById(step.targetId);
+      // Prefer the primary element; fall back to the -desktop variant when primary is display:none (zero-width)
+      let el = document.getElementById(step.targetId);
+      if (el && el.getBoundingClientRect().width === 0) {
+        const desktopEl = document.getElementById(step.targetId + "-desktop");
+        if (desktopEl && desktopEl.getBoundingClientRect().width > 0) {
+          el = desktopEl;
+        }
+      }
       if (el) {
         const rect = el.getBoundingClientRect();
+        // Read the element's actual border-radius so the spotlight matches
+        const computedRadius = window.getComputedStyle(el).borderRadius;
+        setTargetBorderRadius(computedRadius || "50px");
         const isInViewport =
           rect.top >= 60 && rect.bottom <= window.innerHeight - 60;
         const isSpotlightStep =
@@ -63,8 +78,9 @@ export default function OverlayTour({
         if (!isInViewport) {
           isTransitioning.current = true;
 
-          // Temporarily unlock body overflow so scrollIntoView actually works
-          document.body.style.overflow = "";
+          // Temporarily allow scrolling while keeping the scrollbar gutter to avoid layout shift
+          document.body.style.overflowY = "scroll";
+          document.body.style.overflowX = "hidden";
 
           if (
             step.layoutType === "welcome" ||
@@ -77,12 +93,14 @@ export default function OverlayTour({
           }
 
           setTimeout(() => {
-            // Re-lock body overflow after scroll completes
+            // Re-lock body overflow
+            document.body.style.overflowY = "";
+            document.body.style.overflowX = "";
             document.body.style.overflow = "hidden";
             isTransitioning.current = false;
 
             if (isSpotlightStep) {
-              setTargetRect(el.getBoundingClientRect());
+              setTargetRect(el!.getBoundingClientRect());
             } else {
               setTargetRect(null);
             }
@@ -103,10 +121,20 @@ export default function OverlayTour({
   }, [isOpen, step]);
 
   useEffect(() => {
+    const refreshBadgeAnchor = () => {
+      const el = document.getElementById("tour-badge-anchor");
+      if (el) setBadgeAnchorRect(el.getBoundingClientRect());
+    };
     updatePosition();
-    window.addEventListener("resize", updatePosition);
+    refreshBadgeAnchor();
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      updatePosition();
+      refreshBadgeAnchor();
+    };
+    window.addEventListener("resize", handleResize);
     return () => {
-      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("resize", handleResize);
     };
   }, [updatePosition]);
 
@@ -114,6 +142,11 @@ export default function OverlayTour({
     if (isOpen) {
       setCurrentStepIndex(0);
       document.body.style.overflow = "hidden";
+      // Refresh badge anchor after the feed has painted
+      setTimeout(() => {
+        const el = document.getElementById("tour-badge-anchor");
+        if (el) setBadgeAnchorRect(el.getBoundingClientRect());
+      }, 100);
     } else {
       document.body.style.overflow = "";
     }
@@ -181,15 +214,6 @@ export default function OverlayTour({
     }
   };
 
-  const handleClick = () => {
-    // If the logical 'click' was triggered at the end of a swipe, ignore it
-    if (isSwiping.current) {
-      isSwiping.current = false;
-      return;
-    }
-    handleNext(); // Normal tap = next
-  };
-
   // 此變數決定：如果有選到目標，且不屬於不該挖洞的步驟（如 scroll 步驟不需要大範圍挖洞），才呈現亮斑
   const showSpotlight =
     targetRect &&
@@ -204,14 +228,14 @@ export default function OverlayTour({
         left: targetRect.left,
         width: targetRect.width,
         height: targetRect.height,
-        borderRadius: 50,
+        borderRadius: targetBorderRadius,
       }
     : {
         top: 0,
         left: 0,
         width: 0,
         height: 0,
-        borderRadius: 50,
+        borderRadius: targetBorderRadius,
       };
 
   // Close handler with scroll-to-top
@@ -225,13 +249,27 @@ export default function OverlayTour({
 
   return (
     <div
-      className="fixed inset-0 z-[100] cursor-pointer"
-      onClick={handleClick}
+      className="fixed inset-0 z-[100]"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      aria-label="Proceed to next tour step"
     >
+      {/* Left click zone — go to previous step */}
+      <div
+        className="absolute inset-y-0 left-0 z-[110] w-1/3 cursor-w-resize"
+        onClick={() => {
+          if (!isSwiping.current) handlePrev();
+        }}
+        aria-label="Previous tour step"
+      />
+      {/* Right click zone — go to next step */}
+      <div
+        className="absolute inset-y-0 right-0 z-[110] w-1/3 cursor-e-resize"
+        onClick={() => {
+          if (!isSwiping.current) handleNext();
+        }}
+        aria-label="Next tour step"
+      />
       {/* ====== Mock PostDetail Overlay (Message Step) ====== */}
       <AnimatePresence>
         {showMockDetail && (
@@ -442,50 +480,70 @@ export default function OverlayTour({
         </AnimatePresence>
       </div>
 
-      {/* 獨立渲染的 Badge */}
+      {/* 獨立渲染的 Badge — position derived from #tour-badge-anchor (first PostCard's badge container) */}
       <AnimatePresence>
-        {step?.layoutType === "wish" && targetRect && (
-          <motion.div
-            key="wish-badge"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="pointer-events-none fixed z-[120] text-[#efd0c4]"
-            style={{
-              top: targetRect.bottom + 40,
-              right: 54,
-              width: "48px",
-              height: "48px",
-            }}
-          >
-            <WishBadgeIcon />
-          </motion.div>
-        )}
+        {step?.layoutType === "wish" && (badgeAnchorRect || targetRect) && (() => {
+          // Always prefer the real badge container anchor (works on both mobile & desktop)
+          const right = badgeAnchorRect
+            ? windowWidth - badgeAnchorRect.right + 10
+            : targetRect
+              ? windowWidth - targetRect.right + 10
+              : 54;
+          const top = badgeAnchorRect
+            ? badgeAnchorRect.top
+            : targetRect
+              ? targetRect.bottom + 8
+              : 120;
+          return (
+            <motion.div
+              key="wish-badge"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pointer-events-none fixed z-[120] text-[#efd0c4]"
+              style={{ right, top, width: "48px", height: "48px" }}
+            >
+              <WishBadgeIcon />
+            </motion.div>
+          );
+        })()}
 
-        {step?.layoutType === "share" && targetRect && (
-          <motion.div
-            key="share-badge"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="pointer-events-none fixed z-[120] text-[#fbe7c6]"
-            style={{
-              top: targetRect.bottom + 40,
-              right: 54,
-              width: "48px",
-              height: "48px",
-            }}
-          >
-            <ShareBadgeIcon />
-          </motion.div>
-        )}
+        {step?.layoutType === "share" && (badgeAnchorRect || targetRect) && (() => {
+          const right = badgeAnchorRect
+            ? windowWidth - badgeAnchorRect.right + 10
+            : targetRect
+              ? windowWidth - targetRect.right + 10
+              : 54;
+          const top = badgeAnchorRect
+            ? badgeAnchorRect.top
+            : targetRect
+              ? targetRect.bottom + 8
+              : 120;
+          return (
+            <motion.div
+              key="share-badge"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pointer-events-none fixed z-[120] text-[#fbe7c6]"
+              style={{ right, top, width: "48px", height: "48px" }}
+            >
+              <ShareBadgeIcon />
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* Fixed Bottom Dots Navigation */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-8 z-[120] flex justify-center space-x-2.5">
+      <div className="pointer-events-auto fixed inset-x-0 bottom-8 z-[120] flex justify-center space-x-2.5">
         {steps.map((_, idx) => (
-          <div
+          <button
             key={idx}
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentStepIndex(idx);
+            }}
+            aria-label={`Go to step ${idx + 1}`}
             className={`h-2.5 rounded-full transition-all duration-300 ${
               idx === currentStepIndex ? "w-6 bg-white" : "w-2.5 bg-white/40"
             }`}

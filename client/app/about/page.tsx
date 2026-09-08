@@ -35,9 +35,9 @@ const titleLocation = [
 ];
 
 const partners = [
-  { name: "FabDao", link: "" },
-  { name: "FabDAO Green Sofa 綠沙發", link: "" },
-  { name: "Fab DAO 行動客廳 ", link: "" },
+  { name: "FabDao", link: "https://fabdao.world/" },
+  { name: "FabDAO Green Sofa 綠沙發", link: "https://fabdaotw.github.io/#/" },
+  { name: "Fab DAO 行動客廳 ", link: "https://fabdao.world/" },
   { name: "草率季", link: "" },
   { name: "大直順", link: "" },
   { name: "實踐大學建築設計學系", link: "" },
@@ -563,9 +563,11 @@ const TeamInfoPage = () => {
                 {partners.map((partner, i) => (
                   <div
                     key={i}
-                    className="type-t4 relative mb-2 font-ddin font-bold text-black sm:type-h3"
+                    className="type-t4 relative mb-2 font-ddin font-bold text-black sm:type-h3 md:hover:underline"
                   >
-                    {partner.name}
+                    <a href={partner.link} target="_blank">
+                      {partner.name}
+                    </a>
                   </div>
                 ))}
               </div>

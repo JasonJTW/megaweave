@@ -299,6 +299,7 @@ export default function Feed({
                 onPostClick={handlePostClick}
                 isExpanded={true}
                 isFirstVisible={i === 0}
+                badgeContainerId={i === 0 ? "tour-badge-anchor" : undefined}
                 onCategoryClick={onCategoryClick}
                 onLocationClick={onLocationClick}
               />

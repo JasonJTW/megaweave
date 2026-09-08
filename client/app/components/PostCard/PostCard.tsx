@@ -97,6 +97,7 @@ interface PostCardProps {
   isExpanded?: boolean;
   isActive?: boolean;
   isFirstVisible?: boolean;
+  badgeContainerId?: string;
   onCategoryClick?: (categoryId: number) => void;
   onLocationClick?: (type: PostLocationField, value: string) => void;
 }
@@ -108,6 +109,7 @@ function PostCardInner({
   onPostClick,
   isExpanded = false,
   isFirstVisible,
+  badgeContainerId,
   // onCategoryClick,
   onLocationClick,
 }: PostCardProps) {
@@ -156,7 +158,10 @@ function PostCardInner({
       {/*//* pt-3 for title margin */}
       <div className="relative min-h-[280px] pt-3">
         {/* Type badges aligned to the image column (outside overflow-hidden so ribbon isn't clipped) */}
-        <div className="pointer-events-none absolute inset-x-4 top-3 z-20 sm:inset-x-auto sm:left-1/2 sm:w-[215px] sm:-translate-x-1/2">
+        <div
+          id={badgeContainerId}
+          className="pointer-events-none absolute inset-x-4 top-3 z-20 sm:inset-x-auto sm:left-1/2 sm:w-[215px] sm:-translate-x-1/2"
+        >
           {post.type === "share" &&
             (isExpired ? (
               <ShareBadgeExpiredIcon className="absolute right-[10px] top-0" />

@@ -20,8 +20,16 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { usePost } from "../contexts/PostContext";
-import { CreatePostFormData, ItemInput, Post, PostFormSubmitData } from "../types/schema";
-import { parseGooglePlace, GOOGLE_AUTOCOMPLETE_FIELDS } from "@/utils/locationUtils";
+import {
+  CreatePostFormData,
+  ItemInput,
+  Post,
+  PostFormSubmitData,
+} from "../types/schema";
+import {
+  parseGooglePlace,
+  GOOGLE_AUTOCOMPLETE_FIELDS,
+} from "@/utils/locationUtils";
 import AddIcon from "./icons/AddIcon";
 import DeleteIcon from "./icons/DeleteIcon";
 import TagIcon from "./icons/TagIcon";
@@ -770,7 +778,7 @@ export default function PostFormModal({
                     ref={locationInputRef}
                     type="text"
                     required
-                    placeholder="Location (City)"
+                    placeholder="Location"
                     value={formData.location}
                     onChange={(e) => {
                       const value = e.target.value;

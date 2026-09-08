@@ -17,7 +17,16 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Strip console.log (and other non-essential console.*) in production builds.
+  // console.error and console.warn are preserved for Sentry and runtime diagnostics.
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error", "warn"] }
+        : false,
+  },
 };
+
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:

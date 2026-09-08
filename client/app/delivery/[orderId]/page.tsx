@@ -339,7 +339,8 @@ export default function DeliveryTrackingPage() {
           (current) => {
             if (!current) return current;
             const updatedDriver =
-              update.driver || (update.coordinates ? { coordinates: update.coordinates } : null);
+              update.driver ||
+              (update.coordinates ? { coordinates: update.coordinates } : null);
 
             return {
               ...current,
@@ -353,9 +354,15 @@ export default function DeliveryTrackingPage() {
                         phone: "",
                         plateNumber: "",
                       }),
-                      ...(updatedDriver.name ? { name: updatedDriver.name } : {}),
-                      ...(updatedDriver.phone ? { phone: updatedDriver.phone } : {}),
-                      ...(updatedDriver.plateNumber ? { plateNumber: updatedDriver.plateNumber } : {}),
+                      ...(updatedDriver.name
+                        ? { name: updatedDriver.name }
+                        : {}),
+                      ...(updatedDriver.phone
+                        ? { phone: updatedDriver.phone }
+                        : {}),
+                      ...(updatedDriver.plateNumber
+                        ? { plateNumber: updatedDriver.plateNumber }
+                        : {}),
                       ...(updatedDriver.coordinates
                         ? {
                             coordinates: {
@@ -1089,7 +1096,7 @@ export default function DeliveryTrackingPage() {
       </div>
 
       {/* 🧪 Sandbox 測試面板（僅開發環境顯示） */}
-      {process.env.NEXT_PUBLIC_APP_ENV !== "production" && (
+      {process.env.NEXT_PUBLIC_APP_ENV === "development" && (
         <SandboxPanel
           orderId={order.orderId}
           onAction={(opt) => {

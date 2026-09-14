@@ -68,6 +68,20 @@ router.post("/update", requireAuth, async (req: Request, res: Response) => {
     console.log("User before update:", req.user);
     console.log("Received updates:", updates);
 
+    // 安全防護：禁止一般使用者任意竄改自身權限角色或使用者 ID（防範 Privilege Escalation）
+    if (updates) {
+      if (updates.role && updates.role !== req.user.role) {
+        return res.status(403).json({
+          errorMessage: "Forbidden: Cannot change user role",
+        });
+      }
+      if (updates.userId && Number(updates.userId) !== req.user.userId) {
+        return res.status(403).json({
+          errorMessage: "Forbidden: Cannot change user ID",
+        });
+      }
+    }
+
     if (!updates || _.isEqual(updates, req.user)) {
       return res.status(400).json({
         errorMessage:

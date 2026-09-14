@@ -618,6 +618,7 @@ export class PostService {
     userId: number,
     incoming: EditPostInput,
     files?: Express.Multer.File[],
+    userRole?: string,
   ): Promise<RowDataPacket> {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
       "SELECT * FROM posts WHERE public_id = ? AND deleted_at IS NULL",
@@ -630,7 +631,7 @@ export class PostService {
 
     const existing = rows[0];
     const postId = existing.id;
-    if (existing.user_id !== userId) {
+    if (existing.user_id !== userId && userRole !== "admin") {
       throw new Error("FORBIDDEN");
     }
 
@@ -790,7 +791,7 @@ export class PostService {
   }
 
   /** 刪除貼文 (Soft Delete，使用 public_id) */
-  async deletePost(publicId: string, userId: number): Promise<void> {
+  async deletePost(publicId: string, userId: number, userRole?: string): Promise<void> {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
       "SELECT id, user_id FROM posts WHERE public_id = ? AND deleted_at IS NULL",
       [publicId],
@@ -800,7 +801,7 @@ export class PostService {
       throw new Error("POST_NOT_FOUND");
     }
 
-    if (rows[0].user_id !== userId) {
+    if (rows[0].user_id !== userId && userRole !== "admin") {
       throw new Error("FORBIDDEN");
     }
 

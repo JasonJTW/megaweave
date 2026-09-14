@@ -17,6 +17,7 @@ describe("postEmbedding worker", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.OPENAI_API_KEY = "test-openai-key";
     mockRedis = {
       hSet: jest.fn().mockResolvedValue("OK"),
     };

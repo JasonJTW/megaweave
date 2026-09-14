@@ -1,10 +1,12 @@
 // server/src/server.ts
 
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./api";
 import cors from "cors";
-import dotenv from "dotenv";
 import https from "https";
 import http from "http";
 import path from "path";
@@ -19,12 +21,10 @@ import { connectRedis, disconnectRedis, getRedisClient } from "./utils/redis";
 import { closeDatabase } from "./utils/db";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { startWorkers } from "./queue/workers";
+import { startWorkers, stopWorkers } from "./queue/workers";
 import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
-
-dotenv.config();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -77,9 +77,15 @@ async function startServer() {
   try {
     await connectRedis();
     await ensureVectorIndexExists();
-    await startWorkers();
 
-    await initHotScoreCron();
+    if (process.env.RUN_WORKERS_INLINE === "true") {
+      console.log(
+        "⚠️  RUN_WORKERS_INLINE=true: starting BullMQ workers inline with server process",
+      );
+      await startWorkers();
+      await initHotScoreCron();
+    }
+
     const redisClient = getRedisClient();
 
     //* 1.Get Redis clients for Socket.IO adapter
@@ -189,7 +195,11 @@ async function startServer() {
           );
           await subClient.quit();
 
-          console.log("✅ Socket.IO Redis subscriber disconnected");
+          if (process.env.RUN_WORKERS_INLINE === "true") {
+            console.log("\n📍 Stopping inline BullMQ workers...");
+            await stopWorkers();
+          }
+
           // Step 1: 關閉 Redis
           console.log("\n📍 Step 1/2: Closing Redis...");
           await disconnectRedis();

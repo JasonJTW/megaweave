@@ -9,8 +9,18 @@ import dbPool from "../../utils/db";
 import { generatePostText } from "../../utils/generatePostText";
 import { PostTextInput } from "../../types/post";
 
-//* 自動讀取 process.env.OPENAI_API_KEY
-const openai = new OpenAI();
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Configuration Error: Missing OPENAI_API_KEY environment variable.");
+    }
+    openaiClient = new OpenAI({ apiKey });
+  }
+  return openaiClient;
+}
 
 // ─── Metadata In-Memory Cache (0 DB query on hot cache) ───────────────────────
 let categoryCache: Map<number, string> | null = null;
@@ -79,6 +89,7 @@ export async function fetchEmbedding(text: string): Promise<{
   dimensions: number;
   byteLength: number;
 }> {
+  const openai = getOpenAIClient();
   const response = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: text,

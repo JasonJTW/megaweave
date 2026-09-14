@@ -54,7 +54,28 @@ function formatJobId(jobId?: string): string {
   return jobId;
 }
 
+let activeWorkers: Worker[] = [];
+
+export function getActiveWorkers(): Worker[] {
+  return [...activeWorkers];
+}
+
+export async function stopWorkers(): Promise<void> {
+  if (activeWorkers.length === 0) return;
+  console.log(`🛑 Stopping ${activeWorkers.length} BullMQ workers...`);
+  const workersToClose = [...activeWorkers];
+  activeWorkers = [];
+  await Promise.all(workersToClose.map((w) => w.close()));
+  console.log("✅ All BullMQ workers stopped");
+}
+
 export async function startWorkers(): Promise<void> {
+  // 避免重複啟動多組 worker
+  if (activeWorkers.length > 0) {
+    console.warn("⚠️ Workers already running, stopping existing workers first...");
+    await stopWorkers();
+  }
+
   const postImageWorker = new Worker(
     "post-image",
     async (job: Job<PostUploadImageJobData | PostDeleteImageJobData>) => {
@@ -245,6 +266,16 @@ export async function startWorkers(): Promise<void> {
 
   // 啟動外送訂單對帳排程 (每 5 分鐘一次)
   await initDeliveryReconcileCron();
+
+  activeWorkers = [
+    postImageWorker,
+    emailWorker,
+    embeddingWorker,
+    userVectorWorker,
+    hotScoreWorker,
+    userVectorFlushWorker,
+    deliveryReconcileWorker,
+  ];
 
   console.log("🚀 All workers started");
 }

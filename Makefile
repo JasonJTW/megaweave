@@ -125,7 +125,13 @@ logs:
 	docker compose logs -f
 
 logs-backend:
-	docker compose logs -f backend
+	docker compose logs -f backend-api backend-worker
+
+logs-api:
+	docker compose logs -f backend-api
+
+logs-worker:
+	docker compose logs -f backend-worker
 
 logs-frontend:
 	docker compose logs -f frontend

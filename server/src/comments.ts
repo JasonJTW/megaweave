@@ -4,6 +4,7 @@ import { RowDataPacket, ResultSetHeader } from "mysql2";
 import dbPool from "./utils/db";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
+import { requireAuth } from "./middleware/auth";
 
 const router = express.Router();
 
@@ -33,7 +34,8 @@ interface CommentWithChildren extends CommentRow {
  * POST /comments
  * 創建新留言
  */
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response) => {
+  const sessionUserId = req.user!.userId;
   const {
     post_id,
     item_id = null,
@@ -42,8 +44,18 @@ router.post("/", async (req: Request, res: Response) => {
     content,
   } = req.body;
 
-  if (!post_id || !user_id || !content?.trim()) {
-    return res.status(400).json({ message: "Missing required fields" });
+  // 驗證資源所有權：防止冒用他人 ID 發表留言
+  if (user_id !== undefined && user_id !== null && Number(user_id) !== sessionUserId) {
+    return res.status(403).json({
+      errorMessage: "Forbidden: You cannot post comments on behalf of another user",
+      message: "Forbidden: You cannot post comments on behalf of another user",
+    });
+  }
+
+  const effectiveUserId = sessionUserId;
+
+  if (!post_id || !content?.trim()) {
+    return res.status(400).json({ errorMessage: "Missing required fields", message: "Missing required fields" });
   }
 
   const connection = await dbPool.getConnection();
@@ -123,7 +135,7 @@ router.post("/", async (req: Request, res: Response) => {
         post_id,
         effectiveItemId,
         parent_id,
-        user_id,
+        effectiveUserId,
         content.trim(),
         rootId,
         depth,
@@ -170,7 +182,7 @@ router.post("/", async (req: Request, res: Response) => {
         const post = postRows[0];
         
         // Notify Post Owner if commenter is not the owner
-        if (post.user_id !== user_id) {
+        if (post.user_id !== effectiveUserId) {
           const io = req.app.get("io"); // Get io from app
           if (io) {
             // Get commenter name
@@ -178,7 +190,7 @@ router.post("/", async (req: Request, res: Response) => {
             
             await createNotification(io, {
               recipient_id: post.user_id,
-              sender_id: user_id,
+              sender_id: effectiveUserId,
               type: "COMMENT",
               title: "New Comment",
               content: `${commenterName} commented on your post "${post.title}"`,
@@ -188,7 +200,7 @@ router.post("/", async (req: Request, res: Response) => {
 
           // 🧠 非作者留言 → 觸發使用者興趣向量更新（fire-and-forget）
           enqueueUserVectorUpdate({
-            userId: user_id,
+            userId: effectiveUserId,
             postId: post_id,
             action: "comment",
           }).catch((err) =>
@@ -203,13 +215,13 @@ router.post("/", async (req: Request, res: Response) => {
              [parent_id]
            );
            
-           if (parentComment.length > 0 && parentComment[0].user_id !== user_id && parentComment[0].user_id !== post.user_id) {
+           if (parentComment.length > 0 && parentComment[0].user_id !== effectiveUserId && parentComment[0].user_id !== post.user_id) {
              const io = req.app.get("io");
              if (io) {
                 const commenterName = newComment.username || "Someone";
                 await createNotification(io, {
                   recipient_id: parentComment[0].user_id,
-                  sender_id: user_id,
+                  sender_id: effectiveUserId,
                   type: "COMMENT",
                   title: "New Reply",
                   content: `${commenterName} replied to your comment`,
@@ -375,6 +387,104 @@ router.get("/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error fetching comment:", error);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
+ * PUT /comments/:id
+ * 編輯留言（需驗證資源擁有者或管理員角色）
+ */
+router.put("/:id", requireAuth, async (req: Request, res: Response) => {
+  const commentId = Number(req.params.id);
+  const userId = req.user!.userId;
+  const userRole = req.user!.role;
+  const { content } = req.body;
+
+  if (isNaN(commentId)) {
+    return res.status(400).json({ errorMessage: "Invalid comment ID" });
+  }
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ errorMessage: "Comment content cannot be empty" });
+  }
+
+  try {
+    const [rows] = await dbPool.execute<CommentRow[]>(
+      "SELECT id, user_id, is_deleted FROM comments WHERE id = ?",
+      [commentId]
+    );
+
+    if (rows.length === 0 || rows[0].is_deleted === 1) {
+      return res.status(404).json({ errorMessage: "Comment not found" });
+    }
+
+    const comment = rows[0];
+    if (comment.user_id !== userId && userRole !== "admin") {
+      return res.status(403).json({
+        errorMessage: "Forbidden: You are not the owner of this comment",
+        message: "Forbidden: You are not the owner of this comment",
+      });
+    }
+
+    await dbPool.execute(
+      "UPDATE comments SET content = ? WHERE id = ?",
+      [content.trim(), commentId]
+    );
+
+    return res.status(200).json({
+      message: "Comment updated successfully",
+      commentId,
+      content: content.trim(),
+    });
+  } catch (error) {
+    console.error("Error updating comment:", error);
+    return res.status(500).json({ errorMessage: "Failed to update comment" });
+  }
+});
+
+/**
+ * DELETE /comments/:id
+ * 刪除留言（Soft Delete，需驗證資源擁有者或管理員角色）
+ */
+router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+  const commentId = Number(req.params.id);
+  const userId = req.user!.userId;
+  const userRole = req.user!.role;
+
+  if (isNaN(commentId)) {
+    return res.status(400).json({ errorMessage: "Invalid comment ID" });
+  }
+
+  try {
+    const [rows] = await dbPool.execute<CommentRow[]>(
+      "SELECT id, user_id, is_deleted FROM comments WHERE id = ?",
+      [commentId]
+    );
+
+    if (rows.length === 0 || rows[0].is_deleted === 1) {
+      return res.status(404).json({ errorMessage: "Comment not found" });
+    }
+
+    const comment = rows[0];
+    if (comment.user_id !== userId && userRole !== "admin") {
+      return res.status(403).json({
+        errorMessage: "Forbidden: You are not the owner of this comment",
+        message: "Forbidden: You are not the owner of this comment",
+      });
+    }
+
+    await dbPool.execute(
+      "UPDATE comments SET is_deleted = 1 WHERE id = ?",
+      [commentId]
+    );
+
+    return res.status(200).json({
+      message: "Comment deleted successfully",
+      commentId,
+    });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
+    return res.status(500).json({ errorMessage: "Failed to delete comment" });
   }
 });
 

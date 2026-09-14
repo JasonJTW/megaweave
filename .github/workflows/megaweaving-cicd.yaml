@@ -211,24 +211,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull and deploy backend container
+      - name: Pull and deploy backend containers (API & Worker)
         env:
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           echo "⬇️ Pulling latest backend image from GHCR..."
-          docker compose pull backend
-          echo "🚀 Starting backend & redis container..."
-          docker compose up -d backend
+          docker compose pull backend-api backend-worker
+          echo "🚀 Starting backend-api, backend-worker & redis containers..."
+          docker compose up -d backend-api backend-worker
 
-      - name: Verify backend container
+      - name: Verify backend containers
         run: |
           sleep 5
-          if [ "$(docker inspect -f '{{.State.Running}}' megaweave-backend 2>/dev/null)" = "true" ]; then
-            echo "✅ Backend container is running successfully"
-            docker compose ps backend
+          API_RUNNING=$(docker inspect -f '{{.State.Running}}' megaweave-backend-api 2>/dev/null || echo "false")
+          WORKER_RUNNING=$(docker inspect -f '{{.State.Running}}' megaweave-backend-worker 2>/dev/null || echo "false")
+
+          if [ "$API_RUNNING" = "true" ] && [ "$WORKER_RUNNING" = "true" ]; then
+            echo "✅ Both Backend API and Worker containers are running successfully"
+            docker compose ps backend-api backend-worker
           else
-            echo "❌ Backend container failed to start"
-            docker logs megaweave-backend --tail 50
+            echo "❌ One or more backend containers failed to start"
+            if [ "$API_RUNNING" != "true" ]; then
+              echo "Logs from megaweave-backend-api:"
+              docker logs megaweave-backend-api --tail 50 || true
+            fi
+            if [ "$WORKER_RUNNING" != "true" ]; then
+              echo "Logs from megaweave-backend-worker:"
+              docker logs megaweave-backend-worker --tail 50 || true
+            fi
             exit 1
           fi
 
@@ -355,7 +365,7 @@ jobs:
           echo ""
           echo "🚀 Deployment results:"
           if [ "${{ needs.deploy-server.result }}" == "success" ]; then
-            echo "  - ✅ Backend Container: deployed"
+            echo "  - ✅ Backend Containers (API & Worker): deployed"
           else
             echo "  - Backend: skipped (no changes)"
           fi
@@ -390,7 +400,7 @@ jobs:
           echo ""
           echo "💥 Failed jobs:"
           if [ "${{ needs.deploy-server.result }}" == "failure" ]; then
-            echo "  - ❌ Backend container deployment failed"
+            echo "  - ❌ Backend containers (API & Worker) deployment failed"
           fi
           if [ "${{ needs.deploy-client.result }}" == "failure" ]; then
             echo "  - ❌ Frontend container deployment failed"

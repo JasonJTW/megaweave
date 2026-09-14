@@ -13,13 +13,36 @@ services:
     networks:
       - megaweave-net
 
-  backend:
-    container_name: megaweave-backend
+  backend-api:
+    container_name: megaweave-backend-api
     image: ghcr.io/jasonjtw/megaweaving-backend:latest
+    command: ["node", "dist/server.js"]
     ports:
       - "8443:8443"
     env_file:
       - ./server/.env.production
+    environment:
+      # APP_ROLE tells getDbPoolConfig() to use API_DB_CONNECTION_LIMIT.
+      # Set here (not in .env.production) because api and worker share the same env file.
+      APP_ROLE: api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      - redis
+    networks:
+      - megaweave-net
+
+  backend-worker:
+    container_name: megaweave-backend-worker
+    image: ghcr.io/jasonjtw/megaweaving-backend:latest
+    command: ["node", "dist/worker.js"]
+    env_file:
+      - ./server/.env.production
+    environment:
+      # APP_ROLE tells getDbPoolConfig() to use WORKER_DB_CONNECTION_LIMIT.
+      # Set here (not in .env.production) because api and worker share the same env file.
+      APP_ROLE: worker
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -37,7 +60,7 @@ services:
       - ./client/.env.production
     restart: unless-stopped
     depends_on:
-      - backend
+      - backend-api
     networks:
       - megaweave-net
 

@@ -2,7 +2,18 @@ import { Job } from "bullmq";
 import EmailTemplate, { EmailTemplateProps } from "../../emails/EmailTemplate";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error("Configuration Error: Missing RESEND_API_KEY environment variable.");
+    }
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
 
 export async function processSendEmail(
   job: Job<EmailTemplateProps>,
@@ -13,6 +24,7 @@ export async function processSendEmail(
     `Starting to send email to ${props.toEmail}, title: ${props.title}`,
   );
 
+  const resend = getResendClient();
   const { data, error } = await resend.emails.send({
     from: "JasonJTW <no-reply@notification.megaweaving.net>",
     to: props.toEmail,

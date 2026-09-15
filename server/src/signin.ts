@@ -12,9 +12,13 @@ import { OAuth2Client } from "google-auth-library";
 import dotenv from "dotenv";
 import { userRoles } from "./schema";
 import { randomUUID } from "crypto";
+import { authRateLimiter } from "./middleware/rateLimiter";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
+
+// Apply tiered strict rate limiting to all auth signin routes
+router.use(authRateLimiter);
 
 /// env check
 if (!GOOGLE_CLIENT_ID) {

@@ -11,7 +11,6 @@ import https from "https";
 import http from "http";
 import path from "path";
 import fs from "fs";
-import rateLimit from "express-rate-limit";
 
 // express-rate-limit v7 adds a 'close' listener to every ServerResponse to
 // detect aborted requests. With concurrent traffic the default limit of 10
@@ -19,12 +18,13 @@ import rateLimit from "express-rate-limit";
 http.ServerResponse.prototype.setMaxListeners(50);
 import { connectRedis, disconnectRedis, getCacheRedisClient } from "./utils/redis";
 import { closeDatabase } from "./utils/db";
-import { Server } from "socket.io";
+import { Server as SocketIOServer } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import { startWorkers, stopWorkers } from "./queue/workers";
 import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
+import { globalRateLimiter } from "./middleware/rateLimiter";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -33,7 +33,6 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS
   : ["https://localhost:3000"];
 const PORT = parseInt(process.env.PORT || "8443");
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
-const NODE_ENV = process.env.NODE_ENV;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -46,24 +45,9 @@ app.use(
   }),
 );
 
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  limit: 120,
-  message: {
-    errorMessage: "Too many requests from this IP, please try again later.",
-  },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  // Skip tracking successful requests to reduce the number of 'close'
-  // listeners that express-rate-limit v7 attaches per ServerResponse.
-  skipSuccessfulRequests: false,
-});
 console.log("Cors Origins:", CORS_ORIGINS);
-// Apply the rate limiting middleware to all requests.
-
-if (NODE_ENV !== "development") {
-  app.use(limiter);
-}
+// Apply the distributed rate limiting middleware to all requests.
+app.use(globalRateLimiter);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -121,7 +105,7 @@ async function startServer() {
       server = http.createServer(app);
     }
     //* 2.Socket.IO setup
-    const io = new Server(server, {
+    const io = new SocketIOServer(server, {
       cors: {
         origin: CORS_ORIGINS,
         credentials: true,

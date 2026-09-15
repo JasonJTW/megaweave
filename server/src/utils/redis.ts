@@ -6,11 +6,9 @@ dotenv.config();
 
 let connectionPromise: Promise<void> | null = null;
 
-const CACHE_REDIS_URL =
-  process.env.REDIS_CACHE_URL || process.env.REDIS_URL || "redis://127.0.0.1:6379";
+const CACHE_REDIS_URL = process.env.REDIS_CACHE_URL!;
 
-const VECTOR_REDIS_URL =
-  process.env.REDIS_VECTOR_URL || process.env.REDIS_URL || "redis://127.0.0.1:6381";
+const VECTOR_REDIS_URL = process.env.REDIS_VECTOR_URL!;
 
 function createManagedRedisClient(name: string, url: string) {
   const client = createClient({
@@ -22,11 +20,15 @@ function createManagedRedisClient(name: string, url: string) {
       connectTimeout: 30000,
       reconnectStrategy: (retries) => {
         if (retries > 10) {
-          console.error(`❌ [${name}] Redis connection failed after ${retries} retries`);
+          console.error(
+            `❌ [${name}] Redis connection failed after ${retries} retries`,
+          );
           return new Error(`[${name}] Redis connection failed`);
         }
         const delay = Math.min(retries * 1000, 10000);
-        console.log(`🔄 [${name}] Redis reconnect attempt ${retries} in ${delay}ms`);
+        console.log(
+          `🔄 [${name}] Redis reconnect attempt ${retries} in ${delay}ms`,
+        );
         return delay;
       },
     },
@@ -65,8 +67,14 @@ function createManagedRedisClient(name: string, url: string) {
 
 export type AppRedisClient = ReturnType<typeof createManagedRedisClient>;
 
-export const cacheRedisClient = createManagedRedisClient("cache", CACHE_REDIS_URL);
-export const vectorRedisClient = createManagedRedisClient("vector", VECTOR_REDIS_URL);
+export const cacheRedisClient = createManagedRedisClient(
+  "cache",
+  CACHE_REDIS_URL,
+);
+export const vectorRedisClient = createManagedRedisClient(
+  "vector",
+  VECTOR_REDIS_URL,
+);
 
 export async function connectRedis(): Promise<void> {
   if (connectionPromise) {
@@ -115,13 +123,19 @@ async function disconnectSingleClient(
     console.log(`📍 [${name}] Calling client.quit() for graceful shutdown...`);
     const quitPromise = client.quit();
     const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error(`Quit timeout after 5s for ${name}`)), 5000),
+      setTimeout(
+        () => reject(new Error(`Quit timeout after 5s for ${name}`)),
+        5000,
+      ),
     );
 
     await Promise.race([quitPromise, timeoutPromise]);
     console.log(`✅ [${name}] Redis client disconnected successfully`);
   } catch (error) {
-    console.warn(`⚠️ [${name}] Quit failed or timed out, forcing destroy:`, error);
+    console.warn(
+      `⚠️ [${name}] Quit failed or timed out, forcing destroy:`,
+      error,
+    );
     try {
       client.destroy();
       console.log(`✅ [${name}] Redis force destroyed successfully`);
@@ -143,14 +157,18 @@ export async function disconnectRedis(): Promise<void> {
 
 export function getCacheRedisClient() {
   if (!cacheRedisClient.isOpen || !cacheRedisClient.isReady) {
-    console.warn("⚠️  Cache Redis client is not ready. Call connectRedis() first.");
+    console.warn(
+      "⚠️  Cache Redis client is not ready. Call connectRedis() first.",
+    );
   }
   return cacheRedisClient;
 }
 
 export function getVectorRedisClient() {
   if (!vectorRedisClient.isOpen || !vectorRedisClient.isReady) {
-    console.warn("⚠️  Vector Redis client is not ready. Call connectRedis() first.");
+    console.warn(
+      "⚠️  Vector Redis client is not ready. Call connectRedis() first.",
+    );
   }
   return vectorRedisClient;
 }
@@ -164,7 +182,10 @@ export function isRedisConnected(): boolean {
   return cacheRedisClient.isOpen && cacheRedisClient.isReady;
 }
 
-export async function checkRedisHealth(): Promise<{ cache: boolean; vector: boolean }> {
+export async function checkRedisHealth(): Promise<{
+  cache: boolean;
+  vector: boolean;
+}> {
   let cacheOk = false;
   let vectorOk = false;
   try {

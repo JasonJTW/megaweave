@@ -5,14 +5,11 @@ dotenv.config();
 
 function getBullmqConnection() {
   try {
-    const rawUrl =
-      process.env.REDIS_QUEUE_URL ||
-      process.env.REDIS_URL ||
-      "redis://127.0.0.1:6380";
+    const rawUrl = process.env.REDIS_QUEUE_URL!;
     const redisUrl = new URL(rawUrl);
     return {
       host: redisUrl.hostname,
-      port: Number(redisUrl.port) || (process.env.REDIS_QUEUE_URL ? 6380 : 6379),
+      port: Number(redisUrl.port),
       password: redisUrl.password || undefined,
     };
   } catch {

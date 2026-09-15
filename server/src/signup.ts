@@ -8,11 +8,15 @@ import { SignupUserSchema, SignupUserSchemaType } from "./validations";
 import { hashPassword, generateSalt } from "./passwordHasher";
 import { handleError } from "./utils/errorHandler";
 import { randomUUID } from "crypto";
+import { authRateLimiter } from "./middleware/rateLimiter";
 
 const router: Router = express.Router();
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { createUserSession } from "./session";
+
+// Apply tiered strict rate limiting to all auth signup routes
+router.use(authRateLimiter);
 
 router.post("/", async (req: Request, res: Response) => {
   console.log("API signup called");

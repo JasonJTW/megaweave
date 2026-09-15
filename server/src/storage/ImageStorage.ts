@@ -31,11 +31,13 @@ export interface ImageStorage {
 export class S3ImageStorage implements ImageStorage {
   private s3Client: S3Client;
   private bucketName: string;
+  private stagingBucketName: string;
   private destinationBucket: string;
   private cloudfrontUrl: string;
 
   constructor() {
     this.bucketName = process.env.BUCKET_NAME || "";
+    this.stagingBucketName = process.env.STAGING_BUCKET_NAME || "megaweave-staging-462457677414";
     this.destinationBucket = process.env.DESTINATION_BUCKET || "megaweave-thumbnails";
     this.cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
 
@@ -74,8 +76,11 @@ export class S3ImageStorage implements ImageStorage {
     contentType: string,
     expiresInSeconds: number = 300,
   ): Promise<string> {
+    const targetBucket = key.startsWith("staging/")
+      ? this.stagingBucketName
+      : this.bucketName;
     const command = new PutObjectCommand({
-      Bucket: this.bucketName,
+      Bucket: targetBucket,
       Key: key,
       ContentType: contentType,
     });
@@ -83,8 +88,11 @@ export class S3ImageStorage implements ImageStorage {
   }
 
   async getObjectBuffer(key: string): Promise<Buffer> {
+    const targetBucket = key.startsWith("staging/")
+      ? this.stagingBucketName
+      : this.bucketName;
     const command = new GetObjectCommand({
-      Bucket: this.bucketName,
+      Bucket: targetBucket,
       Key: key,
     });
     const response = await this.s3Client.send(command);
@@ -104,9 +112,11 @@ export class S3ImageStorage implements ImageStorage {
 
     const deletePromises = fileKeys.map(async (key) => {
       try {
-        const targetBucket = key.startsWith("thumbnails/")
-          ? this.destinationBucket
-          : this.bucketName;
+        const targetBucket = key.startsWith("staging/")
+          ? this.stagingBucketName
+          : key.startsWith("thumbnails/")
+            ? this.destinationBucket
+            : this.bucketName;
         const deleteCommand = new DeleteObjectCommand({
           Bucket: targetBucket,
           Key: key,

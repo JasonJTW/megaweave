@@ -47,6 +47,7 @@ export interface CreatePostInput {
   lat?: number;
   lng?: number;
   items?: PostItemData[];
+  stagingKeys?: string[];
 }
 
 export interface EditPostInput extends Omit<
@@ -55,6 +56,7 @@ export interface EditPostInput extends Omit<
 > {
   expiresAt?: string | null;
   deleteImageIds?: number[];
+  stagingKeys?: string[];
 }
 
 export interface ListPostsParams {
@@ -90,7 +92,6 @@ export class PostService {
   async createPost(
     userId: number,
     input: CreatePostInput,
-    files?: Express.Multer.File[],
   ): Promise<RowDataPacket> {
     const categoryExists = await this.validateCategory(input.categoryId);
     if (!categoryExists) {
@@ -163,12 +164,13 @@ export class PostService {
       }
 
       // 預先在 DB 事務中插入 s3_key，確保即時回傳 201 時 posts 資料表已有圖檔 key 關聯
-      const fileJobs: Array<{ s3Key: string; tempPath: string }> = [];
-      if (files && files.length > 0) {
+      const fileJobs: Array<{ s3Key: string; stagingKey: string }> = [];
+      const stagingKeys = input.stagingKeys || [];
+      if (stagingKeys.length > 0) {
         const dbImageValues: (number | string)[] = [];
-        const placeholders = files.map(() => "(?, ?, ?, NOW())").join(", ");
+        const placeholders = stagingKeys.map(() => "(?, ?, ?, NOW())").join(", ");
 
-        for (const file of files) {
+        for (const stagingKey of stagingKeys) {
           const fileId = randomUUID();
           const timestamp = Date.now();
           const fileName = `${timestamp}-${fileId}.webp`;
@@ -177,7 +179,7 @@ export class PostService {
           dbImageValues.push(postId, s3Key, `Image for post ${postId}`);
           fileJobs.push({
             s3Key,
-            tempPath: file.path,
+            stagingKey,
           });
         }
 
@@ -617,7 +619,6 @@ export class PostService {
     publicId: string,
     userId: number,
     incoming: EditPostInput,
-    files?: Express.Multer.File[],
     userRole?: string,
   ): Promise<RowDataPacket> {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
@@ -747,12 +748,13 @@ export class PostService {
       }
 
       // 上傳新圖片：先在 DB 事務中預先插入 s3_key
-      const fileJobs: Array<{ s3Key: string; tempPath: string }> = [];
-      if (files && files.length > 0) {
+      const fileJobs: Array<{ s3Key: string; stagingKey: string }> = [];
+      const stagingKeys = incoming.stagingKeys || [];
+      if (stagingKeys.length > 0) {
         const dbImageValues: (number | string)[] = [];
-        const placeholders = files.map(() => "(?, ?, ?, NOW())").join(", ");
+        const placeholders = stagingKeys.map(() => "(?, ?, ?, NOW())").join(", ");
 
-        for (const file of files) {
+        for (const stagingKey of stagingKeys) {
           const fileId = randomUUID();
           const timestamp = Date.now();
           const fileName = `${timestamp}-${fileId}.webp`;
@@ -761,7 +763,7 @@ export class PostService {
           dbImageValues.push(postId, s3Key, `Image for post ${postId}`);
           fileJobs.push({
             s3Key,
-            tempPath: file.path,
+            stagingKey,
           });
         }
 

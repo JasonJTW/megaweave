@@ -9,7 +9,8 @@ import ShareBadgeIcon from "@/app/components/icons/ShareBadgeIcon";
 import WishBadgeIcon from "@/app/components/icons/WishBadgeIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { safeCompressImage } from "@/utils/imageProcessor";
+import { compressImagesParallel } from "@/utils/imageProcessor";
+import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, ExternalLink, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -171,65 +172,61 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const handleUpdatePost = async (data: PostFormSubmitData) => {
     setIsUpdating(true);
     try {
-      const formData = new FormData();
-      formData.append("title", data.title);
-      formData.append("content", data.content);
-      formData.append("location", data.location);
-      formData.append("status", data.status);
-      if (data.place_id) formData.append("place_id", data.place_id);
-      if (data.location_name)
-        formData.append("location_name", data.location_name);
-      if (data.location_url) formData.append("location_url", data.location_url);
-      if (data.location) formData.append("full_address", data.location);
-      if (data.province) formData.append("province", data.province);
-      if (data.city) formData.append("city", data.city);
-      if (data.route) formData.append("route", data.route);
-      if (data.zip_code || data.zip)
-        formData.append("zip", (data.zip_code || data.zip)!);
-      if (data.lat !== undefined && data.lat !== null)
-        formData.append("lat", data.lat.toString());
-      if (data.lng !== undefined && data.lng !== null)
-        formData.append("lng", data.lng.toString());
-      formData.append("tags", data.tags);
-      formData.append("categoryId", data.categoryId.toString());
-      formData.append("conditionLevel", data.conditionLevel.toString());
-      if (data.expires_at) {
-        formData.append("expiresAt", data.expires_at.toISOString());
-      } else {
-        formData.append("expiresAt", "");
+      // 1. 若有新圖片，進行平行壓縮並直傳 S3 Staging bucket
+      let stagingKeys: string[] = [];
+      if (data.newImages && data.newImages.length > 0) {
+        const processedImages = await compressImagesParallel(
+          data.newImages,
+          1200,
+          1200,
+          0.85,
+        );
+        stagingKeys = await uploadImagesToS3Staging(
+          processedImages.map(({ blob, filename }) => ({ blob, filename })),
+          hostName || "",
+        );
       }
 
       // items
-      if (data.items && data.items.length > 0) {
-        const validItems = data.items.filter(
-          (item) => item.title.trim() !== "" && item.quantity !== "",
-        );
-        if (validItems.length > 0) {
-          formData.append("items", JSON.stringify(validItems));
-        }
-      }
+      const validItems = data.items
+        ? data.items.filter(
+            (item) => item.title.trim() !== "" && item.quantity !== "",
+          )
+        : undefined;
 
-      // deleteImageIds
-      if (data.deletedImageIds && data.deletedImageIds.length > 0) {
-        formData.append("deleteImageIds", JSON.stringify(data.deletedImageIds));
-      }
-
-      // new images
-      if (data.newImages && data.newImages.length > 0) {
-        for (const image of data.newImages) {
-          const { blob, filename } = await safeCompressImage(
-            image,
-            1200,
-            1200,
-            0.85,
-          );
-          formData.append("images", blob, filename);
-        }
-      }
+      // 2. 以乾淨的 JSON payload 送出貼文更新請求
+      const updatePayload = {
+        title: data.title,
+        content: data.content,
+        status: data.status,
+        categoryId: Number(data.categoryId),
+        conditionLevel: Number(data.conditionLevel),
+        tags: data.tags || undefined,
+        place_id: data.place_id || undefined,
+        location_name: data.location_name || undefined,
+        location_url: data.location_url || undefined,
+        full_address: data.location || undefined,
+        province: data.province || undefined,
+        city: data.city || undefined,
+        route: data.route || undefined,
+        zip: data.zip_code || data.zip || undefined,
+        lat: data.lat !== undefined && data.lat !== null ? Number(data.lat) : undefined,
+        lng: data.lng !== undefined && data.lng !== null ? Number(data.lng) : undefined,
+        expiresAt: data.expires_at ? data.expires_at.toISOString() : null,
+        items: validItems && validItems.length > 0 ? validItems : undefined,
+        deleteImageIds:
+          data.deletedImageIds && data.deletedImageIds.length > 0
+            ? data.deletedImageIds
+            : undefined,
+        stagingKeys,
+      };
 
       const response = await fetch(`${hostName}/api/posts/${postId}`, {
         method: "PUT",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatePayload),
         credentials: "include",
       });
 
@@ -242,9 +239,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         const errorData = await response.json();
         toast.error(errorData.errorMessage || "Failed to update post");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error updating post:", error);
-      toast.error("Failed to update post");
+      const message =
+        error instanceof Error ? error.message : "Failed to update post";
+      toast.error(message);
     } finally {
       setIsUpdating(false);
     }

@@ -20,6 +20,7 @@ import sendAPI from "./send";
 import meAPI from "./me";
 import lalamoveAPI from "./lalamove";
 import paymentAPI from "./payments";
+import adminAPI from "./admin";
 
 //* Test api
 router.post("/test", (_req, res) => {
@@ -52,5 +53,6 @@ router.use("/send", sendAPI);
 router.use("/me", meAPI);
 router.use("/lalamove", lalamoveAPI);
 router.use("/payments", paymentAPI);
+router.use("/admin", adminAPI);
 
 export default router;

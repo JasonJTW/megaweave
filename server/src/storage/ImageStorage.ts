@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -14,6 +20,12 @@ export interface ImageStorage {
   ): Promise<{ key: string; url: string }>;
   delete(fileKeys: string[]): Promise<void>;
   getUrl(s3Key?: string | null, size?: ImageSize): string;
+  getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresInSeconds?: number,
+  ): Promise<string>;
+  getObjectBuffer(key: string): Promise<Buffer>;
 }
 
 export class S3ImageStorage implements ImageStorage {
@@ -55,6 +67,32 @@ export class S3ImageStorage implements ImageStorage {
       key,
       url: this.getUrl(key, "original"),
     };
+  }
+
+  async getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresInSeconds: number = 300,
+  ): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+    return getSignedUrl(this.s3Client, command, { expiresIn: expiresInSeconds });
+  }
+
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    const response = await this.s3Client.send(command);
+    if (!response.Body) {
+      throw new Error(`S3 object ${key} has no body`);
+    }
+    const byteArray = await response.Body.transformToByteArray();
+    return Buffer.from(byteArray);
   }
 
   async delete(fileKeys: string[]): Promise<void> {
@@ -119,6 +157,26 @@ export class InMemoryImageStorage implements ImageStorage {
       key,
       url: this.getUrl(key, "original"),
     };
+  }
+
+  async getPresignedUploadUrl(
+    key: string,
+    _contentType: string,
+    _expiresInSeconds: number = 300,
+  ): Promise<string> {
+    return `${this.baseUrl}/mock-upload/${key}`;
+  }
+
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const buffer = this.storage.get(key);
+    if (!buffer) {
+      throw new Error(`Object not found in memory storage: ${key}`);
+    }
+    return buffer;
+  }
+
+  setFile(key: string, buffer: Buffer): void {
+    this.storage.set(key, buffer);
   }
 
   async delete(fileKeys: string[]): Promise<void> {

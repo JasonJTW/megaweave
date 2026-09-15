@@ -232,13 +232,11 @@ jobs:
           else
             echo "❌ One or more backend containers failed to start"
             if [ "$API_RUNNING" != "true" ]; then
-              echo "Logs from megaweave-backend-api:
-"
+              echo "Logs from megaweave-backend-api:"
               docker logs megaweave-backend-api --tail 50 || true
             fi
             if [ "$WORKER_RUNNING" != "true" ]; then
-              echo "Logs from megaweave-backend-worker:
-"
+              echo "Logs from megaweave-backend-worker:"
               docker logs megaweave-backend-worker --tail 50 || true
             fi
             exit 1

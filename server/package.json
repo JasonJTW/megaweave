@@ -22,6 +22,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1132.0",
+    "@aws-sdk/s3-request-presigner": "^3.1132.0",
     "@lalamove/lalamove-js": "^1.1.0",
     "@redis/client": "^5.1.0",
     "@socket.io/redis-adapter": "^8.3.0",

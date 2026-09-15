@@ -100,6 +100,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    depends_on:
+      - redis-queue
     networks:
       - megaweave-net
 

@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -14,16 +20,24 @@ export interface ImageStorage {
   ): Promise<{ key: string; url: string }>;
   delete(fileKeys: string[]): Promise<void>;
   getUrl(s3Key?: string | null, size?: ImageSize): string;
+  getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresInSeconds?: number,
+  ): Promise<string>;
+  getObjectBuffer(key: string): Promise<Buffer>;
 }
 
 export class S3ImageStorage implements ImageStorage {
   private s3Client: S3Client;
   private bucketName: string;
+  private stagingBucketName: string;
   private destinationBucket: string;
   private cloudfrontUrl: string;
 
   constructor() {
     this.bucketName = process.env.BUCKET_NAME || "";
+    this.stagingBucketName = process.env.STAGING_BUCKET_NAME || "megaweave-staging-462457677414";
     this.destinationBucket = process.env.DESTINATION_BUCKET || "megaweave-thumbnails";
     this.cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
 
@@ -57,6 +71,38 @@ export class S3ImageStorage implements ImageStorage {
     };
   }
 
+  async getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresInSeconds: number = 300,
+  ): Promise<string> {
+    const targetBucket = key.startsWith("staging/")
+      ? this.stagingBucketName
+      : this.bucketName;
+    const command = new PutObjectCommand({
+      Bucket: targetBucket,
+      Key: key,
+      ContentType: contentType,
+    });
+    return getSignedUrl(this.s3Client, command, { expiresIn: expiresInSeconds });
+  }
+
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const targetBucket = key.startsWith("staging/")
+      ? this.stagingBucketName
+      : this.bucketName;
+    const command = new GetObjectCommand({
+      Bucket: targetBucket,
+      Key: key,
+    });
+    const response = await this.s3Client.send(command);
+    if (!response.Body) {
+      throw new Error(`S3 object ${key} has no body`);
+    }
+    const byteArray = await response.Body.transformToByteArray();
+    return Buffer.from(byteArray);
+  }
+
   async delete(fileKeys: string[]): Promise<void> {
     if (!this.bucketName) {
       console.error("S3ImageStorage.delete: BUCKET_NAME not set");
@@ -66,9 +112,11 @@ export class S3ImageStorage implements ImageStorage {
 
     const deletePromises = fileKeys.map(async (key) => {
       try {
-        const targetBucket = key.startsWith("thumbnails/")
-          ? this.destinationBucket
-          : this.bucketName;
+        const targetBucket = key.startsWith("staging/")
+          ? this.stagingBucketName
+          : key.startsWith("thumbnails/")
+            ? this.destinationBucket
+            : this.bucketName;
         const deleteCommand = new DeleteObjectCommand({
           Bucket: targetBucket,
           Key: key,
@@ -119,6 +167,26 @@ export class InMemoryImageStorage implements ImageStorage {
       key,
       url: this.getUrl(key, "original"),
     };
+  }
+
+  async getPresignedUploadUrl(
+    key: string,
+    _contentType: string,
+    _expiresInSeconds: number = 300,
+  ): Promise<string> {
+    return `${this.baseUrl}/mock-upload/${key}`;
+  }
+
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const buffer = this.storage.get(key);
+    if (!buffer) {
+      throw new Error(`Object not found in memory storage: ${key}`);
+    }
+    return buffer;
+  }
+
+  setFile(key: string, buffer: Buffer): void {
+    this.storage.set(key, buffer);
   }
 
   async delete(fileKeys: string[]): Promise<void> {

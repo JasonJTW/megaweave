@@ -1,4 +1,3 @@
-import fs from "fs";
 import sharp from "sharp";
 import { Job } from "bullmq";
 import { defaultImageStorage } from "../../storage/ImageStorage";
@@ -7,23 +6,12 @@ export interface PostUploadImageJobData {
   postId: number;
   files: Array<{
     s3Key: string;
-    tempPath: string;
+    stagingKey: string;
   }>;
 }
 
 export interface PostDeleteImageJobData {
   s3Keys: string[];
-}
-
-async function waitForFile(filePath: string, maxWaitMs = 5000, intervalMs = 100): Promise<boolean> {
-  const startTime = Date.now();
-  while (Date.now() - startTime < maxWaitMs) {
-    if (fs.existsSync(filePath)) {
-      return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return fs.existsSync(filePath);
 }
 
 export async function processPostUploadImages(
@@ -40,51 +28,47 @@ export async function processPostUploadImages(
     const fileName = segments.slice(1).join("/");
 
     try {
-      let uploadBuffer: Buffer;
-      const fileExists = file.tempPath ? await waitForFile(file.tempPath) : false;
-      if (file.tempPath && fileExists) {
-        try {
-          // 先讀取真實的圖片 metadata（使用 libvips 魔術字節，無法被前端偽造）
-          const meta = await sharp(file.tempPath).metadata();
-          const isAlreadyOptimal =
-            meta.format === "webp" &&
-            (meta.width ?? Infinity) <= 1200 &&
-            (meta.height ?? Infinity) <= 1200;
+      // 1. 從 S3 Staging 下載原始檔案
+      await job.log(`📥 [Worker] Fetching staging image from S3: ${file.stagingKey}`);
+      const rawBuffer = await defaultImageStorage.getObjectBuffer(file.stagingKey);
 
-          if (isAlreadyOptimal) {
-            // 前端已完成 WebP 壓縮且尺寸符合規格，直接讀取上傳，跳過 CPU 密集壓縮
-            uploadBuffer = await fs.promises.readFile(file.tempPath);
-            await job.log(
-              `⚡ [sharp] Skipped compression (already WebP ${meta.width}×${meta.height}): ${file.tempPath}`,
-            );
-          } else {
-            // 前端未壓縮（PNG/JPEG/超大尺寸）→ 後端執行 resize + WebP 轉換
-            const origStats = await fs.promises.stat(file.tempPath);
-            const origSizeKB = (origStats.size / 1024).toFixed(1);
-            uploadBuffer = await sharp(file.tempPath)
-              .resize(1200, 1200, {
-                fit: "inside",
-                withoutEnlargement: true,
-              })
-              .webp({ quality: 80 })
-              .toBuffer();
-            const compressedSizeKB = (uploadBuffer.length / 1024).toFixed(1);
-            await job.log(
-              `✅ [sharp] Compressed ${meta.format?.toUpperCase() ?? "unknown"} → WebP (${origSizeKB}KB → ${compressedSizeKB}KB): ${file.tempPath}`,
-            );
-          }
-        } catch (compressError) {
-          const warnMsg = `⚠️ [Worker] sharp processing failed for ${file.tempPath}, uploading raw file`;
-          console.warn(warnMsg, compressError);
-          await job.log(warnMsg);
-          uploadBuffer = await fs.promises.readFile(file.tempPath);
+      let uploadBuffer: Buffer;
+      try {
+        // 2. 讀取真實圖片 metadata（支援 iPhone raw/heic/jpeg/png 等格式）
+        const meta = await sharp(rawBuffer).metadata();
+        const isAlreadyOptimal =
+          meta.format === "webp" &&
+          (meta.width ?? Infinity) <= 1200 &&
+          (meta.height ?? Infinity) <= 1200;
+
+        if (isAlreadyOptimal) {
+          uploadBuffer = rawBuffer;
+          await job.log(
+            `⚡ [sharp] Skipped compression (already WebP ${meta.width}×${meta.height})`,
+          );
+        } else {
+          // 執行 resize + WebP 轉換
+          const origSizeKB = (rawBuffer.length / 1024).toFixed(1);
+          uploadBuffer = await sharp(rawBuffer)
+            .resize(1200, 1200, {
+              fit: "inside",
+              withoutEnlargement: true,
+            })
+            .webp({ quality: 80 })
+            .toBuffer();
+          const compressedSizeKB = (uploadBuffer.length / 1024).toFixed(1);
+          await job.log(
+            `✅ [sharp] Compressed ${meta.format?.toUpperCase() ?? "unknown"} → WebP (${origSizeKB}KB → ${compressedSizeKB}KB)`,
+          );
         }
-      } else {
-        const errorMsg = `Temporary file not found for upload: ${file.tempPath || "undefined"}`;
-        await job.log(`❌ ${errorMsg}`);
-        throw new Error(errorMsg);
+      } catch (compressError) {
+        const warnMsg = `⚠️ [Worker] sharp processing failed, uploading raw buffer`;
+        console.warn(warnMsg, compressError);
+        await job.log(warnMsg);
+        uploadBuffer = rawBuffer;
       }
 
+      // 3. 上傳正式 S3 物件
       await defaultImageStorage.upload(
         uploadBuffer,
         folder,
@@ -93,8 +77,11 @@ export async function processPostUploadImages(
       );
       await job.log(`✅ [S3] Uploaded ${file.s3Key}`);
 
-      // 只有在上傳 S3 成功後才刪除本機臨時檔
-      await fs.promises.unlink(file.tempPath).catch(() => {});
+      // 4. 清理 S3 暫存原始檔
+      await defaultImageStorage.delete([file.stagingKey]).catch((delErr) => {
+        console.warn(`Failed to delete staging S3 file ${file.stagingKey}:`, delErr);
+      });
+      await job.log(`🗑️ [S3] Deleted staging file ${file.stagingKey}`);
     } catch (uploadError) {
       const errMessage =
         uploadError instanceof Error
@@ -103,14 +90,6 @@ export async function processPostUploadImages(
       const errMsg = `❌ [Worker] S3 upload failed for post #${postId}: ${errMessage}`;
       console.error(errMsg, uploadError);
       await job.log(errMsg);
-
-      // 若已達到最大重試次數 (BullMQ 重試失敗)，清理臨時檔防止硬碟空間洩漏
-      const maxAttempts = job.opts.attempts || 1;
-      if (job.attemptsMade >= maxAttempts) {
-        if (file.tempPath && fs.existsSync(file.tempPath)) {
-          await fs.promises.unlink(file.tempPath).catch(() => {});
-        }
-      }
       throw uploadError; // 重新拋出錯誤讓 BullMQ 進行 Retry
     }
   }

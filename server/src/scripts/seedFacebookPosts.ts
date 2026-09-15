@@ -9,29 +9,17 @@
 
 import fs from "fs";
 import path from "path";
-import os from "os";
 import dotenv from "dotenv";
 
 // Load development environment variables
 dotenv.config({ path: path.resolve(process.cwd(), ".env.development") });
-
-// Local interface matching the fields of Express.Multer.File used by postService
-interface MulterFile {
-  fieldname: string;
-  originalname: string;
-  encoding: string;
-  mimetype: string;
-  destination: string;
-  filename: string;
-  path: string;
-  size: number;
-}
 
 import { postService } from "../services/postService";
 import type { PostType } from "../types/post";
 import dbPool from "../utils/db";
 import { RowDataPacket } from "mysql2";
 import { connectRedis, disconnectRedis } from "../utils/redis";
+import { defaultImageStorage } from "../storage/ImageStorage";
 
 interface RawLocation {
   query?: string;
@@ -47,208 +35,189 @@ interface RawLocation {
   lng?: number | null;
 }
 
-interface RawFacebookPost {
-  index: string;
-  id: string;
-  author: string;
-  title: string;
-  content: string;
-  link: string;
-  images: string[];
-  type: "share" | "wish" | "commons";
-  category: string;
-  condition: string;
-  location?: RawLocation | null;
-  scraped_at: string;
-  posted: boolean;
+interface RawPost {
+  title?: string;
+  content?: string;
+  type?: string;
+  category_id?: number | string;
+  condition_level?: number | string;
+  location?: RawLocation;
+  images?: string[];
+  [key: string]: unknown;
 }
 
-// Configuration constants
-const BOT_USER_ID = 59; // Default post author ID (e.g., admin or bot user)
-const HOME_DIR = os.homedir(); // System home directory
+const BOT_USER_ID = 2; // MegaBot default ID
 
 /**
- * Ensures title satisfies Zod schema constraints: min(5), max(60).
- * If length is already sufficient (5-60 chars), returns original title as-is.
+ * Resolves the absolute path to an image file.
+ * Checks relative to posts directory first, then as-is.
  */
-function sanitizeTitle(post: RawFacebookPost): string {
-  let title = (post.title || "").trim();
+function resolveImagePath(
+  imgPath: string,
+  postsDir: string,
+): string | null {
+  const candidate1 = path.resolve(postsDir, imgPath);
+  if (fs.existsSync(candidate1)) return candidate1;
 
-  // If title is within valid length, keep it directly without modifications
-  if (title.length >= 5 && title.length <= 60) {
-    return title;
-  }
-
-  // If title is too short (< 5 characters), fallback to clean content or default title
-  if (title.length < 5) {
-    const cleanContent = post.content.replace(/\r?\n|\r/g, " ").trim();
-    if (cleanContent.length >= 5) {
-      title = cleanContent.slice(0, 60);
-    } else {
-      title = `${title} - Facebook Post`.trim();
-      if (title.length < 5) {
-        title = "Facebook Imported Post";
-      }
-    }
-  }
-
-  // If title exceeds 60 characters, truncate it
-  if (title.length > 60) {
-    title = title.slice(0, 57) + "...";
-  }
-
-  return title;
-}
-
-/**
- * Ensures content length is within 3 ~ 1000 characters and appends attribution & disclaimer footer.
- * If content length is already sufficient, keeps original content without modification.
- */
-function sanitizeContent(post: RawFacebookPost): string {
-  const footer = `\n\n---\nAuthor: ${post.author}\nOriginal Post: ${post.link}\nThis content is reposted from Facebook by @megaweaving. In case of any discrepancies, the original Facebook post shall prevail.`;
-  let content = (post.content || "").trim();
-
-  // If content is too short (< 3 characters), fallback to title or default text
-  if (content.length < 3) {
-    content =
-      post.title && post.title.trim().length >= 3
-        ? post.title.trim()
-        : "Please refer to the images and original link for more details.";
-  }
-
-  // Ensure content + footer does not exceed 1000 characters
-  const maxContentLength = 1000 - footer.length;
-  if (content.length > maxContentLength) {
-    content = content.slice(0, maxContentLength - 3) + "...";
-  }
-
-  return content + footer;
-}
-
-/**
- * Resolves the absolute local file path for an image relative to posts.json directory.
- */
-function resolveImagePath(imgRelPath: string, baseDir: string): string | null {
-  const resolved = path.resolve(baseDir, imgRelPath);
-  if (fs.existsSync(resolved)) {
-    return resolved;
-  }
-
-  // Fallback in case path starts with ~/ or is already absolute
-  const fallbackPaths = [
-    imgRelPath.startsWith("~")
-      ? path.join(HOME_DIR, imgRelPath.slice(1))
-      : null,
-    path.join(HOME_DIR, imgRelPath),
-    path.resolve(process.cwd(), imgRelPath),
-  ].filter(Boolean) as string[];
-
-  for (const p of fallbackPaths) {
-    if (fs.existsSync(p)) {
-      return p;
-    }
-  }
+  const candidate2 = path.resolve(imgPath);
+  if (fs.existsSync(candidate2)) return candidate2;
 
   return null;
 }
 
-async function seedFacebookPosts() {
-  // Search for posts.json path
-  const postsJsonPaths = [
-    process.argv[2], // Allows passing path via CLI: npx ts-node seedFacebookPosts.ts <path>
-    path.resolve(process.cwd(), "posts.json"),
-    path.resolve(process.cwd(), "..", "posts.json"),
-    path.join(HOME_DIR, "megaweavingFB", "posts.json"),
-  ].filter(Boolean) as string[];
+/**
+ * Validates whether a category ID exists and is active.
+ */
+async function isValidCategory(categoryId: number): Promise<boolean> {
+  const [rows] = await dbPool.execute<RowDataPacket[]>(
+    "SELECT id FROM categories WHERE id = ? AND status = 'active'",
+    [categoryId],
+  );
+  return rows.length > 0;
+}
 
-  let postsDataPath = "";
-  for (const p of postsJsonPaths) {
-    if (fs.existsSync(p)) {
-      postsDataPath = p;
-      break;
-    }
-  }
+/**
+ * Validates condition level (must be integer between 1 and 5).
+ */
+function isValidConditionLevel(level: number): boolean {
+  return Number.isInteger(level) && level >= 1 && level <= 5;
+}
 
-  if (!postsDataPath) {
+/**
+ * Validates post type (must be 'share', 'wish', or 'commons').
+ */
+function isValidPostType(type: string): type is PostType {
+  return ["share", "wish", "commons"].includes(type);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  if (args.length === 0) {
+    console.error("❌ Please provide the path to posts.json");
     console.error(
-      "❌ Could not find posts.json. Please place posts.json in root or pass it as an argument.",
-    );
-    console.error(
-      "Usage: npx ts-node server/src/scripts/seedFacebookPosts.ts /path/to/posts.json",
+      "   Usage: npx ts-node --transpile-only src/scripts/seedFacebookPosts.ts <path-to-json>",
     );
     process.exit(1);
   }
 
-  const postsDir = path.dirname(postsDataPath);
-  console.log(`📖 Loading posts from: ${postsDataPath}`);
-  console.log(`📂 Base directory for images: ${postsDir}`);
-
-  const rawPosts: RawFacebookPost[] = JSON.parse(
-    fs.readFileSync(postsDataPath, "utf-8"),
-  );
-
-  const pending = rawPosts.filter((p) => !p.posted);
-  const alreadyPosted = rawPosts.length - pending.length;
-
-  console.log(
-    `📊 Found ${rawPosts.length} posts total: ${pending.length} pending, ${alreadyPosted} already posted (skipped)\n`,
-  );
-
-  if (pending.length === 0) {
-    console.log("✅ All posts have already been published. Nothing to do.");
-    process.exit(0);
+  const jsonFilePath = path.resolve(args[0]);
+  if (!fs.existsSync(jsonFilePath)) {
+    console.error(`❌ File not found: ${jsonFilePath}`);
+    process.exit(1);
   }
 
-  // Connect to Redis for hot_score caching and feed updates
-  console.log("🔌 Connecting to Redis...");
-  await connectRedis();
+  const postsDir = path.dirname(jsonFilePath);
 
+  console.log(`\n📦 Loading seed data from: ${jsonFilePath}`);
+  console.log(`📂 Image search directory: ${postsDir}`);
+
+  let rawData: unknown;
   try {
-    // Pre-load category and condition maps from database
-    console.log("🔄 Fetching category and condition metadata from database...");
-    const categoryMap = new Map<number, string>();
-    const [categories] = await dbPool.query<RowDataPacket[]>(
-      "SELECT id, name_en, name FROM categories WHERE status = 'active'",
+    const fileContent = fs.readFileSync(jsonFilePath, "utf-8");
+    rawData = JSON.parse(fileContent);
+  } catch (err) {
+    console.error("❌ Failed to parse JSON file:", err);
+    process.exit(1);
+  }
+
+  if (!Array.isArray(rawData)) {
+    console.error("❌ JSON root must be an array of posts");
+    process.exit(1);
+  }
+
+  const posts: RawPost[] = rawData;
+  console.log(`📊 Found ${posts.length} posts to process\n`);
+
+  // Verify MegaBot user exists
+  const [botRows] = await dbPool.execute<RowDataPacket[]>(
+    "SELECT id, username FROM users WHERE id = ?",
+    [BOT_USER_ID],
+  );
+  if (botRows.length === 0) {
+    console.error(
+      `❌ MegaBot user (ID: ${BOT_USER_ID}) does not exist in the database!`,
     );
-    for (const cat of categories) {
-      categoryMap.set(cat.id, (cat.name_en as string) || (cat.name as string));
-    }
-
-    const conditionMap = new Map<number, string>();
-    const [conditions] = await dbPool.query<RowDataPacket[]>(
-      "SELECT level, name FROM conditions WHERE status = 'active'",
+    console.error(
+      "   Please ensure the bot user is created before running this script.",
     );
-    for (const cond of conditions) {
-      conditionMap.set(cond.level, cond.name as string);
-    }
+    process.exit(1);
+  }
+  console.log(`🤖 Seeding as user: ${botRows[0].username} (ID: ${BOT_USER_ID})\n`);
 
-    let successCount = 0;
-    let failCount = 0;
+  // Connect Redis for hotScore calculation in postService
+  try {
+    await connectRedis();
+  } catch (redisErr) {
+    console.warn(
+      "⚠️ Could not connect to Redis, hotScore caching may fail silently:",
+      redisErr,
+    );
+  }
 
-    for (let i = 0; i < pending.length; i++) {
-      const post = pending[i];
-      const postIndex = post.index ?? `${i}`;
-      console.log(`--------------------------------------------------`);
-      console.log(
-        `[${i + 1}/${pending.length}] Processing Post Index: ${postIndex} (Author: ${post.author})`,
-      );
+  let successCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
 
-      const title = sanitizeTitle(post);
-      const content = sanitizeContent(post);
-      const parsedCatId = parseInt(post.category, 10);
-      const categoryId = isNaN(parsedCatId) ? 4 : parsedCatId; // Default to 4 (Others)
-      const parsedCondLevel = parseInt(post.condition, 10);
-      const conditionLevel = isNaN(parsedCondLevel) ? 3 : parsedCondLevel; // Default to 3 (Good)
+  for (let i = 0; i < posts.length; i++) {
+    const post = posts[i];
+    const postNum = i + 1;
+    console.log(
+      `------------------------------------------------------------`,
+    );
+    console.log(
+      `[${postNum}/${posts.length}] Processing: "${post.title || "Untitled"}"`,
+    );
 
-      const categoryName = categoryMap.get(categoryId) || "Others";
-      const conditionName = conditionMap.get(conditionLevel) || "Good";
+    try {
+      // 1. Validate required text fields
+      const title = (post.title || "").trim();
+      const content = (post.content || "").trim();
 
-      const type = (
-        ["share", "wish", "commons"].includes(post.type) ? post.type : "share"
-      ) as PostType;
+      if (title.length < 5 || title.length > 60) {
+        console.warn(
+          `  ⚠️ Skipped: Title length (${title.length}) outside allowed range [5, 60]`,
+        );
+        skippedCount++;
+        continue;
+      }
 
-      // Image handling: Copy to OS temp directory to avoid Worker unlinking the original file after S3 upload
-      const mockFiles: MulterFile[] = [];
+      if (content.length < 3 || content.length > 1000) {
+        console.warn(
+          `  ⚠️ Skipped: Content length (${content.length}) outside allowed range [3, 1000]`,
+        );
+        skippedCount++;
+        continue;
+      }
+
+      // 2. Validate Post Type
+      const type = post.type || "share";
+      if (!isValidPostType(type)) {
+        console.warn(`  ⚠️ Skipped: Invalid post type "${type}"`);
+        skippedCount++;
+        continue;
+      }
+
+      // 3. Validate Category ID
+      const categoryId = Number(post.category_id) || 1;
+      const categoryValid = await isValidCategory(categoryId);
+      if (!categoryValid) {
+        console.warn(`  ⚠️ Skipped: Category ID ${categoryId} is invalid or inactive`);
+        skippedCount++;
+        continue;
+      }
+
+      // 4. Validate Condition Level
+      const conditionLevel = Number(post.condition_level) || 3;
+      if (!isValidConditionLevel(conditionLevel)) {
+        console.warn(
+          `  ⚠️ Skipped: Invalid condition level ${conditionLevel} (must be 1-5)`,
+        );
+        skippedCount++;
+        continue;
+      }
+
+      // 5. Image handling: Upload to staging S3
+      const stagingKeys: string[] = [];
       if (Array.isArray(post.images) && post.images.length > 0) {
         for (const imgRelPath of post.images) {
           const srcPath = resolveImagePath(imgRelPath, postsDir);
@@ -259,22 +228,13 @@ async function seedFacebookPosts() {
 
           try {
             const tempFileName = `fb_seed_${Date.now()}_${Math.random().toString(36).slice(2)}_${path.basename(srcPath)}`;
-            const tempDestPath = path.join(os.tmpdir(), tempFileName);
-            await fs.promises.copyFile(srcPath, tempDestPath);
-
-            mockFiles.push({
-              fieldname: "images",
-              originalname: path.basename(srcPath),
-              encoding: "7bit",
-              mimetype: "image/jpeg",
-              destination: os.tmpdir(),
-              filename: tempFileName,
-              path: tempDestPath,
-              size: (await fs.promises.stat(tempDestPath)).size,
-            });
+            const stagingKey = `staging/posts/${tempFileName}`;
+            const fileBuf = await fs.promises.readFile(srcPath);
+            await defaultImageStorage.upload(fileBuf, "staging/posts", tempFileName, "image/jpeg");
+            stagingKeys.push(stagingKey);
           } catch (copyErr) {
             console.error(
-              `  ⚠️ Failed to copy image to temp directory (${srcPath}):`,
+              `  ⚠️ Failed to stage image (${srcPath}):`,
               copyErr,
             );
           }
@@ -320,52 +280,44 @@ async function seedFacebookPosts() {
             conditionLevel,
             status: "active",
             expiresAt,
+            stagingKeys,
             ...locationData,
           },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          mockFiles.length > 0 ? (mockFiles as any[]) : undefined,
         );
 
         console.log(`  ✅ Successfully created post ID: ${createdPost.id}`);
         console.log(`     Title: ${title}`);
-        console.log(
-          `     Category: ${categoryId} (${categoryName}), Condition: ${conditionLevel} (${conditionName}), Images: ${mockFiles.length}`,
-        );
-        if (post.location?.full_address) {
-          console.log(`     Location: ${post.location.full_address}`);
+        console.log(`     Type: ${type}, Category: ${categoryId}`);
+        if (stagingKeys.length > 0) {
+          console.log(`     Images: ${stagingKeys.length} staged for worker upload`);
         }
-
-        // Mark as posted in the JSON file immediately after success
-        const postInArray = rawPosts.find((p) => p.index === post.index);
-        if (postInArray) {
-          postInArray.posted = true;
-          fs.writeFileSync(
-            postsDataPath,
-            JSON.stringify(rawPosts, null, 2),
-            "utf-8",
-          );
-        }
-
         successCount++;
       } catch (err) {
         console.error(`  ❌ Failed to create post:`, err);
-        failCount++;
+        failedCount++;
       }
+    } catch (loopErr) {
+      console.error(`  ❌ Unexpected error on post [${postNum}]:`, loopErr);
+      failedCount++;
     }
+  }
 
-    console.log(`==================================================`);
-    console.log(
-      `🎉 Import completed! Succeeded: ${successCount}, Failed: ${failCount}`,
-    );
-  } finally {
-    console.log("🔌 Disconnecting from Redis...");
+  console.log(`\n============================================================`);
+  console.log(`🎉 Seeding complete!`);
+  console.log(`   ✅ Succeeded: ${successCount}`);
+  console.log(`   ⚠️ Skipped:   ${skippedCount}`);
+  console.log(`   ❌ Failed:    ${failedCount}`);
+  console.log(`============================================================\n`);
+
+  try {
     await disconnectRedis();
-    await dbPool.end();
+  } catch {
+    // Ignore redis disconnect errors on exit
   }
   process.exit(0);
 }
 
-seedFacebookPosts().catch((err) => {
-  console.error("💥 Unexpected error occurred during execution:", err);
+main().catch((err) => {
+  console.error("Fatal error during seeding:", err);
   process.exit(1);
 });

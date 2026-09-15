@@ -3,12 +3,13 @@
 import { Request, Response, Router } from "express";
 import { z } from "zod";
 import dotenv from "dotenv";
+import path from "path";
+import { randomUUID } from "crypto";
 import {
   requireAuth,
   requireRole,
   AuthenticatedRequest,
 } from "./middleware/auth";
-import { diskUpload } from "./upload";
 import likeRouter from "./like";
 import { getUserFromCookie } from "./session";
 import { handleError } from "./utils/errorHandler";
@@ -16,6 +17,7 @@ import { postService } from "./services/postService";
 import { feedService } from "./services/feedService";
 import type { PostType } from "./types/post";
 import { enqueueUserVectorUpdate } from "./queue/queues";
+import { defaultImageStorage } from "./storage/ImageStorage";
 
 dotenv.config();
 
@@ -66,30 +68,92 @@ const CreatePostSchema = z.object({
       { message: "Item titles must be unique" },
     )
     .optional(),
+  stagingKeys: z.array(z.string()).max(parseInt(UPLOAD_IMAGE_LIMIT)).optional(),
 });
 
 type CreatePostSchemaType = z.infer<typeof CreatePostSchema>;
+
+const PresignedUrlsSchema = z.object({
+  files: z
+    .array(
+      z.object({
+        filename: z.string().min(1, "Filename is required"),
+        contentType: z
+          .string()
+          .regex(/^image\//, "Content type must be an image"),
+      }),
+    )
+    .min(1, "At least one file is required")
+    .max(
+      parseInt(UPLOAD_IMAGE_LIMIT),
+      `Cannot exceed ${UPLOAD_IMAGE_LIMIT} files`,
+    ),
+});
+
+//* Presigned URLs API for client-direct S3 staging upload
+router.post(
+  "/presigned-urls",
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const validationResult = PresignedUrlsSchema.parse(req.body);
+      const urls = await Promise.all(
+        validationResult.files.map(async (file) => {
+          const ext = path.extname(file.filename) || ".webp";
+          const stagingKey = `staging/posts/${Date.now()}-${randomUUID()}${ext}`;
+          const presignedUrl = await defaultImageStorage.getPresignedUploadUrl(
+            stagingKey,
+            file.contentType,
+            300,
+          );
+          return {
+            stagingKey,
+            presignedUrl,
+          };
+        }),
+      );
+      res.status(200).json({ urls });
+    } catch (error) {
+      console.error("Presigned URL generation error:", error);
+      return handleError(error, res);
+    }
+  },
+);
 
 //* Create post API
 router.post(
   "/",
   requireAuth,
-  diskUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
   async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.userId;
-    const files = req.files as Express.Multer.File[];
-    const items = req.body.items;
 
     let validationResult: CreatePostSchemaType;
     try {
       const postData = {
         ...req.body,
-        categoryId: parseInt(req.body.categoryId),
-        conditionLevel: parseInt(req.body.conditionLevel),
-        expiresAt: req.body.expires_at,
-        lat: req.body.lat ? parseFloat(req.body.lat) : undefined,
-        lng: req.body.lng ? parseFloat(req.body.lng) : undefined,
-        items: items ? JSON.parse(items) : undefined,
+        categoryId:
+          typeof req.body.categoryId === "string"
+            ? parseInt(req.body.categoryId)
+            : req.body.categoryId,
+        conditionLevel:
+          typeof req.body.conditionLevel === "string"
+            ? parseInt(req.body.conditionLevel)
+            : req.body.conditionLevel,
+        expiresAt: req.body.expiresAt || req.body.expires_at,
+        lat: req.body.lat !== undefined && req.body.lat !== null && req.body.lat !== ""
+          ? parseFloat(req.body.lat)
+          : undefined,
+        lng: req.body.lng !== undefined && req.body.lng !== null && req.body.lng !== ""
+          ? parseFloat(req.body.lng)
+          : undefined,
+        items:
+          typeof req.body.items === "string"
+            ? JSON.parse(req.body.items)
+            : req.body.items,
+        stagingKeys:
+          typeof req.body.stagingKeys === "string"
+            ? JSON.parse(req.body.stagingKeys)
+            : req.body.stagingKeys,
       };
 
       validationResult = CreatePostSchema.parse(postData);
@@ -102,7 +166,6 @@ router.post(
       const newPost = await postService.createPost(
         userId,
         validationResult,
-        files,
       );
 
       res.status(201).json({
@@ -147,48 +210,6 @@ router.get("/", async (req: Request, res: Response) => {
     res.status(200).json(result);
   } catch (error) {
     console.error("Get posts error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
-  }
-});
-
-//* Get user's posts api
-router.get("/user", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const userPosts = await postService.getUserPosts(userId);
-    res.status(200).json({ userPosts });
-  } catch (error) {
-    console.error("Get user's posts error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
-  }
-});
-
-//* Get user's viewed posts history API
-router.get("/history", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-
-    const result = await postService.getViewedPosts(userId, page, limit);
-    res.status(200).json(result);
-  } catch (error) {
-    console.error("Get viewed posts history error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
-  }
-});
-
-// Alias for /history
-router.get("/viewed", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-
-    const result = await postService.getViewedPosts(userId, page, limit);
-    res.status(200).json(result);
-  } catch (error) {
-    console.error("Get viewed posts error:", error);
     return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
@@ -251,6 +272,142 @@ router.get("/feed", async (req: Request, res: Response) => {
   }
 });
 
+//* Edit post API (PUT /:id using public_id)
+const EditPostSchema = CreatePostSchema.partial().extend({
+  expiresAt: z.string().datetime().optional().nullable(),
+  deleteImageIds: z.array(z.number().int().positive()).optional(),
+  stagingKeys: z.array(z.string()).max(parseInt(UPLOAD_IMAGE_LIMIT)).optional(),
+});
+
+type EditPostSchemaType = z.infer<typeof EditPostSchema>;
+
+router.put(
+  "/:id",
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const publicId = req.params.id;
+    const userId = req.user!.userId;
+
+    if (!publicId) {
+      return res.status(400).json({ errorMessage: "Invalid post ID" });
+    }
+
+    let incoming: EditPostSchemaType;
+    try {
+      const deleteImageIdsRaw = req.body.deleteImageIds || req.body.deletedImageIds;
+      const raw = {
+        ...req.body,
+        ...(req.body.categoryId !== undefined && {
+          categoryId:
+            typeof req.body.categoryId === "string"
+              ? parseInt(req.body.categoryId)
+              : req.body.categoryId,
+        }),
+        ...(req.body.conditionLevel !== undefined && {
+          conditionLevel:
+            typeof req.body.conditionLevel === "string"
+              ? parseInt(req.body.conditionLevel)
+              : req.body.conditionLevel,
+        }),
+        ...(req.body.lat !== undefined && req.body.lat !== null && req.body.lat !== "" && {
+          lat: parseFloat(req.body.lat),
+        }),
+        ...(req.body.lng !== undefined && req.body.lng !== null && req.body.lng !== "" && {
+          lng: parseFloat(req.body.lng),
+        }),
+        ...(req.body.expiresAt === "" && { expiresAt: null }),
+        ...(req.body.items !== undefined && {
+          items:
+            typeof req.body.items === "string"
+              ? JSON.parse(req.body.items)
+              : req.body.items,
+        }),
+        ...(deleteImageIdsRaw !== undefined && {
+          deleteImageIds:
+            typeof deleteImageIdsRaw === "string"
+              ? JSON.parse(deleteImageIdsRaw)
+              : deleteImageIdsRaw,
+        }),
+        ...(req.body.stagingKeys !== undefined && {
+          stagingKeys:
+            typeof req.body.stagingKeys === "string"
+              ? JSON.parse(req.body.stagingKeys)
+              : req.body.stagingKeys,
+        }),
+      };
+      incoming = EditPostSchema.parse(raw);
+    } catch (error) {
+      console.error("Edit post validation error:", error);
+      return handleError(error, res);
+    }
+
+    const userRole = req.user!.role;
+    try {
+      const updatedPost = await postService.updatePost(
+        publicId,
+        userId,
+        incoming,
+        userRole,
+      );
+
+      res.status(200).json({
+        message: "Post updated successfully",
+        post: updatedPost,
+      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.message === "POST_NOT_FOUND") {
+          return res.status(404).json({ errorMessage: "Post not found" });
+        }
+        if (error.message === "FORBIDDEN") {
+          return res.status(403).json({
+            errorMessage: "Forbidden: You are not the owner of this post",
+          });
+        }
+        if (error.message === "INVALID_CATEGORY") {
+          return res.status(400).json({ errorMessage: "Invalid category" });
+        }
+      }
+      console.error("⚠️ Edit post error:", error);
+      return res.status(500).json({ errorMessage: "Internal server error" });
+    }
+  },
+);
+
+// Delete post api
+router.delete(
+  "/:id",
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const publicId = req.params.id;
+      const userId = req.user!.userId;
+      const userRole = req.user!.role;
+
+      if (!publicId) {
+        return res.status(400).json({ errorMessage: "Invalid post ID" });
+      }
+
+      await postService.deletePost(publicId, userId, userRole);
+
+      res.status(200).json({ message: "Post deleted successfully" });
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message === "POST_NOT_FOUND") {
+          return res.status(404).json({ errorMessage: "Post not found" });
+        }
+        if (error.message === "FORBIDDEN") {
+          return res.status(403).json({
+            errorMessage: "Forbidden: You are not the owner of this post",
+          });
+        }
+      }
+      console.error("Delete post error:", error);
+      return res.status(500).json({ errorMessage: "Internal server error" });
+    }
+  },
+);
+
 //* Get post details api (using public_id)
 router.get("/:id", async (req: Request, res: Response) => {
   try {
@@ -290,118 +447,6 @@ router.get("/:id", async (req: Request, res: Response) => {
     return res.status(500).json({ errorMessage: "Internal server error" });
   }
 });
-
-//* Edit post API (PUT /:id using public_id)
-const EditPostSchema = CreatePostSchema.partial().extend({
-  expiresAt: z.string().datetime().optional().nullable(),
-  deleteImageIds: z.array(z.number().int().positive()).optional(),
-});
-
-type EditPostSchemaType = z.infer<typeof EditPostSchema>;
-
-router.put(
-  "/:id",
-  requireAuth,
-  diskUpload.array("images", parseInt(UPLOAD_IMAGE_LIMIT)),
-  async (req: AuthenticatedRequest, res: Response) => {
-    const publicId = req.params.id;
-    const userId = req.user!.userId;
-    const files = req.files as Express.Multer.File[];
-
-    if (!publicId) {
-      return res.status(400).json({ errorMessage: "Invalid post ID" });
-    }
-
-    let incoming: EditPostSchemaType;
-    try {
-      const raw = {
-        ...req.body,
-        ...(req.body.categoryId && {
-          categoryId: parseInt(req.body.categoryId),
-        }),
-        ...(req.body.conditionLevel && {
-          conditionLevel: parseInt(req.body.conditionLevel),
-        }),
-        ...(req.body.lat && { lat: parseFloat(req.body.lat) }),
-        ...(req.body.lng && { lng: parseFloat(req.body.lng) }),
-        ...(req.body.expiresAt === "" && { expiresAt: null }),
-        ...(req.body.items && { items: JSON.parse(req.body.items) }),
-        ...(req.body.deleteImageIds && {
-          deleteImageIds: JSON.parse(req.body.deleteImageIds),
-        }),
-      };
-      incoming = EditPostSchema.parse(raw);
-    } catch (error) {
-      console.error("Edit post validation error:", error);
-      return handleError(error, res);
-    }
-
-    const userRole = req.user!.role;
-    try {
-      const updatedPost = await postService.updatePost(
-        publicId,
-        userId,
-        incoming,
-        files,
-        userRole,
-      );
-
-      res.status(200).json({
-        message: "Post updated successfully",
-        post: updatedPost,
-      });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        if (error.message === "POST_NOT_FOUND") {
-          return res.status(404).json({ errorMessage: "Post not found" });
-        }
-        if (error.message === "FORBIDDEN") {
-          return res.status(403).json({
-            errorMessage: "Forbidden: You are not the owner of this post",
-          });
-        }
-        if (error.message === "INVALID_CATEGORY") {
-          return res.status(400).json({ errorMessage: "Invalid category" });
-        }
-      }
-      console.error("⚠️ Edit post error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
-    }
-  },
-);
-
-//* Delete post api (Soft Delete using public_id)
-router.delete(
-  "/:id",
-  requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const publicId = req.params.id;
-      const userId = req.user!.userId;
-
-      if (!publicId) {
-        return res.status(400).json({ errorMessage: "Invalid post ID" });
-      }
-
-      const userRole = req.user!.role;
-      await postService.deletePost(publicId, userId, userRole);
-      res.status(200).json({ message: "Post deleted successfully" });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        if (error.message === "POST_NOT_FOUND") {
-          return res.status(404).json({ errorMessage: "Post not found" });
-        }
-        if (error.message === "FORBIDDEN") {
-          return res.status(403).json({
-            errorMessage: "Forbidden: You are not the owner of this post",
-          });
-        }
-      }
-      console.error("Delete post error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
-    }
-  },
-);
 
 //* Manual Trigger Embedding API (POST /:id/embedding)
 // 安全防護：限管理員 (admin) 角色可手動呼叫，嚴格防止一般用戶調用消耗 OpenAI Credits

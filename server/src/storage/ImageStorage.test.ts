@@ -35,6 +35,16 @@ describe("ImageStorage Module Tests", () => {
       await storage.delete([key]);
       expect(storage.hasFile(key)).toBe(false);
     });
+
+    it("should generate mock presigned upload URL and retrieve buffer", async () => {
+      const stagingKey = "staging/posts/mock-id.jpg";
+      const presignedUrl = await storage.getPresignedUploadUrl(stagingKey, "image/jpeg");
+      expect(presignedUrl).toBe(`https://cdn.megaweaving.net/mock-upload/${stagingKey}`);
+
+      storage.setFile(stagingKey, Buffer.from("raw-image-bytes"));
+      const retrieved = await storage.getObjectBuffer(stagingKey);
+      expect(retrieved.toString()).toBe("raw-image-bytes");
+    });
   });
 
   describe("S3ImageStorage URL resolution matching client imageUtils", () => {

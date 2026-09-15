@@ -1,8 +1,32 @@
 services:
-  redis:
-    container_name: megaweave-redis-dev
-    image: redis/redis-stack:latest
+  # 1. 快取實例：Session, Socket.IO, 防刷冷卻, Trending 排行榜
+  # 2GB 伺服器配置：上限 128MB，volatile-lru 確保過期 key 主動淘汰
+  redis-cache:
+    container_name: megaweave-redis-cache-dev
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy volatile-lru
     restart: unless-stopped
     ports:
       - "6379:6379"
-      - "8001:8001" # 方便前端/後端打開 Redis Insight 檢視快取與向量索引
+
+  # 2. 隊列實例：BullMQ 佇列任務 (AOF 每秒持久化)
+  # 2GB 伺服器配置：上限 128MB，配合佇列自動修剪 (removeOnComplete)，常態僅佔 10~20MB
+  redis-queue:
+    container_name: megaweave-redis-queue-dev
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+
+  # 3. 向量實例：Redis Stack (RediSearch + HNSW Index)
+  # 2GB 伺服器配置：上限 384MB，足夠支撐數千篇貼文與使用者的 Float32 向量索引
+  redis-vector:
+    container_name: megaweave-redis-vector-dev
+    image: redis/redis-stack:latest
+    restart: unless-stopped
+    environment:
+      - REDIS_ARGS=--maxmemory 384mb --maxmemory-policy noeviction
+    ports:
+      - "6381:6379"
+      - "8001:8001" # Redis Insight UI

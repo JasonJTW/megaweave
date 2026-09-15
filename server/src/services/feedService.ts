@@ -4,7 +4,7 @@
 import { RowDataPacket } from "mysql2";
 import { RESP_TYPES } from "@redis/client";
 import dbPool from "../utils/db";
-import { getRedisClient } from "../utils/redis";
+import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { locationService } from "./locationService";
 
 export interface FeedParams {
@@ -207,7 +207,7 @@ export class FeedService {
       return cached.buf;
     }
 
-    const redis = getRedisClient();
+    const redis = getVectorRedisClient();
 
     // 1. Redis 讀取
     try {
@@ -450,7 +450,7 @@ export class FeedService {
 
       if (missingIds.length > 0) {
         try {
-          const redis = getRedisClient();
+          const redis = getVectorRedisClient();
           const rawBuffers = await Promise.all(
             missingIds.map((id) =>
               Promise.resolve(
@@ -577,7 +577,7 @@ export class FeedService {
     const limit = Math.max(1, Math.min(50, params.limit || 20));
     const offset = (page - 1) * limit;
 
-    const redis = getRedisClient();
+    const redis = getCacheRedisClient();
     let postIds: number[] = [];
     let totalPosts = 0;
 
@@ -633,7 +633,7 @@ export class FeedService {
     const page = Math.max(1, params.page || 1);
     const limit = Math.max(1, Math.min(50, params.limit || 20));
 
-    const redis = getRedisClient();
+    const redis = getVectorRedisClient();
     const CANDIDATE_LIMIT = Math.max(150, (page + 2) * limit);
 
     interface CandidateInfo {

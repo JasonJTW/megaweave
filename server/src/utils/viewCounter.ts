@@ -1,4 +1,4 @@
-import { getRedisClient } from "./redis";
+import { getCacheRedisClient } from "./redis";
 
 const VIEW_COOLDOWN_SECONDS = 60 * 60; // 設定冷卻時間：1小時
 const REDIS_VIEW_KEY_PREFIX = "view_cooldown";
@@ -13,7 +13,7 @@ export async function shouldIncrementView(
   postId: number,
   viewerIdentifier: string
 ): Promise<boolean> {
-  const redis = getRedisClient();
+  const redis = getCacheRedisClient();
   const key = `${REDIS_VIEW_KEY_PREFIX}:${postId}:${viewerIdentifier}`;
 
   try {

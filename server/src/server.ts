@@ -17,7 +17,7 @@ import rateLimit from "express-rate-limit";
 // detect aborted requests. With concurrent traffic the default limit of 10
 // listeners is quickly exceeded. Raise it here before any middleware is wired.
 http.ServerResponse.prototype.setMaxListeners(50);
-import { connectRedis, disconnectRedis, getRedisClient } from "./utils/redis";
+import { connectRedis, disconnectRedis, getCacheRedisClient } from "./utils/redis";
 import { closeDatabase } from "./utils/db";
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
@@ -86,7 +86,7 @@ async function startServer() {
       await initHotScoreCron();
     }
 
-    const redisClient = getRedisClient();
+    const redisClient = getCacheRedisClient();
 
     //* 1.Get Redis clients for Socket.IO adapter
     const pubClient = redisClient;

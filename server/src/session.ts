@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { UserSession } from "./schema";
 import crypto from "crypto";
-import { getRedisClient, connectRedis, isRedisConnected } from "./utils/redis";
+import { getCacheRedisClient, connectRedis, isRedisConnected } from "./utils/redis";
 import { CookieOptions, Request, Response } from "express";
 import { sessionSchema } from "./schema";
 import dotenv from "dotenv";
@@ -24,7 +24,7 @@ if (
   );
 }
 
-const redisClient = getRedisClient();
+const redisClient = getCacheRedisClient();
 
 // ✅ 自定義錯誤類別
 export class SessionError extends Error {

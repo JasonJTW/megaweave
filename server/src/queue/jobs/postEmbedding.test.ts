@@ -1,5 +1,5 @@
 import { processPostEmbedding, PostEmbeddingJobData } from "./postEmbedding";
-import { getRedisClient } from "../../utils/redis";
+import { getRedisClient, getVectorRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import OpenAI from "openai";
 import { Job } from "bullmq";
@@ -22,6 +22,7 @@ describe("postEmbedding worker", () => {
       hSet: jest.fn().mockResolvedValue("OK"),
     };
     (getRedisClient as jest.Mock).mockReturnValue(mockRedis);
+    (getVectorRedisClient as jest.Mock).mockReturnValue(mockRedis);
   });
 
   it("fetches embedding from OpenAI and writes FLOAT32 buffer to Redis and JSON to MySQL", async () => {

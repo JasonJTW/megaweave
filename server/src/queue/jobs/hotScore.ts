@@ -2,7 +2,7 @@
 // Job 型別定義 + Processor：定期計算全站貼文 HotScore，更新 Redis feed:trending 及 MySQL posts.hot_score
 
 import { Job } from "bullmq";
-import { getRedisClient } from "../../utils/redis";
+import { getCacheRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import { RowDataPacket } from "mysql2";
 
@@ -122,7 +122,7 @@ export async function processCalculateHotScore(
   }
 
   // 3. 更新 Redis ZSET feed:trending（採用原子交換 RENAME 模式，避免殘留過期商品）
-  const redis = getRedisClient();
+  const redis = getCacheRedisClient();
   const tempKey = `feed:trending:temp:${Date.now()}`;
 
   try {
@@ -177,7 +177,7 @@ export async function processCalculateHotScore(
 
   // 記錄本次執行時間，供啟動時防抖判斷（TTL 1 小時，防止 key 永久殘留）
   try {
-    const redis = getRedisClient();
+    const redis = getCacheRedisClient();
     await redis.set("hot-score:last-run", String(Date.now()), { EX: 60 * 60 });
   } catch (err) {
     await logWarn("failed to write last-run timestamp", err);

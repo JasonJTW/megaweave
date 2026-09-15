@@ -20,7 +20,7 @@ import {
 import { generatePostText } from "../utils/generatePostText";
 import { fetchEmbedding } from "../queue/jobs/postEmbedding";
 import { calculatePostHotScore } from "../queue/jobs/hotScore";
-import { getRedisClient } from "../utils/redis";
+import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { LocationInputData } from "../types/location";
 import { locationService } from "./locationService";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
@@ -227,7 +227,7 @@ export class PostService {
           });
 
           if (initialScore > 0) {
-            const redis = getRedisClient();
+            const redis = getCacheRedisClient();
             await redis.zAdd("feed:trending", {
               score: initialScore,
               value: String(postId),
@@ -811,10 +811,11 @@ export class PostService {
 
     // 🌟 即時自 Redis 移除已刪除的貼文（避免 feed:trending 與向量檢索殘留）
     try {
-      const redis = getRedisClient();
-      await Promise.all([
-        redis.zRem("feed:trending", String(postId)),
-        redis.del(`post:${postId}`),
+      const cacheRedis = getCacheRedisClient();
+      const vectorRedis = getVectorRedisClient();
+      await Promise.allSettled([
+        cacheRedis.zRem("feed:trending", String(postId)),
+        vectorRedis.del(`post:${postId}`),
       ]);
     } catch (redisErr) {
       console.warn("⚠️ Failed to remove deleted post from Redis:", redisErr);
@@ -878,7 +879,7 @@ export class PostService {
     } = await fetchEmbedding(text);
 
     // 寫入 Redis 向量索引
-    const redis = getRedisClient();
+    const redis = getVectorRedisClient();
     await redis.hSet(`post:${postId}`, {
       v: vectorBuffer,
       post_id: postId,

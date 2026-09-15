@@ -13,8 +13,8 @@ help:
 	@echo "──────────────────────────────────────────"
 	@echo "  make install      安裝所有依賴（client + server）"
 	@echo "  make dev          同時啟動前後端開發伺服器（需要兩個 terminal）"
-	@echo "  make redis        啟動開發用 Redis Stack（Docker）"
-	@echo "  make redis-stop   停止開發用 Redis Stack"
+	@echo "  make redis        啟動開發用 3-Instance Redis（Cache:6379, Queue:6380, Vector:6381）"
+	@echo "  make redis-stop   停止開發用 Redis 容器群"
 	@echo "  make build        Production build（client + server）"
 	@echo "  make build-dev    Dev build（client + server）"
 	@echo "  make test         執行所有測試"
@@ -55,11 +55,13 @@ dev-server:
 # Redis（開發用）
 # -----------------------------------------------------------------------------
 redis:
-	@echo "🔴 啟動開發用 Redis Stack..."
+	@echo "🔴 啟動開發用 3-Instance Redis (Cache, Queue, Vector)..."
 	docker compose -f docker-compose.dev.yml up -d
-	@echo "✅ Redis 已啟動"
-	@echo "   連線：redis://localhost:6379"
-	@echo "   Redis Insight UI：http://localhost:8001"
+	@echo "✅ 3-Instance Redis 已啟動："
+	@echo "   [Cache]  redis://localhost:6379 (Session, Socket.IO, Cooldowns, Trending)"
+	@echo "   [Queue]  redis://localhost:6380 (BullMQ, AOF enabled)"
+	@echo "   [Vector] redis://localhost:6381 (HNSW Index, Embeddings)"
+	@echo "   [Insight] UI：http://localhost:8001"
 
 redis-stop:
 	docker compose -f docker-compose.dev.yml down

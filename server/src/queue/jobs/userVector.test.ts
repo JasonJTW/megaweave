@@ -1,5 +1,5 @@
 import { processUserVector, UserVectorJobData } from "./userVector";
-import { getRedisClient } from "../../utils/redis";
+import { getRedisClient, getVectorRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import { Job } from "bullmq";
 
@@ -23,6 +23,7 @@ describe("userVector worker", () => {
       sAdd: jest.fn().mockResolvedValue(1),
     };
     (getRedisClient as jest.Mock).mockReturnValue(mockRedis);
+    (getVectorRedisClient as jest.Mock).mockReturnValue(mockRedis);
   });
 
   function createFloat32Buffer(vec: number[]): Buffer {

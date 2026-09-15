@@ -217,8 +217,8 @@ jobs:
         run: |
           echo "⬇️ Pulling latest backend image from GHCR..."
           docker compose pull backend-api backend-worker
-          echo "🚀 Starting backend-api, backend-worker & redis containers..."
-          docker compose up -d backend-api backend-worker
+          echo "🚀 Starting backend-api, backend-worker & redis containers with --remove-orphans..."
+          docker compose up -d --remove-orphans backend-api backend-worker
 
       - name: Verify backend containers
         run: |
@@ -232,11 +232,13 @@ jobs:
           else
             echo "❌ One or more backend containers failed to start"
             if [ "$API_RUNNING" != "true" ]; then
-              echo "Logs from megaweave-backend-api:"
+              echo "Logs from megaweave-backend-api:
+"
               docker logs megaweave-backend-api --tail 50 || true
             fi
             if [ "$WORKER_RUNNING" != "true" ]; then
-              echo "Logs from megaweave-backend-worker:"
+              echo "Logs from megaweave-backend-worker:
+"
               docker logs megaweave-backend-worker --tail 50 || true
             fi
             exit 1
@@ -300,8 +302,8 @@ jobs:
         run: |
           echo "⬇️ Pulling latest frontend image from GHCR..."
           docker compose pull frontend
-          echo "🚀 Starting frontend container..."
-          docker compose up -d frontend
+          echo "🚀 Starting frontend container with --remove-orphans..."
+          docker compose up -d --remove-orphans frontend
 
       - name: Verify frontend container
         run: |

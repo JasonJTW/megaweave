@@ -1,10 +1,10 @@
 import { Job } from "bullmq";
 import { RESP_TYPES } from "@redis/client";
-import { getRedisClient } from "../../utils/redis";
+import { getVectorRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import { RowDataPacket } from "mysql2";
 
-// ─── 行為權重 ──────────────────────────────────────────────────────────────────
+// ─── 行為權重 ────────────────────────────────────────────────────────────────
 
 export type UserActionType = "view" | "like" | "comment" | "weave";
 
@@ -18,7 +18,7 @@ const ACTION_WEIGHTS: Record<UserActionType, number> = {
 // EMA alpha = 行為對應的 α，越強的行為讓新商品向量佔比越高
 // V_user_new = Normalize((1 - α) * V_user_old + α * V_product)
 
-// ─── Job Payload ──────────────────────────────────────────────────────────────
+// ─── Job Payload ─────────────────────────────────────────────────────────────
 
 export interface UserVectorJobData {
   userId: number;
@@ -57,7 +57,7 @@ function toFloat32Buffer(vec: number[]): Buffer {
  * 需在 sendCommand 傳入 typeMapping: { [RESP_TYPES.BLOB_STRING]: Buffer } 才能取得 Buffer。
  */
 async function fetchPostVector(postId: number): Promise<number[] | null> {
-  const redis = getRedisClient();
+  const redis = getVectorRedisClient();
   try {
     const raw = await redis.sendCommand<Buffer | null>(
       ["HGET", `post:${postId}`, "v"],
@@ -104,7 +104,7 @@ async function fetchPostVector(postId: number): Promise<number[] | null> {
 async function fetchUserVector(
   userId: number,
 ): Promise<number[] | null> {
-  const redis = getRedisClient();
+  const redis = getVectorRedisClient();
 
   // 1. 先讀 Redis（worker 每次更新後都會 HSET 到這裡）
   try {
@@ -137,7 +137,7 @@ async function fetchUserVector(
     if (rows.length === 0 || !rows[0].interest_vector) return null;
 
     const raw = rows[0].interest_vector;
-    // MySQL JSON 欄位取出後已是 JS 物件，但型別不確定，統一用 JSON.parse 保險
+    // MySQL JSON 欄位取出後已是 JS 物件，但型別不確定，統一定用 JSON.parse 保險
     return typeof raw === "string" ? JSON.parse(raw) : (raw as number[]);
   } catch (err) {
     console.warn(`⚠️ Failed to fetch user vector from MySQL (user #${userId}):`, err);
@@ -146,7 +146,7 @@ async function fetchUserVector(
   return null;
 }
 
-// ─── Processor ────────────────────────────────────────────────────────────────
+// ─── Processor ───────────────────────────────────────────────────────────────
 
 export async function processUserVector(
   job: Job<UserVectorJobData>,
@@ -193,8 +193,8 @@ export async function processUserVector(
     `${logPrefix} – EMA α=${alpha}, dim=${dim}, norm updated`,
   );
 
-  // 4. 寫入 Redis  key: user:{userId}:vector
-  const redis = getRedisClient();
+  // 4. 寫入 Redis 向量實例 key: user:{userId}:vector
+  const redis = getVectorRedisClient();
   const redisKey = `user:${userId}:vector`;
   const vectorBuffer = toFloat32Buffer(newUserVec);
   await redis.hSet(redisKey, {

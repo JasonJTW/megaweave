@@ -4,7 +4,7 @@
 import { Job } from "bullmq";
 import OpenAI from "openai";
 import { RowDataPacket } from "mysql2";
-import { getRedisClient } from "../../utils/redis";
+import { getVectorRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import { generatePostText } from "../../utils/generatePostText";
 import { PostTextInput } from "../../types/post";
@@ -22,7 +22,7 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
-// ─── Metadata In-Memory Cache (0 DB query on hot cache) ───────────────────────
+// ─── Metadata In-Memory Cache (0 DB query on hot cache) ─────────────────────
 let categoryCache: Map<number, string> | null = null;
 let conditionCache: Map<number, string> | null = null;
 let lastCategoryCacheTime = 0;
@@ -70,14 +70,14 @@ async function getConditionName(
   return conditionCache.get(conditionLevel);
 }
 
-// ─── Job Payload ──────────────────────────────────────────────────────────────
+// ─── Job Payload ─────────────────────────────────────────────────────────────
 
 export interface PostEmbeddingJobData {
   postId: number;
   post: PostTextInput;
 }
 
-// ─── OpenAI Embedding ─────────────────────────────────────────────────────────
+// ─── OpenAI Embedding ────────────────────────────────────────────────────────
 
 /**
  * 呼叫 OpenAI text-embedding-3-small，回傳 FLOAT32 向量 Buffer 與原始 number[] 向量數值。
@@ -112,7 +112,7 @@ export async function fetchEmbedding(text: string): Promise<{
   };
 }
 
-// ─── Processor ────────────────────────────────────────────────────────────────
+// ─── Processor ───────────────────────────────────────────────────────────────
 
 export async function processPostEmbedding(
   job: Job<PostEmbeddingJobData>,
@@ -147,9 +147,9 @@ export async function processPostEmbedding(
     `${logPrefix} embedding received (${vectorBuffer.length} bytes)`,
   );
 
-  // 4. 寫入 Redis 向量索引
+  // 4. 寫入 Redis 向量索引實例
   //    key 格式必須與 vectorIndexService PREFIX 一致：post:{id}
-  const redis = getRedisClient();
+  const redis = getVectorRedisClient();
   await redis.hSet(`post:${postId}`, {
     v: vectorBuffer,
     post_id: postId,

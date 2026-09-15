@@ -1,4 +1,4 @@
-import { getRedisClient } from "../utils/redis";
+import { getVectorRedisClient } from "../utils/redis";
 
 /**
  * 確保 Redis Vector Index (idx:posts_v) 存在。
@@ -8,7 +8,7 @@ import { getRedisClient } from "../utils/redis";
  * 改用 sendCommand 直接執行 FT.INFO / FT.CREATE 原始命令。
  */
 export async function ensureVectorIndexExists(): Promise<void> {
-  const redis = getRedisClient();
+  const redis = getVectorRedisClient();
 
   try {
     // 檢查索引是否已經存在

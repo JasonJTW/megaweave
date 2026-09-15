@@ -3,7 +3,7 @@ import {
   feedService,
   clearVectorMemoryCachesForTest,
 } from "./feedService";
-import { getRedisClient } from "../utils/redis";
+import { getRedisClient, getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import dbPool from "../utils/db";
 
 jest.mock("../utils/redis");
@@ -27,6 +27,8 @@ describe("FeedService", () => {
       zRange: jest.fn().mockResolvedValue([]),
     };
     (getRedisClient as jest.Mock).mockReturnValue(mockRedis);
+    (getCacheRedisClient as jest.Mock).mockReturnValue(mockRedis);
+    (getVectorRedisClient as jest.Mock).mockReturnValue(mockRedis);
   });
 
   function createFloat32Buffer(vec: number[]): Buffer {

@@ -4,79 +4,94 @@ import { createClient } from "@redis/client";
 import dotenv from "dotenv";
 dotenv.config();
 
-//! New insert
 let connectionPromise: Promise<void> | null = null;
 
-//* Create a static Redis client instance
-const redisClient = createClient({
-  url: process.env.REDIS_URL,
-  socket: {
-    keepAlive: true,
-    noDelay: true,
-    keepAliveInitialDelay: 10000, // Send keep-alive packet every 10 seconds
-    connectTimeout: 30000, // 30 秒連接超時
-    reconnectStrategy: (retries) => {
-      if (retries > 10) {
-        console.error(`❌ Redis connection failed after ${retries} retries`);
-        return new Error("Redis connection failed");
-      }
-      const delay = Math.min(retries * 1000, 10000);
-      console.log(`🔄 Redis reconnect attempt ${retries} in ${delay}ms`);
-      return delay;
+const CACHE_REDIS_URL =
+  process.env.REDIS_CACHE_URL || process.env.REDIS_URL || "redis://127.0.0.1:6379";
+
+const VECTOR_REDIS_URL =
+  process.env.REDIS_VECTOR_URL || process.env.REDIS_URL || "redis://127.0.0.1:6381";
+
+function createManagedRedisClient(name: string, url: string) {
+  const client = createClient({
+    url,
+    socket: {
+      keepAlive: true,
+      noDelay: true,
+      keepAliveInitialDelay: 10000,
+      connectTimeout: 30000,
+      reconnectStrategy: (retries) => {
+        if (retries > 10) {
+          console.error(`❌ [${name}] Redis connection failed after ${retries} retries`);
+          return new Error(`[${name}] Redis connection failed`);
+        }
+        const delay = Math.min(retries * 1000, 10000);
+        console.log(`🔄 [${name}] Redis reconnect attempt ${retries} in ${delay}ms`);
+        return delay;
+      },
     },
-  },
-  // 添加命令超時配置到根級別
-  commandsQueueMaxLength: 100,
-  pingInterval: 30000,
-});
+    commandsQueueMaxLength: 100,
+    pingInterval: 30000,
+  });
 
-redisClient.on("error", (err) => {
-  console.error("❌ Redis Client Error", err.message);
-  console.log("Redis URL: ", process.env.REDIS_URL);
+  client.on("error", (err) => {
+    console.error(`❌ [${name}] Redis Client Error:`, err.message);
+  });
 
-  //! New insert
-  connectionPromise = null;
-});
+  client.on("connect", () => {
+    console.log(`✅ [${name}] Redis client connected successfully.`);
+  });
 
-redisClient.on("connect", () => {
-  console.log("✅ Redis client connected successfully.");
-});
+  client.on("ready", () => {
+    console.log(`✅ [${name}] Redis client ready.`);
+  });
 
-redisClient.on("ready", () => {
-  console.log("✅ Redis client ready.");
-});
+  client.on("disconnect", () => {
+    console.log(`⚠️ [${name}] Redis client disconnected.`);
+    connectionPromise = null;
+  });
 
-redisClient.on("disconnect", () => {
-  console.log("⚠️ Redis client disconnected.");
-  connectionPromise = null;
-});
+  client.on("reconnecting", () => {
+    console.log(`🔄 [${name}] Redis client reconnecting...`);
+  });
 
-redisClient.on("reconnecting", () => {
-  console.log("🔄 Redis client reconnecting...");
-});
+  client.on("end", () => {
+    console.log(`[${name}] Redis connection ended.`);
+    connectionPromise = null;
+  });
 
-redisClient.on("end", () => {
-  console.log("Redis connection ended.");
-  connectionPromise = null;
-});
+  return client;
+}
+
+export type AppRedisClient = ReturnType<typeof createManagedRedisClient>;
+
+export const cacheRedisClient = createManagedRedisClient("cache", CACHE_REDIS_URL);
+export const vectorRedisClient = createManagedRedisClient("vector", VECTOR_REDIS_URL);
 
 export async function connectRedis(): Promise<void> {
-  // ✅ 如果已經在連接中，返回同一個 Promise
   if (connectionPromise) {
     return connectionPromise;
   }
 
-  // ✅ 如果已經連接，直接返回
-  if (redisClient.isOpen && redisClient.isReady) {
+  const needConnect = (client: AppRedisClient) =>
+    !client.isOpen || !client.isReady;
+
+  if (!needConnect(cacheRedisClient) && !needConnect(vectorRedisClient)) {
     return Promise.resolve();
   }
 
-  // ✅ 創建新的連接 Promise
   connectionPromise = (async () => {
     try {
-      console.log("🔌 Connecting to Redis...");
-      await redisClient.connect();
-      console.log("✅ Redis connected and ready");
+      console.log("🔌 Connecting to Redis instances (cache & vector)...");
+      const connects: Promise<unknown>[] = [];
+      if (needConnect(cacheRedisClient)) {
+        connects.push(cacheRedisClient.connect());
+      }
+      if (needConnect(vectorRedisClient)) {
+        connects.push(vectorRedisClient.connect());
+      }
+      await Promise.all(connects);
+      console.log("✅ All Redis clients connected and ready");
     } catch (error) {
       connectionPromise = null;
       console.error("❌ Failed to connect to Redis:", error);
@@ -87,79 +102,90 @@ export async function connectRedis(): Promise<void> {
   return connectionPromise;
 }
 
-//* Disconnect from Redis
-export async function disconnectRedis(): Promise<void> {
+async function disconnectSingleClient(
+  client: AppRedisClient,
+  name: string,
+): Promise<void> {
+  if (!client.isOpen) {
+    console.log(`ℹ️ [${name}] Redis was already closed, skipping quit`);
+    return;
+  }
+
   try {
-    console.log("📍 [1/5] disconnectRedis called");
+    console.log(`📍 [${name}] Calling client.quit() for graceful shutdown...`);
+    const quitPromise = client.quit();
+    const timeoutPromise = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error(`Quit timeout after 5s for ${name}`)), 5000),
+    );
 
-    connectionPromise = null;
-
-    console.log("📍 [2/5] Checking Redis status:");
-    console.log("  - isOpen:", redisClient.isOpen);
-    console.log("  - isReady:", redisClient.isReady);
-
-    if (redisClient.isOpen) {
-      console.log(
-        "📍 [3/5] Calling redisClient.quit() for graceful shutdown...",
-      );
-
-      // ✅ Add timeout protection
-      const quitPromise = redisClient.quit();
-      const timeoutPromise = new Promise<void>((_, reject) =>
-        setTimeout(() => reject(new Error("Quit timeout after 5s")), 5000),
-      );
-
-      try {
-        await Promise.race([quitPromise, timeoutPromise]);
-        console.log("📍 [4/5] Quit completed");
-        console.log("✅ [5/5] Redis client disconnected successfully");
-      } catch (timeoutError) {
-        console.warn("⚠️  Quit timeout, forcing destroy");
-        throw timeoutError;
-      }
-    } else {
-      console.log("ℹ️  [3/5] Redis was already closed, skipping quit");
-    }
+    await Promise.race([quitPromise, timeoutPromise]);
+    console.log(`✅ [${name}] Redis client disconnected successfully`);
   } catch (error) {
-    console.error("❌ Error during graceful Redis disconnect:", error);
-
-    // ✅ Force shutdown with destroy() (not disconnect())
+    console.warn(`⚠️ [${name}] Quit failed or timed out, forcing destroy:`, error);
     try {
-      console.log("📍 Attempting force shutdown with destroy()...");
-      redisClient.destroy();
-      console.log("✅ Redis force destroyed successfully");
+      client.destroy();
+      console.log(`✅ [${name}] Redis force destroyed successfully`);
     } catch (destroyError) {
-      console.error("❌ Force destroy also failed:", destroyError);
-      console.log("⚠️  Giving up on Redis cleanup, proceeding with shutdown");
+      console.error(`❌ [${name}] Force destroy also failed:`, destroyError);
     }
   }
 }
 
-//* Get Redis client instance
+export async function disconnectRedis(): Promise<void> {
+  connectionPromise = null;
+  console.log("📍 Disconnecting all Redis clients...");
+  await Promise.allSettled([
+    disconnectSingleClient(cacheRedisClient, "cache"),
+    disconnectSingleClient(vectorRedisClient, "vector"),
+  ]);
+  console.log("✅ Disconnect sequence completed");
+}
+
+export function getCacheRedisClient() {
+  if (!cacheRedisClient.isOpen || !cacheRedisClient.isReady) {
+    console.warn("⚠️  Cache Redis client is not ready. Call connectRedis() first.");
+  }
+  return cacheRedisClient;
+}
+
+export function getVectorRedisClient() {
+  if (!vectorRedisClient.isOpen || !vectorRedisClient.isReady) {
+    console.warn("⚠️  Vector Redis client is not ready. Call connectRedis() first.");
+  }
+  return vectorRedisClient;
+}
+
+// Backward compatibility alias (points to cache)
 export function getRedisClient() {
-  if (!redisClient.isOpen || !redisClient.isReady) {
-    console.warn("⚠️  Redis client is not ready. Call connectRedis() first.");
-  }
-  return redisClient;
+  return getCacheRedisClient();
 }
 
-//* Check if Redis is connected
 export function isRedisConnected(): boolean {
-  return redisClient.isOpen && redisClient.isReady;
+  return cacheRedisClient.isOpen && cacheRedisClient.isReady;
 }
 
-// ✅ 新增：健康檢查函數
-export async function checkRedisHealth(): Promise<boolean> {
+export async function checkRedisHealth(): Promise<{ cache: boolean; vector: boolean }> {
+  let cacheOk = false;
+  let vectorOk = false;
   try {
-    if (!isRedisConnected()) {
-      return false;
+    if (cacheRedisClient.isOpen && cacheRedisClient.isReady) {
+      await cacheRedisClient.ping();
+      cacheOk = true;
     }
-    await redisClient.ping();
-    return true;
-  } catch (error) {
-    console.error("❌ Redis health check failed:", error);
-    return false;
+  } catch (err) {
+    console.error("❌ Cache Redis health check failed:", err);
   }
+
+  try {
+    if (vectorRedisClient.isOpen && vectorRedisClient.isReady) {
+      await vectorRedisClient.ping();
+      vectorOk = true;
+    }
+  } catch (err) {
+    console.error("❌ Vector Redis health check failed:", err);
+  }
+
+  return { cache: cacheOk, vector: vectorOk };
 }
 
-export default redisClient;
+export default cacheRedisClient;

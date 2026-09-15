@@ -12,7 +12,7 @@ import { PostEmbeddingJobData } from "./jobs/postEmbedding";
 import { UserVectorJobData } from "./jobs/userVector";
 
 import { EmailTemplateProps } from "../emails/EmailTemplate";
-import { getRedisClient } from "../utils/redis";
+import { getCacheRedisClient } from "../utils/redis";
 
 export const postImageQueue = new Queue<
   PostUploadImageJobData | PostDeleteImageJobData
@@ -118,7 +118,7 @@ export async function enqueueUserVectorUpdate(
       : ACTION_VECTOR_COOLDOWN_SECONDS;
 
   try {
-    const redis = getRedisClient();
+    const redis = getCacheRedisClient();
     const dedupKey = `user_vector_${data.action}_cd:${data.userId}:${data.postId}`;
     const acquired = await redis.set(dedupKey, "1", {
       NX: true,
@@ -211,7 +211,7 @@ export async function initHotScoreCron(): Promise<void> {
   const LAST_RUN_KEY = "hot-score:last-run";
 
   try {
-    const redis = getRedisClient();
+    const redis = getCacheRedisClient();
     const lastRunStr = await redis.get(LAST_RUN_KEY);
     const lastRunMs = lastRunStr ? Number(lastRunStr) : 0;
     const elapsedMs = Date.now() - lastRunMs;

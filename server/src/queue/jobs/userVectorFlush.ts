@@ -1,9 +1,9 @@
 import { Job } from "bullmq";
 import { RESP_TYPES } from "@redis/client";
-import { getRedisClient } from "../../utils/redis";
+import { getVectorRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────
 
 /** Redis Set：記錄哪些 userId 的向量已更新、待寫入 MySQL */
 const DIRTY_SET_KEY = "user:vector:dirty";
@@ -14,7 +14,7 @@ const DIRTY_SET_KEY = "user:vector:dirty";
  */
 const FLUSH_BATCH_SIZE = 500;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 /**
  * 從 Redis user:{userId}:vector 讀取 FLOAT32 LE Buffer，解碼為 number[]。
@@ -23,7 +23,7 @@ const FLUSH_BATCH_SIZE = 500;
 async function fetchUserVectorFromRedis(
   userId: number,
 ): Promise<number[] | null> {
-  const redis = getRedisClient();
+  const redis = getVectorRedisClient();
   try {
     const raw = await redis.sendCommand<Buffer | null>(
       ["HGET", `user:${userId}:vector`, "v"],
@@ -50,7 +50,7 @@ async function fetchUserVectorFromRedis(
   return null;
 }
 
-// ─── Processor ────────────────────────────────────────────────────────────────
+// ─── Processor ─────────────────────────────────────────────────────────────
 
 /**
  * Write-Back flush processor。
@@ -67,13 +67,15 @@ export async function processUserVectorFlush(
   const logPrefix = "🗄️ [vector-flush]";
   await job.log(`${logPrefix} start`);
 
-  const redis = getRedisClient();
+  const redis = getVectorRedisClient();
 
   // 1. 原子性地從 dirty set 取出一批 userId
   // 使用 sendCommand 直接呼叫 SPOP key count，確保回傳型別為 string[]
-  const members = await redis.sendCommand<string[]>(
-    ["SPOP", DIRTY_SET_KEY, String(FLUSH_BATCH_SIZE)],
-  );
+  const members = await redis.sendCommand<string[]>([
+    "SPOP",
+    DIRTY_SET_KEY,
+    String(FLUSH_BATCH_SIZE),
+  ]);
   if (!members || members.length === 0) {
     await job.log(`${logPrefix} – skip: dirty set empty`);
     return { flushedCount: 0 };

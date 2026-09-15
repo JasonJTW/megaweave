@@ -23,6 +23,7 @@ import PrivateMessageIcon from "./components/icons/PrivateMessageIcon";
 import { Post, PostsResponse, PostLocationField } from "./types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImagesParallel } from "@/utils/imageProcessor";
+import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { parseGooglePlace } from "@/utils/locationUtils";
 import OverlayTour, { TourStep } from "./components/OverlayTour";
 
@@ -486,33 +487,8 @@ const PostsApp = () => {
   const handleCreatePost = async (data: PostFormSubmitData) => {
     setIsCreating(true);
     try {
-      const formData = new FormData();
-      formData.append("title", data.title);
-      formData.append("content", data.content);
-      formData.append("location", data.location);
-      if (data.place_id) formData.append("place_id", data.place_id);
-      if (data.location_name)
-        formData.append("location_name", data.location_name);
-      if (data.location_url) formData.append("location_url", data.location_url);
-      if (data.location) formData.append("full_address", data.location);
-      if (data.province) formData.append("province", data.province);
-      if (data.city) formData.append("city", data.city);
-      if (data.route) formData.append("route", data.route);
-      if (data.zip_code || data.zip)
-        formData.append("zip", (data.zip_code || data.zip)!);
-      if (data.lat !== undefined && data.lat !== null)
-        formData.append("lat", data.lat.toString());
-      if (data.lng !== undefined && data.lng !== null)
-        formData.append("lng", data.lng.toString());
-      formData.append("tags", data.tags);
-      formData.append("categoryId", data.categoryId.toString());
-      formData.append("conditionLevel", data.conditionLevel.toString());
-      if (data.expires_at) {
-        formData.append("expires_at", data.expires_at.toISOString());
-      }
-      formData.append("type", postType);
-
-      // 壓縮並添加圖片 (平行處理 + 量化基準測試日誌)
+      // 1. 壓縮圖片並直接上傳至 S3 Staging bucket
+      let stagingKeys: string[] = [];
       if (data.newImages && data.newImages.length > 0) {
         const processedImages = await compressImagesParallel(
           data.newImages,
@@ -520,18 +496,41 @@ const PostsApp = () => {
           1200,
           0.85,
         );
-        for (const { blob, filename } of processedImages) {
-          formData.append("images", blob, filename);
-        }
+        stagingKeys = await uploadImagesToS3Staging(
+          processedImages.map(({ blob, filename }) => ({ blob, filename })),
+          hostName || "",
+        );
       }
 
-      if (data.items && data.items.length > 0) {
-        formData.append("items", JSON.stringify(data.items));
-      }
+      // 2. 以乾淨的 JSON payload 送出貼文建立請求
+      const postPayload = {
+        title: data.title,
+        content: data.content,
+        type: postType,
+        categoryId: Number(data.categoryId),
+        conditionLevel: Number(data.conditionLevel),
+        tags: data.tags || undefined,
+        place_id: data.place_id || undefined,
+        location_name: data.location_name || undefined,
+        location_url: data.location_url || undefined,
+        full_address: data.location || undefined,
+        province: data.province || undefined,
+        city: data.city || undefined,
+        route: data.route || undefined,
+        zip: data.zip_code || data.zip || undefined,
+        lat: data.lat !== undefined && data.lat !== null ? Number(data.lat) : undefined,
+        lng: data.lng !== undefined && data.lng !== null ? Number(data.lng) : undefined,
+        expiresAt: data.expires_at ? data.expires_at.toISOString() : undefined,
+        items: data.items && data.items.length > 0 ? data.items : undefined,
+        stagingKeys,
+      };
 
       const response = await fetch(`${hostName}/api/posts`, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(postPayload),
         credentials: "include",
       });
 
@@ -543,9 +542,13 @@ const PostsApp = () => {
         const errorData = await response.json();
         toast.error(errorData.errorMessage || "Failed to create post");
       }
-    } catch (error) {
-      console.error("Network error:", error);
-      toast.error("Network error, please try again later.");
+    } catch (error: unknown) {
+      console.error("Create post error:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Network error, please try again later.";
+      toast.error(message);
     } finally {
       setIsCreating(false);
     }

@@ -126,8 +126,16 @@ router.get("/bio", requireAuth, async (req: Request, res: Response) => {
 router.post("/bio", requireAuth, async (req: Request, res: Response) => {
   let query;
   if (!req.user) {
-    return res.status(404).json({ errorMessage: "Please signin first" });
+    return res.status(401).json({ errorMessage: "Please login first" });
   }
+    if (
+      (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
+      (req.body.userId && Number(req.body.userId) !== req.user.userId)
+    ) {
+      return res.status(403).json({
+        errorMessage: "Forbidden: You cannot modify another user's profile",
+      });
+    }
   const userId = req.user.userId;
   const newBio = req.body.bio;
   try {
@@ -145,7 +153,7 @@ router.post("/bio", requireAuth, async (req: Request, res: Response) => {
 router.get("/custom_name", requireAuth, async (req: Request, res: Response) => {
   let query;
   if (!req.user) {
-    return res.status(404).json({ errorMessage: "Please signin first" });
+    return res.status(401).json({ errorMessage: "Please login first" });
   }
   const userId = req.user.userId;
   try {
@@ -167,7 +175,15 @@ router.post(
   async (req: Request, res: Response) => {
     let query;
     if (!req.user) {
-      return res.status(404).json({ errorMessage: "Please signin first" });
+      return res.status(401).json({ errorMessage: "Please login first" });
+    }
+    if (
+      (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
+      (req.body.userId && Number(req.body.userId) !== req.user.userId)
+    ) {
+      return res.status(403).json({
+        errorMessage: "Forbidden: You cannot modify another user's profile",
+      });
     }
     const userId = req.user.userId;
     const newCustomName = req.body.custom_name;
@@ -229,7 +245,15 @@ router.post(
   async (req: Request, res: Response) => {
     let query;
     if (!req.user) {
-      return res.status(404).json({ errorMessage: "Please signin first" });
+      return res.status(401).json({ errorMessage: "Please login first" });
+    }
+    if (
+      (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
+      (req.body.userId && Number(req.body.userId) !== req.user.userId)
+    ) {
+      return res.status(403).json({
+        errorMessage: "Forbidden: You cannot modify another user's profile",
+      });
     }
     const userId = req.user.userId;
     const newContactEmail = req.body.contact_email;
@@ -289,7 +313,15 @@ router.post(
   async (req: Request, res: Response) => {
     let query;
     if (!req.user) {
-      return res.status(404).json({ errorMessage: "Please signin first" });
+      return res.status(401).json({ errorMessage: "Please login first" });
+    }
+    if (
+      (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
+      (req.body.userId && Number(req.body.userId) !== req.user.userId)
+    ) {
+      return res.status(403).json({
+        errorMessage: "Forbidden: You cannot modify another user's profile",
+      });
     }
     const userId = req.user.userId;
     const newContactPhone = req.body.contact_phone;

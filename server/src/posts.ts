@@ -336,12 +336,14 @@ router.put(
       return handleError(error, res);
     }
 
+    const userRole = req.user!.role;
     try {
       const updatedPost = await postService.updatePost(
         publicId,
         userId,
         incoming,
         files,
+        userRole,
       );
 
       res.status(200).json({
@@ -381,7 +383,8 @@ router.delete(
         return res.status(400).json({ errorMessage: "Invalid post ID" });
       }
 
-      await postService.deletePost(publicId, userId);
+      const userRole = req.user!.role;
+      await postService.deletePost(publicId, userId, userRole);
       res.status(200).json({ message: "Post deleted successfully" });
     } catch (error: unknown) {
       if (error instanceof Error) {

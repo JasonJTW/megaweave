@@ -77,18 +77,32 @@ export async function optionalAuth(
 /**
  * 角色驗證中間件工廠函數
  * 檢查用戶是否具有指定的角色 (限定 UserRole: "user" | "admin" | "contributor")
+ * 權威角色來源：始終以 Redis session 中的 req.user.role 為準，完全忽略客戶端可能偽造的 user-role cookie
  */
 export function requireRole(...allowedRoles: UserRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
+    // 若尚未經由 requireAuth 注入 req.user，嘗試從權威 session 載入
+    if (!req.user) {
+      try {
+        const user = await getUserFromCookie(req);
+        if (user && user.userId && user.email) {
+          req.user = user;
+        }
+      } catch (error) {
+        console.error("requireRole auth check error:", error);
+      }
+    }
+
     if (!req.user) {
       return res.status(401).json({
-        errorMessage: "Authentication required",
+        errorMessage: "Please login first",
       });
     }
 
+    // 嚴格比對來自 Redis session 的權威角色
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
-        errorMessage: "Insufficient permissions",
+        errorMessage: "Forbidden: Insufficient permissions",
       });
     }
 

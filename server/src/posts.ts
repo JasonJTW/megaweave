@@ -408,19 +408,29 @@ router.delete(
   },
 );
 
-// Get single post by publicId
+//* Get post details api (using public_id)
 router.get("/:id", async (req: Request, res: Response) => {
-  const publicId = req.params.id;
   try {
-    const post = await postService.getPostByPublicId(publicId);
+    const publicId = req.params.id;
+    if (!publicId) {
+      return res.status(400).json({ errorMessage: "Invalid post ID" });
+    }
+
+    const session = await getUserFromCookie(req);
+    const currentUserId = session?.userId;
+    const viewerIp =
+      (req.headers["x-forwarded-for"] as string) || req.ip || "unknown_ip";
+
+    const post = await postService.getPostByPublicId(publicId, {
+      currentUserId,
+      viewerIp,
+    });
 
     if (!post) {
       return res.status(404).json({ errorMessage: "Post not found" });
     }
 
     // 🧠 登入使用者看非自己的貼文 → 觸發興趣向量更新（fire-and-forget）
-    const session = await getUserFromCookie(req);
-    const currentUserId = session?.userId;
     if (currentUserId && post.user_id !== currentUserId) {
       enqueueUserVectorUpdate({
         userId: currentUserId,
@@ -431,7 +441,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       );
     }
 
-    res.status(200).json(post);
+    res.status(200).json({ post });
   } catch (error) {
     console.error("Get post error:", error);
     return res.status(500).json({ errorMessage: "Internal server error" });

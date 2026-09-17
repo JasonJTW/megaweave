@@ -47,7 +47,6 @@ import {
   RefractiveButton,
 } from "./components/Refractive.client";
 
-import DeleteIcon from "./components/icons/DeleteIcon";
 import SearchIcon from "./components/icons/SearchIcon";
 import ElfIcon from "./components/icons/ElfIcon";
 import ReuseIcon from "./components/icons/ReuseIcon";
@@ -160,6 +159,7 @@ const PostsApp = () => {
 
   // 搜索和篩選狀態
   const [searchTerm, setSearchTerm] = useState("");
+  const [submittedSearchTerm, setSubmittedSearchTerm] = useState("");
 
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
@@ -169,6 +169,28 @@ const PostsApp = () => {
   const [postFilterType, setPostFilterType] = useState<Post["type"] | "">("");
   const [hideOverdue, setHideOverdue] = useState(false);
   const categoryInteractionLockRef = useRef(false);
+
+  // 語意搜尋會呼叫 embedding API，因此只在使用者明確送出時才更新查詢。
+  const submitSearch = () => setSubmittedSearchTerm(searchTerm.trim());
+  const updateSearchTerm = (value: string) => {
+    setSearchTerm(value);
+    // Backspace 刪到空白時，搜尋意圖已被取消；不可保留舊的已送出 query。
+    if (!value.trim()) setSubmittedSearchTerm("");
+  };
+  const clearSearch = () => {
+    setSearchTerm("");
+    setSubmittedSearchTerm("");
+  };
+  const hasSearch = Boolean(searchTerm || submittedSearchTerm);
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    // 注音／拼音等 IME 用 Enter 選字時仍在 composition 中，不可誤送出搜尋。
+    // keyCode 229 是部分瀏覽器在 IME 組字期間的相容訊號。
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitSearch();
+    }
+  };
 
   const getKey = useCallback(
     (pageIndex: number, previousPageData: PostsResponse | null) => {
@@ -183,7 +205,7 @@ const PostsApp = () => {
         limit: "12",
       });
 
-      if (searchTerm) params.append("search", searchTerm);
+      if (submittedSearchTerm) params.append("search", submittedSearchTerm);
       if (selectedCategory) params.append("category_id", selectedCategory);
       if (selectedLocation) params.append("location", selectedLocation);
       if (searchCity) params.append("city", searchCity);
@@ -200,7 +222,7 @@ const PostsApp = () => {
     [
       isReady,
       hostName,
-      searchTerm,
+      submittedSearchTerm,
       selectedCategory,
       selectedLocation,
       searchCity,
@@ -669,15 +691,23 @@ const PostsApp = () => {
                     isStuck ? "type-body-t2" : "type-h3"
                   }`}
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => updateSearchTerm(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                 />
-                {searchTerm ? (
-                  <button onClick={() => setSearchTerm("")}>
+                {hasSearch ? (
+                  <button type="button" onClick={clearSearch} aria-label="Clear search">
                     <X className="ml-2 h-5 w-5 shrink-0 text-[#333]" />
                   </button>
                 ) : (
                   <div className="ml-2 h-5 w-5 shrink-0 border-none bg-transparent" />
                 )}
+                <button
+                  type="button"
+                  onClick={submitSearch}
+                  className="ml-3 shrink-0 rounded-full bg-megaweave-forest-dark px-4 py-2 text-sm font-semibold text-white hover:bg-megaweave-forest-dark/90"
+                >
+                  Search
+                </button>
               </div>
               <div
                 className={`type-button-b1 flex items-center gap-1 transition-all duration-300 lg:gap-2 ${
@@ -1068,21 +1098,23 @@ const PostsApp = () => {
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Search Input */}
-                  <div className="relative mb-4">
-                    {/* 搜索框 */}
+                  <div className="mb-4 space-y-2">
                     <Input
                       type="text"
                       placeholder="Search"
-                      className="w-full py-2"
+                      className="h-12"
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e) => updateSearchTerm(e.target.value)}
+                      onKeyDown={handleSearchKeyDown}
+                      forceShowClear={Boolean(submittedSearchTerm)}
+                      onClear={clearSearch}
                     />
-
                     <button
-                      className="absolute right-4 top-1/2 -translate-y-1/2"
-                      onClick={() => setSearchTerm("")}
+                      type="button"
+                      onClick={submitSearch}
+                      className="w-full rounded-full bg-white px-4 py-2 text-[18px] font-semibold tracking-wider text-megaweave-forest-dark hover:bg-gray-100"
                     >
-                      <DeleteIcon className="h-[18px] w-[18px]" />
+                      Search
                     </button>
                   </div>
 

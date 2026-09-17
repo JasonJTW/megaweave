@@ -6,6 +6,7 @@ import { RESP_TYPES } from "@redis/client";
 import dbPool from "../utils/db";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { locationService } from "./locationService";
+import { fetchQueryEmbedding } from "./embeddingService";
 
 export interface FeedParams {
   userId?: number;
@@ -624,6 +625,136 @@ export class FeedService {
   }
 
   /**
+   * 使用者主動搜尋時，以 query embedding 做 Redis HNSW KNN 召回。
+   * MySQL 只負責套用目前的業務篩選與 hydration，讓搜尋意圖不被個人化 feed 覆蓋。
+   */
+  async getSemanticSearchFeed(params: FeedParams): Promise<FeedResult> {
+    const query = params.search?.trim() ?? "";
+    if (!query) return this.getFilteredFeed({ ...params, search: undefined }, null);
+    if (query.length > 300) {
+      throw new Error("SEARCH_QUERY_TOO_LONG");
+    }
+
+    const page = Math.max(1, params.page || 1);
+    const limit = Math.max(1, Math.min(50, params.limit || 20));
+    // 先過度召回，讓 MySQL 的分類、地點、狀態篩選後仍保有足夠結果。
+    const candidateLimit = Math.min(500, Math.max(100, (page + 1) * limit * 10));
+    let queryVector: Buffer;
+    try {
+      queryVector = await fetchQueryEmbedding(query);
+    } catch (error) {
+      // OpenAI 暫時不可用時，保留原本的關鍵字搜尋作為可用性 fallback。
+      console.warn("⚠️ Query embedding failed; falling back to keyword search:", error);
+      return this.getFilteredFeed(params, null);
+    }
+    const redis = getVectorRedisClient();
+
+    interface VectorCandidate {
+      postId: number;
+      similarity: number;
+    }
+    const candidates: VectorCandidate[] = [];
+
+    try {
+      const knnQuery = `*=>[KNN ${candidateLimit} @v $vec AS vector_distance]`;
+      const rawResult = (await redis.sendCommand([
+        "FT.SEARCH",
+        "idx:posts_v",
+        knnQuery,
+        "PARAMS",
+        "2",
+        "vec",
+        queryVector,
+        "SORTBY",
+        "vector_distance",
+        "ASC",
+        "RETURN",
+        "1",
+        "vector_distance",
+        "LIMIT",
+        "0",
+        String(candidateLimit),
+        "DIALECT",
+        "2",
+      ])) as unknown[];
+
+      for (let i = 1; Array.isArray(rawResult) && i < rawResult.length; i += 2) {
+        const postId = Number(String(rawResult[i] ?? "").replace("post:", ""));
+        const fields = rawResult[i + 1];
+        let distance = 1;
+        if (Array.isArray(fields)) {
+          for (let f = 0; f < fields.length; f += 2) {
+            if (fields[f] === "vector_distance") {
+              distance = Number(fields[f + 1]) || 0;
+              break;
+            }
+          }
+        }
+        if (Number.isInteger(postId) && postId > 0) {
+          candidates.push({ postId, similarity: Math.max(0, 1 - distance) });
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ Semantic vector search failed; falling back to keyword search:", error);
+      return this.getFilteredFeed(params, null);
+    }
+
+    if (candidates.length === 0) {
+      return {
+        posts: [],
+        pagination: { currentPage: page, totalPages: 1, totalPosts: 0, postsPerPage: limit },
+        isPersonalized: false,
+      };
+    }
+
+    const { whereClause, queryParams } = this.buildWhereConditions({
+      ...params,
+      search: undefined,
+    });
+    const candidateIds = candidates.map((candidate) => candidate.postId);
+    const placeholders = candidateIds.map(() => "?").join(",");
+    const [matchingRows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT p.id, p.hot_score, p.expires_at, l.lat, l.lng
+       FROM posts p
+       LEFT JOIN locations l ON p.location_id = l.id
+       WHERE p.id IN (${placeholders}) AND ${whereClause}`,
+      [...candidateIds, ...queryParams],
+    );
+    const matchingById = new Map<number, RowDataPacket>();
+    for (const row of matchingRows) matchingById.set(Number(row.id), row);
+
+    const maxHotScore = Math.max(1, ...matchingRows.map((row) => Number(row.hot_score || 0)));
+    const ranked = candidates.flatMap((candidate) => {
+      const post = matchingById.get(candidate.postId);
+      if (!post) return [];
+      let score = 0.85 * candidate.similarity + 0.15 * (Number(post.hot_score || 0) / maxHotScore);
+      if (params.lat !== undefined && params.lng !== undefined && post.lat !== null && post.lng !== null) {
+        score *= getGeoMultiplier(calculateDistanceKm(params.lat, params.lng, Number(post.lat), Number(post.lng)), params.mode);
+      }
+      return [{ postId: candidate.postId, score }];
+    });
+    ranked.sort((a, b) => b.score - a.score);
+
+    const offset = (page - 1) * limit;
+    const pagePostIds = ranked.slice(offset, offset + limit).map((candidate) => candidate.postId);
+    const postMap = await fetchPostsByIds(pagePostIds, params.userId);
+    const posts = pagePostIds
+      .map((id) => postMap.get(id))
+      .filter((post): post is RowDataPacket => Boolean(post));
+
+    return {
+      posts,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(ranked.length / limit) || 1,
+        totalPosts: ranked.length,
+        postsPerPage: limit,
+      },
+      isPersonalized: false,
+    };
+  }
+
+  /**
    * 登入老用戶：Redis 向量檢索 (HNSW KNN) + 混合重排 (Hybrid Re-ranking)
    */
   async getPersonalizedFeed(
@@ -801,13 +932,16 @@ export class FeedService {
    * 🌟 統一推薦 Feed 主入口 (Unified Hybrid Feed)
    */
   async getFeed(params: FeedParams): Promise<FeedResult> {
+    if (params.search?.trim()) {
+      return this.getSemanticSearchFeed(params);
+    }
+
     const hasFilters = Boolean(
       params.type ||
       params.category_id ||
       params.city ||
       params.province ||
-      params.location ||
-      params.search,
+      params.location,
     );
 
     const userVectorBuffer: Buffer | null = params.userId

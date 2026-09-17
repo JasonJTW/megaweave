@@ -5,9 +5,11 @@ import {
 } from "./feedService";
 import { getRedisClient, getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import dbPool from "../utils/db";
+import { fetchQueryEmbedding } from "./embeddingService";
 
 jest.mock("../utils/redis");
 jest.mock("../utils/db");
+jest.mock("./embeddingService");
 
 interface MockRedisClient {
   sendCommand: jest.Mock;
@@ -57,6 +59,55 @@ describe("FeedService", () => {
       await feedService.getFeed({ category_id: 3 });
 
       expect(getFilteredFeedSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("routes a search query to semantic vector search", async () => {
+      const semanticSearchSpy = jest
+        .spyOn(feedService, "getSemanticSearchFeed")
+        .mockResolvedValue({
+          posts: [],
+          pagination: { currentPage: 1, totalPages: 1, totalPosts: 0, postsPerPage: 20 },
+          isPersonalized: false,
+        });
+
+      await feedService.getFeed({ search: "露營燈" });
+
+      expect(semanticSearchSpy).toHaveBeenCalledWith({ search: "露營燈" });
+    });
+
+    it("embeds the search query, uses Redis KNN, then applies active-post filters in MySQL", async () => {
+      const service = new FeedService();
+      const queryVector = createFloat32Buffer(new Array(1536).fill(0.1));
+      (fetchQueryEmbedding as jest.Mock).mockResolvedValue(queryVector);
+      mockRedis.sendCommand.mockResolvedValue([
+        2,
+        "post:2",
+        ["vector_distance", "0.02"],
+        "post:1",
+        ["vector_distance", "0.20"],
+      ]);
+      const matchingRows = [
+        { id: 1, hot_score: 1, expires_at: null, lat: null, lng: null },
+        // 即使已過期，語意搜尋也不應因期限而失去其較高的相似度排序。
+        { id: 2, hot_score: 1, expires_at: "2020-01-01T00:00:00.000Z", lat: null, lng: null },
+      ];
+      (dbPool.execute as jest.Mock)
+        .mockResolvedValueOnce([matchingRows])
+        .mockResolvedValueOnce([matchingRows]);
+
+      const result = await service.getSemanticSearchFeed({
+        search: "適合露營照明的燈",
+        limit: 20,
+      });
+
+      expect(fetchQueryEmbedding).toHaveBeenCalledWith("適合露營照明的燈");
+      expect(mockRedis.sendCommand).toHaveBeenCalledWith(
+        expect.arrayContaining(["FT.SEARCH", "idx:posts_v", queryVector]),
+      );
+      expect((dbPool.execute as jest.Mock).mock.calls[0][0]).toContain(
+        "p.status = 'active'",
+      );
+      expect(result.posts.map((post) => post.id)).toEqual([2, 1]);
     });
 
     it("routes to personalized feed when user has a vector and no filters are present", async () => {

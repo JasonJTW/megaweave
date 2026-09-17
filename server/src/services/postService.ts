@@ -18,7 +18,7 @@ import {
   PostImage,
 } from "../types/post";
 import { generatePostText } from "../utils/generatePostText";
-import { fetchEmbedding } from "../queue/jobs/postEmbedding";
+import { fetchEmbedding } from "./embeddingService";
 import { calculatePostHotScore } from "../queue/jobs/hotScore";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { LocationInputData } from "../types/location";
@@ -782,6 +782,10 @@ export class PostService {
           files: fileJobs,
         });
       }
+
+      // 標題、內文、分類、狀況、物品與地點都會影響語意搜尋；編輯後必須重建向量。
+      // 從已提交的資料讀回完整貼文，避免 partial edit 漏掉既有 items 或 location。
+      await this.enqueueEmbeddingForPost(postId);
 
       return await this.getPostDetailsQuery(postId);
     } catch (error) {

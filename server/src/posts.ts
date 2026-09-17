@@ -267,6 +267,9 @@ router.get("/feed", async (req: Request, res: Response) => {
 
     res.status(200).json(result);
   } catch (error) {
+    if (error instanceof Error && error.message === "SEARCH_QUERY_TOO_LONG") {
+      return res.status(400).json({ errorMessage: "Search query must be 300 characters or fewer" });
+    }
     console.error("Get feed error:", error);
     return res.status(500).json({ errorMessage: "Internal server error" });
   }

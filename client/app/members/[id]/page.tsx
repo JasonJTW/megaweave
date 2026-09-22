@@ -19,7 +19,7 @@ import TitleBadgeIcon3 from "@/app/components/icons/TitleBadge3";
 import TitleBadgeIcon4 from "@/app/components/icons/TitleBadge4";
 import TitleBadgeIcon5 from "@/app/components/icons/TitleBadge5";
 import TitleBadgeIcon6 from "@/app/components/icons/TitleBadge6";
-import { RefractiveDiv } from "@/app/components/Refractive";
+import { RefractiveDiv } from "@/app/components/Refractive.client";
 import BgCloud from "@/app/components/icons/BgCloud";
 
 const MemberPage = () => {
@@ -414,7 +414,7 @@ const MemberPage = () => {
                           {member.skills.map((skill, index) => (
                             <span
                               key={index}
-                              className="bg-secondary-75 rounded-full px-4 py-2 text-sm text-white"
+                              className="rounded-full bg-secondary-75 px-4 py-2 text-sm text-white"
                             >
                               {skill}
                             </span>

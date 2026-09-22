@@ -3,6 +3,7 @@
 // 刻意不記錄 hostname：常含個人名稱，而結果摘要可能被 commit 或公開。
 
 import { execFile } from "child_process";
+import { request } from "http";
 import { arch, cpus, platform, release, totalmem } from "os";
 import { promisify } from "util";
 
@@ -32,6 +33,37 @@ export interface HostInfoDependencies {
 }
 
 const roundGb = (bytes: number) => Math.round((bytes / GIB) * 10) / 10;
+
+/**
+ * IMDS 專用的最小 fetch：global fetch 逾時後雖會 reject，但卡住的 TCP 連線要等 undici 的
+ * 10 秒連線逾時才釋放，讓 CLI 在非 EC2 主機上遲遲無法結束；這裡逾時即 destroy 連線。
+ */
+export function imdsFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const req = request(url, {
+      method: init.method ?? "GET",
+      headers: init.headers as Record<string, string> | undefined,
+    });
+    const abort = () => req.destroy(init.signal?.reason ?? new Error("aborted"));
+    if (init.signal?.aborted) return abort();
+    init.signal?.addEventListener("abort", abort, { once: true });
+
+    req.on("response", (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => {
+        init.signal?.removeEventListener("abort", abort);
+        resolve(new Response(Buffer.concat(chunks), { status: res.statusCode ?? 0 }));
+      });
+      res.on("error", reject);
+    });
+    req.on("error", (error) => {
+      init.signal?.removeEventListener("abort", abort);
+      reject(error);
+    });
+    req.end();
+  });
+}
 
 async function detectAws(fetchImpl: typeof fetch): Promise<HostInfo["aws"]> {
   try {
@@ -93,7 +125,7 @@ export async function collectHostInfo(
 ): Promise<HostInfo> {
   const processors = cpus();
   const [aws, docker] = await Promise.all([
-    detectAws(dependencies.fetch ?? fetch),
+    detectAws(dependencies.fetch ?? (imdsFetch as typeof fetch)),
     detectDocker(dependencies.runDocker ?? defaultRunDocker),
   ]);
 

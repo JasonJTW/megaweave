@@ -48,12 +48,13 @@ export interface ScenarioSummary {
   medianResponseBytes: number | null;
 }
 
-const round = (value: number, digits = 1) => {
+export const round = (value: number, digits = 1) => {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 };
 
-const isSuccess = (sample: RequestSample) => sample.status >= 200 && sample.status < 300;
+/** 2xx 才算成功；網路錯誤與逾時的 status 為 0 */
+export const isSuccess = (sample: RequestSample) => sample.status >= 200 && sample.status < 300;
 
 /** Nearest-rank percentile：回傳值一定是實際觀測到的樣本。 */
 export function percentile(values: readonly number[], p: number): number {

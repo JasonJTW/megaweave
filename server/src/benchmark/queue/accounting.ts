@@ -200,3 +200,6 @@ export function accountJobs(input: { submitted: readonly SubmittedJob[]; events:
     },
   };
 }
+
+/** 所有工作都已完成或終止失敗；仍在處理或從未觀測到的工作會讓結果為 false */
+export const isSettled = (account: QueueAccount) => account.unfinished === 0 && account.unobserved === 0;

@@ -14,6 +14,7 @@ import {
 } from "./observations";
 import {
   compareStrategies,
+  isSuccess,
   median,
   RequestSample,
   RunSummary,
@@ -178,7 +179,6 @@ export async function runComparison(options: ComparisonOptions): Promise<Compari
           const memorySamples = sampler.stop();
 
           const summary = summarizeRun(load.samples, plan.measureMs);
-          const isSuccess = (s: RequestSample) => s.status >= 200 && s.status < 300;
           runs.push({
             cacheState,
             virtualUsers,

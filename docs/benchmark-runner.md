@@ -241,7 +241,7 @@ npm run benchmark:api      # terminal 1: http://localhost:18443
 npm run benchmark:worker   # terminal 2: builds, then runs the standalone worker with server/benchmark.env
 # terminal 3
 BENCHMARK_ENVIRONMENT=isolated BENCHMARK_API_REPLICAS=1 BENCHMARK_WORKER_REPLICAS=1 \
-BENCHMARK_WORKER_CONCURRENCY='{"post-image":1,"post-embedding":2,"user-vector":5}' \
+BENCHMARK_WORKER_CONCURRENCY='{"post-image":2,"post-embedding":2,"user-vector":5}' \
 BENCHMARK_RESOURCE_LIMITS='{"api":"1 vCPU / 2 GB","worker":"1 vCPU / 2 GB"}' \
   npm run benchmark -- --profile queue-burst-500 --target http://localhost:18443
 ```

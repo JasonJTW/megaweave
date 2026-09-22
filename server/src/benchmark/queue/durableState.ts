@@ -3,12 +3,24 @@
 
 import { RowDataPacket } from "mysql2";
 import type { AppStores } from "../fixture/fixtureProfile";
+import { REDIS_BATCH_SIZE } from "../fixture/loadFixture";
 import type { MockS3 } from "../mocks/mockS3";
 import type { ConsistencyInput, ObservedState } from "./consistency";
 
+/** 分批送出，讓同時等待回覆的 Redis 指令低於應用程式 client 的 commandsQueueMaxLength */
+async function mapInBatches<T, R>(values: readonly T[], read: (value: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < values.length; i += REDIS_BATCH_SIZE) {
+    results.push(...(await Promise.all(values.slice(i, i + REDIS_BATCH_SIZE).map(read))));
+  }
+  return results;
+}
+
+export type DurableStateStores = Pick<AppStores, "mysql" | "vectorRedis">;
+
 export async function observeDurableState(
-  stores: AppStores,
-  s3: MockS3,
+  stores: DurableStateStores,
+  s3: Pick<MockS3, "uploads" | "hasObject">,
   buckets: { bucket: string; stagingBucket: string },
   expected: ConsistencyInput,
 ): Promise<ObservedState> {
@@ -23,8 +35,8 @@ export async function observeDurableState(
     "SELECT post_id, s3_key FROM images WHERE post_id IN (?) ORDER BY id",
     [postIds],
   );
-  const vectorBytes = await Promise.all(postIds.map((id) => stores.vectorRedis.hStrLen(`post:${id}`, "v")));
-  const userUpdatedAt = await Promise.all(userIds.map((id) => stores.vectorRedis.hGet(`user:${id}:vector`, "updated_at")));
+  const vectorBytes = await mapInBatches(postIds, (id) => stores.vectorRedis.hStrLen(`post:${id}`, "v"));
+  const userUpdatedAt = await mapInBatches(userIds, (id) => stores.vectorRedis.hGet(`user:${id}:vector`, "updated_at"));
 
   const dimensions = new Map(embeddingRows.map((row) => [Number(row.id), row.dimensions === null ? null : Number(row.dimensions)]));
   const imageKeysByPost = new Map<number, string[]>();

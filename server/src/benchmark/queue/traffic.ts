@@ -4,6 +4,7 @@
 // 流量是 closed loop：每個虛擬使用者收到回應並等待 think time 後才發出下一個請求，直到收到停止訊號。
 
 import { buildFeedUrl, REQUEST_TIMEOUT_MS } from "../feed/load";
+import { isSuccess, round } from "../feed/stats";
 import { createVirtualUserScript, FeedPersona, WorkloadCatalog } from "../feed/workload";
 import { createRandom, deriveSeed, Random } from "../fixture/random";
 import { generatePostDraft } from "./burstPlan";
@@ -62,8 +63,6 @@ function pause(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-const round1 = (value: number) => Math.round(value * 10) / 10;
-
 interface Timed<T> {
   sample: TrafficSample;
   body: T | null;
@@ -87,7 +86,7 @@ async function timedRequest<T>(
       group,
       requestClass,
       startedAtMs,
-      latencyMs: round1(performance.now() - started),
+      latencyMs: round(performance.now() - started),
       status: response.status,
       bytes: bytes.byteLength,
     };
@@ -99,7 +98,7 @@ async function timedRequest<T>(
       group,
       requestClass,
       startedAtMs,
-      latencyMs: round1(performance.now() - started),
+      latencyMs: round(performance.now() - started),
       status: 0,
       bytes: 0,
       error: error instanceof Error ? error.message : String(error),
@@ -108,8 +107,6 @@ async function timedRequest<T>(
   samples.push(sample);
   return { sample, body };
 }
-
-const isSuccess = (sample: TrafficSample) => sample.status >= 200 && sample.status < 300;
 
 async function createPost(
   options: TrafficOptions,

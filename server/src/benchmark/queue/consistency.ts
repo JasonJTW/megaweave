@@ -3,7 +3,9 @@
 // 且不得產生重複的持久化紀錄；「看似全部 completed」不足以證明沒有遺失工作。
 
 import { EMBEDDING_DIMENSIONS } from "../fixture/embeddings";
-import type { JobOrigin, JobState } from "./accounting";
+import { isSettled, JobAccounting, JobOrigin, JobState } from "./accounting";
+import type { BurstInjection, BurstPost } from "./injection";
+import type { CreatedPost } from "./traffic";
 
 const VECTOR_BYTES = EMBEDDING_DIMENSIONS * 4;
 /** 失敗清單只保留前幾筆，完整數量見 expected / actual */
@@ -58,6 +60,50 @@ function check(name: string, expected: number, problems: string[]): ConsistencyC
     actual: expected - new Set(problems.map((problem) => problem.split(":")[0])).size,
     ok: problems.length === 0,
     missing: problems.slice(0, MAX_LISTED),
+  };
+}
+
+/**
+ * 依帳目決定每篇貼文與每位使用者應留下哪些結果：只有 completed 的 job 才預期有結果。
+ * API 建立的貼文無法對應到個別 job，因此只有在 API 排入的工作全部完成時才預期其結果。
+ */
+export function expectDurableEffects(input: {
+  accounting: JobAccounting;
+  burstPosts: readonly BurstPost[];
+  injection: Pick<BurstInjection, "jobIdsByUnit" | "startedAtMs">;
+  createdPosts: readonly CreatedPost[];
+}): ConsistencyInput {
+  const states = new Map(input.accounting.jobs.map((job) => [`${job.queue}/${job.jobId}`, job.state]));
+  const stateOf = (queue: string, jobId: string | undefined): JobState =>
+    (jobId !== undefined && states.get(`${queue}/${jobId}`)) || "unobserved";
+  const traffic = input.accounting.byOrigin.traffic.total;
+  const trafficState: JobState = isSettled(traffic) && traffic.terminalFailed === 0 ? "completed" : "unfinished";
+
+  return {
+    posts: [
+      ...input.burstPosts.map((post) => {
+        const ids = input.injection.jobIdsByUnit.get(post.unit.index);
+        return {
+          postId: post.postId,
+          origin: "burst" as const,
+          stagingKeys: post.stagingKeys,
+          embeddingJob: stateOf("post-embedding", ids?.embedding),
+          imageJob: stateOf("post-image", ids?.image),
+        };
+      }),
+      ...input.createdPosts.map((post) => ({
+        postId: post.postId,
+        origin: "traffic" as const,
+        stagingKeys: post.stagingKeys,
+        embeddingJob: trafficState,
+        imageJob: trafficState,
+      })),
+    ],
+    userVectors: input.burstPosts.map((post) => ({
+      userId: post.unit.interaction.userId,
+      job: stateOf("user-vector", input.injection.jobIdsByUnit.get(post.unit.index)?.userVector),
+    })),
+    userVectorsUpdatedSinceMs: input.injection.startedAtMs,
   };
 }
 

@@ -1,4 +1,7 @@
-import { evaluateConsistency, ConsistencyInput, ObservedState } from "./consistency";
+import { accountJobs, JobEvent, SubmittedJob } from "./accounting";
+import type { BurstUnit } from "./burstPlan";
+import { evaluateConsistency, expectDurableEffects, ConsistencyInput, ObservedState } from "./consistency";
+import type { BurstPost } from "./injection";
 
 const VECTOR_BYTES = 1536 * 4;
 
@@ -121,5 +124,92 @@ describe("queue burst post-run consistency", () => {
 
     expect(byName(result.checks)["embeddings-persisted"]).toMatchObject({ ok: true, expected: 1, actual: 1 });
     expect(result.effectsNotExpected).toEqual({ "post-embedding": 1, "post-images": 0, "user-vector": 0 });
+  });
+});
+
+describe("expected durable effects", () => {
+  const burstPost = (index: number, userId: number): BurstPost => ({
+    unit: { index, interaction: { userId, postId: 900, action: "view" } } as BurstUnit,
+    postId: 100 + index,
+    stagingKeys: [`staging/${index}.jpg`],
+    s3Keys: [`posts/${index}.webp`],
+  });
+  const lifecycle = (queue: string, jobId: string, end: "completed" | "failed" | null): JobEvent[] => [
+    { queue, jobId, type: "added", atMs: 0 },
+    { queue, jobId, type: "active", atMs: 1 },
+    ...(end ? [{ queue, jobId, type: end, atMs: 2 } as JobEvent] : []),
+  ];
+  const injection = {
+    startedAtMs: 1_234,
+    jobIdsByUnit: new Map([
+      [0, { image: "1", embedding: "1", userVector: "1" }],
+      [1, { image: "2", embedding: "2", userVector: undefined }],
+    ]),
+  };
+  const submitted: SubmittedJob[] = [
+    { queue: "post-image", jobId: "1", origin: "burst" },
+    { queue: "post-embedding", jobId: "1", origin: "burst" },
+    { queue: "user-vector", jobId: "1", origin: "burst" },
+    { queue: "post-image", jobId: "2", origin: "burst" },
+    { queue: "post-embedding", jobId: "2", origin: "burst" },
+  ];
+
+  it("expects each burst post's effects according to its own jobs, and user vectors updated since the burst started", () => {
+    const accounting = accountJobs({
+      submitted,
+      events: [
+        ...lifecycle("post-image", "1", "completed"),
+        ...lifecycle("post-embedding", "1", "completed"),
+        ...lifecycle("user-vector", "1", "completed"),
+        ...lifecycle("post-image", "2", "failed"),
+      ],
+    });
+
+    const expected = expectDurableEffects({
+      accounting,
+      burstPosts: [burstPost(0, 7), burstPost(1, 8)],
+      injection,
+      createdPosts: [],
+    });
+
+    expect(expected).toEqual({
+      posts: [
+        { postId: 100, origin: "burst", stagingKeys: ["staging/0.jpg"], embeddingJob: "completed", imageJob: "completed" },
+        { postId: 101, origin: "burst", stagingKeys: ["staging/1.jpg"], embeddingJob: "unobserved", imageJob: "failed" },
+      ],
+      userVectors: [
+        { userId: 7, job: "completed" },
+        { userId: 8, job: "unobserved" },
+      ],
+      userVectorsUpdatedSinceMs: 1_234,
+    });
+  });
+
+  it("expects posts created by the traffic only when every job the API enqueued completed", () => {
+    const events = [
+      ...lifecycle("post-image", "1", "completed"),
+      ...lifecycle("post-embedding", "1", "completed"),
+      ...lifecycle("user-vector", "1", "completed"),
+      ...lifecycle("post-image", "2", "completed"),
+      ...lifecycle("post-embedding", "2", "completed"),
+    ];
+    const createdPosts = [{ postId: 300, stagingKeys: ["staging/api.jpg"] }];
+    const expectFor = (apiJobEnd: "completed" | "failed" | null) =>
+      expectDurableEffects({
+        accounting: accountJobs({ submitted, events: [...events, ...lifecycle("post-image", "api-1", apiJobEnd)] }),
+        burstPosts: [burstPost(0, 7), burstPost(1, 8)],
+        injection,
+        createdPosts,
+      }).posts.find((post) => post.origin === "traffic");
+
+    expect(expectFor("completed")).toEqual({
+      postId: 300,
+      origin: "traffic",
+      stagingKeys: ["staging/api.jpg"],
+      embeddingJob: "completed",
+      imageJob: "completed",
+    });
+    expect(expectFor("failed")?.imageJob).toBe("unfinished");
+    expect(expectFor(null)?.embeddingJob).toBe("unfinished");
   });
 });

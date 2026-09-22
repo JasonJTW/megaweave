@@ -1,8 +1,9 @@
 // server/src/benchmark/queue/invariants.ts
 // Queue burst 的通過條件：所有工作都有帳可查、沒有終止失敗、持久化結果一致，且使用者流量在每個階段都持續運作。
 
+import { isSuccess } from "../feed/stats";
 import type { BenchmarkInvariant } from "../profiles";
-import type { JobAccounting } from "./accounting";
+import { isSettled, JobAccounting } from "./accounting";
 import type { ConsistencyResult } from "./consistency";
 import { PhaseSummary, TRAFFIC_GROUPS, TrafficSample } from "./phases";
 
@@ -26,12 +27,12 @@ export function evaluateQueueBurstInvariants(input: QueueBurstInvariantInput): B
   const burst = input.accounting.byOrigin.burst.total;
   const traffic = input.accounting.byOrigin.traffic.total;
   const failures = burst.terminalFailed + traffic.terminalFailed;
-  const failedRequests = input.samples.filter((sample) => sample.status < 200 || sample.status >= 300).length;
+  const failedRequests = input.samples.filter((sample) => !isSuccess(sample)).length;
   const unserved = input.phases.flatMap((phase) =>
     TRAFFIC_GROUPS.filter((group) => (phase.groups[group].latencyMs?.count ?? 0) === 0).map((group) => `${group} in ${phase.name}`),
   );
   const burstComplete =
-    input.drained && input.deduplicated === 0 && burst.submitted === input.plannedJobs && burst.unfinished === 0 && burst.unobserved === 0;
+    input.drained && input.deduplicated === 0 && burst.submitted === input.plannedJobs && isSettled(burst);
 
   return [
     invariant(
@@ -43,7 +44,7 @@ export function evaluateQueueBurstInvariants(input: QueueBurstInvariantInput): B
     // 使用者流量排入的工作也必須完成，否則其貼文的持久化結果無法驗證
     invariant(
       "traffic-work-accounted",
-      traffic.unfinished === 0 && traffic.unobserved === 0,
+      isSettled(traffic),
       `${traffic.unfinished} of ${traffic.submitted} jobs enqueued by the API did not finish`,
     ),
     invariant("no-terminal-failures", failures === 0, `${failures} jobs exhausted their attempts with mocked dependencies`),

@@ -4,6 +4,7 @@
 
 import { createFeedProfile } from "./feed/feedProfile";
 import { createFixtureProfile } from "./fixture/fixtureProfile";
+import { createQueueBurstProfile, QueueBurstPlan } from "./queue/queueBurstProfile";
 
 export const DEPENDENCY_MODES = ["mock", "benchmark", "real-probe"] as const;
 export type DependencyMode = (typeof DEPENDENCY_MODES)[number];
@@ -51,6 +52,18 @@ export interface BenchmarkProfile {
   dispose?(): Promise<void>;
 }
 
+/** Queue burst 期間持續的低量使用者流量：5 位瀏覽 feed 的使用者與 2 位發文者 */
+const QUEUE_BURST_TRAFFIC: Pick<
+  QueueBurstPlan,
+  "feedVirtualUsers" | "postVirtualUsers" | "feedThinkTimeMs" | "postThinkTimeMs" | "depthSampleIntervalMs"
+> = {
+  feedVirtualUsers: 5,
+  postVirtualUsers: 2,
+  feedThinkTimeMs: { min: 3_000, max: 8_000 },
+  postThinkTimeMs: { min: 20_000, max: 40_000 },
+  depthSampleIntervalMs: 1_000,
+};
+
 const environmentCheck: BenchmarkProfile = {
   name: "environment-check",
   description:
@@ -92,6 +105,31 @@ export const benchmarkProfiles: Record<string, BenchmarkProfile> = Object.fromEn
         warmUpMs: 10_000,
         measureMs: 30_000,
         thinkTimeMs: { min: 3_000, max: 8_000 },
+      },
+    }),
+    createQueueBurstProfile({
+      name: "queue-burst-500",
+      posts: 10_000,
+      plan: {
+        units: 500,
+        injectionMs: 30_000,
+        baselineMs: 120_000,
+        recoveryMs: 120_000,
+        drainTimeoutMs: 30 * 60_000,
+        ...QUEUE_BURST_TRAFFIC,
+      },
+    }),
+    // 開發機上驗證 queue burst 流程用；數據不可作為容量結論
+    createQueueBurstProfile({
+      name: "queue-burst-1k-smoke",
+      posts: 1_000,
+      plan: {
+        units: 50,
+        injectionMs: 5_000,
+        baselineMs: 20_000,
+        recoveryMs: 20_000,
+        drainTimeoutMs: 5 * 60_000,
+        ...QUEUE_BURST_TRAFFIC,
       },
     }),
   ].map((profile) => [profile.name, profile]),

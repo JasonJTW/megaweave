@@ -34,6 +34,8 @@ export interface BenchmarkProfile {
   /** Profile 專屬的安全檢查（例如資料庫標記），在 runner 檢查之後、run() 之前執行。 */
   assertSafeToRun?(): Promise<void>;
   run(context: BenchmarkProfileContext): Promise<BenchmarkProfileOutcome>;
+  /** 回報 profile 使用的服務實際版本（例如 MySQL / Redis），在 run() 之後、dispose() 之前呼叫。 */
+  describeServices?(): Promise<Record<string, string>>;
   /** 無論成功或失敗都會呼叫，用於關閉連線。 */
   dispose?(): Promise<void>;
 }

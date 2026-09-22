@@ -86,6 +86,11 @@ export function createFixtureProfile(options: {
 
     run: async () => prepareFixture(stores!, fixtureOptions),
 
+    async describeServices() {
+      const { describeDataStores } = await import("./dataStoreGuard");
+      return describeDataStores(stores!);
+    },
+
     async dispose() {
       await stores?.close();
       stores = null;

@@ -32,6 +32,8 @@ Every check below runs before a profile starts. If any check fails, the runner e
    ```
 
    Set this only in benchmark-specific configuration. It must never appear in production environment files or deployment settings.
+
+   A marked target also returns `benchmarkMetrics` from `/health`, such as `feedCandidateVectorReads` (candidate vector reads, failures, and vectors missing from Redis since the process started). Profiles can use these counters to detect silent ranking degradation under load. Unmarked targets never compute or expose them.
 3. **Dependency modes.** Each profile declares how it uses every external dependency:
 
    | Mode | Meaning |
@@ -152,10 +154,14 @@ Each run writes one JSON artifact and one Markdown summary named `<profile>-<tim
 
 - timestamp, commit SHA, whether the working tree was dirty, runner version, and profile name
 - verified target URL, or `null` for profiles that do not touch a target
+- host, detected automatically: OS, CPU model and count, memory, Node version, the EC2 instance type and region when running on EC2 (through IMDSv2, otherwise `null`), and the CPUs and memory available to Docker. On macOS, containers are limited by the Docker VM's resources, not the host's. The hostname is deliberately not recorded.
+- service versions reported by the profile, e.g. MySQL and each Redis instance
 - dataset version and counts
 - workload definition
 - API/worker replica counts, worker concurrency, and resource limits
 - dependency modes and cost metadata
 - profile result data
+
+Absolute latency and throughput depend on the host, so only numbers from an EC2 instance that matches production (and is separate from it) should be quoted as capacity. Development-machine runs are for building and debugging profiles, and for relative comparisons made under identical conditions.
 
 Artifacts are written outside the repository by default. Commit only curated result summaries. Do not include credentials, production connection strings, or personal data in metadata or results.

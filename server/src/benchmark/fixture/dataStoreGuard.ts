@@ -69,3 +69,25 @@ export async function assertBenchmarkDataStores(
   await assertBenchmarkRedis(stores.cacheRedis, "cache");
   await assertBenchmarkRedis(stores.vectorRedis, "vector");
 }
+
+function parseRedisVersion(info: string): string {
+  return /^redis_version:(.+)$/m.exec(info)?.[1].trim() ?? "unknown";
+}
+
+/** 回報實際連線的服務版本，寫入 benchmark 結果以便跨環境比較。 */
+export async function describeDataStores(
+  stores: FixtureStores,
+): Promise<Record<string, string>> {
+  const [[mysqlVersion]] = await stores.mysql.query<RowDataPacket[]>(
+    "SELECT VERSION() AS version",
+  );
+  const [cacheInfo, vectorInfo] = await Promise.all([
+    stores.cacheRedis.info("server"),
+    stores.vectorRedis.info("server"),
+  ]);
+  return {
+    mysql: String(mysqlVersion.version),
+    redisCache: parseRedisVersion(String(cacheInfo)),
+    redisVector: parseRedisVersion(String(vectorInfo)),
+  };
+}

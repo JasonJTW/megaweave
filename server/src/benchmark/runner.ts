@@ -5,6 +5,7 @@ import { execFileSync } from "child_process";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
 import { BenchmarkSafetyError } from "./errors";
+import { collectHostInfo, describeHost, HostInfo } from "./hostInfo";
 import {
   BenchmarkDataset,
   BenchmarkProfile,
@@ -15,7 +16,7 @@ import { BENCHMARK_HEALTH_ENVIRONMENT } from "./targetMarker";
 
 export { BenchmarkSafetyError };
 
-export const RUNNER_VERSION = "2";
+export const RUNNER_VERSION = "3";
 const REQUIRED_ENVIRONMENT = "isolated";
 const REAL_PROBE_CONFIRMATION = "allow-real-probe";
 
@@ -49,6 +50,9 @@ export interface BenchmarkArtifact extends BenchmarkEnvironmentMetadata {
   commitSha: string;
   workingTreeDirty: boolean | "unknown";
   target: string | null;
+  host: HostInfo;
+  /** Profile 回報的實際服務版本，例如 MySQL / Redis */
+  services: Record<string, string>;
   dataset: BenchmarkDataset;
   workload: Record<string, unknown>;
   dependencies: Record<string, DependencyMode>;
@@ -149,6 +153,8 @@ function buildSummary(artifact: BenchmarkArtifact): string {
     `- Commit: ${artifact.commitSha}${artifact.workingTreeDirty === true ? " (dirty working tree)" : ""}`,
     `- Runner version: ${artifact.runnerVersion}`,
     `- Target: ${artifact.target ?? "none"}`,
+    `- Host: ${describeHost(artifact.host)}`,
+    `- Services: ${JSON.stringify(artifact.services)}`,
     `- Dataset: ${artifact.dataset.version}`,
     `- Dataset counts: ${JSON.stringify(artifact.dataset.counts)}`,
     `- Workload: ${JSON.stringify(artifact.workload)}`,
@@ -189,13 +195,17 @@ export async function runBenchmark(
 
   const targetUrl = profile.touchesTarget ? request.targetUrl : undefined;
   let outcome: Awaited<ReturnType<BenchmarkProfile["run"]>>;
+  let services: Record<string, string> = {};
   try {
     await profile.assertSafeToRun?.();
     outcome = await profile.run({ targetUrl });
+    // 在 dispose 關閉連線前讀取服務版本
+    services = (await profile.describeServices?.()) ?? {};
   } finally {
     await profile.dispose?.();
   }
   const { dataset, result } = outcome;
+  const host = await collectHostInfo();
   const status = runGit(["status", "--porcelain"]);
   const timestamp = new Date().toISOString();
   const artifact: BenchmarkArtifact = {
@@ -205,6 +215,8 @@ export async function runBenchmark(
     commitSha: runGit(["rev-parse", "HEAD"]) ?? "unknown",
     workingTreeDirty: status === null ? "unknown" : status.length > 0,
     target: targetUrl ?? null,
+    host,
+    services,
     dataset,
     workload: profile.workload,
     dependencies: profile.dependencies,

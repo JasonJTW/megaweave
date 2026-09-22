@@ -3,12 +3,31 @@ import { AddressInfo } from "net";
 import { mkdtemp, readdir, readFile, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
+import { HostInfo } from "./hostInfo";
 import { BenchmarkProfile } from "./profiles";
 import {
   BenchmarkEnvironmentMetadata,
   BenchmarkSafetyError,
   runBenchmark,
 } from "./runner";
+
+const fakeHost: HostInfo = {
+  platform: "linux",
+  osRelease: "6.1.0",
+  arch: "x64",
+  cpuModel: "Test CPU",
+  logicalCpus: 2,
+  totalMemoryGb: 2,
+  nodeVersion: "v22.0.0",
+  aws: { instanceType: "t3.small", region: "ap-northeast-1" },
+  docker: null,
+};
+
+// 避免每個測試都實際偵測 EC2 metadata 與 Docker
+jest.mock("./hostInfo", () => ({
+  ...jest.requireActual("./hostInfo"),
+  collectHostInfo: jest.fn(async () => fakeHost),
+}));
 
 const originalEnvironment = process.env;
 const metadata: BenchmarkEnvironmentMetadata = {
@@ -114,6 +133,42 @@ describe("benchmark runner", () => {
     expect(summary).toContain("fixture-v1");
     expect(summary).toContain('Worker concurrency: {"post-embedding":2}');
     expect(summary).toContain('Dependencies: {"openai":"mock"');
+  });
+
+  it("records the host and the service versions reported by the profile", async () => {
+    const result = await runBenchmark({
+      profile: createProfile({
+        describeServices: jest.fn(async () => ({ mysql: "8.0.46" })),
+      }),
+      outputDirectory,
+      metadata,
+    });
+
+    const artifact = JSON.parse(await readFile(result.jsonPath, "utf8"));
+    const summary = await readFile(result.summaryPath, "utf8");
+    expect(artifact.host).toEqual(fakeHost);
+    expect(artifact.services).toEqual({ mysql: "8.0.46" });
+    expect(summary).toContain("- Host: AWS t3.small (ap-northeast-1), linux 6.1.0 x64");
+    expect(summary).toContain('- Services: {"mysql":"8.0.46"}');
+  });
+
+  it("describes services before the profile disposes its connections", async () => {
+    const calls: string[] = [];
+    await runBenchmark({
+      profile: createProfile({
+        describeServices: jest.fn(async () => {
+          calls.push("describeServices");
+          return {};
+        }),
+        dispose: jest.fn(async () => {
+          calls.push("dispose");
+        }),
+      }),
+      outputDirectory,
+      metadata,
+    });
+
+    expect(calls).toEqual(["describeServices", "dispose"]);
   });
 
   it("refuses a target-touching profile without a target URL", async () => {

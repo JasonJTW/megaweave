@@ -15,6 +15,7 @@ import { getUserFromCookie } from "./session";
 import { handleError } from "./utils/errorHandler";
 import { postService } from "./services/postService";
 import { feedService } from "./services/feedService";
+import { FEED_STRATEGY_HEADER, resolveFeedStrategy } from "./benchmark/feedStrategy";
 import type { PostType } from "./types/post";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { defaultImageStorage } from "./storage/ImageStorage";
@@ -240,6 +241,9 @@ router.get("/feed", async (req: Request, res: Response) => {
       ? parseFloat(req.query.radius as string)
       : undefined;
     const mode = req.query.mode as string | undefined;
+    // 只有 benchmark 目標會回傳策略（並回應標頭讓 runner 確認實際採用的策略）；production 恆為 null
+    const benchmarkStrategy = resolveFeedStrategy(req.headers[FEED_STRATEGY_HEADER]);
+    if (benchmarkStrategy) res.setHeader(FEED_STRATEGY_HEADER, benchmarkStrategy);
 
     const tFeedStart = performance.now();
     const result = await feedService.getFeed({
@@ -256,6 +260,7 @@ router.get("/feed", async (req: Request, res: Response) => {
       lng,
       radius,
       mode,
+      fullHydrationBaseline: benchmarkStrategy === "full-hydration",
     });
     const tFeed = performance.now() - tFeedStart;
     const tTotal = performance.now() - t0;

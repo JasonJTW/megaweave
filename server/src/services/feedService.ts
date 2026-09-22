@@ -22,6 +22,12 @@ export interface FeedParams {
   lng?: number;
   radius?: number;
   mode?: string;
+  /**
+   * Benchmark 專用對照組：候選貼文直接做完整 6 表 hydration（含 MySQL embedding），
+   * 重現 late materialization 之前的做法；排序公式與回傳資料與現行策略相同。
+   * 只由帶隔離標記的 benchmark API 設定，production 永遠不會啟用。
+   */
+  fullHydrationBaseline?: boolean;
 }
 
 export interface FeedResult {
@@ -107,8 +113,7 @@ function getGeoMultiplier(distKm: number, mode?: string): number {
 
 // ─── 貼文詳細資料 Hydration (MySQL Batch Query) ───────────────────────────────
 
-const POST_FIELDS_SQL = `
-  SELECT 
+const POST_COLUMNS_SQL = `
     p.id, p.public_id, p.user_id, p.title, p.content, p.type, p.status, p.tags, 
     p.category_id, p.condition_level, p.expires_at, p.view_count, 
     p.likes_count, p.hot_score, p.created_at, p.updated_at, p.deleted_at, p.location_id,
@@ -119,7 +124,9 @@ const POST_FIELDS_SQL = `
     c.name_en as category_name_en,
     cond.name as condition_name,
     l.place_id, l.name as location_name, l.url as location_url, l.full_address, l.route, l.province, l.city, l.lat, l.lng, l.zip_code,
-    GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
+    GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys`;
+
+const POST_JOINS_SQL = `
   FROM posts p
   LEFT JOIN users u ON p.user_id = u.id
   LEFT JOIN user_profiles up ON u.id = up.user_id
@@ -128,6 +135,21 @@ const POST_FIELDS_SQL = `
   LEFT JOIN locations l ON p.location_id = l.id
   LEFT JOIN images i ON p.id = i.post_id
 `;
+
+const POST_FIELDS_SQL = `SELECT ${POST_COLUMNS_SQL} ${POST_JOINS_SQL}`;
+
+function parseEmbedding(raw: unknown): Float32Array | null {
+  if (!raw) return null;
+  try {
+    const values = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(values) && values.length === 1536) {
+      return new Float32Array(values);
+    }
+  } catch {
+    // 格式錯誤時與 Redis 缺少向量相同，以中立相似度排序
+  }
+  return null;
+}
 
 async function fetchPostsByIds(
   postIds: number[],
@@ -178,6 +200,41 @@ async function stampIsLiked(
   }
 }
 
+/** 只查詢打分所需欄位（不 JOIN images/users），供 late materialization 的候選重排使用。 */
+async function fetchCandidateScoringFields(
+  postIds: number[],
+): Promise<Map<number, RowDataPacket>> {
+  const placeholders = postIds.map(() => "?").join(",");
+  const [rows] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT p.id, p.hot_score, p.expires_at, p.status, l.lat, l.lng
+     FROM posts p
+     LEFT JOIN locations l ON p.location_id = l.id
+     WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL`,
+    postIds,
+  );
+  return new Map(rows.map((row) => [row.id as number, row]));
+}
+
+/** Full-hydration baseline：候選列已含完整欄位，只需為當頁貼文標記 is_liked。 */
+async function pickHydratedPosts(
+  candidates: RowDataPacket[],
+  pagePostIds: number[],
+  userId?: number,
+): Promise<Map<number, RowDataPacket>> {
+  const candidateById = new Map(candidates.map((row) => [Number(row.id), row]));
+  const map = new Map<number, RowDataPacket>();
+  for (const id of pagePostIds) {
+    const row = candidateById.get(id);
+    if (!row) continue;
+    row.is_liked = false;
+    map.set(id, row);
+  }
+  if (userId && map.size > 0) {
+    await stampIsLiked(Array.from(map.values()), userId);
+  }
+  return map;
+}
+
 // ─── 核心 Feed 服務類別 ────────────────────────────────────────────────────────
 
 // Post Vector 本地記憶體快取（貼文向量生成後即不變，快取於 Node 記憶體避免反覆向 Redis 請求）
@@ -185,12 +242,14 @@ const POST_VECTOR_CACHE_MAX = 2000;
 const postVectorMemoryCache = new Map<number, Float32Array>();
 
 // 候選貼文向量讀取統計：累計自 process 啟動，供 benchmark 判斷個人化排序是否因 Redis 讀取失敗而降級
-const candidateVectorReadStats = { reads: 0, failed: 0, missing: 0 };
+const candidateVectorReadStats = { reads: 0, failed: 0, missing: 0, cacheHits: 0 };
 
 export function getCandidateVectorReadStats(): {
   reads: number;
   failed: number;
   missing: number;
+  /** 由 postVectorMemoryCache 直接取得、未讀取 Redis 的候選向量數 */
+  cacheHits: number;
 } {
   return { ...candidateVectorReadStats };
 }
@@ -403,7 +462,17 @@ export class FeedService {
     //* 2. Stage 1: 輕量條件召回 (Candidate Retrieval - 不 SELECT embedding 大欄位，走純索引排序)
     // const tCand0 = performance.now();
     const CANDIDATE_FETCH_LIMIT = Math.max(60, (page + 1) * limit);
-    const candidateQuery = `
+    const fullHydration = Boolean(params.fullHydrationBaseline);
+    const candidateQuery = fullHydration
+      ? `
+      SELECT ${POST_COLUMNS_SQL}${userVectorBuffer ? ", p.embedding" : ""}
+      ${POST_JOINS_SQL}
+      WHERE ${whereClause}
+      GROUP BY p.id
+      ORDER BY p.hot_score DESC, p.id DESC
+      LIMIT ${CANDIDATE_FETCH_LIMIT}
+    `
+      : `
       SELECT 
         p.id, p.hot_score, p.expires_at, p.status,
         l.lat, l.lng
@@ -449,12 +518,18 @@ export class FeedService {
     // 🌟 延遲加載 Embedding (Late Materialization)：記憶體快取 + Redis Pipeline 讀取 Float32 向量
     const candPostIds = candidates.map((p) => Number(p.id));
     const embeddingMap = new Map<number, Float32Array>();
-    if (userVec && candPostIds.length > 0) {
+    if (userVec && fullHydration) {
+      for (const post of candidates) {
+        const vec = parseEmbedding(post.embedding);
+        if (vec) embeddingMap.set(Number(post.id), vec);
+      }
+    } else if (userVec && candPostIds.length > 0) {
       const missingIds: number[] = [];
       for (const id of candPostIds) {
         const cached = postVectorMemoryCache.get(id);
         if (cached) {
           embeddingMap.set(id, cached);
+          candidateVectorReadStats.cacheHits++;
         } else {
           missingIds.push(id);
         }
@@ -572,7 +647,9 @@ export class FeedService {
 
     // 5. 🌟 延遲關聯 (Late Materialization)：只對當前頁所需的貼文 (例如 12 篇) 批次查詢 6 表詳細資料
     // const tHydrate0 = performance.now();
-    const postMap = await fetchPostsByIds(pagePostIds, params.userId);
+    const postMap = fullHydration
+      ? await pickHydratedPosts(candidates, pagePostIds, params.userId)
+      : await fetchPostsByIds(pagePostIds, params.userId);
     const pagePosts = pagePostIds
       .map((id) => postMap.get(id))
       .filter((p): p is RowDataPacket => Boolean(p));
@@ -866,18 +943,12 @@ export class FeedService {
 
     // 2. 🌟 延遲關聯 (Late Materialization)：先輕量查詢候選 150 篇的打分欄位 (不 JOIN images/users)
     const postIds = candidates.map((c) => c.postId);
-    const placeholders = postIds.map(() => "?").join(",");
-    const [candidateMetaRows] = await dbPool.execute<RowDataPacket[]>(
-      `SELECT p.id, p.hot_score, p.expires_at, p.status, l.lat, l.lng
-       FROM posts p
-       LEFT JOIN locations l ON p.location_id = l.id
-       WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL`,
-      postIds,
-    );
-    const candidateMetaMap = new Map<number, RowDataPacket>();
-    for (const row of candidateMetaRows) {
-      candidateMetaMap.set(row.id, row);
-    }
+    // Baseline：一次完整 hydration 全部候選（含 is_liked），再從中切出當頁
+    const hydratedCandidates = params.fullHydrationBaseline
+      ? await fetchPostsByIds(postIds, params.userId)
+      : null;
+    const candidateMetaMap =
+      hydratedCandidates ?? (await fetchCandidateScoringFields(postIds));
 
     // 3. 混合重排 (Hybrid Re-ranking)
     let maxHotScore = 1.0;
@@ -942,7 +1013,8 @@ export class FeedService {
       .map((s) => s.postId);
 
     // 🌟 延遲關聯 (Late Materialization)：只對當前頁所需貼文 (例如 12 篇) 批次查詢 6 表詳細資料
-    const postMap = await fetchPostsByIds(pagePostIds, params.userId);
+    const postMap =
+      hydratedCandidates ?? (await fetchPostsByIds(pagePostIds, params.userId));
     const pagePosts = pagePostIds
       .map((id) => postMap.get(id))
       .filter((p): p is RowDataPacket => Boolean(p));
@@ -1003,9 +1075,27 @@ export const feedService = new FeedService();
 
 /** 測試輔助函式：清空記憶體向量快取以保證單元測試隔離 */
 export function clearVectorMemoryCachesForTest(): void {
-  postVectorMemoryCache.clear();
-  userVectorMemoryCache.clear();
+  resetFeedVectorCaches();
   candidateVectorReadStats.reads = 0;
   candidateVectorReadStats.failed = 0;
   candidateVectorReadStats.missing = 0;
+  candidateVectorReadStats.cacheHits = 0;
+}
+
+/** 清空記憶體向量快取；benchmark 以此建立 cold-cache 情境，計數器保留以便計算區間差值。 */
+export function resetFeedVectorCaches(): void {
+  postVectorMemoryCache.clear();
+  userVectorMemoryCache.clear();
+}
+
+export function getFeedVectorCacheSizes(): {
+  postVectors: number;
+  postVectorCapacity: number;
+  userVectors: number;
+} {
+  return {
+    postVectors: postVectorMemoryCache.size,
+    postVectorCapacity: POST_VECTOR_CACHE_MAX,
+    userVectors: userVectorMemoryCache.size,
+  };
 }

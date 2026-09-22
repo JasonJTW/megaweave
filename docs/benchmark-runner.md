@@ -33,7 +33,9 @@ Every check below runs before a profile starts. If any check fails, the runner e
 
    Set this only in benchmark-specific configuration. It must never appear in production environment files or deployment settings.
 
-   A marked target also returns `benchmarkMetrics` from `/health`, such as `feedCandidateVectorReads` (candidate vector reads, failures, and vectors missing from Redis since the process started). Profiles can use these counters to detect silent ranking degradation under load. Unmarked targets never compute or expose them.
+   A marked target also returns `benchmarkMetrics` from `/health`: `feedCandidateVectorReads` (candidate vector Redis reads, failures, vectors missing from Redis, and in-memory cache hits since the process started), `feedVectorCaches` (in-memory vector cache sizes), and `process` (API CPU time, RSS, and heap). Profiles use these counters to detect silent ranking degradation and to observe API resource use. Unmarked targets never compute or expose them.
+
+   Only a marked target also accepts the benchmark-only controls used by `feed-*` profiles: the `x-benchmark-feed-strategy` request header on `GET /api/posts/feed`, and `POST /benchmark/feed-caches/reset`. See [Feed profiles](#feed-profiles).
 3. **Dependency modes.** Each profile declares how it uses every external dependency:
 
    | Mode | Meaning |
@@ -95,6 +97,8 @@ Omitted replica counts are recorded as `"unknown"`.
 | `environment-check` | No | No | Validates the environment gate and artifact contract without touching any target |
 | `fixture-1k` | No | Yes | Resets the benchmark data stores and loads the 1k-post smoke fixture |
 | `fixture-10k` | No | Yes | Resets the benchmark data stores and loads the 10k-post fixture |
+| `feed-10k` | Yes | Yes | Loads the 10k fixture, then compares the full-hydration baseline with the current feed over HTTP (about 2.7 hours) |
+| `feed-1k-smoke` | Yes | Yes | Same flow on the 1k fixture with one short repetition at 5 VUs (about 4 minutes); for checking the profile, not for results |
 
 ```bash
 cd server
@@ -105,7 +109,7 @@ BENCHMARK_RESOURCE_LIMITS='{"api":"1 vCPU / 2 GB","worker":"1 vCPU / 2 GB"}' \
 npm run benchmark -- --profile environment-check --output /tmp/megaweave-benchmark
 ```
 
-Future tickets add `feed-10k`, `queue-burst-500`, and recovery profiles to the same registry.
+Future tickets add `queue-burst-500` and recovery profiles to the same registry.
 
 ## Fixture dataset
 
@@ -148,9 +152,79 @@ cd server
 BENCHMARK_INTEGRATION=1 npx jest src/benchmark/fixture/fixture.integration.test.ts
 ```
 
+## Feed profiles
+
+`feed-10k` measures the current feed (candidate retrieval, in-memory rerank, and hydration of the returned page only) against an equivalent full-hydration baseline, through the public `GET /api/posts/feed` endpoint.
+
+### Running
+
+Start an API against the benchmark data stores, then run the profile against it:
+
+```bash
+make benchmark-up
+cd server
+npm run benchmark:api      # builds, then serves http://localhost:18443 with server/benchmark.env
+# in another terminal
+BENCHMARK_ENVIRONMENT=isolated BENCHMARK_API_REPLICAS=1 BENCHMARK_WORKER_REPLICAS=0 \
+  npm run benchmark -- --profile feed-10k --target http://localhost:18443
+```
+
+`npm run benchmark:api` runs the compiled server (as production does) with the benchmark target marker, rate limiting disabled, and no inline workers. No worker is needed, because the feed path does not enqueue jobs. The profile reloads the fixture itself and clears the API's in-memory caches through the reset endpoint, so the API does not need a restart.
+
+### Strategies
+
+| Strategy | Header value | Behavior |
+| --- | --- | --- |
+| Baseline | `full-hydration` | The candidate query does the full 6-table join for every candidate. Filtered feeds read `posts.embedding` from MySQL when the user has an interest vector. Personalized feeds hydrate all KNN candidates, including `is_liked`. This is the hydration approach used before late materialization (`b97b1cb`), with the current candidate limits, ordering, and response fields. The pre-`b97b1cb` code also fetched more filtered candidates and always selected `embedding`. Keeping those would change the results or cost more, so the baseline is conservative. |
+| Current | `late-materialization` | A lightweight candidate query, vectors from the in-memory cache or Redis, and a 6-table hydration of only the returned page. |
+
+Ranking formulas, candidate limits, and response fields are shared, so both strategies must return identical responses. Before measuring, the profile sends eight fixed requests that cover the personalized, filtered, tinder, cold-start geo, and trending paths to both strategies. If any response differs, is empty, is not personalized when it should be, or reports a strategy other than the one requested, the profile skips performance measurement and writes artifacts with a failed `strategy-equivalence` invariant. It also checks that the returned posts are active in the benchmark MySQL, which catches an API connected to different data stores.
+
+The trending feed and the cold-start geo feed without a user vector read no embeddings. Their difference comes only from hydration. Per-class latency is reported in the JSON artifact.
+
+### Workload
+
+| Parameter | `feed-10k` |
+| --- | --- |
+| Virtual users | 5, 10, 20 (closed loop) |
+| Think time | Uniform 3–8 s after each response; start times are staggered |
+| Warm-up | 60 s (warm cache only) |
+| Measurement | 240 s per run |
+| Repetitions | 3 per strategy, cache state, and VU level (36 runs) |
+| Personas per 10 VUs | 5 returning users with an interest vector, 2 logged-in users without one, 3 anonymous visitors (half without location) |
+| Views | Home 60%, category filter 15%, type filter 10%, tinder deck 15% (location required); 60% chance to scroll to the next page, up to page 5 |
+| Page size | 12 (home), 50 (tinder), matching the client |
+
+Semantic search is excluded because it needs query embeddings; it belongs to a separate search profile. Logged-in personas use sessions that the profile writes to the benchmark cache Redis for fixture users. These sessions are deleted after the run.
+
+Each repetition sends both strategies the same seeded request sequence and think times. The strategy that runs first alternates between repetitions to offset drift. The API's in-memory caches are reset before every run:
+
+- **Cold cache**: measurement starts right after the reset, with no warm-up.
+- **Warm cache**: the same strategy and workload run for the warm-up period, and those requests are discarded.
+
+The MySQL buffer pool is not reset. The fixture fits in memory and is warm from loading.
+
+### Results
+
+For each run, the JSON artifact keeps the raw successful latencies, failed requests, and a summary: nearest-rank p50/p95/p99, request rate, error rate, response bytes, and a per-request-class breakdown. Each scenario reports the median of these values across repetitions and the current strategy's percentage change against the baseline.
+
+Resource observations cover the measurement window of each run:
+
+| Source | Metrics |
+| --- | --- |
+| MySQL `SHOW GLOBAL STATUS` | Queries, selects, InnoDB rows read, buffer pool read requests and disk reads, bytes sent, temporary tables, sort rows, slow queries, connections at end |
+| MySQL `performance_schema` | Statement count, total statement latency, rows examined and sent |
+| Redis cache and vector `INFO` | Commands, keyspace hits and misses, used memory at end |
+| API `/health` | Process CPU time and percent of one core, peak RSS and heap (sampled every 5 s) |
+| Feed caches | Candidate vector lookups, cache hit rate, Redis reads, failures, missing vectors, cache sizes |
+
+Global counters include the runner's own few snapshot queries. Metrics that are not collected, such as MySQL and Redis server CPU and memory, are listed with a reason under `result.unavailableMetrics`. `performance_schema` requires the read grant in `server/db/benchmark-marker.sql`. Existing benchmark volumes need `make benchmark-reset` to apply it.
+
+The run fails (exit code 1, artifacts still written) if any request returns an error, any response did not apply the requested strategy, or any candidate vector read failed. A relative claim such as "reduced p95 by X%" should come only from a passing `feed-10k` run on hardware that matches production.
+
 ## Artifacts
 
-Each run writes one JSON artifact and one Markdown summary named `<profile>-<timestamp>`. The JSON artifact is canonical and contains:
+Each run writes one JSON artifact and one Markdown summary named `<profile>-<timestamp>`. A profile can provide its own Markdown result section in place of the full result JSON. If any invariant fails, the runner still writes both artifacts but exits with code 1. The JSON artifact is canonical and contains:
 
 - timestamp, commit SHA, whether the working tree was dirty, runner version, and profile name
 - verified target URL, or `null` for profiles that do not touch a target
@@ -160,6 +234,7 @@ Each run writes one JSON artifact and one Markdown summary named `<profile>-<tim
 - workload definition
 - API/worker replica counts, worker concurrency, and resource limits
 - dependency modes and cost metadata
+- invariants reported by the profile and whether all of them passed
 - profile result data
 
 Absolute latency and throughput depend on the host, so only numbers from an EC2 instance that matches production (and is separate from it) should be quoted as capacity. Development-machine runs are for building and debugging profiles, and for relative comparisons made under identical conditions.

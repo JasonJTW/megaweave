@@ -130,6 +130,10 @@ async function main(): Promise<void> {
   console.log(
     `Benchmark artifacts written:\n${result.jsonPath}\n${result.summaryPath}`,
   );
+  if (!result.passed) {
+    console.error("Benchmark completed, but one or more invariants failed");
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error: unknown) => {

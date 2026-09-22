@@ -13,6 +13,7 @@
     "dev:api": "dotenv -e .env.development -v APP_ROLE=api -- nodemon ./src/server.ts",
     "dev:worker": "dotenv -e .env.development -v APP_ROLE=worker -- nodemon ./src/worker.ts",
     "sync:vectors": "dotenv -e .env.development -- ts-node src/scripts/syncVectorsToRedis.ts",
+    "benchmark": "ts-node src/scripts/benchmark.ts",
     "docker:redis": "docker compose -f ../docker-compose.dev.yml up -d",
     "docker:redis:stop": "docker compose -f ../docker-compose.dev.yml down",
     "lint": "eslint src/",

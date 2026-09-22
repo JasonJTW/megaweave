@@ -223,7 +223,7 @@ function pickActiveUserId(random: Random, userCount: number): number {
   return Math.min(userCount, 1 + Math.floor(Math.pow(random.next(), 2.2) * userCount));
 }
 
-function buildTitle(random: Random, type: FixturePostType, noun: string, conditionLevel: number): string {
+export function buildTitle(random: Random, type: FixturePostType, noun: string, conditionLevel: number): string {
   const prefix = random.pick(TITLE_PREFIX[type]);
   if (type === "wish") {
     return `${prefix}${random.pick(["二手", "堪用的", "不用的", ""])}${noun}`;
@@ -232,7 +232,7 @@ function buildTitle(random: Random, type: FixturePostType, noun: string, conditi
   return `${prefix}${condition}${noun} ${random.pick(QUANTITY_WORDS)}`;
 }
 
-function buildContent(random: Random, noun: string): string {
+export function buildContent(random: Random, noun: string): string {
   // 長度分佈：多數短文、少數長文，讓 response bytes 接近真實貼文
   const sentences = random.weighted([[1, 20], [2, 30], [4, 25], [8, 15], [20, 7], [45, 3]] as const);
   const parts = [`${noun}，${random.pick(CONTENT_SENTENCES)}`];
@@ -240,7 +240,7 @@ function buildContent(random: Random, noun: string): string {
   return parts.join("").slice(0, 1000);
 }
 
-function buildTags(random: Random, categoryTags: readonly string[]): string | null {
+export function buildTags(random: Random, categoryTags: readonly string[]): string | null {
   const count = random.weighted([[0, 25], [1, 25], [2, 25], [3, 15], [4, 10]] as const);
   if (count === 0) return null;
   const pool = [...categoryTags, ...GENERIC_TAGS];

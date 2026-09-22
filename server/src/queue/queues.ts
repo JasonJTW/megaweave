@@ -2,7 +2,7 @@
 // 職責：建立所有 Queue 實例，提供 enqueue helpers 給 route handlers 使用
 //* producer
 
-import { Queue } from "bullmq";
+import { Job, Queue } from "bullmq";
 import { bullmqConnection } from "./connection";
 import {
   PostUploadImageJobData,
@@ -29,9 +29,10 @@ export const postImageQueue = new Queue<
 
 export async function enqueuePostUploadImages(
   data: PostUploadImageJobData,
-): Promise<void> {
-  await postImageQueue.add("upload-images", data, { delay: 100 });
+): Promise<Job<PostUploadImageJobData>> {
+  const job = await postImageQueue.add("upload-images", data, { delay: 100 });
   console.log(`🖼️ Enqueued upload images job for post #${data.postId}`);
+  return job as Job<PostUploadImageJobData>;
 }
 
 export async function enqueuePostDeleteImages(
@@ -83,9 +84,10 @@ export const embeddingQueue = new Queue<PostEmbeddingJobData>(
 
 export async function enqueuePostEmbedding(
   data: PostEmbeddingJobData,
-): Promise<void> {
-  await embeddingQueue.add("generate-embedding", data, { delay: 500 });
+): Promise<Job<PostEmbeddingJobData>> {
+  const job = await embeddingQueue.add("generate-embedding", data, { delay: 500 });
   console.log(`🧠 Enqueued embedding job for post #${data.postId}`);
+  return job;
 }
 
 //* ─── User Vector Queue ──────────────────────────────────────────────────────
@@ -106,9 +108,10 @@ export const userVectorQueue = new Queue<UserVectorJobData>(
 const VIEW_VECTOR_COOLDOWN_SECONDS = 5 * 60;  // view：5 分鐘冷卻
 const ACTION_VECTOR_COOLDOWN_SECONDS = 60;     // like / comment / weave：1 分鐘防抖
 
+/** 回傳排入的 job；冷卻期內的重複事件不排入，回傳 null */
 export async function enqueueUserVectorUpdate(
   data: UserVectorJobData,
-): Promise<void> {
+): Promise<Job<UserVectorJobData> | null> {
   // 對所有 action 進行防抖去重，避免短時間內對同一 (user, post, action) 重複丟 job
   // view: 5 分鐘冷卻（行為輕量，高頻觸發）
   // like / comment / weave: 1 分鐘防抖（理論上不會秒速重複，保險起見）
@@ -127,17 +130,18 @@ export async function enqueueUserVectorUpdate(
 
     if (!acquired) {
       // 還在冷卻期內，忽略重複事件
-      return;
+      return null;
     }
   } catch (err) {
     console.warn(`⚠️ Failed to check user-vector ${data.action} cooldown:`, err);
     // Redis 失敗時仍繼續丟 job，避免向量更新完全停擺
   }
 
-  await userVectorQueue.add("update-user-vector", data);
+  const job = await userVectorQueue.add("update-user-vector", data);
   console.log(
     `👤 Enqueued user-vector job: user #${data.userId} ← post #${data.postId} (${data.action})`,
   );
+  return job;
 }
 
 //* ─── User Vector Flush Queue (Write-Back cron) ─────────────────────────
@@ -268,4 +272,17 @@ export async function initDeliveryReconcileCron(): Promise<void> {
   console.log("⏱️ Delivery Reconcile Cron Scheduler initialized (runs every 5 mins)");
 }
 
-
+/** 關閉本模組建立的所有 Queue 連線；供只作為 producer 的短期程序（例如 benchmark runner）結束時使用 */
+export async function closeQueues(): Promise<void> {
+  await Promise.all(
+    [
+      postImageQueue,
+      emailQueue,
+      embeddingQueue,
+      userVectorQueue,
+      userVectorFlushQueue,
+      hotScoreQueue,
+      deliveryReconcileQueue,
+    ].map((queue) => queue.close()),
+  );
+}

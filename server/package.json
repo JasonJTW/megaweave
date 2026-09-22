@@ -15,6 +15,7 @@
     "sync:vectors": "dotenv -e .env.development -- ts-node src/scripts/syncVectorsToRedis.ts",
     "benchmark": "dotenv -o -e benchmark.env -- ts-node src/scripts/benchmark.ts",
     "benchmark:api": "dotenv -o -e benchmark.env -v APP_ROLE=api -v PORT=18443 -v ENABLE_HTTPS=false -v RATE_LIMIT_DISABLED=true -v BENCHMARK_TARGET_MARKER=megaweave-isolated -- sh -c 'tsc -p tsconfig.build.json && node ./dist/server.js'",
+    "benchmark:worker": "dotenv -o -e benchmark.env -v APP_ROLE=worker -- sh -c 'tsc -p tsconfig.build.json && node ./dist/worker.js'",
     "docker:redis": "docker compose -f ../docker-compose.dev.yml up -d",
     "docker:redis:stop": "docker compose -f ../docker-compose.dev.yml down",
     "lint": "eslint src/",

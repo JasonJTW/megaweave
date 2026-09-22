@@ -43,7 +43,7 @@ export interface FeedProfileOptions {
   seed?: number;
 }
 
-async function resetTargetCaches(targetUrl: string): Promise<void> {
+export async function resetTargetCaches(targetUrl: string): Promise<void> {
   const response = await fetch(new URL(CACHE_RESET_PATH, targetUrl), {
     method: "POST",
     signal: AbortSignal.timeout(5000),
@@ -55,13 +55,13 @@ async function resetTargetCaches(targetUrl: string): Promise<void> {
   }
 }
 
-interface PreparedPersonas {
+export interface PreparedPersonas {
   personas: FeedPersona[];
   catalog: WorkloadCatalog;
   sessionIds: string[];
 }
 
-async function preparePersonas(stores: AppStores, count: number): Promise<PreparedPersonas> {
+export async function preparePersonas(stores: AppStores, count: number): Promise<PreparedPersonas> {
   const { createBenchmarkSessions } = await import("./sessions");
   const selectUsers = async (withInterestVector: boolean) => {
     const [rows] = await stores.mysql.query<RowDataPacket[]>(
@@ -185,7 +185,7 @@ async function assertTargetSharesMysql(stores: AppStores, postIds: number[]): Pr
   }
 }
 
-async function describeEnvironment(stores: AppStores) {
+export async function describeEnvironment(stores: AppStores) {
   const [variables] = await stores.mysql.query<RowDataPacket[]>(
     "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_buffer_pool_size', 'max_connections', 'performance_schema')",
   );

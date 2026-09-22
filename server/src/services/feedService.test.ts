@@ -2,6 +2,7 @@ import {
   FeedService,
   feedService,
   clearVectorMemoryCachesForTest,
+  getCandidateVectorReadStats,
 } from "./feedService";
 import { getRedisClient, getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import dbPool from "../utils/db";
@@ -277,6 +278,47 @@ describe("FeedService", () => {
       expect(result.posts).toHaveLength(1);
       expect(result.posts[0].id).toBe(1);
       expect(result.isPersonalized).toBe(true);
+    });
+
+    it("counts failed and missing candidate vector reads instead of hiding them", async () => {
+      const service = new FeedService();
+      const candidatePosts = [1, 2, 3].map((id) => ({
+        id,
+        status: "active",
+        hot_score: 1,
+        expires_at: null,
+        lat: null,
+        lng: null,
+      }));
+
+      (dbPool.execute as jest.Mock)
+        .mockResolvedValueOnce([[{ total: 3 }]])
+        .mockResolvedValueOnce([candidatePosts])
+        .mockResolvedValueOnce([candidatePosts]);
+
+      const userVec = new Array(1536).fill(0);
+      userVec[0] = 1.0;
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+      // post:1 有向量、post:2 不存在、post:3 因 client 佇列已滿而失敗
+      mockRedis.sendCommand.mockImplementation((args: unknown) => {
+        const [command, key] = args as string[];
+        if (command !== "HGET") return Promise.resolve(null);
+        if (key === "post:1") return Promise.resolve(createFloat32Buffer(userVec));
+        if (key === "post:3") return Promise.reject(new Error("The queue is full"));
+        return Promise.resolve(null);
+      });
+
+      const result = await service.getFilteredFeed({}, createFloat32Buffer(userVec));
+
+      expect(result.posts).toHaveLength(3);
+      expect(getCandidateVectorReadStats()).toEqual({ reads: 3, failed: 1, missing: 1 });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]).toEqual([
+        expect.stringContaining("1/3 candidate vector reads failed"),
+        "The queue is full",
+      ]);
+      warn.mockRestore();
     });
 
     it("applies geo boost for closer posts when coordinates are supplied", async () => {

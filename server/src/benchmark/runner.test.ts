@@ -200,6 +200,35 @@ describe("benchmark runner", () => {
     await expectRefused(createProfile({ name: "../unsafe" }));
   });
 
+  it("does not run a profile whose own safety check fails, but still disposes it", async () => {
+    const dispose = jest.fn(async () => {});
+    const profile = createProfile({
+      assertSafeToRun: jest.fn(async () => {
+        throw new BenchmarkSafetyError("database is not a benchmark database");
+      }),
+      dispose,
+    });
+
+    await expectRefused(profile);
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs the profile safety check only after the runner's own checks", async () => {
+    delete process.env.BENCHMARK_ENVIRONMENT;
+    const assertSafeToRun = jest.fn(async () => {});
+
+    await expectRefused(createProfile({ assertSafeToRun }));
+    expect(assertSafeToRun).not.toHaveBeenCalled();
+  });
+
+  it("disposes the profile after a successful run", async () => {
+    const dispose = jest.fn(async () => {});
+
+    await runBenchmark({ profile: createProfile({ dispose }), outputDirectory, metadata });
+
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
   it("writes no artifacts when the profile fails", async () => {
     const profile = createProfile({
       run: jest.fn(async () => {

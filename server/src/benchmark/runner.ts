@@ -4,6 +4,7 @@
 import { execFileSync } from "child_process";
 import { mkdir, writeFile } from "fs/promises";
 import { join } from "path";
+import { BenchmarkSafetyError } from "./errors";
 import {
   BenchmarkDataset,
   BenchmarkProfile,
@@ -12,16 +13,11 @@ import {
 } from "./profiles";
 import { BENCHMARK_HEALTH_ENVIRONMENT } from "./targetMarker";
 
+export { BenchmarkSafetyError };
+
 export const RUNNER_VERSION = "2";
 const REQUIRED_ENVIRONMENT = "isolated";
 const REAL_PROBE_CONFIRMATION = "allow-real-probe";
-
-export class BenchmarkSafetyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BenchmarkSafetyError";
-  }
-}
 
 /** 由操作者提供、描述部署環境的 metadata（profile 本身無法得知）。 */
 export interface BenchmarkEnvironmentMetadata {
@@ -192,7 +188,14 @@ export async function runBenchmark(
   }
 
   const targetUrl = profile.touchesTarget ? request.targetUrl : undefined;
-  const { dataset, result } = await profile.run({ targetUrl });
+  let outcome: Awaited<ReturnType<BenchmarkProfile["run"]>>;
+  try {
+    await profile.assertSafeToRun?.();
+    outcome = await profile.run({ targetUrl });
+  } finally {
+    await profile.dispose?.();
+  }
+  const { dataset, result } = outcome;
   const status = runGit(["status", "--porcelain"]);
   const timestamp = new Date().toISOString();
   const artifact: BenchmarkArtifact = {

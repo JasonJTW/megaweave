@@ -108,7 +108,7 @@ export class ResilientRedisStore implements Store {
   }
 
   async resetAll(): Promise<void> {
-    const redis = this.getRedisStore() as any;
+    const redis: Store | null = this.getRedisStore();
     if (redis && typeof redis.resetAll === "function") {
       try {
         await redis.resetAll();
@@ -120,7 +120,7 @@ export class ResilientRedisStore implements Store {
   }
 
   async shutdown(): Promise<void> {
-    const redis = this.getRedisStore() as any;
+    const redis: Store | null = this.getRedisStore();
     if (redis && typeof redis.shutdown === "function") {
       try {
         await redis.shutdown();

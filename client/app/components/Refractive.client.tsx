@@ -7,6 +7,10 @@ import dynamic from "next/dynamic";
  * statically imported from any client component without triggering
  * the "ImageData is not defined" SSR error.
  *
+ * Each component automatically checks for Chromium support via UA-CH / feature detection.
+ * On unsupported browsers (iOS Safari, macOS Safari, Firefox), an outer fallback blur
+ * layer is applied cleanly without breaking layout or events.
+ *
  * Usage:
  *   import { RefractiveDiv, RefractiveButton } from "@/app/components/Refractive.client";
  *
@@ -32,3 +36,6 @@ export const RefractiveNav = dynamic(
   () => import("./Refractive").then((mod) => mod.RefractiveNav),
   { ssr: false },
 );
+
+export { isChromiumSupported } from "@/utils/browserDetection";
+export { useIsChromium } from "@/hooks/useIsChromium";

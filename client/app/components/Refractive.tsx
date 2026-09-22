@@ -1,13 +1,27 @@
 "use client";
 
 /**
- * Raw refractive exports — DO NOT import this file directly.
- * Use `@/app/components/Refractive.client` instead.
+ * Refractive exports with fallback blur for non-Chromium browsers.
+ * For safe usage across client components without SSR ImageData issues,
+ * import from `@/app/components/Refractive.client` instead.
  */
 import { refractive } from "@hashintel/refractive";
 import { Button } from "@/components/ui/button";
+import { withRefractiveFallback } from "./withRefractiveFallback";
 
-export const RefractiveDiv = refractive.div;
-export const RefractiveSpan = refractive.span;
-export const RefractiveNav = refractive.nav;
-export const RefractiveButton = refractive(Button);
+export const RefractiveDiv = withRefractiveFallback(
+  refractive.div,
+  "RefractiveDiv",
+);
+export const RefractiveSpan = withRefractiveFallback(
+  refractive.span,
+  "RefractiveSpan",
+);
+export const RefractiveNav = withRefractiveFallback(
+  refractive.nav,
+  "RefractiveNav",
+);
+export const RefractiveButton = withRefractiveFallback(
+  refractive(Button),
+  "RefractiveButton",
+);

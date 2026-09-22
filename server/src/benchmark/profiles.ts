@@ -2,6 +2,7 @@
 // Benchmark profile 註冊表：每個 profile 自行宣告是否會操作目標環境與外部依賴模式，
 // runner 依此強制執行安全檢查，呼叫端無法略過。
 
+import { createFeedProfile } from "./feed/feedProfile";
 import { createFixtureProfile } from "./fixture/fixtureProfile";
 
 export const DEPENDENCY_MODES = ["mock", "benchmark", "real-probe"] as const;
@@ -19,9 +20,19 @@ export interface BenchmarkProfileContext {
   targetUrl?: string;
 }
 
+/** Profile 自行判定的通過條件；任一失敗時仍寫出結果，但 runner 會回報失敗。 */
+export interface BenchmarkInvariant {
+  name: string;
+  ok: boolean;
+  detail?: string;
+}
+
 export interface BenchmarkProfileOutcome {
   dataset: BenchmarkDataset;
   result: Record<string, unknown>;
+  invariants?: BenchmarkInvariant[];
+  /** Markdown 摘要中取代完整 result JSON 的內容；result 含大量原始資料時使用。 */
+  summary?: string;
 }
 
 export interface BenchmarkProfile {
@@ -58,5 +69,30 @@ export const benchmarkProfiles: Record<string, BenchmarkProfile> = Object.fromEn
     environmentCheck,
     createFixtureProfile({ name: "fixture-1k", posts: 1_000 }),
     createFixtureProfile({ name: "fixture-10k", posts: 10_000 }),
+    createFeedProfile({
+      name: "feed-10k",
+      posts: 10_000,
+      plan: {
+        cacheStates: ["cold", "warm"],
+        virtualUsers: [5, 10, 20],
+        repetitions: 3,
+        warmUpMs: 60_000,
+        measureMs: 240_000,
+        thinkTimeMs: { min: 3_000, max: 8_000 },
+      },
+    }),
+    // 開發機上驗證 feed profile 流程用；數據不可作為效能結論
+    createFeedProfile({
+      name: "feed-1k-smoke",
+      posts: 1_000,
+      plan: {
+        cacheStates: ["cold", "warm"],
+        virtualUsers: [5],
+        repetitions: 1,
+        warmUpMs: 10_000,
+        measureMs: 30_000,
+        thinkTimeMs: { min: 3_000, max: 8_000 },
+      },
+    }),
   ].map((profile) => [profile.name, profile]),
 );

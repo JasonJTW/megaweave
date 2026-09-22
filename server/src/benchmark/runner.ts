@@ -8,6 +8,7 @@ import { BenchmarkSafetyError } from "./errors";
 import { collectHostInfo, describeHost, HostInfo } from "./hostInfo";
 import {
   BenchmarkDataset,
+  BenchmarkInvariant,
   BenchmarkProfile,
   DEPENDENCY_MODES,
   DependencyMode,
@@ -16,7 +17,7 @@ import { BENCHMARK_HEALTH_ENVIRONMENT } from "./targetMarker";
 
 export { BenchmarkSafetyError };
 
-export const RUNNER_VERSION = "3";
+export const RUNNER_VERSION = "4";
 const REQUIRED_ENVIRONMENT = "isolated";
 const REAL_PROBE_CONFIRMATION = "allow-real-probe";
 
@@ -41,6 +42,8 @@ export interface BenchmarkRunRequest {
 export interface BenchmarkRunResult {
   jsonPath: string;
   summaryPath: string;
+  /** 所有 invariant 皆通過；未宣告 invariant 的 profile 視為通過 */
+  passed: boolean;
 }
 
 export interface BenchmarkArtifact extends BenchmarkEnvironmentMetadata {
@@ -56,6 +59,8 @@ export interface BenchmarkArtifact extends BenchmarkEnvironmentMetadata {
   dataset: BenchmarkDataset;
   workload: Record<string, unknown>;
   dependencies: Record<string, DependencyMode>;
+  invariants: BenchmarkInvariant[];
+  passed: boolean;
   result: Record<string, unknown>;
 }
 
@@ -145,7 +150,22 @@ function runGit(args: string[]): string | null {
   }
 }
 
-function buildSummary(artifact: BenchmarkArtifact): string {
+function buildSummary(artifact: BenchmarkArtifact, profileSummary?: string): string {
+  const invariants = artifact.invariants.length
+    ? [
+        "",
+        `## Invariants: ${artifact.passed ? "PASS" : "FAIL"}`,
+        "",
+        ...artifact.invariants.map(
+          (invariant) =>
+            `- ${invariant.ok ? "PASS" : "FAIL"} ${invariant.name}${invariant.detail ? `: ${invariant.detail}` : ""}`,
+        ),
+      ]
+    : [];
+  const result = profileSummary
+    ? [profileSummary]
+    : ["```json", JSON.stringify(artifact.result, null, 2), "```"];
+
   return [
     `# Benchmark: ${artifact.profile}`,
     "",
@@ -164,12 +184,11 @@ function buildSummary(artifact: BenchmarkArtifact): string {
     `- Resource limits: ${JSON.stringify(artifact.deployment.resourceLimits)}`,
     `- Dependencies: ${JSON.stringify(artifact.dependencies)}`,
     `- Cost metadata: ${JSON.stringify(artifact.cost)}`,
+    ...invariants,
     "",
     "## Result",
     "",
-    "```json",
-    JSON.stringify(artifact.result, null, 2),
-    "```",
+    ...result,
     "",
   ].join("\n");
 }
@@ -204,7 +223,8 @@ export async function runBenchmark(
   } finally {
     await profile.dispose?.();
   }
-  const { dataset, result } = outcome;
+  const { dataset, result, invariants = [] } = outcome;
+  const passed = invariants.every((invariant) => invariant.ok);
   const host = await collectHostInfo();
   const status = runGit(["status", "--porcelain"]);
   const timestamp = new Date().toISOString();
@@ -221,6 +241,8 @@ export async function runBenchmark(
     workload: profile.workload,
     dependencies: profile.dependencies,
     ...request.metadata,
+    invariants,
+    passed,
     result,
   };
   const artifactBaseName = `${profile.name}-${timestamp.replace(/[:.]/g, "-")}`;
@@ -229,7 +251,7 @@ export async function runBenchmark(
 
   await mkdir(request.outputDirectory, { recursive: true });
   await writeFile(jsonPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
-  await writeFile(summaryPath, buildSummary(artifact), "utf8");
+  await writeFile(summaryPath, buildSummary(artifact, outcome.summary), "utf8");
 
-  return { jsonPath, summaryPath };
+  return { jsonPath, summaryPath, passed };
 }

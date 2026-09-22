@@ -1,5 +1,7 @@
+import { createServer } from "http";
+import { AddressInfo } from "net";
 import { hostname } from "os";
-import { collectHostInfo, describeHost } from "./hostInfo";
+import { collectHostInfo, describeHost, imdsFetch } from "./hostInfo";
 
 function response(status: number, body = ""): Response {
   return new Response(body, { status });
@@ -60,5 +62,41 @@ describe("benchmark host info", () => {
     });
 
     expect(JSON.stringify(host)).not.toContain(hostname());
+  });
+
+  it("closes the metadata connection when a request times out", async () => {
+    // 非 EC2 主機上 metadata 請求可能卡住；逾時後必須斷開連線，否則 CLI 會多等約 10 秒才結束
+    let closed: Promise<void> = Promise.resolve();
+    const server = createServer((req) => {
+      closed = new Promise((resolve) => req.socket.on("close", () => resolve()));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    await expect(
+      imdsFetch(`http://127.0.0.1:${port}/latest/api/token`, {
+        method: "PUT",
+        signal: AbortSignal.timeout(100),
+      }),
+    ).rejects.toThrow();
+    await closed;
+
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it("returns the metadata response body and status", async () => {
+    const server = createServer((req, res) => {
+      res.writeHead(req.headers["x-aws-ec2-metadata-token"] === "token" ? 200 : 401);
+      res.end("t3.small");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+
+    const ok = await imdsFetch(`http://127.0.0.1:${port}/`, { headers: { "X-aws-ec2-metadata-token": "token" } });
+    const denied = await imdsFetch(`http://127.0.0.1:${port}/`);
+
+    expect([ok.status, await ok.text()]).toEqual([200, "t3.small"]);
+    expect(denied.ok).toBe(false);
+    await new Promise((resolve) => server.close(resolve));
   });
 });

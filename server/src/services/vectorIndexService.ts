@@ -1,6 +1,38 @@
 import { RowDataPacket } from "mysql2";
 import dbPool from "../utils/db";
-import { getVectorRedisClient } from "../utils/redis";
+import { AppRedisClient, getVectorRedisClient } from "../utils/redis";
+
+export const POST_VECTOR_INDEX = "idx:posts_v";
+
+/** 建立貼文 HNSW 向量索引；索引已存在時 Redis 會回傳錯誤。 */
+export async function createPostVectorIndex(
+  redis: Pick<AppRedisClient, "sendCommand">,
+): Promise<void> {
+  await redis.sendCommand([
+    "FT.CREATE",
+    POST_VECTOR_INDEX,
+    "ON",
+    "HASH",
+    "PREFIX",
+    "1",
+    "post:",
+    "SCHEMA",
+    "v",
+    "VECTOR",
+    "HNSW",
+    "6",
+    "TYPE",
+    "FLOAT32",
+    "DIM",
+    "1536",
+    "DISTANCE_METRIC",
+    "COSINE",
+    "post_id",
+    "NUMERIC",
+    "status",
+    "TAG",
+  ]);
+}
 
 /**
  * 解析 FT.INFO 回傳的鍵值陣列，安全取得 num_docs 數量
@@ -159,30 +191,7 @@ export async function ensureVectorIndexExists(): Promise<void> {
     ) {
       console.log("⚙️  Creating Redis Vector Index (idx:posts_v)...");
       try {
-        await redis.sendCommand([
-          "FT.CREATE",
-          "idx:posts_v",
-          "ON",
-          "HASH",
-          "PREFIX",
-          "1",
-          "post:",
-          "SCHEMA",
-          "v",
-          "VECTOR",
-          "HNSW",
-          "6",
-          "TYPE",
-          "FLOAT32",
-          "DIM",
-          "1536",
-          "DISTANCE_METRIC",
-          "COSINE",
-          "post_id",
-          "NUMERIC",
-          "status",
-          "TAG",
-        ]);
+        await createPostVectorIndex(redis);
         console.log(
           "🚀 Redis Vector Index (idx:posts_v) created successfully!",
         );

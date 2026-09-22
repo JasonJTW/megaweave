@@ -31,7 +31,7 @@ const ROW_BATCH_SIZE = 1000;
 /** 每篇貼文的 embedding JSON 約 30KB，縮小批次以避開 max_allowed_packet */
 const POST_BATCH_SIZE = 100;
 /** 應用程式的 Redis client 設定 commandsQueueMaxLength=100，同時送出的指令必須低於此上限 */
-const REDIS_BATCH_SIZE = 50;
+export const REDIS_BATCH_SIZE = 50;
 
 export interface FixtureLoadTimings {
   reset: number;

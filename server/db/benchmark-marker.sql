@@ -6,3 +6,6 @@ CREATE TABLE `benchmark_environment` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `benchmark_environment` (`marker`) VALUES ('megaweave-isolated');
+
+-- feed benchmark 讀取 statement 總量（次數、耗時、examined/sent rows）；唯讀
+GRANT SELECT ON `performance_schema`.* TO 'benchmark'@'%';

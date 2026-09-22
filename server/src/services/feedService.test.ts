@@ -312,7 +312,7 @@ describe("FeedService", () => {
       const result = await service.getFilteredFeed({}, createFloat32Buffer(userVec));
 
       expect(result.posts).toHaveLength(3);
-      expect(getCandidateVectorReadStats()).toEqual({ reads: 3, failed: 1, missing: 1 });
+      expect(getCandidateVectorReadStats()).toEqual({ reads: 3, failed: 1, missing: 1, cacheHits: 0 });
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0]).toEqual([
         expect.stringContaining("1/3 candidate vector reads failed"),
@@ -363,6 +363,105 @@ describe("FeedService", () => {
       // Post 2 is ranked 1st due to geo boost
       expect(result.posts[0].id).toBe(2);
       expect(result.posts[1].id).toBe(1);
+    });
+  });
+
+  describe("full-hydration baseline (benchmark only)", () => {
+    // 同一份資料以 MySQL 列與 Redis 向量兩種形式提供，驗證 baseline 與現行策略的業務結果一致
+    const vectorFor = (id: number): number[] => {
+      const vec = new Array(1536).fill(0);
+      vec[id % 3] = 1;
+      vec[3] = id / 10;
+      return vec;
+    };
+    const posts = [1, 2, 3, 4].map((id) => ({
+      id,
+      public_id: `post-${id}`,
+      title: `Post ${id}`,
+      status: "active",
+      hot_score: 10 - id,
+      expires_at: id === 4 ? "2020-01-01T00:00:00.000Z" : null,
+      lat: 25 + id / 100,
+      lng: 121.5,
+      s3_keys: `benchmark/posts/${id}.jpg`,
+    }));
+    const LIGHT_COLUMNS = ["id", "hot_score", "expires_at", "status", "lat", "lng"];
+
+    function mockDatabase(likedPostIds: number[] = []): void {
+      (dbPool.execute as jest.Mock).mockImplementation(async (sql: string, params: unknown[] = []) => {
+        if (sql.includes("COUNT(")) return [[{ total: posts.length }]];
+        if (sql.includes("FROM post_likes")) {
+          const ids = params.slice(1) as number[];
+          return [likedPostIds.filter((id) => ids.includes(id)).map((post_id) => ({ post_id }))];
+        }
+        const idFilter = sql.includes("p.id IN") ? (params as number[]) : null;
+        const matching = posts
+          .filter((post) => !idFilter || idFilter.includes(post.id))
+          .sort((a, b) => b.hot_score - a.hot_score || b.id - a.id);
+        if (sql.includes("GROUP_CONCAT")) {
+          const withEmbedding = sql.includes("p.embedding");
+          return [
+            matching.map((post) => ({
+              ...post,
+              ...(withEmbedding ? { embedding: JSON.stringify(vectorFor(post.id)) } : {}),
+            })),
+          ];
+        }
+        return [
+          matching.map((post) =>
+            Object.fromEntries(LIGHT_COLUMNS.map((column) => [column, post[column as keyof typeof post]])),
+          ),
+        ];
+      });
+    }
+
+    function mockRedisVectors(): void {
+      mockRedis.sendCommand.mockImplementation(async (args: unknown) => {
+        const [command, key] = args as string[];
+        if (command === "HGET") {
+          return createFloat32Buffer(vectorFor(Number(key.replace("post:", ""))));
+        }
+        if (command === "FT.SEARCH") {
+          return [3, "post:3", ["vector_distance", "0.1"], "post:1", ["vector_distance", "0.2"], "post:2", ["vector_distance", "0.3"]];
+        }
+        return null;
+      });
+    }
+
+    const userVector = () => createFloat32Buffer([1, ...new Array(1535).fill(0)]);
+
+    it.each([
+      ["filtered feed", { category_id: 3, userId: 7, limit: 2, page: 1 }],
+      ["filtered feed page 2 with geo boost", { type: "share", userId: 7, limit: 2, page: 2, lat: 25.03, lng: 121.5 }],
+      ["tinder feed", { mode: "tinder", userId: 7, limit: 3, lat: 25.03, lng: 121.5 }],
+      ["personalized feed", { userId: 7, limit: 2 }],
+    ])("returns the same business result as late materialization for the %s", async (_label, params) => {
+      mockDatabase([1, 3]);
+      mockRedisVectors();
+      const service = new FeedService();
+      jest.spyOn(service, "getUserVector").mockResolvedValue(userVector());
+
+      const current = await service.getFeed(params);
+      clearVectorMemoryCachesForTest();
+      const baseline = await service.getFeed({ ...params, fullHydrationBaseline: true });
+
+      expect(current.posts.length).toBeGreaterThan(0);
+      expect(baseline).toEqual(current);
+    });
+
+    it("ranks filtered candidates with embeddings hydrated from MySQL rather than Redis", async () => {
+      mockDatabase();
+      mockRedis.sendCommand.mockResolvedValue(null);
+      const service = new FeedService();
+
+      const baseline = await service.getFilteredFeed(
+        { category_id: 3, fullHydrationBaseline: true },
+        userVector(),
+      );
+
+      // post 3 與使用者向量 (dimension 0) 完全對齊，因此排在熱度較高的 post 1、2 之前
+      expect(baseline.posts[0].id).toBe(3);
+      expect(getCandidateVectorReadStats().reads).toBe(0);
     });
   });
 });

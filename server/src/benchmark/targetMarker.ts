@@ -10,11 +10,15 @@ export interface BenchmarkHealthFields {
   benchmarkMetrics?: Record<string, unknown>;
 }
 
+export function isBenchmarkTarget(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.BENCHMARK_TARGET_MARKER === BENCHMARK_TARGET_MARKER_VALUE;
+}
+
 export function getBenchmarkHealthFields(
   env: NodeJS.ProcessEnv = process.env,
   getMetrics?: () => Record<string, unknown>,
 ): BenchmarkHealthFields {
-  if (env.BENCHMARK_TARGET_MARKER !== BENCHMARK_TARGET_MARKER_VALUE) return {};
+  if (!isBenchmarkTarget(env)) return {};
 
   return {
     benchmarkEnvironment: BENCHMARK_HEALTH_ENVIRONMENT,

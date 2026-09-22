@@ -284,6 +284,67 @@ describe("benchmark runner", () => {
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("records passing invariants and reports the run as passed", async () => {
+    const result = await runBenchmark({
+      profile: createProfile({
+        run: jest.fn(async () => ({
+          dataset: { version: "fixture-v1", counts: {} },
+          result: {},
+          invariants: [{ name: "no-http-errors", ok: true }],
+        })),
+      }),
+      outputDirectory,
+      metadata,
+    });
+
+    const artifact = JSON.parse(await readFile(result.jsonPath, "utf8"));
+    expect(result.passed).toBe(true);
+    expect(artifact.passed).toBe(true);
+    expect(artifact.invariants).toEqual([{ name: "no-http-errors", ok: true }]);
+  });
+
+  it("still writes artifacts for a completed run whose invariants fail, but reports it as failed", async () => {
+    const result = await runBenchmark({
+      profile: createProfile({
+        run: jest.fn(async () => ({
+          dataset: { version: "fixture-v1", counts: {} },
+          result: { errors: 3 },
+          invariants: [
+            { name: "no-http-errors", ok: false, detail: "3 of 120 requests failed" },
+          ],
+        })),
+      }),
+      outputDirectory,
+      metadata,
+    });
+
+    const artifact = JSON.parse(await readFile(result.jsonPath, "utf8"));
+    const summary = await readFile(result.summaryPath, "utf8");
+    expect(result.passed).toBe(false);
+    expect(artifact.passed).toBe(false);
+    expect(summary).toContain("FAIL no-http-errors: 3 of 120 requests failed");
+  });
+
+  it("uses the profile's own summary instead of dumping the result JSON", async () => {
+    const result = await runBenchmark({
+      profile: createProfile({
+        run: jest.fn(async () => ({
+          dataset: { version: "fixture-v1", counts: {} },
+          result: { rawLatenciesMs: [1, 2, 3] },
+          summary: "| Scenario | p95 |\n| --- | --- |\n| warm | 12 ms |",
+        })),
+      }),
+      outputDirectory,
+      metadata,
+    });
+
+    const artifact = JSON.parse(await readFile(result.jsonPath, "utf8"));
+    const summary = await readFile(result.summaryPath, "utf8");
+    expect(artifact.result).toEqual({ rawLatenciesMs: [1, 2, 3] });
+    expect(summary).toContain("| warm | 12 ms |");
+    expect(summary).not.toContain("rawLatenciesMs");
+  });
+
   it("writes no artifacts when the profile fails", async () => {
     const profile = createProfile({
       run: jest.fn(async () => {

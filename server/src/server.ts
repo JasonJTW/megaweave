@@ -25,8 +25,12 @@ import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
 import { globalRateLimiter } from "./middleware/rateLimiter";
-import { getBenchmarkHealthFields } from "./benchmark/targetMarker";
-import { getCandidateVectorReadStats } from "./services/feedService";
+import { getBenchmarkHealthFields, isBenchmarkTarget } from "./benchmark/targetMarker";
+import {
+  getCandidateVectorReadStats,
+  getFeedVectorCacheSizes,
+  resetFeedVectorCaches,
+} from "./services/feedService";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -56,11 +60,30 @@ app.get("/health", (_req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     ssl: ENABLE_HTTPS,
-    ...getBenchmarkHealthFields(process.env, () => ({
-      feedCandidateVectorReads: getCandidateVectorReadStats(),
-    })),
+    ...getBenchmarkHealthFields(process.env, () => {
+      const cpu = process.cpuUsage();
+      const memory = process.memoryUsage();
+      return {
+        feedCandidateVectorReads: getCandidateVectorReadStats(),
+        feedVectorCaches: getFeedVectorCacheSizes(),
+        process: {
+          cpuUserMicros: cpu.user,
+          cpuSystemMicros: cpu.system,
+          rssBytes: memory.rss,
+          heapUsedBytes: memory.heapUsed,
+        },
+      };
+    }),
   });
 });
+
+// Benchmark 專用：清空 API 記憶體向量快取以建立 cold-cache 情境；只在帶隔離標記的 instance 掛載
+if (isBenchmarkTarget()) {
+  app.post("/benchmark/feed-caches/reset", (_req, res) => {
+    resetFeedVectorCaches();
+    res.json({ feedVectorCaches: getFeedVectorCacheSizes() });
+  });
+}
 
 async function startServer() {
   try {

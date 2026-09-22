@@ -25,6 +25,8 @@ import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
 import { globalRateLimiter } from "./middleware/rateLimiter";
+import { getBenchmarkHealthFields } from "./benchmark/targetMarker";
+import { getCandidateVectorReadStats } from "./services/feedService";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -54,6 +56,9 @@ app.get("/health", (_req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     ssl: ENABLE_HTTPS,
+    ...getBenchmarkHealthFields(process.env, () => ({
+      feedCandidateVectorReads: getCandidateVectorReadStats(),
+    })),
   });
 });
 

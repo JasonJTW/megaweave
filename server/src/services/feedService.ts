@@ -184,6 +184,17 @@ async function stampIsLiked(
 const POST_VECTOR_CACHE_MAX = 2000;
 const postVectorMemoryCache = new Map<number, Float32Array>();
 
+// 候選貼文向量讀取統計：累計自 process 啟動，供 benchmark 判斷個人化排序是否因 Redis 讀取失敗而降級
+const candidateVectorReadStats = { reads: 0, failed: 0, missing: 0 };
+
+export function getCandidateVectorReadStats(): {
+  reads: number;
+  failed: number;
+  missing: number;
+} {
+  return { ...candidateVectorReadStats };
+}
+
 // User Vector 本地記憶體快取（5 分鐘 TTL，避免每次請求都重複花費 300ms+ 連線至遠端 Redis）
 const USER_VECTOR_CACHE_TTL_MS = 5 * 60 * 1000;
 const userVectorMemoryCache = new Map<
@@ -452,6 +463,8 @@ export class FeedService {
       if (missingIds.length > 0) {
         try {
           const redis = getVectorRedisClient();
+          let failedReads = 0;
+          let firstError: unknown = null;
           const rawBuffers = await Promise.all(
             missingIds.map((id) =>
               Promise.resolve(
@@ -460,9 +473,15 @@ export class FeedService {
                     [RESP_TYPES.BLOB_STRING]: Buffer,
                   },
                 }),
-              ).catch(() => null),
+              ).catch((err: unknown) => {
+                // 單篇讀取失敗時以中立相似度排序，但必須計數，否則個人化降級不可見
+                failedReads++;
+                firstError ??= err;
+                return null;
+              }),
             ),
           );
+          let validVectors = 0;
           for (let i = 0; i < missingIds.length; i++) {
             const buf = rawBuffers[i];
             if (buf && Buffer.isBuffer(buf) && buf.length === 1536 * 4) {
@@ -471,7 +490,19 @@ export class FeedService {
               if (postVectorMemoryCache.size < POST_VECTOR_CACHE_MAX) {
                 postVectorMemoryCache.set(missingIds[i], vec);
               }
+              validVectors++;
             }
+          }
+          candidateVectorReadStats.reads += missingIds.length;
+          candidateVectorReadStats.failed += failedReads;
+          // 成功讀取但 Redis 沒有該貼文向量（或長度不符）
+          candidateVectorReadStats.missing += missingIds.length - validVectors - failedReads;
+          if (failedReads > 0) {
+            // 每個請求只記一行，避免高負載時每個 key 各印一次
+            console.warn(
+              `⚠️ ${failedReads}/${missingIds.length} candidate vector reads failed; ranking those posts with neutral similarity:`,
+              firstError instanceof Error ? firstError.message : firstError,
+            );
           }
         } catch (redisErr) {
           console.warn(
@@ -974,4 +1005,7 @@ export const feedService = new FeedService();
 export function clearVectorMemoryCachesForTest(): void {
   postVectorMemoryCache.clear();
   userVectorMemoryCache.clear();
+  candidateVectorReadStats.reads = 0;
+  candidateVectorReadStats.failed = 0;
+  candidateVectorReadStats.missing = 0;
 }

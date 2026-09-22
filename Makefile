@@ -4,7 +4,8 @@
 # =============================================================================
 
 .PHONY: help dev build build-dev test lint typecheck install \
-        redis redis-stop logs clean
+        redis redis-stop logs clean \
+        benchmark-up benchmark-down benchmark-reset
 
 # 預設：顯示說明
 help:
@@ -15,6 +16,9 @@ help:
 	@echo "  make dev          同時啟動前後端開發伺服器（需要兩個 terminal）"
 	@echo "  make redis        啟動開發用 3-Instance Redis（Cache:6379, Queue:6380, Vector:6381）"
 	@echo "  make redis-stop   停止開發用 Redis 容器群"
+	@echo "  make benchmark-up    啟動 benchmark 隔離環境（MySQL:13306, Redis:16379-16381）"
+	@echo "  make benchmark-down  停止 benchmark 環境（保留 MySQL 資料）"
+	@echo "  make benchmark-reset 刪除 benchmark MySQL 資料並重新初始化"
 	@echo "  make build        Production build（client + server）"
 	@echo "  make build-dev    Dev build（client + server）"
 	@echo "  make test         執行所有測試"
@@ -65,6 +69,20 @@ redis:
 
 redis-stop:
 	docker compose -f docker-compose.dev.yml down
+
+# -----------------------------------------------------------------------------
+# Benchmark 隔離環境（詳見 docs/benchmark-runner.md）
+# -----------------------------------------------------------------------------
+benchmark-up:
+	docker compose -f docker-compose.benchmark.yml up -d --wait mysql redis-cache redis-queue redis-vector
+	docker compose -f docker-compose.benchmark.yml run --rm benchmark-marker
+
+benchmark-down:
+	docker compose -f docker-compose.benchmark.yml down
+
+benchmark-reset:
+	docker compose -f docker-compose.benchmark.yml down -v
+	$(MAKE) benchmark-up
 
 # -----------------------------------------------------------------------------
 # Build

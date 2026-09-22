@@ -1,0 +1,87 @@
+# MegaWeaving benchmark 隔離環境（與 docker-compose.dev.yml 使用不同 port 與 volume，可同時存在）
+# 啟動：make benchmark-up    重置為全新資料庫：make benchmark-reset
+# MySQL 首次建立時依序匯入 schema、參考資料與 benchmark 標記；Redis 由 benchmark-marker 寫入標記 key。
+name: megaweave-benchmark
+
+services:
+  mysql:
+    container_name: megaweave-benchmark-mysql
+    # 與 production 相同主版本 (MySQL 8.0)
+    image: mysql:8.0
+    command: ["--default-time-zone=+00:00", "--max_allowed_packet=64M"]
+    environment:
+      MYSQL_DATABASE: megaweave_benchmark
+      MYSQL_USER: benchmark
+      MYSQL_PASSWORD: benchmark
+      MYSQL_ROOT_PASSWORD: benchmark-root
+    ports:
+      - "127.0.0.1:13306:3306"
+    volumes:
+      - benchmark-mysql-data:/var/lib/mysql
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./server/db/reference-data.sql:/docker-entrypoint-initdb.d/02-reference-data.sql:ro
+      - ./server/db/benchmark-marker.sql:/docker-entrypoint-initdb.d/03-benchmark-marker.sql:ro
+    healthcheck:
+      # 走 TCP：初始化期間暫時 server 不開放網路，確保匯入完成前不會回報 healthy
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pbenchmark-root"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  # Redis 設定與 production 相同 (maxmemory / eviction policy)，僅移除密碼與持久化目錄
+  redis-cache:
+    container_name: megaweave-benchmark-redis-cache
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy volatile-lru
+    ports:
+      - "127.0.0.1:16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  redis-queue:
+    container_name: megaweave-benchmark-redis-queue
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction
+    ports:
+      - "127.0.0.1:16380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  redis-vector:
+    container_name: megaweave-benchmark-redis-vector
+    image: redis/redis-stack-server:latest
+    environment:
+      - REDIS_ARGS=--maxmemory 384mb --maxmemory-policy noeviction
+    ports:
+      - "127.0.0.1:16381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  # 一次性工作：在每個 Redis 寫入 benchmark 標記（由 make benchmark-up 執行；Redis 重啟後需重新執行）
+  benchmark-marker:
+    image: redis:7-alpine
+    restart: "no"
+    profiles: ["init"]
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      redis-queue:
+        condition: service_healthy
+      redis-vector:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        for host in redis-cache redis-queue redis-vector; do
+          redis-cli -h "$$host" SET benchmark:environment megaweave-isolated || exit 1
+        done
+
+volumes:
+  benchmark-mysql-data:

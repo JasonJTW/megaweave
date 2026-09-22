@@ -36,12 +36,13 @@ export async function prepareFixture(
   };
 }
 
-interface AppStores extends FixtureStores {
+export interface AppStores extends FixtureStores {
   connectRedis(): Promise<void>;
   close(): Promise<void>;
 }
 
-async function openAppStores(): Promise<AppStores> {
+/** 以 benchmark.env 設定連線到 benchmark MySQL / Redis；呼叫端須在寫入前確認資料儲存標記。 */
+export async function openAppStores(): Promise<AppStores> {
   const db = await import("../../utils/db");
   const redis = await import("../../utils/redis");
   return {

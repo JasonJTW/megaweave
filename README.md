@@ -108,9 +108,9 @@ Before you begin, ensure you have met the following requirements:
         BUCKET_REGION=<your_aws_s3_bucket_region>
         ACCESS_KEY=<your_aws_access_key>
         SECRET_ACCESS_KEY=<your_aws_secret_access_key>
-        CERT_PATH=<path_to_your_ssl_cert> (e.g., ./cert/localhost.crt)
-        KEY_PATH=<path_to_your_ssl_key> (e.g., ./cert/localhost.key)
-        PASSPHRASE=<ssl_cert_passphrase>
+        CERT_PATH=<path_to_your_ssl_cert> (resolved from server/src, e.g., ../cert/localhost.crt)
+        KEY_PATH=<path_to_your_ssl_key> (resolved from server/src, e.g., ../cert/localhost.key)
+        PASSPHRASE=<ssl_key_passphrase, omit if the key is unencrypted>
         STAGING_BUCKET_NAME=<your_aws_s3_staging_bucket_name>
         DESTINATION_BUCKET=<your_aws_s3_thumbnail_bucket_name>
         UPLOAD_IMAGE_LIMIT=5
@@ -155,7 +155,10 @@ Before you begin, ensure you have met the following requirements:
            localhost "*.localhost"
     ```
 
-    Leave `PASSPHRASE` empty for mkcert-generated keys. `server/cert/` is git-ignored.
+    mkcert produces an unencrypted private key, so `PASSPHRASE` can be omitted
+    entirely — it is only needed if you supply your own encrypted key.
+    `CERT_PATH` / `KEY_PATH` are resolved relative to `server/src`, so the paths
+    above point at `server/cert/`. That directory is git-ignored.
 
 6.  Set up the MySQL database:
 

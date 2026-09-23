@@ -114,18 +114,20 @@ async function startServer() {
       const KEY_PATH = process.env.KEY_PATH;
       const PASSPHRASE = process.env.PASSPHRASE;
 
-      if (!CERT_PATH || !KEY_PATH || !PASSPHRASE) {
+      if (!CERT_PATH || !KEY_PATH) {
         console.error(
-          "HTTPS configuration is incomplete. Please check your .env.development file.",
+          "HTTPS configuration is incomplete: CERT_PATH and KEY_PATH are required. " +
+            "Please check your .env.development file.",
         );
         process.exit(1);
       }
       //* Implement https in local dev env
+      //* PASSPHRASE 為選用：mkcert 產出的私鑰未加密，沒有密碼可填。
       server = https.createServer(
         {
           key: fs.readFileSync(path.join(__dirname, KEY_PATH)),
           cert: fs.readFileSync(path.join(__dirname, CERT_PATH)),
-          passphrase: PASSPHRASE, // 替換為你的密碼
+          ...(PASSPHRASE ? { passphrase: PASSPHRASE } : {}),
         },
         app,
       );

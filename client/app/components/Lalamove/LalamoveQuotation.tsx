@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import useSWR from "swr";
 import { Post } from "@/app/types/schema";
 import {
   Truck,
@@ -18,7 +19,10 @@ import toast from "react-hot-toast";
 import OrderPlacementModal from "./OrderPlacementModal";
 import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
+import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import { ArrowRight } from "lucide-react";
+import WeavingIcon from "@/app/components/icons/WeavingIcon";
+import { hasPendingWeaveForPost, getLalamoveActionState } from "@/utils/weaveGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   parseGooglePlace,
@@ -55,9 +59,11 @@ function sanitizeTwAddress(address: string): string {
 
 export type LalamoveLocale = "en" | "zh";
 
-interface LalamoveQuotationProps {
+export interface LalamoveQuotationProps {
   post: Post;
   locale?: LalamoveLocale;
+  hasPendingWeaveOverride?: boolean;
+  className?: string;
 }
 
 interface ServiceOption {
@@ -248,6 +254,8 @@ export interface QuotationItem {
 export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   post,
   locale = "en",
+  hasPendingWeaveOverride,
+  className,
 }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const t = TRANSLATIONS[locale] || TRANSLATIONS.en;
@@ -286,7 +294,67 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const { user } = useUser();
+  const { openChat } = useChatPopup();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+
+  // Weaves query to check if there is a pending weave for this post
+  const { data: weavesData } = useSWR(
+    user && hasPendingWeaveOverride === undefined
+      ? `${hostName}/api/weaves?postId=${post.id}&status=pending`
+      : null,
+    async (url: string) => {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  );
+
+  const hasPendingWeave =
+    hasPendingWeaveOverride !== undefined
+      ? hasPendingWeaveOverride
+      : hasPendingWeaveForPost(weavesData?.weaves, post.id);
+
+  const handleWeaveThisClick = async () => {
+    if (!user) {
+      toast.error("Please log in to message.");
+      router.push(
+        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
+      );
+      return;
+    }
+
+    if (user.userId === (post.author_user_id ?? post.user_id)) {
+      toast.error("You cannot message yourself.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${hostName}/api/messages/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ recipient_public_id: post.author_public_id }),
+      });
+
+      if (!res.ok) throw new Error("Failed to start conversation");
+
+      const data = await res.json();
+
+      openChat(
+        data.conversationId,
+        {
+          public_id: post.author_public_id,
+          username: post.username,
+          avatar_url: post.avatar_url,
+        },
+        post,
+        { id: "all", title: "All" },
+      );
+    } catch (error) {
+      console.error("Message error:", error);
+      toast.error(`Could not message ${post.username}`);
+    }
+  };
 
   // Origin info from post (allows overriding from modal)
   const [customOriginAddress, setCustomOriginAddress] = useState<string | null>(null);
@@ -567,8 +635,18 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     }
   };
 
+  const actionState = getLalamoveActionState({
+    isQuoteExpired,
+    hasPendingWeave,
+  });
+
   return (
-    <div className="my-5 overflow-hidden rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-4 shadow-sm transition-all sm:p-5">
+    <div
+      className={
+        className ||
+        "my-5 overflow-hidden rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-4 shadow-sm transition-all sm:p-5"
+      }
+    >
       {/* Header Bar */}
       <div className="flex items-start justify-between gap-3 sm:items-center">
         <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center">
@@ -866,7 +944,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                       destinationAddress={destinationAddress}
                       onExpireChange={handleExpireChange}
                       actionButton={
-                        isQuoteExpired ? (
+                        actionState.action === "recalculate" ? (
                           <button
                             type="button"
                             onClick={() => handleFetchQuotation()}
@@ -881,6 +959,15 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                                 ? t.calculating
                                 : t.quoteExpiredRecalculate}
                             </span>
+                          </button>
+                        ) : actionState.action === "weave_this" ? (
+                          <button
+                            type="button"
+                            onClick={handleWeaveThisClick}
+                            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-3 font-ddin text-sm font-semibold tracking-wider text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99]"
+                          >
+                            <WeavingIcon className="!h-[19px] !w-[19px] text-white" />
+                            <span>weave this</span>
                           </button>
                         ) : (
                           <button

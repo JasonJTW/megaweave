@@ -35,6 +35,9 @@ export interface WeaveOutput extends RowDataPacket {
   post_id_original: number;
   post_public_id: string;
   post_user_id: number;
+  post_author_public_id?: string;
+  post_author_username?: string;
+  post_author_avatar?: string | null;
   post_title: string;
   post_content: string;
   post_type: "wish" | "share" | "commons";
@@ -73,6 +76,9 @@ export const WEAVE_QUERY_BASE = `
       p.id AS post_id_original,
       p.public_id AS post_public_id,
       p.user_id AS post_user_id,
+      post_author.public_id AS post_author_public_id,
+      COALESCE(NULLIF(TRIM(p_up.custom_name), ''), post_author.username) AS post_author_username,
+      post_author.avatar_url AS post_author_avatar,
       p.title AS post_title,
       p.content AS post_content,
       p.type AS post_type,
@@ -103,6 +109,8 @@ export const WEAVE_QUERY_BASE = `
       GROUP_CONCAT(img.s3_key ORDER BY img.id ASC) AS s3_keys
   FROM weaves w
   JOIN posts p ON w.post_id = p.id
+  LEFT JOIN users post_author ON p.user_id = post_author.id
+  LEFT JOIN user_profiles p_up ON post_author.id = p_up.user_id
   LEFT JOIN locations l ON p.location_id = l.id
   JOIN users giver ON w.giver_id = giver.id
   LEFT JOIN user_profiles g_up ON giver.id = g_up.user_id
@@ -134,11 +142,16 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
       id: row.post_id_original,
       public_id: row.post_public_id,
       user_id: row.post_user_id,
+      author_user_id: row.post_user_id,
+      author_public_id: row.post_author_public_id,
+      username: row.post_author_username,
+      avatar_url: row.post_author_avatar,
       title: row.post_title,
       content: row.post_content,
       type: row.post_type,
       status: row.post_status_original,
       location: row.post_location,
+      full_address: row.post_location || row.post_location_name || "",
       place_id: row.post_place_id,
       location_name: row.post_location_name,
       location_url: row.post_location_url,

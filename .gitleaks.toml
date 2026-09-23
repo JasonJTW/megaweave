@@ -4,8 +4,6 @@ useDefault = true
 [allowlist]
 description = "Known non-secrets in this repository"
 paths = [
-  # 本機 dev 自簽憑證，僅綁 localhost；已從 git 追蹤移除，此項用於壓下歷史 commit 的命中
-  '''server/cert/.*''',
   # 本機 docker benchmark 容器的假帳密，外部服務一律指向 loopback mock
   '''server/benchmark\.env''',
   '''package-lock\.json''',

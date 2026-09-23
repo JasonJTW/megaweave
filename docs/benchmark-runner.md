@@ -53,6 +53,8 @@ Every check below runs before a profile starts. If any check fails, the runner e
    | MySQL | table `benchmark_environment` containing exactly one row, `megaweave-isolated` |
    | Redis cache and vector | key `benchmark:environment` = `megaweave-isolated` |
 
+   `queue-burst-*` profiles also enqueue jobs and drain leftover jobs, so they require the same marker in the queue Redis, and refuse to run unless `OPENAI_BASE_URL` and `AWS_ENDPOINT_URL_S3` point to a mock on `127.0.0.1` with an explicit port.
+
    MySQL is checked before connecting to Redis, so a wrong database fails immediately. The markers are created only by `docker-compose.benchmark.yml` (`server/db/benchmark-marker.sql` and the `benchmark-marker` job) and the application never writes them, so a production database or Redis instance cannot pass this check.
 
 ## Benchmark environment
@@ -99,6 +101,8 @@ Omitted replica counts are recorded as `"unknown"`.
 | `fixture-10k` | No | Yes | Resets the benchmark data stores and loads the 10k-post fixture |
 | `feed-10k` | Yes | Yes | Loads the 10k fixture, then compares the full-hydration baseline with the current feed over HTTP (about 2.7 hours) |
 | `feed-1k-smoke` | Yes | Yes | Same flow on the 1k fixture with one short repetition at 5 VUs (about 4 minutes); for checking the profile, not for results |
+| `queue-burst-500` | Yes | Yes | Loads the 10k fixture, then injects 500 post/interaction units (1,500 image, embedding, and user-vector jobs) while feed and post-creation traffic continues (about 6 minutes plus fixture load and drain) |
+| `queue-burst-1k-smoke` | Yes | Yes | Same flow on the 1k fixture with 50 units and short phases (about 2 minutes); for checking the profile, not for results |
 
 ```bash
 cd server
@@ -109,7 +113,7 @@ BENCHMARK_RESOURCE_LIMITS='{"api":"1 vCPU / 2 GB","worker":"1 vCPU / 2 GB"}' \
 npm run benchmark -- --profile environment-check --output /tmp/megaweave-benchmark
 ```
 
-Future tickets add `queue-burst-500` and recovery profiles to the same registry.
+Future tickets add the recovery profiles to the same registry.
 
 ## Fixture dataset
 
@@ -221,6 +225,83 @@ Resource observations cover the measurement window of each run:
 Global counters include the runner's own few snapshot queries. Metrics that are not collected, such as MySQL and Redis server CPU and memory, are listed with a reason under `result.unavailableMetrics`. `performance_schema` requires the read grant in `server/db/benchmark-marker.sql`. Existing benchmark volumes need `make benchmark-reset` to apply it.
 
 The run fails (exit code 1, artifacts still written) if any request returns an error, any response did not apply the requested strategy, or any candidate vector read failed. A relative claim such as "reduced p95 by X%" should come only from a passing `feed-10k` run on hardware that matches production.
+
+## Queue burst profiles
+
+`queue-burst-500` measures asynchronous capacity and its user-facing impact. It injects representative post-image, post-embedding, and user-vector work while low, continuous feed and post-creation traffic runs through the public API. It reports queue wait and processing distributions, completed work, retries, terminal failures, peak depth, time to zero backlog, and feed and post-creation latency before, during, and after the burst.
+
+### Running
+
+The profile needs both an API and a worker connected to the benchmark data stores:
+
+```bash
+make benchmark-up
+cd server
+npm run benchmark:api      # terminal 1: http://localhost:18443
+npm run benchmark:worker   # terminal 2: builds, then runs the standalone worker with server/benchmark.env
+# terminal 3
+BENCHMARK_ENVIRONMENT=isolated BENCHMARK_API_REPLICAS=1 BENCHMARK_WORKER_REPLICAS=1 \
+BENCHMARK_WORKER_CONCURRENCY='{"post-image":2,"post-embedding":2,"user-vector":5}' \
+BENCHMARK_RESOURCE_LIMITS='{"api":"1 vCPU / 2 GB","worker":"1 vCPU / 2 GB"}' \
+  npm run benchmark -- --profile queue-burst-500 --target http://localhost:18443
+```
+
+Start the API first. Both scripts compile to `dist/`, so running them at the same time can fail. The profile fails before loading the fixture if no worker is consuming `post-image`, `post-embedding`, or `user-vector`. Leftover unprocessed jobs from an interrupted run are drained before the fixture is reloaded. The worker needs no restart between runs.
+
+Replica counts, worker concurrency, and resource limits in the artifact header come from the operator variables above. The result also records the per-process concurrency configured in code and the worker connections the profile observed per queue, so a mismatch with the declared values is visible.
+
+### Mocked dependencies
+
+OpenAI and S3 are replaced by loopback mocks that the runner starts for the duration of the run. `server/benchmark.env` points the API and the worker at them through the standard SDK variables, so the production code paths (OpenAI SDK, AWS SDK, and sharp) run unchanged:
+
+| Service | Variable | Mock behavior |
+| --- | --- | --- |
+| OpenAI embeddings | `OPENAI_BASE_URL=http://127.0.0.1:18090/v1` | Deterministic 1536-dimension unit vector per input text, 150–450 ms latency |
+| S3 | `AWS_ENDPOINT_URL_S3=http://127.0.0.1:18091` | In-memory path-style GetObject / PutObject / DeleteObject and presigned uploads, 20–80 ms latency |
+
+`benchmark.env` also sets placeholder credentials, so an API or worker started with it can never reach the real services. When the mocks are not running, those calls fail. The artifact records the dependency modes as `openai: mock` and `s3: mock`. The throughput therefore measures the worker, MySQL, and Redis, not OpenAI or S3 capacity.
+
+### Workload
+
+| Parameter | `queue-burst-500` |
+| --- | --- |
+| Burst units | 500. Each unit is one new post with 1–5 staged images (35/25/20/10/10%) and one interaction by a fixture user on an embedded fixture post (view 55%, like 30%, comment 10%, weave 5%) |
+| Jobs | 1 `upload-images`, 1 `generate-embedding`, and 1 `update-user-vector` per unit (1,500 total) |
+| Injection | Spread evenly over 30 s, using the production enqueue helpers (same job names, delays, attempts, and backoff) |
+| Source image | Synthetic 2048×1536 JPEG (about 1 MB), decoded, resized, and WebP-encoded by the worker for each image |
+| Feed traffic | 5 closed-loop virtual users, 3–8 s think time. Personas and view mix as in `feed-10k`. Production default strategy |
+| Post-creation traffic | 2 closed-loop virtual users, 20–40 s think time. Each creates a post the way the client does: presigned URLs, then a PUT of each image to the mock S3, then `POST /api/posts` |
+| Phases | `before`: 120 s of traffic only. `burst`: from the first enqueue until every burst job is terminal (30-minute limit). `after`: 120 s of traffic after the backlog clears |
+| Depth sampling | Every 1 s |
+
+Burst posts, items, and image rows are written to MySQL, and their staging images are placed in the mock S3, before measurement starts. This matches the state a committed `createPost` leaves. The burst therefore measures the queue and the worker, not API write capacity, which the post-creation traffic covers. Interactions never repeat a (user, post, action) triple, so the producer's cooldown does not drop any of them.
+
+### Results
+
+Job lifecycles come from the BullMQ event stream (`QueueEvents`), timestamped by the queue Redis clock. Every submitted job is accounted for as completed, terminally failed, unfinished, or never observed. Jobs that the API enqueued for created posts are reported separately as traffic jobs.
+
+| Metric | Definition |
+| --- | --- |
+| Queue wait | First start minus enqueue. Includes the producer's scheduled delay (100 ms for images, 500 ms for embeddings) |
+| Processing | Finish minus start of the final attempt |
+| Retries | Attempts beyond the first, including re-processing after a stall |
+| Terminal failure | A job that exhausted its attempts |
+| Peak depth | Maximum sampled waiting + delayed + prioritized + active jobs, per queue and in total |
+| Time to zero backlog | From the last burst enqueue until the last burst job reached a terminal state. The first sampled zero depth after injection, which includes traffic jobs, is reported alongside |
+| Completed/hour | Completed jobs divided by the time from first enqueue to last terminal job |
+
+User-facing results are summarized per phase and per traffic group (`feed` and `post-creation`), with the same statistics as the feed profiles and each phase's p95 change from `before`. The post-creation workload is deliberately low (about 8 API calls per 120 s phase), so its percentiles indicate direction only. The summary flags every phase and group with fewer than 100 successful requests. MySQL, Redis, and API process observations are recorded per phase, as in the feed profiles. The artifact also records the per-process queue concurrency configured in `server/src/queue/concurrency.ts`, the worker connections observed per queue, and the mock request counts. Worker CPU and memory are not sampled; use `docker stats` or `ps` alongside the run.
+
+After the run, the profile checks durable outcomes for every burst post and every post created by the traffic:
+
+- a completed embedding job left a 1536-dimension `posts.embedding` and a Redis `post:{id}` vector
+- a completed image job uploaded every image key to the mock S3 and deleted its staging object
+- each post has exactly as many image rows as uploaded images
+- a completed user-vector job rewrote `user:{id}:vector` after the burst started. This is checked per user, so when one user has several burst interactions, one rewrite satisfies all of them
+
+Repeated uploads of the same key are counted but allowed, because a retried image job re-uploads idempotently. Posts created by the traffic are checked only when every traffic job finished without a terminal failure; otherwise the run already fails.
+
+The run fails (exit code 1, artifacts still written) if any burst job is unfinished or was never observed, if any job enqueued by the traffic did not finish, if any job terminally failed, if a durable outcome is missing or duplicated, if either traffic group had no successful request in a phase, or if any user request failed. Quote capacity only from a passing `queue-burst-500` run on hardware that matches production, together with the replica counts, concurrency, and resource limits in its artifact.
 
 ## Artifacts
 

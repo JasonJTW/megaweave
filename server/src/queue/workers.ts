@@ -20,6 +20,7 @@ import { processUserVectorFlush } from "./jobs/userVectorFlush";
 import { processCalculateHotScore } from "./jobs/hotScore";
 import { processDeliveryReconciliation } from "./jobs/deliveryReconcile";
 import { initUserVectorFlushCron, initDeliveryReconcileCron } from "./queues";
+import { WORKER_CONCURRENCY } from "./concurrency";
 
 
 /**
@@ -85,7 +86,7 @@ export async function startWorkers(): Promise<void> {
         await processPostDeleteImages(job as Job<PostDeleteImageJobData>);
       }
     },
-    { connection: bullmqConnection },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["post-image"] },
   );
 
   postImageWorker.on("completed", (job) => {
@@ -108,7 +109,7 @@ export async function startWorkers(): Promise<void> {
         await processSendEmail(job);
       }
     },
-    { connection: bullmqConnection },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY.email },
   );
 
   emailWorker.on("completed", (job) => {
@@ -131,7 +132,7 @@ export async function startWorkers(): Promise<void> {
         await processPostEmbedding(job);
       }
     },
-    { connection: bullmqConnection, concurrency: 2 },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["post-embedding"] },
   );
 
   embeddingWorker.on("completed", (job) => {
@@ -154,7 +155,7 @@ export async function startWorkers(): Promise<void> {
         await processUserVector(job);
       }
     },
-    { connection: bullmqConnection, concurrency: 5 },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["user-vector"] },
   );
 
   userVectorWorker.on("completed", (job) => {
@@ -177,7 +178,7 @@ export async function startWorkers(): Promise<void> {
         return await processCalculateHotScore(job);
       }
     },
-    { connection: bullmqConnection, concurrency: 1 },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["hot-score"] },
   );
 
   hotScoreWorker.on("completed", (job, result) => {
@@ -207,9 +208,9 @@ export async function startWorkers(): Promise<void> {
         return await processUserVectorFlush(job);
       }
     },
-    // concurrency: 1 — 確保同一時間只有一個 flush job 操作 dirty set，
+    // concurrency 1 — 確保同一時間只有一個 flush job 操作 dirty set，
     // 避免多個 worker 同時 SPOP 造成資料競態。
-    { connection: bullmqConnection, concurrency: 1 },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["user-vector-flush"] },
   );
 
   userVectorFlushWorker.on("completed", (job, result) => {
@@ -242,7 +243,7 @@ export async function startWorkers(): Promise<void> {
         return await processDeliveryReconciliation(job);
       }
     },
-    { connection: bullmqConnection, concurrency: 1 },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["delivery-reconcile"] },
   );
 
   deliveryReconcileWorker.on("completed", (job, result) => {

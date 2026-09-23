@@ -1,39 +1,39 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  getLalamoveActionState,
+  getLalamoveAction,
   shouldShowLalamoveQuotation,
 } from "@/utils/weaveGuard";
 
-describe("getLalamoveActionState", () => {
+describe("getLalamoveAction", () => {
   it("returns 'recalculate' when isQuoteExpired is true, regardless of weave status", () => {
-    const stateWithPending = getLalamoveActionState({
+    const actionWithPending = getLalamoveAction({
       isQuoteExpired: true,
       hasPendingWeave: true,
     });
-    assert.equal(stateWithPending.action, "recalculate");
+    assert.equal(actionWithPending, "recalculate");
 
-    const stateWithoutPending = getLalamoveActionState({
+    const actionWithoutPending = getLalamoveAction({
       isQuoteExpired: true,
       hasPendingWeave: false,
     });
-    assert.equal(stateWithoutPending.action, "recalculate");
+    assert.equal(actionWithoutPending, "recalculate");
   });
 
   it("returns 'book' when quote is valid and hasPendingWeave is true", () => {
-    const state = getLalamoveActionState({
+    const action = getLalamoveAction({
       isQuoteExpired: false,
       hasPendingWeave: true,
     });
-    assert.equal(state.action, "book");
+    assert.equal(action, "book");
   });
 
   it("returns 'weave_this' when quote is valid and hasPendingWeave is false", () => {
-    const state = getLalamoveActionState({
+    const action = getLalamoveAction({
       isQuoteExpired: false,
       hasPendingWeave: false,
     });
-    assert.equal(state.action, "weave_this");
+    assert.equal(action, "weave_this");
   });
 });
 

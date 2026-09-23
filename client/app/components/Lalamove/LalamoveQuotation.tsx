@@ -22,7 +22,7 @@ import { useUser } from "@/app/contexts/UserContext";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
-import { hasPendingWeaveForPost, getLalamoveActionState } from "@/utils/weaveGuard";
+import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   parseGooglePlace,
@@ -62,8 +62,8 @@ export type LalamoveLocale = "en" | "zh";
 export interface LalamoveQuotationProps {
   post: Post;
   locale?: LalamoveLocale;
-  hasPendingWeaveOverride?: boolean;
-  className?: string;
+  /** Caller already knows a pending weave exists (e.g. rendered under a pending WeavingCard); skips the lookup. */
+  hasPendingWeave?: boolean;
 }
 
 interface ServiceOption {
@@ -254,8 +254,7 @@ export interface QuotationItem {
 export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   post,
   locale = "en",
-  hasPendingWeaveOverride,
-  className,
+  hasPendingWeave: hasPendingWeaveProp,
 }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const t = TRANSLATIONS[locale] || TRANSLATIONS.en;
@@ -265,9 +264,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   // Destination input
   const destinationInputRef = useRef<HTMLInputElement | null>(null);
   const [destinationAddress, setDestinationAddress] = useState("");
-  const [destinationPlaceId, setDestinationPlaceId] = useState<string | undefined>(
-    undefined,
-  );
+  const [destinationPlaceId, setDestinationPlaceId] = useState<
+    string | undefined
+  >(undefined);
   const [destinationCoords, setDestinationCoords] = useState<{
     lat: number;
     lng: number;
@@ -299,7 +298,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
   // Weaves query to check if there is a pending weave for this post
   const { data: weavesData } = useSWR(
-    user && hasPendingWeaveOverride === undefined
+    user && hasPendingWeaveProp === undefined
       ? `${hostName}/api/weaves?postId=${post.id}&status=pending`
       : null,
     async (url: string) => {
@@ -310,9 +309,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   );
 
   const hasPendingWeave =
-    hasPendingWeaveOverride !== undefined
-      ? hasPendingWeaveOverride
-      : hasPendingWeaveForPost(weavesData?.weaves, post.id);
+    hasPendingWeaveProp ?? hasPendingWeaveForPost(weavesData?.weaves, post.id);
 
   const handleWeaveThisClick = async () => {
     if (!user) {
@@ -357,7 +354,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   };
 
   // Origin info from post (allows overriding from modal)
-  const [customOriginAddress, setCustomOriginAddress] = useState<string | null>(null);
+  const [customOriginAddress, setCustomOriginAddress] = useState<string | null>(
+    null,
+  );
   const originAddress =
     customOriginAddress ||
     post.full_address ||
@@ -585,7 +584,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   );
                   setDestinationDetails(parsed);
                   setDestinationAddress(
-                    sanitizeTwAddress(parsed.full_address || results[0].formatted_address),
+                    sanitizeTwAddress(
+                      parsed.full_address || results[0].formatted_address,
+                    ),
                   );
                   if (results[0].place_id) {
                     setDestinationPlaceId(results[0].place_id);
@@ -635,18 +636,13 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     }
   };
 
-  const actionState = getLalamoveActionState({
+  const lalamoveAction = getLalamoveAction({
     isQuoteExpired,
     hasPendingWeave,
   });
 
   return (
-    <div
-      className={
-        className ||
-        "my-5 overflow-hidden rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-4 shadow-sm transition-all sm:p-5"
-      }
-    >
+    <div className="my-5 overflow-hidden rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-4 shadow-sm transition-all sm:p-5">
       {/* Header Bar */}
       <div className="flex items-start justify-between gap-3 sm:items-center">
         <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center">
@@ -944,7 +940,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                       destinationAddress={destinationAddress}
                       onExpireChange={handleExpireChange}
                       actionButton={
-                        actionState.action === "recalculate" ? (
+                        lalamoveAction === "recalculate" ? (
                           <button
                             type="button"
                             onClick={() => handleFetchQuotation()}
@@ -960,7 +956,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                                 : t.quoteExpiredRecalculate}
                             </span>
                           </button>
-                        ) : actionState.action === "weave_this" ? (
+                        ) : lalamoveAction === "weave_this" ? (
                           <button
                             type="button"
                             onClick={handleWeaveThisClick}

@@ -88,11 +88,13 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
 
       // Mock insert payment & delivery_order
       mockConnection.query
+        .mockResolvedValueOnce([[{ id: 7 }]]) // pending weave lookup
         .mockResolvedValueOnce([{ insertId: 101 }]) // payments insert
         .mockResolvedValueOnce([{ insertId: 201 }]); // delivery_orders insert
 
       const input: CreateCheckoutOrderInput = {
         userId: 42,
+        postId: 99,
         serviceType: "MOTORCYCLE",
         quotationId: "QUOTE_12345",
         feeTotal: 150,
@@ -114,9 +116,43 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       expect(result.htmlForm).toContain("<form>Mock</form>");
     });
 
+    it("should reject checkout and roll back when the user has no pending weave for the post", async () => {
+      mockPool.query
+        .mockResolvedValueOnce([[{ id: 1, full_address: "Taipei Main Station" }]]) // pickup
+        .mockResolvedValueOnce([[{ id: 2, full_address: "Taipei 101" }]]); // dropoff
+      mockConnection.query.mockResolvedValueOnce([[]]); // pending weave lookup → none
+
+      const input: CreateCheckoutOrderInput = {
+        userId: 42,
+        postId: 99,
+        serviceType: "MOTORCYCLE",
+        quotationId: "QUOTE_12345",
+        feeTotal: 150,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        pickupLocationId: 1,
+        dropoffLocationId: 2,
+        senderName: "Alice",
+        senderPhone: "+886912345678",
+        recipientName: "Bob",
+        recipientPhone: "+886987654321",
+      };
+
+      await expect(paymentService.createCheckoutOrder(input)).rejects.toThrow(
+        /pending weave/i,
+      );
+      expect(mockConnection.query).toHaveBeenCalledWith(
+        expect.stringContaining("FOR UPDATE"),
+        [99, 42, 42],
+      );
+      expect(mockConnection.rollback).toHaveBeenCalled();
+      expect(mockConnection.commit).not.toHaveBeenCalled();
+      expect(mockProvider.createPaymentSession).not.toHaveBeenCalled();
+    });
+
     it("should reject checkout if quotation has already expired", async () => {
       const input: CreateCheckoutOrderInput = {
         userId: 42,
+        postId: 99,
         serviceType: "MOTORCYCLE",
         quotationId: "EXPIRED_QUOTE",
         feeTotal: 150,

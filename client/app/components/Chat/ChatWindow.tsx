@@ -844,6 +844,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                       {shouldShowCard && (
                         <div id={`weave-card-${weaveId}`} className="w-full">
                           <WeavingCard
+                            post={activePost || undefined}
                             currentUserId={currentUser?.userId}
                             isHighlighted={
                               String(weaveId) === String(highlightWeaveId)

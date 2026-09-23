@@ -36,9 +36,10 @@ export class S3ImageStorage implements ImageStorage {
   private cloudfrontUrl: string;
 
   constructor() {
+    // Bucket 名稱一律由環境變數提供；不放預設值，避免漏設時安靜寫入非預期的 bucket。
     this.bucketName = process.env.BUCKET_NAME || "";
-    this.stagingBucketName = process.env.STAGING_BUCKET_NAME || "megaweave-staging-462457677414";
-    this.destinationBucket = process.env.DESTINATION_BUCKET || "megaweave-thumbnails";
+    this.stagingBucketName = process.env.STAGING_BUCKET_NAME || "";
+    this.destinationBucket = process.env.DESTINATION_BUCKET || "";
     this.cloudfrontUrl = process.env.CLOUDFRONT_URL || "";
 
     this.s3Client = new S3Client({

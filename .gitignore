@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Lambda functions
 services/**/**.zip
+
+# Local dev TLS certs — generate with mkcert, never commit
+server/cert/

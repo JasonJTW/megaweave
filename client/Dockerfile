@@ -14,13 +14,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ARG SENTRY_AUTH_TOKEN
 ARG NEXT_PUBLIC_API_URL
-ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+# SENTRY_AUTH_TOKEN 以 BuildKit secret 傳入，只存在於這個 RUN 的 tmpfs：
+# 用 ARG/ENV 會把 token 寫進 builder layer 的 metadata，而 CI 的
+# `cache-to: mode=max` 會把 builder layer 推進 GitHub Actions cache。
+RUN --mount=type=secret,id=sentry_auth_token \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" \
+    npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner

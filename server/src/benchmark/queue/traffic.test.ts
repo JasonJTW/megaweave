@@ -80,7 +80,7 @@ describe("queue burst user traffic", () => {
       feedThinkTimeMs: { min: 5, max: 10 },
       postThinkTimeMs: { min: 5, max: 10 },
       imageCountWeights: [[2, 1]],
-      image: Buffer.from("jpeg-bytes"),
+      images: [[{ buffer: Buffer.from("jpeg-bytes"), contentType: "image/jpeg", extension: "jpg" }, 1]],
       signal: stop.signal,
     });
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -111,6 +111,40 @@ describe("queue burst user traffic", () => {
     expect(target.requests.some((r) => r.path === "/api/posts/feed" && r.cookie === "session-id=returning-session")).toBe(true);
   });
 
+  it("uploads each image from the weighted mix with a matching presign content type", async () => {
+    const stop = new AbortController();
+    const running = runTraffic({
+      targetUrl: target.url,
+      sessionCookieName: "session-id",
+      catalog: { categoryIds: [1] },
+      feedUsers: [],
+      posters: [{ sessionId: "poster-session", seed: 4 }],
+      feedThinkTimeMs: { min: 5, max: 10 },
+      postThinkTimeMs: { min: 5, max: 10 },
+      imageCountWeights: [[3, 1]],
+      images: [
+        [{ buffer: Buffer.from("webp-bytes"), contentType: "image/webp", extension: "webp" }, 1],
+        [{ buffer: Buffer.from("jpeg-bytes"), contentType: "image/jpeg", extension: "jpg" }, 1],
+      ],
+      signal: stop.signal,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    stop.abort();
+    await running;
+
+    const requestedTypes = target.requests
+      .filter((r) => r.path === "/api/posts/presigned-urls")
+      .flatMap((r) => (JSON.parse(r.body).files as { filename: string; contentType: string }[]));
+    for (const file of requestedTypes) {
+      expect(file.filename.endsWith(file.contentType === "image/webp" ? ".webp" : ".jpg")).toBe(true);
+    }
+    const uploaded = target.requests.filter((r) => r.method === "PUT").map((r) => r.body);
+    expect(new Set(uploaded)).toEqual(new Set(["webp-bytes", "jpeg-bytes"]));
+    expect(uploaded).toEqual(
+      requestedTypes.slice(0, uploaded.length).map((file) => (file.contentType === "image/webp" ? "webp-bytes" : "jpeg-bytes")),
+    );
+  });
+
   it("records failed post creation steps as errors instead of throwing", async () => {
     const stop = new AbortController();
     const running = runTraffic({
@@ -122,7 +156,7 @@ describe("queue burst user traffic", () => {
       feedThinkTimeMs: { min: 5, max: 10 },
       postThinkTimeMs: { min: 5, max: 10 },
       imageCountWeights: [[1, 1]],
-      image: Buffer.from("x"),
+      images: [[{ buffer: Buffer.from("x"), contentType: "image/jpeg", extension: "jpg" }, 1]],
       signal: stop.signal,
     });
     await new Promise((resolve) => setTimeout(resolve, 60));
@@ -148,7 +182,7 @@ describe("queue burst user traffic", () => {
         feedThinkTimeMs: { min: 1, max: 1 },
         postThinkTimeMs: { min: 5, max: 10 },
         imageCountWeights: [[1, 1]],
-        image: Buffer.from("x"),
+        images: [[{ buffer: Buffer.from("x"), contentType: "image/jpeg", extension: "jpg" }, 1]],
         signal: stop.signal,
       });
       await new Promise((resolve) => setTimeout(resolve, 100));

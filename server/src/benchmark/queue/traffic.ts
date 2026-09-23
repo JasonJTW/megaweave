@@ -39,9 +39,15 @@ export interface TrafficOptions {
   postThinkTimeMs: { min: number; max: number };
   /** 每篇新貼文附帶的圖片數與權重 */
   imageCountWeights: readonly (readonly [number, number])[];
-  /** 上傳到 presigned URL 的原圖 */
-  image: Buffer;
+  /** 上傳到 presigned URL 的原圖與權重；每張圖依權重各自抽選 */
+  images: readonly (readonly [UploadImage, number])[];
   signal: AbortSignal;
+}
+
+export interface UploadImage {
+  buffer: Buffer;
+  contentType: string;
+  extension: string;
 }
 
 export interface TrafficResult {
@@ -112,10 +118,12 @@ async function createPost(
   options: TrafficOptions,
   poster: TrafficOptions["posters"][number],
   random: Random,
+  imageRandom: Random,
   samples: TrafficSample[],
 ): Promise<CreatedPost | null> {
   const cookie = `${options.sessionCookieName}=${poster.sessionId}`;
   const imageCount = random.weighted(options.imageCountWeights);
+  const images = Array.from({ length: imageCount }, () => imageRandom.weighted(options.images));
   const presign = await timedRequest<{ urls: { stagingKey: string; presignedUrl: string }[] }>(
     "post-creation",
     "post-presign",
@@ -124,7 +132,7 @@ async function createPost(
       method: "POST",
       headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({
-        files: Array.from({ length: imageCount }, (_, i) => ({ filename: `photo-${i + 1}.jpg`, contentType: "image/jpeg" })),
+        files: images.map((image, i) => ({ filename: `photo-${i + 1}.${image.extension}`, contentType: image.contentType })),
       }),
     },
     samples,
@@ -133,13 +141,13 @@ async function createPost(
 
   // 上傳到 staging 是瀏覽器直接對 S3 的請求，不屬於 API 延遲；只有失敗時才記錄
   const stagingKeys: string[] = [];
-  for (const { stagingKey, presignedUrl } of presign.body.urls) {
+  for (const [i, { stagingKey, presignedUrl }] of presign.body.urls.entries()) {
     const uploadSamples: TrafficSample[] = [];
     const upload = await timedRequest(
       "post-creation",
       "staging-upload",
       presignedUrl,
-      { method: "PUT", headers: { "content-type": "image/jpeg" }, body: options.image },
+      { method: "PUT", headers: { "content-type": images[i].contentType }, body: images[i].buffer },
       uploadSamples,
     );
     if (!isSuccess(upload.sample)) {
@@ -208,8 +216,9 @@ export async function runTraffic(options: TrafficOptions): Promise<TrafficResult
 
   const postLoops = options.posters.map((poster) => {
     const contentRandom = createRandom(deriveSeed(poster.seed, "posts"));
+    const imageRandom = createRandom(deriveSeed(poster.seed, "images"));
     return loop(createRandom(deriveSeed(poster.seed, "think-time")), options.postThinkTimeMs, async () => {
-      const created = await createPost(options, poster, contentRandom, samples);
+      const created = await createPost(options, poster, contentRandom, imageRandom, samples);
       if (created) createdPosts.push(created);
     });
   });

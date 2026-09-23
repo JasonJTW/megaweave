@@ -18,6 +18,7 @@ import { isSettled } from "./accounting";
 import { MockEndpoints, resolveMockEndpoints } from "./mockEnvironment";
 import type { TrafficPhase } from "./phases";
 import { CREATE_POST_PATH, PRESIGNED_URLS_PATH } from "./traffic";
+import type { SourceImageVariant } from "./imageMix";
 import { FEED_PATH } from "../feed/load";
 import { isSuccess } from "../feed/stats";
 import { MAX_SCROLL_PAGES, SCROLL_PROBABILITY, VIEW_MIX } from "../feed/workload";
@@ -32,7 +33,6 @@ const MOCK_LATENCY_MS = {
   openaiEmbeddings: { min: 150, max: 450 },
   s3: { min: 20, max: 80 },
 };
-const SAMPLE_IMAGE = { width: 2048, height: 1536 };
 
 const UNAVAILABLE_METRICS = {
   "worker.cpuAndMemory": "not sampled: the worker exposes no metrics endpoint; use docker stats or ps alongside the run",
@@ -63,13 +63,20 @@ export interface QueueBurstProfileOptions {
   name: string;
   posts: number;
   plan: QueueBurstPlan;
+  /** burst 與發文流量上傳的原圖組成 */
+  imageMix: readonly SourceImageVariant[];
   seed?: number;
 }
 
 export function createQueueBurstProfile(options: QueueBurstProfileOptions): BenchmarkProfile {
   const seed = options.seed ?? DEFAULT_FIXTURE_SEED;
   const fixtureOptions = { posts: options.posts, seed };
-  const { plan } = options;
+  const { plan, imageMix } = options;
+  const totalImageWeight = imageMix.reduce((sum, variant) => sum + variant.weight, 0);
+  const describedImageMix = imageMix.map(({ weight, ...variant }) => ({
+    ...variant,
+    share: Math.round((weight / totalImageWeight) * 1000) / 1000,
+  }));
   let stores: AppStores | null = null;
   let queueRedis: Redis | null = null;
   let endpoints: MockEndpoints | null = null;
@@ -97,7 +104,11 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
         injectionSeconds: plan.injectionMs / 1000,
         injection: "units are spread evenly over the injection window and enqueued with the production enqueue helpers (same job names, delays, attempts, and backoff)",
         setup: "burst posts, items, and image rows are written to MySQL and their staging images placed in the mock S3 before measurement, as a committed createPost would leave them",
-        sourceImage: { format: "jpeg", ...SAMPLE_IMAGE, content: "synthetic gradient with noise; no real photos" },
+        sourceImages: {
+          mix: describedImageMix,
+          assignment: "each staged image draws a variant independently by share, from a seeded sequence",
+          content: "synthetic gradient with noise; no real photos",
+        },
       },
       traffic: {
         feed: {
@@ -115,6 +126,7 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
           virtualUsers: plan.postVirtualUsers,
           thinkTimeSeconds: { min: plan.postThinkTimeMs.min / 1000, max: plan.postThinkTimeMs.max / 1000, distribution: "uniform" },
           imageCountWeights: Object.fromEntries(BURST_IMAGE_COUNT_WEIGHTS),
+          sourceImages: "same mix as the burst, drawn per image",
           measuredRequests: "post-presign and post-create; the staging upload goes to S3, not the API, and is recorded only when it fails",
         },
         loop: "closed loop: each virtual user waits for the response and a think time before the next action",
@@ -181,6 +193,7 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
       const { takeSnapshot, diffSnapshots, startApiMemorySampler } = await import("../feed/observations");
       const { generateBurstPlan } = await import("./burstPlan");
       const { createSampleImage } = await import("./sampleImage");
+      const { assignImageVariants, countVariants } = await import("./imageMix");
       const { createPosterSessions, insertBurstPosts, loadBurstCandidates } = await import("./setup");
       const { drainQueues, requireWorkers, waitForIdleQueues } = await import("./queueControl");
       const { startQueueObserver, waitFor } = await import("./observer");
@@ -216,15 +229,22 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
       // fixture 重新載入後，API 記憶體中的向量快取已過期
       await resetTargetCaches(target);
 
-      const image = await createSampleImage({ ...SAMPLE_IMAGE, seed: deriveSeed(seed, "queue-burst-image") });
+      const images = new Map<string, Awaited<ReturnType<typeof createSampleImage>>>();
+      for (const variant of imageMix) {
+        images.set(
+          variant.name,
+          await createSampleImage({ ...variant, seed: deriveSeed(seed, "queue-burst-image", variant.name) }),
+        );
+      }
       const units = generateBurstPlan({ seed, units: plan.units, candidates: await loadBurstCandidates(activeStores.mysql) });
       // 每次執行的 S3 key 不同，mock S3 的上傳計數不會與先前執行混淆
       const burstPosts = await insertBurstPosts(activeStores.mysql, units, randomUUID().slice(0, 8));
-      for (const post of burstPosts) {
-        for (const key of post.stagingKeys) mocks.s3.putObject(buckets.stagingBucket, key, image.buffer);
-      }
-      const stagedImages = burstPosts.reduce((n, post) => n + post.stagingKeys.length, 0);
-      log(`prepared ${burstPosts.length} burst posts with ${stagedImages} staged images`);
+      const stagingKeys = burstPosts.flatMap((post) => post.stagingKeys);
+      const variants = assignImageVariants({ seed: deriveSeed(seed, "queue-burst"), count: stagingKeys.length, mix: imageMix });
+      stagingKeys.forEach((key, i) => mocks!.s3.putObject(buckets.stagingBucket, key, images.get(variants[i].name)!.buffer));
+      const stagedImages = stagingKeys.length;
+      const stagedImagesByVariant = countVariants(variants);
+      log(`prepared ${burstPosts.length} burst posts with ${stagedImages} staged images ${JSON.stringify(stagedImagesByVariant)}`);
 
       const personas = await preparePersonas(activeStores, plan.feedVirtualUsers);
       const posters = await createPosterSessions(activeStores, plan.postVirtualUsers);
@@ -243,7 +263,14 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
         feedThinkTimeMs: plan.feedThinkTimeMs,
         postThinkTimeMs: plan.postThinkTimeMs,
         imageCountWeights: BURST_IMAGE_COUNT_WEIGHTS,
-        image: image.buffer,
+        images: imageMix.map((variant) => [
+          {
+            buffer: images.get(variant.name)!.buffer,
+            contentType: `image/${variant.format}`,
+            extension: variant.format === "jpeg" ? "jpg" : "webp",
+          },
+          variant.weight,
+        ] as const),
         signal: stopTraffic.signal,
       });
 
@@ -329,12 +356,18 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
             openai: { endpoint: process.env.OPENAI_BASE_URL, latencyMs: MOCK_LATENCY_MS.openaiEmbeddings },
             s3: { endpoint: process.env.AWS_ENDPOINT_URL_S3, latencyMs: MOCK_LATENCY_MS.s3, bucket: buckets.bucket, stagingBucket: buckets.stagingBucket },
           },
-          sourceImage: { width: image.width, height: image.height, bytes: image.bytes, sha256: image.sha256 },
+          sourceImages: Object.fromEntries(
+            [...images].map(([name, image]) => [
+              name,
+              { format: image.format, width: image.width, height: image.height, bytes: image.bytes, sha256: image.sha256 },
+            ]),
+          ),
         },
         unavailableMetrics: UNAVAILABLE_METRICS,
         burst: {
           units: burstPosts.length,
           stagedImages,
+          stagedImagesByVariant,
           jobsSubmitted: submitted.length,
           deduplicatedByProducer: deduplicated,
           injectionMs: endedAtMs - startedAtMs,
@@ -367,6 +400,7 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
         invariants,
         summary: renderQueueBurstSummary({
           units: burstPosts.length,
+          stagedImagesByVariant,
           accounting,
           backlog,
           timeToZeroBacklogMs: burst.drainAfterLastSubmissionMs,

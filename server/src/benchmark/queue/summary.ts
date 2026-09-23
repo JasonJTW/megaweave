@@ -10,6 +10,7 @@ import type { PhaseSummary, TrafficGroup } from "./phases";
 
 export interface QueueBurstSummaryInput {
   units: number;
+  stagedImagesByVariant: Record<string, number>;
   accounting: JobAccounting;
   backlog: BacklogSummary;
   timeToZeroBacklogMs: number | null;
@@ -54,6 +55,8 @@ export function renderQueueBurstSummary(input: QueueBurstSummaryInput): string {
     `Burst: ${input.units} post/interaction units, ${burst.total.submitted} jobs. ` +
       `Time to zero backlog after the last enqueue: ${seconds(input.timeToZeroBacklogMs)}. ` +
       `Peak depth: ${input.backlog.peak.depth} jobs at ${seconds(input.backlog.peak.atOffsetMs)} after injection started.`,
+    "",
+    `Staged burst images by source: ${Object.entries(input.stagedImagesByVariant).map(([name, count]) => `${name} ${count}`).join(", ")}.`,
     "",
     "### Burst jobs",
     "",

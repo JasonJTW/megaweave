@@ -2,14 +2,18 @@
 // 每個 BullMQ worker 在單一 worker process 中同時處理的 job 數；獨立成模組，讓 benchmark 結果可記錄實際設定而不必載入 worker。
 
 export const WORKER_CONCURRENCY = {
-  // 每張圖是 S3 下載 → sharp（libuv 執行緒池，不阻塞 event loop）→ S3 上傳 → 刪除 staging；
-  // 2 讓一個 job 等待 S3 時另一個使用 CPU。每個 job 最多同時持有 5 張原圖與解碼緩衝，調高前先確認 worker 記憶體上限
-  "post-image": 2,
+  // 每張圖是 S3 下載 → sharp（libuv 執行緒池，不阻塞 event loop）→ S3 上傳 → 刪除 staging，時間主要花在 S3 往返；
+  // 同時最多 4 × POST_IMAGES_IN_PARALLEL_PER_JOB 張圖持有原圖與解碼緩衝，調高前先確認 worker 記憶體上限
+  "post-image": 4,
   email: 1,
-  "post-embedding": 2,
+  // 每個 job 主要在等待 OpenAI embeddings API；調高前確認帳號的 RPM / TPM 上限
+  "post-embedding": 4,
   "user-vector": 5,
   "hot-score": 1,
   // 確保同一時間只有一個 flush job 操作 dirty set，避免多個 worker 同時 SPOP 造成資料競態
   "user-vector-flush": 1,
   "delivery-reconcile": 1,
 } as const;
+
+/** 單一 post-image job 內同時處理的圖片數（每篇貼文最多 5 張） */
+export const POST_IMAGES_IN_PARALLEL_PER_JOB = 3;

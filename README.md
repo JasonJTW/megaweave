@@ -108,16 +108,29 @@ Before you begin, ensure you have met the following requirements:
         BUCKET_REGION=<your_aws_s3_bucket_region>
         ACCESS_KEY=<your_aws_access_key>
         SECRET_ACCESS_KEY=<your_aws_secret_access_key>
-        CERT_PATH=<path_to_your_ssl_cert> (e.g., ./ssl/cert.pem)
-        KEY_PATH=<path_to_your_ssl_key> (e.g., ./ssl/key.pem)
+        CERT_PATH=<path_to_your_ssl_cert> (e.g., ./cert/localhost.crt)
+        KEY_PATH=<path_to_your_ssl_key> (e.g., ./cert/localhost.key)
         PASSPHRASE=<ssl_cert_passphrase>
+        STAGING_BUCKET_NAME=<your_aws_s3_staging_bucket_name>
+        DESTINATION_BUCKET=<your_aws_s3_thumbnail_bucket_name>
         UPLOAD_IMAGE_LIMIT=5
         CLOUDFRONT_URL=<your_cloudfront_url>
         S3_BUCKET_IMAGE_FOLDER=posts
         S3_BUCKET_AVATAR_FOLDER=avatars
+        ECPAY_MERCHANT_ID=<your_ecpay_merchant_id>
+        ECPAY_HASH_KEY=<your_ecpay_hash_key>
+        ECPAY_HASH_IV=<your_ecpay_hash_iv>
+        ECPAY_HOST=<ecpay_gateway_host> (e.g., https://payment-stage.ecpay.com.tw)
         ENABLE_HTTPS=false (set to true for local HTTPS development )
         NODE_ENV=development
         ```
+
+        > The four `ECPAY_*` variables have no defaults — the server refuses to
+        > start without them. `ECPAY_HASH_KEY` / `ECPAY_HASH_IV` are what verify
+        > the authenticity of payment callbacks, so falling back to ECPay's
+        > publicly documented sandbox keys would let anyone forge a paid order.
+        > For local development, use the sandbox credentials from the
+        > [ECPay developer docs](https://developers.ecpay.com.tw/).
 
         **Client (.env.development):**
 
@@ -129,7 +142,22 @@ Before you begin, ensure you have met the following requirements:
         NEXT_PUBLIC_USERNAME_MAX_LENGTH=30
         ```
 
-5.  Set up the MySQL database:
+5.  Generate local TLS certificates (only needed when `ENABLE_HTTPS=true`):
+
+    Certificates are not committed to this repository — generate your own:
+
+    ```bash
+    brew install mkcert   # or see https://github.com/FiloSottile/mkcert
+    mkcert -install
+    mkdir -p server/cert
+    mkcert -cert-file server/cert/localhost.crt \
+           -key-file  server/cert/localhost.key \
+           localhost "*.localhost"
+    ```
+
+    Leave `PASSPHRASE` empty for mkcert-generated keys. `server/cert/` is git-ignored.
+
+6.  Set up the MySQL database:
 
     -   Create a database named as specified in your `.env.development` file.
     -   Import the database schema (not provided in the file set, requires separate setup).  The project expects tables such as `users`, `user_profiles`, `posts`, `categories`, `conditions`, and `images`.

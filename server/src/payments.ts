@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PaymentService } from "./services/payment/paymentService";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import dbPool from "./utils/db";
+import { requireEnv } from "./utils/env";
 import { ECPayAioProvider } from "./services/payment/ecpay/ECPayAioProvider";
 import * as lalamoveService from "./services/lalamove";
 import { RowDataPacket } from "mysql2/promise";
@@ -79,21 +80,21 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
   const router = Router();
 
   // 預設金流服務實例化 (若未傳入 mock)
-  const provider = new ECPayAioProvider({
-    merchantId: process.env.ECPAY_MERCHANT_ID || "3002607",
-    hashKey: process.env.ECPAY_HASH_KEY || "pwFHCqoQZGmho4w6",
-    hashIV: process.env.ECPAY_HASH_IV || "EkRm7iFT261dpevs",
-    host: process.env.ECPAY_HOST || "https://payment-stage.ecpay.com.tw",
-    returnUrl: process.env.ECPAY_RETURN_URL,
-    clientBackUrl: process.env.ECPAY_CLIENT_BACK_URL,
-    orderResultUrl: process.env.ECPAY_ORDER_RESULT_URL,
-  });
-
+  // hashKey/hashIV 是驗證綠界回調真偽的唯一憑據，絕不可有預設值：
+  // 退回綠界公開的測試金鑰會讓任何人都能偽造「付款成功」回調。
   const paymentService =
     options?.paymentService ||
     new PaymentService({
       dbPool,
-      provider,
+      provider: new ECPayAioProvider({
+        merchantId: requireEnv("ECPAY_MERCHANT_ID", "payments"),
+        hashKey: requireEnv("ECPAY_HASH_KEY", "payments"),
+        hashIV: requireEnv("ECPAY_HASH_IV", "payments"),
+        host: requireEnv("ECPAY_HOST", "payments"),
+        returnUrl: process.env.ECPAY_RETURN_URL,
+        clientBackUrl: process.env.ECPAY_CLIENT_BACK_URL,
+        orderResultUrl: process.env.ECPAY_ORDER_RESULT_URL,
+      }),
       lalamoveService,
     });
 

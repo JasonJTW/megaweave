@@ -117,7 +117,7 @@ jobs:
           push: true
           tags: ghcr.io/jasonjtw/megaweaving-backend:latest
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
 
   # ─────────────────────────────────────────────────────────
   # 3b. Build Frontend（GitHub Cloud Runner — 高效能機器 Build）
@@ -154,10 +154,12 @@ jobs:
           dockerfile: ./client/Dockerfile
           push: true
           tags: ghcr.io/jasonjtw/megaweaving-frontend:latest
-          build-args: |
-            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # mode=min：只快取最終 image 的 layer。mode=max 會把 builder stage 也推進
+          # Actions cache，而 public repo 的 fork PR workflow 讀得到 base branch 的 cache。
+          cache-to: type=gha,mode=min
 
   # ─────────────────────────────────────────────────────────
   # 4a. Deploy Backend（EC2 — 只做 pull + up，幾秒完成）

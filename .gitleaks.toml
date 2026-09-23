@@ -1,0 +1,20 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known non-secrets in this repository"
+paths = [
+  # 本機 dev 自簽憑證，僅綁 localhost；已從 git 追蹤移除，此項用於壓下歷史 commit 的命中
+  '''server/cert/.*''',
+  # 本機 docker benchmark 容器的假帳密，外部服務一律指向 loopback mock
+  '''server/benchmark\.env''',
+  '''package-lock\.json''',
+  '''\.agents/skills/.*''',
+]
+regexes = [
+  # 綠界官方文件公開的測試商店憑證，僅出現在測試設定中
+  '''pwFHCqoQZGmho4w6''',
+  '''EkRm7iFT261dpevs''',
+  # images 資料表欄位名，被 generic-api-key 規則誤判
+  '''thumbnail_s3_key''',
+]

@@ -48,6 +48,7 @@ describe("Payment Routes (Seam 4: HTTP Endpoints & Webhook)", () => {
       const req = {
         user: { userId: 42 },
         body: {
+          postId: 99,
           serviceType: "MOTORCYCLE",
           quotationId: "QUOTE_12345",
           feeTotal: 150,
@@ -86,6 +87,7 @@ describe("Payment Routes (Seam 4: HTTP Endpoints & Webhook)", () => {
       expect(mockPaymentService.createCheckoutOrder).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 42,
+          postId: 99,
           quotationId: "QUOTE_12345",
           feeTotal: 150,
           pickupLocationId: 1,

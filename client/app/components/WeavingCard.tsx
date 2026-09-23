@@ -24,7 +24,7 @@ interface WeavesCardProps {
   onClick?: () => void;
   isHighlighted?: boolean;
   onWeaveStatusChange?: () => void;
-  // ── In-ChatWindow mode ───────────────────────────────────────────────
+  // ── In-ChatWindow mode ─────────────────────────────────────────
   // When these are provided, the card renders a compact summary card
   // (used in ChatWindow) without requiring a full Post or Weave object.
   inChatWindow?: {
@@ -42,6 +42,64 @@ function getThumbnail(post: Post): string | undefined {
   return keys[0].startsWith("http") ? keys[0] : getImageUrl(keys[0], "thumb");
 }
 
+function getDisplayUsername(
+  post: Post,
+  weave: Weave | undefined,
+  currentUserId?: number,
+): string {
+  if (weave && currentUserId) {
+    return currentUserId === weave.giver_id
+      ? weave.receiver_name
+      : weave.giver_name;
+  }
+  return post.username;
+}
+
+type WeaveStatusLabel =
+  | "New Request"
+  | "Request Sent"
+  | "Weaved"
+  | "Weaving"
+  | "Rejected"
+  | "Canceled";
+
+function getWeaveStatusLabel(
+  status: Weave["status"] | undefined,
+  isGiverRole: boolean,
+): WeaveStatusLabel | null {
+  if (!status) return null;
+  switch (status) {
+    case "requested":
+      return isGiverRole ? "New Request" : "Request Sent";
+    case "completed":
+      return "Weaved";
+    case "pending":
+      return "Weaving";
+    case "rejected":
+      return "Rejected";
+    case "cancelled":
+      return "Canceled";
+    default:
+      return null;
+  }
+}
+
+const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> =
+  {
+    "New Request": {
+      badge: "bg-[#FEF3C7] text-[#92400E]",
+      icon: "text-[#92400E]",
+    },
+    "Request Sent": {
+      badge: "bg-[#FEF3C7] text-[#92400E]",
+      icon: "text-[#92400E]",
+    },
+    Weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
+    Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
+    Rejected: { badge: "bg-[#FEE2E2] text-[#991B1B]", icon: "text-[#991B1B]" },
+    Canceled: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
+  };
+
 const WeavingCard = ({
   post,
   weave,
@@ -51,6 +109,7 @@ const WeavingCard = ({
   onWeaveStatusChange,
   inChatWindow,
 }: WeavesCardProps) => {
+  const { socket } = useSocket();
   const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(
     undefined,
   );
@@ -83,21 +142,27 @@ const WeavingCard = ({
     };
   }, [weave, targetWeaveId]);
 
-  // 監聽即時更新 (當狀態變更時重新拉取資料)
-  const { socket } = useSocket();
+  // 監聽即時 Socket 狀態更新，在 ChatWindow 中自動重抓最新細節
   useEffect(() => {
     if (!socket || !targetWeaveId) return;
 
-    const handleWeaveUpdated = (updatedWeave: Weave) => {
-      if (Number(updatedWeave.id) === Number(targetWeaveId)) {
-        setFetchedWeave(updatedWeave);
-        if (onWeaveStatusChange) onWeaveStatusChange();
+    const handleStatusUpdate = (data: { weaveId: number }) => {
+      if (Number(data.weaveId) === Number(targetWeaveId)) {
+        fetch(`${hostName}/api/weaves/${targetWeaveId}`, {
+          credentials: "include",
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.weave) setFetchedWeave(data.weave);
+            onWeaveStatusChange?.();
+          })
+          .catch((err) => console.error("Error re-fetching weave:", err));
       }
     };
 
-    socket.on("weave_status_updated", handleWeaveUpdated);
+    socket.on("weave_status_updated", handleStatusUpdate);
     return () => {
-      socket.off("weave_status_updated", handleWeaveUpdated);
+      socket.off("weave_status_updated", handleStatusUpdate);
     };
   }, [socket, targetWeaveId, onWeaveStatusChange]);
 
@@ -123,63 +188,58 @@ const WeavingCard = ({
 
   const isInChatWindow = !!inChatWindow;
 
-  // Derive thumbnail
   const thumbnail = isInChatWindow
-    ? inChatWindow.imageUrl || (post ? getThumbnail(post) : undefined)
+    ? inChatWindow.imageUrl
     : post
       ? getThumbnail(post)
       : undefined;
 
-  // Derive title
-  const cardTitle = isInChatWindow
-    ? inChatWindow.itemTitle
-    : post?.title || activeWeave?.post_title || "Unknown Post";
+  const username = isInChatWindow
+    ? inChatWindow.isGiver
+      ? "Weaving Request Received"
+      : "Weaving Request Sent"
+    : post
+      ? getDisplayUsername(post, activeWeave, currentUserId)
+      : "";
 
-  // Derive status
-  // When in chat window and activeWeave hasn't loaded yet,
-  // the card represents an initiated weave → default to "requested"
   const currentStatus =
     localStatus ||
     activeWeave?.status ||
     (isInChatWindow ? "requested" : undefined);
 
-  // Status badge style
-  const getBadgeStyle = (status?: string) => {
-    switch (status) {
-      case "requested":
-        return "bg-amber-100 text-amber-800";
-      case "pending":
-        return "bg-blue-100 text-blue-800";
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-100 text-red-800";
-      case "cancelled":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-600";
-    }
-  };
+  const isGiverRole =
+    isGiver || (isInChatWindow ? inChatWindow.isGiver : false);
+  const statusLabel = currentStatus
+    ? getWeaveStatusLabel(currentStatus, isGiverRole)
+    : null;
 
-  const getStatusText = (status?: string) => {
-    switch (status) {
-      case "requested":
-        return "Requested";
-      case "pending":
-        return "Pending";
-      case "completed":
-        return "Completed";
-      case "rejected":
-        return "Rejected";
-      case "cancelled":
-        return "Cancelled";
-      default:
-        return status ? status.charAt(0).toUpperCase() + status.slice(1) : "";
-    }
-  };
+  const cardTitle = isInChatWindow
+    ? activeWeave?.post_title ||
+      (inChatWindow.itemTitle && inChatWindow.itemTitle.toLowerCase() !== "all"
+        ? inChatWindow.itemTitle
+        : post?.title || "Weave Request")
+    : post
+      ? post.title
+      : "";
+  const cardContent = isInChatWindow
+    ? undefined
+    : post
+      ? post.content
+      : undefined;
 
-  // User display info (Row 2)
-  // In inChatWindow mode before activeWeave loads, fallback to generic role label
+  const itemsToDisplay =
+    activeWeave?.items && activeWeave.items.length > 0
+      ? activeWeave.items.map((it, idx) => ({
+          id: it.id || idx,
+          title: it.title || (it.item_id === null ? "All items" : "Item"),
+          quantity: it.quantity,
+        }))
+      : post?.items || [];
+
+  const visibleItems = isInChatWindow ? [] : itemsToDisplay.slice(0, 2);
+
+  const hasMoreItems = isInChatWindow ? false : itemsToDisplay.length > 2;
+
   const displayUser =
     activeWeave && currentUserId
       ? currentUserId === activeWeave.giver_id
@@ -201,16 +261,16 @@ const WeavingCard = ({
           }
         : null;
 
-  const targetPost = post || activeWeave?.post;
+  const quotationPost = post || activeWeave?.post;
   const showQuotation = shouldShowLalamoveQuotation({
     isInChatWindow,
     status: currentStatus,
-    hasPost: Boolean(targetPost),
+    hasPost: Boolean(quotationPost),
   });
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex w-full flex-col">
+    <>
       <div
         onClick={isInChatWindow ? undefined : onClick}
         className={`flex w-full flex-col rounded-[20px] bg-white p-3 text-left transition-shadow hover:shadow-sm ${
@@ -229,65 +289,84 @@ const WeavingCard = ({
                 className="object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-gray-400">
-                <WeavingIcon className="h-6 w-6" />
+              <div className="flex h-full w-full items-center justify-center text-xs text-primary-75">
+                No image
               </div>
             )}
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-col justify-between">
+          <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <span className="type-body-t4 line-clamp-1 font-semibold text-[#222]">
-                {cardTitle}
-              </span>
-              {currentStatus && (
+              <span className="type-h5 text-primary">{username}</span>
+              {statusLabel && (
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${getBadgeStyle(currentStatus)}`}
+                  className={`type-body-t5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-bold ${statusStyles[statusLabel].badge}`}
                 >
-                  {getStatusText(currentStatus)}
+                  <WeavingIcon
+                    className={`h-3 w-3 ${statusStyles[statusLabel].icon}`}
+                  />
+                  {statusLabel}
                 </span>
               )}
             </div>
 
-            {/* In full mode, show post location / notes snippet */}
-            {!isInChatWindow && (
-              <p className="line-clamp-1 text-xs text-gray-400">
-                {post?.full_address || post?.location_name || post?.city || ""}
-              </p>
+            {statusLabel && <div className="my-2 border-b border-primary-30" />}
+
+            <p className="type-body-t5 flex min-w-0 items-baseline truncate font-bold text-dark">
+              <span
+                className={`min-w-0 truncate ${cardContent ? "max-w-[50%]" : "w-full"}`}
+              >
+                {cardTitle}
+              </span>
+              {cardContent && (
+                <>
+                  <span className="shrink-0">: </span>
+                  <span className="min-w-0 max-w-[50%] truncate text-dark">
+                    {cardContent}
+                  </span>
+                </>
+              )}
+            </p>
+
+            {visibleItems.length > 0 && (
+              <div className="mt-1.5 space-y-0.5">
+                {visibleItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="type-body-t5 flex items-center justify-between gap-2 text-dark"
+                  >
+                    <span className="truncate">{item.title}</span>
+                    <span className="shrink-0 text-primary-75">
+                      *{item.quantity}
+                    </span>
+                  </div>
+                ))}
+                {hasMoreItems && (
+                  <p className="type-body-t5 text-primary-75">......</p>
+                )}
+              </div>
             )}
 
-            {/* In inChatWindow mode, show item title + quantity */}
             {isInChatWindow && (
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span className="truncate">
+              <div className="type-body-t5 mt-1.5 flex items-center justify-between">
+                <span className="text-primary-75">
                   {(() => {
-                    const action = inChatWindow.isGiver ? "Give" : "Request";
-
-                    const rawItems = activeWeave?.items;
-                    let parsedItems: Array<{
-                      title?: string | null;
-                      quantity?: number;
-                    }> = [];
-                    if (Array.isArray(rawItems)) {
-                      parsedItems = rawItems;
-                    } else if (typeof rawItems === "string") {
-                      try {
-                        parsedItems = JSON.parse(rawItems);
-                      } catch {
-                        parsedItems = [];
-                      }
-                    }
-
-                    const isAll =
-                      !inChatWindow.itemTitle ||
-                      inChatWindow.itemTitle.toLowerCase() === "all" ||
-                      inChatWindow.itemTitle.toLowerCase() === "all items";
-
-                    const totalQuantity = parsedItems.reduce(
-                      (acc, item) => acc + (Number(item.quantity) || 1),
+                    const weaveItems = activeWeave?.items || [];
+                    const totalTypes = weaveItems.length;
+                    const totalQuantity = weaveItems.reduce(
+                      (sum, item) => sum + (Number(item.quantity) || 1),
                       0,
                     );
-                    const totalTypes = parsedItems.length;
+
+                    const lowerTitle =
+                      inChatWindow.itemTitle?.toLowerCase() || "";
+                    const isAll =
+                      lowerTitle === "all" ||
+                      lowerTitle.startsWith("all items") ||
+                      (weaveItems.length > 0 &&
+                        weaveItems.every((it) => it.item_id === null));
+
+                    const action = inChatWindow.isGiver ? "Offer" : "Request";
 
                     if (isAll) {
                       return `${action} all items`;
@@ -340,7 +419,9 @@ const WeavingCard = ({
               <span className="type-body-t4 font-semibold text-[#222]">
                 {displayUser.name}
               </span>
-              <span className="type-body-t5 text-[#666]">{displayUser.role}</span>
+              <span className="type-body-t5 text-[#666]">
+                {displayUser.role}
+              </span>
 
               {currentStatus === "requested" && (
                 <div className="mt-1 flex flex-col gap-1">
@@ -421,7 +502,9 @@ const WeavingCard = ({
                   onClick={handleCompleteWeave}
                   disabled={isProcessing || hasIConfirmed}
                   className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
-                  title={hasIConfirmed ? "You have confirmed" : "Complete weave"}
+                  title={
+                    hasIConfirmed ? "You have confirmed" : "Complete weave"
+                  }
                 >
                   <AcceptIcon
                     className={`h-auto w-[18px] ${hasIConfirmed ? "stroke-[3px]" : ""}`}
@@ -462,17 +545,11 @@ const WeavingCard = ({
         )}
       </div>
 
-      {/* When in ChatWindow and status === "pending", show LalamoveQuotation below WeavingCard */}
-      {showQuotation && targetPost && (
-        <div className="w-full">
-          <LalamoveQuotation
-            post={targetPost}
-            hasPendingWeaveOverride={true}
-            className="my-3 overflow-hidden rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-4 shadow-sm transition-all sm:p-5"
-          />
-        </div>
+      {/* Pending weave in ChatWindow → show Lalamove quotation below the card */}
+      {showQuotation && quotationPost && (
+        <LalamoveQuotation post={quotationPost} hasPendingWeave />
       )}
-    </div>
+    </>
   );
 };
 

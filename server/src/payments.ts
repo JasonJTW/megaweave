@@ -26,7 +26,7 @@ const LocationByDataSchema = z.object({
 });
 
 const CheckoutSchema = z.object({
-  postId: z.number().optional(),
+  postId: z.number().int().positive(),
   serviceType: z.string().min(1, "serviceType is required"),
   quotationId: z.string().min(1, "quotationId is required"),
   feeTotal: z.number().int().positive("feeTotal must be a positive integer"),

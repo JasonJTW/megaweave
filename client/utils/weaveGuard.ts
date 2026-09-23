@@ -1,7 +1,10 @@
+import type { Weave } from "@/services/weaveService";
+
+type WeaveStatus = Weave["status"];
+
 export interface WeaveItemCheck {
-  id?: number;
   post_id?: number;
-  status?: string;
+  status?: WeaveStatus;
 }
 
 /**
@@ -16,16 +19,10 @@ export function hasPendingWeaveForPost(
     return false;
   }
 
-  return weaves.some(
-    (w) => w.post_id === postId && w.status === "pending",
-  );
+  return weaves.some((w) => w.post_id === postId && w.status === "pending");
 }
 
-export type LalamoveActionType = "recalculate" | "book" | "weave_this";
-
-export interface LalamoveActionState {
-  action: LalamoveActionType;
-}
+export type LalamoveAction = "recalculate" | "book" | "weave_this";
 
 /**
  * Determines the action button state for the Lalamove quotation summary.
@@ -33,22 +30,22 @@ export interface LalamoveActionState {
  * - If quotation is valid and user has a pending weave for this post, allow booking.
  * - Otherwise (no pending weave), restrict to 'weave_this'.
  */
-export function getLalamoveActionState({
+export function getLalamoveAction({
   isQuoteExpired,
   hasPendingWeave,
 }: {
   isQuoteExpired: boolean;
   hasPendingWeave: boolean;
-}): LalamoveActionState {
+}): LalamoveAction {
   if (isQuoteExpired) {
-    return { action: "recalculate" };
+    return "recalculate";
   }
 
   if (hasPendingWeave) {
-    return { action: "book" };
+    return "book";
   }
 
-  return { action: "weave_this" };
+  return "weave_this";
 }
 
 /**
@@ -61,7 +58,7 @@ export function shouldShowLalamoveQuotation({
   hasPost,
 }: {
   isInChatWindow?: boolean;
-  status?: string | null;
+  status?: WeaveStatus | null;
   hasPost?: boolean;
 }): boolean {
   return Boolean(isInChatWindow && status === "pending" && hasPost);

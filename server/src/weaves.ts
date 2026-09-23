@@ -6,6 +6,7 @@ import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { requestWeave, approveWeave, WeaveError } from "./utils/weaveService";
 import { WeaveStatus } from "./utils/weaveService";
+import { buildWeavesFilter, WeavesListQuerySchema } from "./utils/weaveQuery";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 const router = Router();
 
@@ -268,17 +269,14 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { role } = req.query;
-    let whereClause = `WHERE (w.giver_id = ? OR w.receiver_id = ?)`;
-    const params: (string | number)[] = [userId, userId];
+    const parsed = WeavesListQuerySchema.safeParse(req.query);
+    if (!parsed.success)
+      return res.status(400).json({ errorMessage: "Invalid query parameters" });
 
-    if (role === "giver") {
-      whereClause = `WHERE w.giver_id = ?`;
-      params.splice(0, 2, userId);
-    } else if (role === "receiver") {
-      whereClause = `WHERE w.receiver_id = ?`;
-      params.splice(0, 2, userId);
-    }
+    const { whereClause, params } = buildWeavesFilter({
+      userId,
+      ...parsed.data,
+    });
 
     const query = `${WEAVE_QUERY_BASE} ${whereClause} GROUP BY w.id ORDER BY w.created_at DESC`;
     const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);

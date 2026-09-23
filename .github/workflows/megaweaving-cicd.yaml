@@ -95,6 +95,9 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       needs.detect-changes.outputs.server-changed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -129,6 +132,9 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       needs.detect-changes.outputs.client-changed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -169,6 +175,9 @@ jobs:
     needs: [detect-changes, pre-deploy-cleanup, build-backend]
     if: needs.build-backend.result == 'success'
     runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -252,6 +261,9 @@ jobs:
     needs: [detect-changes, pre-deploy-cleanup, build-frontend]
     if: needs.build-frontend.result == 'success'
     runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

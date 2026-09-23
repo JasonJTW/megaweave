@@ -4,6 +4,7 @@
 
 import { createFeedProfile } from "./feed/feedProfile";
 import { createFixtureProfile } from "./fixture/fixtureProfile";
+import { RAW_IMAGE_MIX, TYPICAL_IMAGE_MIX } from "./queue/imageMix";
 import { createQueueBurstProfile, QueueBurstPlan } from "./queue/queueBurstProfile";
 
 export const DEPENDENCY_MODES = ["mock", "benchmark", "real-probe"] as const;
@@ -64,6 +65,15 @@ const QUEUE_BURST_TRAFFIC: Pick<
   depthSampleIntervalMs: 1_000,
 };
 
+const QUEUE_BURST_500_PLAN: QueueBurstPlan = {
+  units: 500,
+  injectionMs: 30_000,
+  baselineMs: 120_000,
+  recoveryMs: 120_000,
+  drainTimeoutMs: 30 * 60_000,
+  ...QUEUE_BURST_TRAFFIC,
+};
+
 const environmentCheck: BenchmarkProfile = {
   name: "environment-check",
   description:
@@ -110,14 +120,15 @@ export const benchmarkProfiles: Record<string, BenchmarkProfile> = Object.fromEn
     createQueueBurstProfile({
       name: "queue-burst-500",
       posts: 10_000,
-      plan: {
-        units: 500,
-        injectionMs: 30_000,
-        baselineMs: 120_000,
-        recoveryMs: 120_000,
-        drainTimeoutMs: 30 * 60_000,
-        ...QUEUE_BURST_TRAFFIC,
-      },
+      plan: QUEUE_BURST_500_PLAN,
+      imageMix: TYPICAL_IMAGE_MIX,
+    }),
+    // 相同 workload 但所有上傳都是未壓縮原圖：image worker 的壓力測試
+    createQueueBurstProfile({
+      name: "queue-burst-500-raw",
+      posts: 10_000,
+      plan: QUEUE_BURST_500_PLAN,
+      imageMix: RAW_IMAGE_MIX,
     }),
     // 開發機上驗證 queue burst 流程用；數據不可作為容量結論
     createQueueBurstProfile({
@@ -131,6 +142,7 @@ export const benchmarkProfiles: Record<string, BenchmarkProfile> = Object.fromEn
         drainTimeoutMs: 5 * 60_000,
         ...QUEUE_BURST_TRAFFIC,
       },
+      imageMix: TYPICAL_IMAGE_MIX,
     }),
   ].map((profile) => [profile.name, profile]),
 );

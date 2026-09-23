@@ -27,6 +27,7 @@ describe("queue burst summary", () => {
 
     const summary = renderQueueBurstSummary({
       units: 1,
+      stagedImagesByVariant: { "client-webp": 1, raw: 2 },
       accounting,
       backlog: summarizeBacklog([], { injectionStartedAtMs: 0, injectionEndedAtMs: 0 }),
       timeToZeroBacklogMs: 900,
@@ -48,6 +49,7 @@ describe("queue burst summary", () => {
     expect(summary).toContain("Time to zero backlog after the last enqueue: 0.9 s");
     expect(summary).toContain("| post-embedding | 1 | 1 | 0 | 0 | 0 (0 jobs) | 600 / 600 / 600 ms | 300 / 300 / 300 ms |");
     expect(summary).toContain("| 2 × 1 |");
+    expect(summary).toContain("Staged burst images by source: client-webp 1, raw 2.");
     expect(summary).toContain("| burst (10.0 s) | Feed | 1 | 0.00% | 60 ms | 60 ms | 60 ms | +50% |");
     expect(summary).toContain("- PASS embeddings-persisted: 0/0");
     expect(summary).toContain("Note: fewer than 100 successful requests for feed in before, post creation in before");

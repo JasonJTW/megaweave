@@ -101,7 +101,8 @@ Omitted replica counts are recorded as `"unknown"`.
 | `fixture-10k` | No | Yes | Resets the benchmark data stores and loads the 10k-post fixture |
 | `feed-10k` | Yes | Yes | Loads the 10k fixture, then compares the full-hydration baseline with the current feed over HTTP (about 2.7 hours) |
 | `feed-1k-smoke` | Yes | Yes | Same flow on the 1k fixture with one short repetition at 5 VUs (about 4 minutes); for checking the profile, not for results |
-| `queue-burst-500` | Yes | Yes | Loads the 10k fixture, then injects 500 post/interaction units (1,500 image, embedding, and user-vector jobs) while feed and post-creation traffic continues (about 6 minutes plus fixture load and drain) |
+| `queue-burst-500` | Yes | Yes | Loads the 10k fixture, then injects 500 post/interaction units (1,500 image, embedding, and user-vector jobs) while feed and post-creation traffic continues, with the typical source image mix (about 6 minutes plus fixture load and drain) |
+| `queue-burst-500-raw` | Yes | Yes | Same as `queue-burst-500`, but every upload is an uncompressed photo; the worst case for the image worker |
 | `queue-burst-1k-smoke` | Yes | Yes | Same flow on the 1k fixture with 50 units and short phases (about 2 minutes); for checking the profile, not for results |
 
 ```bash
@@ -268,11 +269,21 @@ OpenAI and S3 are replaced by loopback mocks that the runner starts for the dura
 | Burst units | 500. Each unit is one new post with 1–5 staged images (35/25/20/10/10%) and one interaction by a fixture user on an embedded fixture post (view 55%, like 30%, comment 10%, weave 5%) |
 | Jobs | 1 `upload-images`, 1 `generate-embedding`, and 1 `update-user-vector` per unit (1,500 total) |
 | Injection | Spread evenly over 30 s, using the production enqueue helpers (same job names, delays, attempts, and backoff) |
-| Source image | Synthetic 2048×1536 JPEG (about 1 MB), decoded, resized, and WebP-encoded by the worker for each image |
+| Source images | Each image draws a variant from the profile's mix (see below). Burst and post-creation uploads use the same mix |
 | Feed traffic | 5 closed-loop virtual users, 3–8 s think time. Personas and view mix as in `feed-10k`. Production default strategy |
 | Post-creation traffic | 2 closed-loop virtual users, 20–40 s think time. Each creates a post the way the client does: presigned URLs, then a PUT of each image to the mock S3, then `POST /api/posts` |
 | Phases | `before`: 120 s of traffic only. `burst`: from the first enqueue until every burst job is terminal (30-minute limit). `after`: 120 s of traffic after the backlog clears |
 | Depth sampling | Every 1 s |
+
+Source image mixes. The client compresses photos to at most 1200 px before upload (`client/utils/imageProcessor.ts`): WebP where the browser can encode it, JPEG otherwise (iOS Safari), and the original photo when compression fails or times out. The worker only reads the metadata of a WebP image of at most 1200 px and resizes and re-encodes everything else, so the mix sets the image worker's CPU cost:
+
+| Variant | Image | Worker work | `queue-burst-500` | `queue-burst-500-raw` |
+| --- | --- | --- | ---: | ---: |
+| `client-webp` | 1200×900 WebP, quality 85 | Metadata only | 50% | 0% |
+| `client-jpeg` | 1200×900 JPEG, quality 85 | Re-encode to WebP | 30% | 0% |
+| `raw` | 2048×1536 JPEG, quality 85 (about 1 MB) | Resize and re-encode to WebP | 20% | 100% |
+
+The typical shares are an assumption, not a production measurement. Update `TYPICAL_IMAGE_MIX` in `server/src/benchmark/queue/imageMix.ts` once real upload formats are known. The artifact records the mix, each variant's size and hash, and the staged burst images per variant.
 
 Burst posts, items, and image rows are written to MySQL, and their staging images are placed in the mock S3, before measurement starts. This matches the state a committed `createPost` leaves. The burst therefore measures the queue and the worker, not API write capacity, which the post-creation traffic covers. Interactions never repeat a (user, post, action) triple, so the producer's cooldown does not drop any of them.
 

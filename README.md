@@ -21,8 +21,9 @@
 Megaweaving started as an 11k-member [Facebook group](https://www.facebook.com/groups/1596603907320118) and is now a searchable, database-driven platform. Users publish a **Share** ("I have this, take it") or a **Wish** ("I'm looking for this"); the other side opens a **Weave** — one complete exchange relationship that lives from the moment the request is made until both parties confirm the handover.
 
 There is no money in the exchange itself. The only paid path is optional Lalamove courier delivery when the two parties can't meet in person.
-
-<img width="3230" height="1955" alt="system-architecture (1)" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
+<p align="center">
+<img width="3230" height="1955" alt="system-architecture" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
+</p>
 <!-- TODO(status): 補一段專案現況，面試官第一個問的就是這個。例如：
      "Live in production since <date>. Built and operated solo: product, backend, frontend, infrastructure.
       Currently serving <N> users and <N> posts on a single 1 vCPU / 2 GB instance."
@@ -64,19 +65,6 @@ The constraint that shaped most of this system: it runs on a single **1 vCPU / 2
 **Secrets fail loudly.** `requireEnv()` refuses to start the process when a payment or session secret is missing, rather than falling back to a public sandbox key — with ECPay, that fallback would let anyone forge a valid `CheckMacValue` on a payment callback.
 
 **Benchmarks can't touch production.** The load runner refuses to start unless `BENCHMARK_ENVIRONMENT=isolated` is set, the target's `/health` returns an isolation marker, and marker rows exist inside the benchmark MySQL and Redis. Profiles that call a real external API need a further explicit opt-in, because those calls cost money.
-
-## Architecture
-
-<p align="center">
-  <img src="docs/diagrams/system-architecture.svg" alt="Megaweaving system architecture" width="100%">
-</p>
-
-Images never touch the request path. The worker uploads the original to S3, an `ObjectCreated` event triggers the standalone Lambda in [`services/image-resizer/`](services/image-resizer/), and Sharp emits two WebP derivatives — `thumb` at 300px and `medium` at 800px, both `fit: inside` so nothing is cropped or upscaled — into a **separate** thumbnails bucket under `thumbnails/<category>/<size>/…`. EXIF orientation is corrected on the way through, and every object is written with a one-year immutable `Cache-Control` so CloudFront can serve it indefinitely.
-
-Two details make the Lambda safe to re-run: it `HeadObject`s each target key first and skips derivatives that already exist, and it ignores any key whose second path segment is a known size name — which is what stops it re-triggering on its own output when source and destination share a bucket. Failures are isolated per S3 record, so one bad image doesn't fail the batch. The Lambda is excluded from both Docker builds and CI path filters, and is deployed on its own.
-
-The diagram's source of truth is [`docs/diagrams/system-architecture.drawio`](docs/diagrams/system-architecture.drawio), edited in draw.io; the SVG above is exported from it (File → Export as → SVG, with *Embed Images* ticked). Full subsystem walkthroughs — feed routing, EMA vector write-back, hot score, Socket.IO, Lalamove, ECPay — are in [`docs/notes/megaweave-system-design.md`](docs/notes/megaweave-system-design.md).
-
 
 ## Background jobs
 

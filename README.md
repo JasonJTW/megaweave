@@ -1,4 +1,4 @@
-<div align="center">
+<div align="left">
   <img src="client/public/icons/weaving.svg" alt="Megaweaving" width="160">
   <h1>Megaweaving</h1>
   <p><strong>A free item-exchange and materials-sharing platform.</strong><br>

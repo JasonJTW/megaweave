@@ -22,10 +22,12 @@ Megaweaving started as an 11k-member [Facebook group](https://www.facebook.com/g
 
 There is no money in the exchange itself. The only paid path is optional Lalamove courier delivery when the two parties can't meet in person.
 
+<img width="3230" height="1955" alt="system-architecture (1)" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
 <!-- TODO(status): 補一段專案現況，面試官第一個問的就是這個。例如：
      "Live in production since <date>. Built and operated solo: product, backend, frontend, infrastructure.
       Currently serving <N> users and <N> posts on a single 1 vCPU / 2 GB instance."
      有真實數字再寫，沒有就先寫角色與上線時間。 -->
+
 
 ## Features
 

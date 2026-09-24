@@ -32,12 +32,12 @@ _Avoid_: Loan, Lending, 共享物
 _Avoid_: Transaction, Trade, Deal, Order, 訂單
 
 **Giver**:
-在這次 Weave 中把物品交出去的一方。
-_Avoid_: Donor, Seller, Owner
+物品從這一方**流出**。描述的是物品的方向，不是所有權移轉 —— Commons 的保管者雖然物品之後會回來，在該次 Weave 中仍然是 Giver。
+_Avoid_: Donor, Seller, Owner, 贈送者
 
 **Receiver**:
-在這次 Weave 中拿到物品的一方。
-_Avoid_: Recipient, Buyer, Claimer
+物品**流入**這一方。同樣只描述方向 —— Commons 的借用者在該次 Weave 中是 Receiver，即使他只是暫時持有。
+_Avoid_: Recipient, Buyer, Claimer, 收受者
 
 **Initiator**:
 送出 Weave 請求的一方。與 Giver / Receiver 垂直：Initiator 是誰由「誰先開口」決定，不由物品流向決定。

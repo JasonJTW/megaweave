@@ -37,13 +37,23 @@ There is no money in the exchange itself. The only paid path is optional Lalamov
 - **Auth** — native sign-up, Google OAuth, and Facebook login over Redis-backed cookie sessions with server-authoritative RBAC (`user` / `contributor` / `admin`).
 - **Async everything** — image processing, embeddings, email, hot-score crons, and user-vector flushes all run off the request path via BullMQ.
 
+## Tech stack
+
+| Layer    | Stack                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Frontend | Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS, Radix UI, SWR, Framer Motion, Socket.io-client, Sentry |
+| Backend  | Node.js, Express 4, TypeScript, Socket.IO + Redis adapter, mysql2 (pooled), BullMQ, Zod                                        |
+| Data     | MySQL 8, Redis 7 (cache / queue), Redis Stack (RediSearch + HNSW vectors)                                                      |
+| Services | AWS S3 + CloudFront, OpenAI embeddings, Resend, ECPay AIO, Lalamove, Google Maps                                               |
+| Infra    | Docker Compose, GHCR images, GitHub Actions → self-hosted EC2 runner                                                           |
+
 ## Engineering notes
 
 The constraint that shaped most of this system: it runs on a single **1 vCPU / 2 GB** instance. Vector search, real-time messaging, and background jobs all had to fit in that budget.
 
 **Late materialization in the feed.** Ranking needs cheap columns; rendering needs an expensive six-table JOIN. So the feed retrieves lightweight candidates (`id`, `hot_score`, `lat`, `lng` — no JOINs, no embedding column), re-ranks them in memory against Float32 vectors read from Redis, and only then hydrates the ~12 posts on the current page. Scoring is `0.7 × cosine similarity + 0.3 × normalized hot score`, multiplied by a distance boost. A `fullHydrationBaseline` flag preserves the pre-optimization path so the two can be measured against each other.
 
-**Three Redis instances, not one.** They have incompatible requirements, and a shared instance resolves that conflict by silently dropping something. The cache (sessions, cooldowns, trending) *may* evict under `volatile-lru`; the queue is durable state and runs `noeviction` with AOF; the vector index is `noeviction` because rebuilding it costs real OpenAI spend. Splitting them makes each policy explicit and caps each one's memory on a box that has little to spare.
+**Three Redis instances, not one.** They have incompatible requirements, and a shared instance resolves that conflict by silently dropping something. The cache (sessions, cooldowns, trending) _may_ evict under `volatile-lru`; the queue is durable state and runs `noeviction` with AOF; the vector index is `noeviction` because rebuilding it costs real OpenAI spend. Splitting them makes each policy explicit and caps each one's memory on a box that has little to spare.
 
 **The index heals itself.** On boot, `ensureVectorIndexExists()` compares `num_docs` in the HNSW index against the MySQL post count and re-syncs from MySQL if Redis was flushed — behind a distributed lock, so replicas starting together don't duplicate the work.
 
@@ -55,51 +65,28 @@ The constraint that shaped most of this system: it runs on a single **1 vCPU / 2
 
 ## Architecture
 
-```
-┌──────────────┐       ┌────────────────────────────┐       ┌─────────────┐
-│  Next.js 16  │◄─────►│  Express API (APP_ROLE=api)│◄─────►│   MySQL 8   │
-│  React 19    │  REST │  + Socket.IO gateway       │       │  (mysql2)   │
-│  PWA / SWR   │◄─────►│                            │       └─────────────┘
-└──────────────┘  WS   └──────────┬─────────────────┘
-                                  │ enqueue
-                       ┌──────────▼─────────────────┐       ┌─────────────┐
-                       │ Worker (APP_ROLE=worker)   │──────►│  S3 · OpenAI│
-                       │ BullMQ: images, embeddings,│       │  Resend     │
-                       │ email, hot-score, delivery │       │  Lalamove   │
-                       └──────────┬─────────────────┘       │  ECPay      │
-                                  │                         └─────────────┘
-              ┌───────────────────┼───────────────────┐
-              ▼                   ▼                   ▼
-      redis-cache:6379    redis-queue:6380    redis-vector:6381
-      sessions, Socket.IO  BullMQ (AOF)       RediSearch HNSW
-      cooldowns, trending                     post & user vectors
-```
+<p align="center">
+  <img src="docs/diagrams/system-architecture.svg" alt="Megaweaving system architecture" width="100%">
+</p>
 
-Images are handled out of band: uploads land in S3, an S3 event triggers the standalone Lambda in `services/image-resizer/`, and it writes `thumb_` and `medium_` variants back. That Lambda is excluded from both Docker builds and CI path filters.
+Images never touch the request path. The worker uploads the original to S3, an `ObjectCreated` event triggers the standalone Lambda in [`services/image-resizer/`](services/image-resizer/), and Sharp emits two WebP derivatives — `thumb` at 300px and `medium` at 800px, both `fit: inside` so nothing is cropped or upscaled — into a **separate** thumbnails bucket under `thumbnails/<category>/<size>/…`. EXIF orientation is corrected on the way through, and every object is written with a one-year immutable `Cache-Control` so CloudFront can serve it indefinitely.
 
-Full subsystem walkthroughs — feed routing, EMA vector write-back, hot score, Socket.IO, Lalamove, ECPay — are in [`docs/notes/megaweave-system-design.md`](docs/notes/megaweave-system-design.md).
+Two details make the Lambda safe to re-run: it `HeadObject`s each target key first and skips derivatives that already exist, and it ignores any key whose second path segment is a known size name — which is what stops it re-triggering on its own output when source and destination share a bucket. Failures are isolated per S3 record, so one bad image doesn't fail the batch. The Lambda is excluded from both Docker builds and CI path filters, and is deployed on its own.
 
-## Tech stack
+The diagram's source of truth is [`docs/diagrams/system-architecture.drawio`](docs/diagrams/system-architecture.drawio), edited in draw.io; the SVG above is exported from it (File → Export as → SVG, with *Embed Images* ticked). Full subsystem walkthroughs — feed routing, EMA vector write-back, hot score, Socket.IO, Lalamove, ECPay — are in [`docs/notes/megaweave-system-design.md`](docs/notes/megaweave-system-design.md).
 
-| Layer | Stack |
-| --- | --- |
-| Frontend | Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS, Radix UI, SWR, Framer Motion, Socket.io-client, Sentry |
-| Backend | Node.js, Express 4, TypeScript, Socket.IO + Redis adapter, mysql2 (pooled), BullMQ, Zod |
-| Data | MySQL 8, Redis 7 (cache / queue), Redis Stack (RediSearch + HNSW vectors) |
-| Services | AWS S3 + CloudFront, OpenAI embeddings, Resend, ECPay AIO, Lalamove, Google Maps |
-| Infra | Docker Compose, GHCR images, GitHub Actions → self-hosted EC2 runner |
 
 ## Background jobs
 
-| Queue | Job | Notes |
-| --- | --- | --- |
-| `post-image` | upload / delete | S3 writes and deletions, 5 attempts with exponential backoff |
-| `post-embedding` | generate-embedding | OpenAI embedding → MySQL + Redis vector index |
-| `user-vector` | update-user-vector | Incremental EMA interest vector from user interactions |
-| `user-vector-flush` | flush-user-vectors | Batched persistence of buffered user vectors |
-| `hot-score` | calculate-hot-score | Repeatable cron recomputing feed ranking scores |
-| `email` | send-email | Resend delivery of React Email templates |
-| `delivery-reconcile` | reconcile-orders | Catches Lalamove orders whose webhook was lost |
+| Queue                | Job                 | Notes                                                        |
+| -------------------- | ------------------- | ------------------------------------------------------------ |
+| `post-image`         | upload / delete     | S3 writes and deletions, 5 attempts with exponential backoff |
+| `post-embedding`     | generate-embedding  | OpenAI embedding → MySQL + Redis vector index                |
+| `user-vector`        | update-user-vector  | Incremental EMA interest vector from user interactions       |
+| `user-vector-flush`  | flush-user-vectors  | Batched persistence of buffered user vectors                 |
+| `hot-score`          | calculate-hot-score | Repeatable cron recomputing feed ranking scores              |
+| `email`              | send-email          | Resend delivery of React Email templates                     |
+| `delivery-reconcile` | reconcile-orders    | Catches Lalamove orders whose webhook was lost               |
 
 ## Testing
 
@@ -179,18 +166,18 @@ cd server && npm run sync:vectors
 
 All routes are mounted under `/api` ([`server/src/api.ts`](server/src/api.ts)).
 
-| Prefix | What it covers |
-| --- | --- |
-| `/signup`, `/signin`, `/signout`, `/currentUser` | Auth and session lifecycle |
-| `/posts`, `/posts/feed` | Post CRUD and the personalized feed |
-| `/weaves` | Create, list, and transition weaves; `/weaves/public/:uuid` for share links |
-| `/comments`, `/like`, `/user/stats` | Engagement |
-| `/messages`, `/send`, `/notifications` | Chat and notifications |
-| `/member`, `/userprofile`, `/avatar`, `/me` | Profiles |
-| `/categories`, `/conditions` | Reference data |
-| `/lalamove`, `/payments` | Quotations, checkout, ECPay callbacks, delivery webhooks |
-| `/admin` | Metrics and cleanup (`admin` role only) |
-| `/health` | Liveness, SSL status, benchmark markers |
+| Prefix                                           | What it covers                                                              |
+| ------------------------------------------------ | --------------------------------------------------------------------------- |
+| `/signup`, `/signin`, `/signout`, `/currentUser` | Auth and session lifecycle                                                  |
+| `/posts`, `/posts/feed`                          | Post CRUD and the personalized feed                                         |
+| `/weaves`                                        | Create, list, and transition weaves; `/weaves/public/:uuid` for share links |
+| `/comments`, `/like`, `/user/stats`              | Engagement                                                                  |
+| `/messages`, `/send`, `/notifications`           | Chat and notifications                                                      |
+| `/member`, `/userprofile`, `/avatar`, `/me`      | Profiles                                                                    |
+| `/categories`, `/conditions`                     | Reference data                                                              |
+| `/lalamove`, `/payments`                         | Quotations, checkout, ECPay callbacks, delivery webhooks                    |
+| `/admin`                                         | Metrics and cleanup (`admin` role only)                                     |
+| `/health`                                        | Liveness, SSL status, benchmark markers                                     |
 
 ```
 client/                 Next.js App Router frontend, Radix UI primitives, SWR hooks
@@ -236,7 +223,7 @@ Pushes to `main` trigger [`.github/workflows/megaweaving-cicd.yaml`](.github/wor
 3. A self-hosted EC2 runner prunes Docker, writes `.env.production` from secrets, pulls, and restarts containers.
 4. Container health is verified, then post-deploy cleanup runs.
 
-Production runs from [`docker-compose.yml`](docker-compose.yml): three Redis instances, `backend-api`, `backend-worker`, and `frontend`. Third-party actions are pinned to commit SHAs and every job declares explicit `GITHUB_TOKEN` permissions.
+Production runs from [`docker-compose.yml`](docker-compose.yml): three Redis instances, `backend-api`, `backend-worker`, and `frontend`. Caddy and MySQL run on the host rather than in Compose — Caddy terminates TLS and splits traffic by subdomain (`megaweaving.net` → `frontend`, `api.megaweaving.net` → `backend-api`, including the WebSocket upgrade), which is why `COOKIE_DOMAIN` is set to `.megaweaving.net` so the session cookie is shared across both. Third-party actions are pinned to commit SHAs and every job declares explicit `GITHUB_TOKEN` permissions.
 
 ```bash
 make up      # start the production stack

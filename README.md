@@ -3,30 +3,31 @@
   <h1>Megaweaving</h1>
   <p><strong>A free item-exchange and materials-sharing platform.</strong><br>
   Post what you have or what you need, get matched, and complete a real-world exchange.</p>
-  <p><a href="https://megaweaving.net"><strong>megaweaving.net</strong></a>  — product, backend, frontend, infrastructure</p>
+  <p><a href="https://megaweaving.net"><strong>megaweaving.net</strong></a>  
 </div>
 
 
-<p align="center">
-  <img width="1200" height="943" alt="semantic-search" src="https://github.com/user-attachments/assets/8719604e-37d3-49b8-b1e0-ae9fdec694cb" />
-</p>
-
-<p align="center">
-<img width="1500" height="946" alt="A Weave request arriving in real time" src="https://github.com/user-attachments/assets/1222d590-168a-4bf9-af0a-ee2df8d6a39f" />
-</p>
-
-<p align="center">
-<img width="1000" height="563" alt="recommendation-system" src="https://github.com/user-attachments/assets/5cc054f9-e5a5-439d-be43-faec4b316cd3" />
-</p>
-
 Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/groups/1596603907320118) where exchanges were buried in an unsearchable timeline. Users publish a **Share** ("I have this, take it") or a **Wish** ("I'm looking for this"); the other side opens a **Weave** — one exchange, tracked from request until both parties confirm the handover. The exchange itself is free; the only paid path is optional courier delivery.
 
+## Demo
+
+**Semantic search** — an English query for "plywood" finds Chinese posts for plywood sheets, pine battens, and wood offcuts. Matching is by meaning, not keywords, so it works across languages.
+
 <p align="center">
-<img width="3230" height="1955" alt="system-architecture" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
+  <img width="720" alt="Semantic search: 'plywood' returns related Chinese wood-material posts" src="https://github.com/user-attachments/assets/8719604e-37d3-49b8-b1e0-ae9fdec694cb" />
 </p>
 
+**Personalized feed** — after opening three chair posts, the top of the feed shifts to chairs. Each interaction updates the user's interest profile in the background.
 
+<p align="center">
+  <img width="720" alt="Feed re-ranks toward chairs after viewing three chair posts" src="https://github.com/user-attachments/assets/5cc054f9-e5a5-439d-be43-faec4b316cd3" />
+</p>
 
+**Real-time Weave** — one user requests an exchange and the other approves it; both screens update live without a refresh.
+
+<p align="center">
+  <img width="720" alt="A Weave request and approval updating live on both sides" src="https://github.com/user-attachments/assets/1222d590-168a-4bf9-af0a-ee2df8d6a39f" />
+</p>
 
 ## Features
 
@@ -39,6 +40,10 @@ Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/
 - **Auth** — email, Google, and Facebook sign-in; session-based RBAC.
 
 ## Design decisions
+
+<p align="center">
+<img width="3230" height="1955" alt="system-architecture" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
+</p>
 
 **Three Redis instances, three eviction policies.** Cache, job queue, and vector index have conflicting needs: the cache may evict, the other two must not. Splitting them means memory pressure on the cache can never drop queued jobs or embeddings that cost money to rebuild — which matters when everything shares one small instance.
 

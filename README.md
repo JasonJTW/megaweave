@@ -3,13 +3,9 @@
   <h1>Megaweaving</h1>
   <p><strong>A free item-exchange and materials-sharing platform.</strong><br>
   Post what you have or what you need, get matched, and complete a real-world exchange.</p>
-  <p><a href="https://megaweaving.net"><strong>megaweaving.net</strong></a> · Soft launch · Built and operated solo — product, backend, frontend, infrastructure</p>
+  <p><a href="https://megaweaving.net"><strong>megaweaving.net</strong></a>  — product, backend, frontend, infrastructure</p>
 </div>
 
-<!-- TODO(screenshots): docs/screenshots/
-     1. swipe-to-feed.gif — swipe 5 cards of one category, return home, feed shifts to that category
-     2. weave-realtime.gif — split screen: A requests a Weave in chat, B sees it live and accepts
-     3. feed.png / multi-item-post.png / delivery.png — static, production data, SandboxPanel hidden -->
 
 <p align="center">
   <img width="1200" height="943" alt="semantic-search" src="https://github.com/user-attachments/assets/8719604e-37d3-49b8-b1e0-ae9fdec694cb" />
@@ -17,6 +13,10 @@
 
 <p align="center">
 <img width="1500" height="946" alt="A Weave request arriving in real time" src="https://github.com/user-attachments/assets/1222d590-168a-4bf9-af0a-ee2df8d6a39f" />
+</p>
+
+<p align="center">
+<img width="1000" height="563" alt="recommendation-system" src="https://github.com/user-attachments/assets/5cc054f9-e5a5-439d-be43-faec4b316cd3" />
 </p>
 
 Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/groups/1596603907320118) where exchanges were buried in an unsearchable timeline. Users publish a **Share** ("I have this, take it") or a **Wish** ("I'm looking for this"); the other side opens a **Weave** — one exchange, tracked from request until both parties confirm the handover. The exchange itself is free; the only paid path is optional courier delivery.

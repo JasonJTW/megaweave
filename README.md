@@ -12,8 +12,11 @@
      3. feed.png / multi-item-post.png / delivery.png — static, production data, SandboxPanel hidden -->
 
 <p align="center">
-  <img src="docs/screenshots/swipe-to-feed.gif" width="49%" alt="Swiping updates the personalized feed">
-  <img src="docs/screenshots/weave-realtime.gif" width="49%" alt="A Weave request arriving in real time">
+  <img width="1200" height="943" alt="semantic-search" src="https://github.com/user-attachments/assets/8719604e-37d3-49b8-b1e0-ae9fdec694cb" />
+</p>
+
+<p align="center">
+<img width="1500" height="946" alt="A Weave request arriving in real time" src="https://github.com/user-attachments/assets/1222d590-168a-4bf9-af0a-ee2df8d6a39f" />
 </p>
 
 Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/groups/1596603907320118) where exchanges were buried in an unsearchable timeline. Users publish a **Share** ("I have this, take it") or a **Wish** ("I'm looking for this"); the other side opens a **Weave** — one exchange, tracked from request until both parties confirm the handover. The exchange itself is free; the only paid path is optional courier delivery.
@@ -21,6 +24,9 @@ Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/
 <p align="center">
 <img width="3230" height="1955" alt="system-architecture" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
 </p>
+
+
+
 
 ## Features
 

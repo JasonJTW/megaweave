@@ -9,36 +9,6 @@
 
 Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/groups/1596603907320118) where exchanges were buried in an unsearchable timeline. Users publish a **Share** ("I have this, take it") or a **Wish** ("I'm looking for this"); the other side opens a **Weave** — one exchange, tracked from request until both parties confirm the handover. The exchange itself is free; the only paid path is optional courier delivery.
 
-## Demo
-
-**Semantic search** — an English query for "plywood" finds Chinese posts for plywood sheets, pine battens, and wood offcuts. Matching is by meaning, not keywords, so it works across languages.
-
-<p align="center">
-  <img width="720" alt="Semantic search: 'plywood' returns related Chinese wood-material posts" src="https://github.com/user-attachments/assets/8719604e-37d3-49b8-b1e0-ae9fdec694cb" />
-</p>
-
-**Personalized feed** — after opening three chair posts, the top of the feed shifts to chairs. Each interaction updates the user's interest profile in the background.
-
-<p align="center">
-  <img width="720" alt="Feed re-ranks toward chairs after viewing three chair posts" src="https://github.com/user-attachments/assets/5cc054f9-e5a5-439d-be43-faec4b316cd3" />
-</p>
-
-**Real-time Weave** — one user requests an exchange and the other approves it; both screens update live without a refresh.
-
-<p align="center">
-  <img width="720" alt="A Weave request and approval updating live on both sides" src="https://github.com/user-attachments/assets/1222d590-168a-4bf9-af0a-ee2df8d6a39f" />
-</p>
-
-## Features
-
-- **Personalized feed** — semantic retrieval over a Redis HNSW vector index, re-ranked by relevance, popularity, and distance, with a trending fallback for new users.
-- **Semantic search** — finds posts by meaning, not just keywords, narrowed by category, location, and radius.
-- **Swipe discovery** — every swipe feeds back into the user's interest profile.
-- **Weaves** — request → approve → dual confirm → complete, down to individual items within a post.
-- **Real-time** — chat, notifications, and Weave updates over Socket.IO with a Redis adapter.
-- **Delivery & payment** — Lalamove courier booking paid through ECPay, with a reconciliation job for lost webhooks.
-- **Auth** — email, Google, and Facebook sign-in; session-based RBAC.
-
 ## Design decisions
 
 <p align="center">
@@ -64,6 +34,37 @@ Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/
 | Data     | MySQL 8, Redis 7, Redis Stack (RediSearch + HNSW vectors)                                 |
 | Services | AWS S3 + CloudFront + Lambda, OpenAI embeddings, Resend, ECPay, Lalamove, Google Maps     |
 | Infra    | Terraform ([infra repo](https://github.com/JasonJTW/Megaweaving-infra)), Docker Compose, GitHub Actions → GHCR → EC2, Sentry |
+
+## Demo
+
+**Semantic search** — an English query for "plywood" finds Chinese posts for plywood sheets, pine battens, and wood offcuts. Matching is by meaning, not keywords, so it works across languages.
+
+<p align="center">
+  <img width="720" alt="Semantic search: 'plywood' returns related Chinese wood-material posts" src="https://github.com/user-attachments/assets/8719604e-37d3-49b8-b1e0-ae9fdec694cb" />
+</p>
+
+**Personalized feed** — after opening three chair posts, the top of the feed shifts to chairs. Each interaction updates the user's interest profile in the background.
+
+<p align="center">
+  <img width="720" alt="Feed re-ranks toward chairs after viewing three chair posts" src="https://github.com/user-attachments/assets/5cc054f9-e5a5-439d-be43-faec4b316cd3" />
+</p>
+
+**Real-time Weave** — one user requests an exchange and the other approves it; both screens update live without a refresh.
+
+<p align="center">
+  <img width="720" alt="A Weave request and approval updating live on both sides" src="https://github.com/user-attachments/assets/1222d590-168a-4bf9-af0a-ee2df8d6a39f" />
+</p>
+
+
+
+## Features
+
+- **Personalized feed** — semantic retrieval over a Redis HNSW vector index, re-ranked by relevance, popularity, and distance, with a trending fallback for new users.
+- **Semantic search** — finds posts by meaning, not just keywords, narrowed by category, location, and radius.
+- **Swipe discovery** — every swipe feeds back into the user's interest profile.
+- **Weaves** — request → approve → dual confirm → complete, down to individual items within a post.
+- **Real-time** — chat, notifications, and Weave updates over Socket.IO with a Redis adapter.
+- **Delivery & payment** — Lalamove courier booking paid through ECPay, with a reconciliation job for lost webhooks.
 
 ## Testing
 

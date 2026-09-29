@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import { User } from "./types/user";
 import { userRoles, UserSession } from "./schema";
-import { SignupUserSchema, SignupUserSchemaType } from "./validations";
+import { SignupUserSchema } from "./validations";
 import { hashPassword, generateSalt } from "./passwordHasher";
 import { handleError } from "./utils/errorHandler";
 import { randomUUID } from "crypto";
@@ -31,13 +31,9 @@ router.post("/", async (req: Request, res: Response) => {
     public_id: "",
     created_at: undefined,
   };
-  console.log(`User:`, user);
-  let validationResult: SignupUserSchemaType | undefined;
   try {
-    validationResult = SignupUserSchema.parse(user);
-    console.log("Validation result:", validationResult);
+    SignupUserSchema.parse(user);
   } catch (error) {
-    console.log(`Validation result:`, validationResult);
     console.error(`Validation error:`, error);
     return handleError(error, res);
   }
@@ -73,13 +69,9 @@ router.post("/", async (req: Request, res: Response) => {
   console.log("Generated public_id: ", public_id);
   const salt = generateSalt();
   const hashedPassword = await hashPassword(user.password, salt);
-  console.log("hashedPassword:", hashedPassword);
-  console.log("salt:", salt);
   user.password = hashedPassword;
   user.salt = salt;
   user.public_id = public_id;
-
-  console.log("user after hashing password and generating public_id:", user);
 
   //* 4. Insert the user into the database
   try {

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": " dotenv -e .env.development -- next dev --turbopack --experimental-https",
+    "dev:e2e": "dotenv -e e2e.env -e .env.development -- next dev --turbopack --experimental-https --port 3100",
     "build": "dotenv -e .env.production -- next build",
     "build:dev": "dotenv -e .env.development --next build",
     "start": "next start",

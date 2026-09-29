@@ -62,6 +62,21 @@ services:
       interval: 2s
       retries: 30
 
+  # S3 相容儲存（Adobe S3Mock）：支援 presigned URL 與 CORS，瀏覽器可直接上傳，worker 再搬移到正式 bucket。
+  # 不驗證簽章與權限，物件可匿名讀取以顯示圖片；資料只存在容器內，容器重建即清空。
+  # 對外只開 HTTPS（自簽憑證）：WebKit 會阻擋 https 頁面上傳到 http 的 loopback 位址。
+  s3:
+    container_name: megaweave-e2e-s3
+    image: adobe/s3mock:5
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: megaweave-e2e,megaweave-e2e-staging
+    ports:
+      - "127.0.0.1:29000:9191"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/"]
+      interval: 2s
+      retries: 30
+
   # 一次性工作：在每個 Redis 寫入隔離標記（由 make e2e-up 執行；Redis 不持久化，重啟後需重新執行）
   e2e-marker:
     image: redis:7-alpine

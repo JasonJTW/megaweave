@@ -1,13 +1,27 @@
+import { readFileSync } from "fs";
+import path from "path";
 import { defineConfig, devices } from "@playwright/test";
-import { config } from "dotenv";
+import { parse } from "dotenv";
 
-// .env.e2e (E2E-only: test account credentials) takes precedence over .env.development
-config({ path: ".env.e2e", override: false });
-config({ path: ".env.development", override: false });
+// By default the suite runs against the local E2E stack (docker-compose.e2e.yml,
+// server/e2e.env; see docs/e2e.md), which Playwright starts below.
+// Set E2E_BASE_URL + E2E_API_URL (+ E2E_USER_*) to test a deployed environment instead.
+const isRemote = Boolean(process.env.E2E_BASE_URL);
+const serverDir = path.join(__dirname, "../server");
+const e2eEnv = parse(readFileSync(path.join(serverDir, "e2e.env")));
+
+const baseURL = process.env.E2E_BASE_URL ?? "https://localhost:3100";
+// Shared with the fixtures, which run in worker processes that load this config too
+process.env.E2E_API_URL ??= `https://localhost:${e2eEnv.PORT}`;
+if (!isRemote) {
+  process.env.E2E_USER_EMAIL ??= e2eEnv.E2E_USER_EMAIL;
+  process.env.E2E_USER_PASSWORD ??= e2eEnv.E2E_USER_PASSWORD;
+}
+
+const reuseExistingServer = !process.env.CI;
 
 // E2E tests live in ./e2e and use *.spec.ts to stay separate from
 // the node:test unit tests in ./__tests__ (*.test.ts).
-const baseURL = process.env.E2E_BASE_URL ?? "https://localhost:3000";
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
@@ -18,7 +32,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",
   use: {
     baseURL,
-    // Dev server runs with --experimental-https (self-signed cert)
+    // Dev servers run with self-signed certificates
     ignoreHTTPSErrors: true,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
@@ -28,8 +42,10 @@ export default defineConfig({
     geolocation: { latitude: 25.0339, longitude: 121.5645 },
   },
   projects: [
+    // Resets the local E2E stack (skipped for remote targets)
+    { name: "seed", testMatch: "**/seed.setup.ts" },
     // Logs in once and saves the session to e2e/.auth/user.json
-    { name: "setup", testMatch: "**/*.setup.ts" },
+    { name: "setup", testMatch: "**/auth.setup.ts", dependencies: ["seed"] },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
@@ -46,15 +62,40 @@ export default defineConfig({
       dependencies: ["setup"],
     },
   ],
-  // Reuse an already-running `npm run dev`; start one otherwise.
-  // Backend (server :8443, worker) + Redis/MySQL must be started separately.
-  webServer: process.env.E2E_BASE_URL
+  // Requires `make e2e-up` (MySQL, Redis, S3 mock). Reuses servers that are already running locally.
+  webServer: isRemote
     ? undefined
-    : {
-        command: "npm run dev",
-        url: baseURL,
-        ignoreHTTPSErrors: true,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
-      },
+    : [
+        {
+          name: "openai-mock",
+          command: "npm run e2e:mock-openai",
+          cwd: serverDir,
+          port: Number(new URL(e2eEnv.OPENAI_BASE_URL).port),
+          reuseExistingServer,
+        },
+        {
+          name: "api",
+          command: "npm run e2e:api",
+          cwd: serverDir,
+          url: `${process.env.E2E_API_URL}/health`,
+          ignoreHTTPSErrors: true,
+          reuseExistingServer,
+          timeout: 120_000,
+        },
+        {
+          name: "worker",
+          command: "npm run e2e:worker",
+          cwd: serverDir,
+          wait: { stdout: /Worker service is running/ },
+          timeout: 120_000,
+        },
+        {
+          name: "client",
+          command: "npm run dev:e2e",
+          url: baseURL,
+          ignoreHTTPSErrors: true,
+          reuseExistingServer,
+          timeout: 120_000,
+        },
+      ],
 });

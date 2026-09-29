@@ -19,6 +19,7 @@
     "e2e:seed": "dotenv -o -e e2e.env -- ts-node src/scripts/e2eSeed.ts",
     "e2e:api": "dotenv -o -e e2e.env -v APP_ROLE=api -- ts-node src/server.ts",
     "e2e:worker": "dotenv -o -e e2e.env -v APP_ROLE=worker -- ts-node src/worker.ts",
+    "e2e:mock-openai": "dotenv -o -e e2e.env -- ts-node src/scripts/e2eMockOpenAi.ts",
     "docker:redis": "docker compose -f ../docker-compose.dev.yml up -d",
     "docker:redis:stop": "docker compose -f ../docker-compose.dev.yml down",
     "lint": "eslint src/",

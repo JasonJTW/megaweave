@@ -15,6 +15,7 @@
 
 # next.js
 /client/.next/
+/client/.next-e2e/
 /out/
 
 # production

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useId, useRef } from "react";
 import { format } from "date-fns";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,7 @@ export default function PostFormModal({
   existingImages = [],
   onSubmit,
 }: PostFormModalProps) {
+  const titleId = useId();
   const { categories, conditions } = usePost();
   const locationInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteInstanceRef =
@@ -507,11 +508,19 @@ export default function PostFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex justify-center overflow-y-auto bg-primary-5 font-ddin">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="pointer-events-auto fixed inset-0 z-50 flex justify-center overflow-y-auto bg-primary-5 font-ddin"
+    >
       <div className="min-h-screen w-full max-w-2xl rounded-lg bg-primary-5 md:max-w-5xl">
         <div className="px-7 py-6">
           <div className="relative flex items-center justify-center border-b pb-2">
-            <h2 className="text-2xl font-bold capitalize text-gray-900">
+            <h2
+              id={titleId}
+              className="text-2xl font-bold capitalize text-gray-900"
+            >
               {title}
             </h2>
             <button

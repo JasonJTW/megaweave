@@ -1,9 +1,16 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+// E2E only (npm run dev:e2e): images come from the local S3 mock, see docs/e2e.md
+const e2eImageOrigin = process.env.E2E_IMAGE_ORIGIN
+  ? new URL(process.env.E2E_IMAGE_ORIGIN)
+  : undefined;
+
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
+  // A separate build dir lets the E2E dev server run alongside `npm run dev`
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   images: {
     remotePatterns: [
       {
@@ -12,7 +19,19 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      ...(e2eImageOrigin
+        ? [
+            {
+              protocol: e2eImageOrigin.protocol.replace(":", "") as "https",
+              hostname: e2eImageOrigin.hostname,
+              port: e2eImageOrigin.port,
+              pathname: "/**",
+            },
+          ]
+        : []),
     ],
+    // The local S3 mock resolves to a loopback IP, which the optimizer blocks by default
+    dangerouslyAllowLocalIP: Boolean(e2eImageOrigin),
   },
   turbopack: {
     root: __dirname,

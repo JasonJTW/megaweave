@@ -1,14 +1,10 @@
 import path from "path";
-import { test as base } from "@playwright/test";
+import { test as base } from "./base";
 
 export const AUTH_FILE = path.join(__dirname, "../.auth/user.json");
 
-// API origin; cookies are set with COOKIE_DOMAIN=localhost, so they are
-// shared with the Next.js app on :3000.
-export const API_URL =
-  process.env.E2E_API_URL ??
-  process.env.NEXT_PUBLIC_HOSTNAME ??
-  "https://localhost:8443";
+// Set by playwright.config.ts: the local E2E API, or E2E_API_URL for a remote run.
+export const API_URL = process.env.E2E_API_URL ?? "";
 
 export const testUser = {
   email: process.env.E2E_USER_EMAIL ?? "",
@@ -28,4 +24,4 @@ export const test = base.extend({
   },
 });
 
-export { expect } from "@playwright/test";
+export { expect } from "./base";

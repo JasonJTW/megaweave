@@ -26,8 +26,8 @@ help:
 	@echo "  make build        Production build（client + server）"
 	@echo "  make build-dev    Dev build（client + server）"
 	@echo "  make test         執行所有測試"
-	@echo "  make e2e          執行 Playwright E2E 測試（需先啟動 server + worker + Redis）"
-	@echo "  make e2e-up       啟動 E2E 隔離環境（MySQL:23306, Redis:26379-26381）"
+	@echo "  make e2e          執行 Playwright E2E 測試（需先 make e2e-up；自動啟動 API、worker、client）"
+	@echo "  make e2e-up       啟動 E2E 隔離環境（MySQL:23306, Redis:26379-26381, S3:29000）"
 	@echo "  make e2e-down     停止 E2E 環境（保留 MySQL 資料）"
 	@echo "  make e2e-reset    刪除 E2E MySQL 資料並重新初始化"
 	@echo "  make e2e-seed     清空 E2E 資料並重建測試帳號"
@@ -101,7 +101,7 @@ benchmark-reset:
 # E2E 隔離環境（詳見 docs/e2e.md）
 # -----------------------------------------------------------------------------
 e2e-up:
-	docker compose -f docker-compose.e2e.yml up -d --wait mysql redis-cache redis-queue redis-vector
+	docker compose -f docker-compose.e2e.yml up -d --wait mysql redis-cache redis-queue redis-vector s3
 	docker compose -f docker-compose.e2e.yml run --rm e2e-marker
 
 e2e-down:

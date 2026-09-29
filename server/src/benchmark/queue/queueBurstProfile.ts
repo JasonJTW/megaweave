@@ -7,7 +7,7 @@ import { randomUUID } from "crypto";
 import type Redis from "ioredis";
 import { BenchmarkSafetyError } from "../errors";
 import type { BenchmarkProfile, BenchmarkProfileOutcome } from "../profiles";
-import type { AppStores } from "../fixture/fixtureProfile";
+import type { AppStores } from "../../isolation/appStores";
 import { EMBEDDING_MODEL_VERSION } from "../fixture/embeddings";
 import { DEFAULT_FIXTURE_SEED } from "../fixture/generateFixture";
 import { deriveSeed } from "../fixture/random";
@@ -25,7 +25,6 @@ import { MAX_SCROLL_PAGES, SCROLL_PROBABILITY, VIEW_MIX } from "../feed/workload
 
 export const BURST_QUEUES = ["post-image", "post-embedding", "user-vector"] as const;
 const JOBS_PER_UNIT = BURST_QUEUES.length;
-const BENCHMARK_QUEUE_MARKER_KEY = "benchmark:environment";
 const TRAFFIC_JOBS_TIMEOUT_MS = 120_000;
 const MAX_FAILED_SAMPLES = 50;
 
@@ -152,29 +151,23 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
 
     async assertSafeToRun() {
       endpoints = resolveMockEndpoints();
-      const { openAppStores } = await import("../fixture/fixtureProfile");
-      const { assertBenchmarkDataStores, assertBenchmarkMysql, BENCHMARK_DATA_MARKER } = await import("../fixture/dataStoreGuard");
+      const { openAppStores } = await import("../../isolation/appStores");
+      const { assertIsolatedDataStores, assertIsolatedMysql, assertIsolatedRedis } = await import("../../isolation/dataStoreGuard");
       stores = await openAppStores();
-      await assertBenchmarkMysql(stores.mysql);
+      await assertIsolatedMysql(stores.mysql);
       await stores.connectRedis();
-      await assertBenchmarkDataStores(stores);
+      await assertIsolatedDataStores(stores);
 
-      // runner 會清空 queue 殘留工作並送入 job；queue Redis 也必須帶有 benchmark 標記
+      // runner 會清空 queue 殘留工作並送入 job；queue Redis 也必須帶有隔離標記
       const { default: IORedis } = await import("ioredis");
       const { bullmqConnection } = await import("../../queue/connection");
       queueRedis = new IORedis({ ...bullmqConnection, maxRetriesPerRequest: 1, lazyConnect: true });
-      let marker: string | null = null;
       try {
         await queueRedis.connect();
-        marker = await queueRedis.get(BENCHMARK_QUEUE_MARKER_KEY);
       } catch {
-        throw new BenchmarkSafetyError("Unable to verify the queue Redis benchmark marker");
+        throw new BenchmarkSafetyError("Unable to connect to the queue Redis to verify its isolation marker");
       }
-      if (marker !== BENCHMARK_DATA_MARKER) {
-        throw new BenchmarkSafetyError(
-          `queue Redis is missing ${BENCHMARK_QUEUE_MARKER_KEY}=${BENCHMARK_DATA_MARKER}; refusing to enqueue into a non-benchmark instance`,
-        );
-      }
+      await assertIsolatedRedis(queueRedis, "queue");
     },
 
 
@@ -413,7 +406,7 @@ export function createQueueBurstProfile(options: QueueBurstProfileOptions): Benc
     },
 
     async describeServices() {
-      const { describeDataStores } = await import("../fixture/dataStoreGuard");
+      const { describeDataStores } = await import("../../isolation/dataStoreGuard");
       const services = await describeDataStores(stores!);
       const info = queueRedis ? await queueRedis.info("server") : "";
       return { ...services, redisQueue: /^redis_version:(.+)$/m.exec(info)?.[1].trim() ?? "unknown" };

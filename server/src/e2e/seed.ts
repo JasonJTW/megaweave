@@ -1,18 +1,12 @@
 // server/src/e2e/seed.ts
 // E2E 每次執行前的資料重置：確認隔離標記 → 清空 MySQL 與三個 Redis → 建立測試帳號。
-// 標記與清空邏輯沿用 benchmark（dataStoreGuard / resetFixture），production 資料儲存永遠不會通過檢查。
+// 標記與清空邏輯由 isolation 模組提供，production 資料儲存永遠不會通過檢查。
 
 import { randomUUID } from "crypto";
-import type Redis from "ioredis";
 import type { Pool, ResultSetHeader } from "mysql2/promise";
 import { z } from "zod";
-import { BenchmarkSafetyError } from "../benchmark/errors";
-import {
-  BENCHMARK_DATA_MARKER,
-  BENCHMARK_REDIS_MARKER_KEY,
-  FixtureStores,
-} from "../benchmark/fixture/dataStoreGuard";
-import { resetFixture } from "../benchmark/fixture/loadFixture";
+import type { IsolatedStores } from "../isolation/dataStoreGuard";
+import { QueueRedis, resetIsolatedStores } from "../isolation/resetStores";
 import { generateSalt, hashPassword } from "../passwordHasher";
 
 export const e2eUserSchema = z.object({
@@ -41,26 +35,6 @@ export function resolveE2eUser(env: NodeJS.ProcessEnv = process.env): E2eUser {
   };
 }
 
-/** BullMQ 的 queue Redis 不在 FixtureStores 內，需另外確認標記 */
-export async function assertIsolatedQueueRedis(queueRedis: Redis): Promise<void> {
-  let marker: string | null;
-  try {
-    marker = await queueRedis.get(BENCHMARK_REDIS_MARKER_KEY);
-  } catch {
-    throw new BenchmarkSafetyError("Unable to verify the queue Redis isolation marker");
-  }
-  if (marker !== BENCHMARK_DATA_MARKER) {
-    throw new BenchmarkSafetyError(
-      `queue Redis is missing ${BENCHMARK_REDIS_MARKER_KEY}=${BENCHMARK_DATA_MARKER}; refusing to reset a non-isolated instance`,
-    );
-  }
-}
-
-async function resetQueueRedis(queueRedis: Redis): Promise<void> {
-  await queueRedis.flushdb();
-  await queueRedis.set(BENCHMARK_REDIS_MARKER_KEY, BENCHMARK_DATA_MARKER);
-}
-
 /** 與 signup.ts 相同的寫入方式建立 native 登入帳號 */
 export async function seedE2eUser(mysql: Pool, user: E2eUser): Promise<number> {
   const salt = generateSalt();
@@ -85,17 +59,12 @@ export async function seedE2eUser(mysql: Pool, user: E2eUser): Promise<number> {
   return result.insertId;
 }
 
-/**
- * 所有標記都確認後才開始清空：queue Redis 先檢查，
- * resetFixture 會在寫入前確認 MySQL / cache / vector 標記。
- */
+/** resetIsolatedStores 會在寫入前確認 MySQL 與三個 Redis 的標記 */
 export async function resetAndSeedE2e(
-  stores: FixtureStores,
-  queueRedis: Redis,
+  stores: IsolatedStores,
+  queueRedis: QueueRedis,
   user: E2eUser,
 ): Promise<void> {
-  await assertIsolatedQueueRedis(queueRedis);
-  await resetFixture(stores);
-  await resetQueueRedis(queueRedis);
+  await resetIsolatedStores(stores, queueRedis);
   await seedE2eUser(stores.mysql, user);
 }

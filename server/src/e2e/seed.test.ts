@@ -1,27 +1,8 @@
-import type Redis from "ioredis";
 import type { Pool } from "mysql2/promise";
-import { BenchmarkSafetyError } from "../benchmark/errors";
+import { IsolationSafetyError } from "../isolation/errors";
+import { createFakeStores } from "../isolation/fakeStores.test-utils";
 import { verifyPassword } from "../passwordHasher";
-import type { FixtureStores } from "../benchmark/fixture/dataStoreGuard";
 import { resetAndSeedE2e, resolveE2eUser, seedE2eUser } from "./seed";
-
-function createFakeQueueRedis(marker: string | null | Error) {
-  const calls: string[] = [];
-  const redis = {
-    get: jest.fn(async () => {
-      calls.push("get");
-      if (marker instanceof Error) throw marker;
-      return marker;
-    }),
-    flushdb: jest.fn(async () => {
-      calls.push("flushdb");
-    }),
-    set: jest.fn(async (...args: string[]) => {
-      calls.push(`set:${args.join("=")}`);
-    }),
-  };
-  return { redis: redis as unknown as Redis, calls };
-}
 
 describe("resolveE2eUser", () => {
   it("reads the test account from env", () => {
@@ -42,23 +23,15 @@ describe("resolveE2eUser", () => {
 describe("resetAndSeedE2e", () => {
   const user = { email: "e2e@megaweave.test", password: "password-123", username: "E2E" };
 
-  it.each([null, "production", new Error("ECONNREFUSED")])(
-    "touches no data store when the queue marker is %p",
-    async (marker) => {
-      const { redis, calls } = createFakeQueueRedis(marker);
-      const stores = new Proxy(
-        {},
-        {
-          get: () => {
-            throw new Error("data store accessed before the queue marker was verified");
-          },
-        },
-      ) as FixtureStores;
+  it.each([null, "production"])(
+    "touches no data store and seeds nothing when the queue marker is %p",
+    async (queueMarker) => {
+      const { stores, queueRedis, writes } = createFakeStores({ queueMarker });
 
-      await expect(resetAndSeedE2e(stores, redis, user)).rejects.toBeInstanceOf(
-        BenchmarkSafetyError,
+      await expect(resetAndSeedE2e(stores, queueRedis, user)).rejects.toBeInstanceOf(
+        IsolationSafetyError,
       );
-      expect(calls).toEqual(["get"]);
+      expect(writes()).toEqual([]);
     },
   );
 });

@@ -7,8 +7,8 @@ import { readFileSync } from "fs";
 import { createPool, Pool, RowDataPacket } from "mysql2/promise";
 import { resolve } from "path";
 import type { AppRedisClient } from "../../utils/redis";
-import { BenchmarkSafetyError } from "../errors";
-import { BENCHMARK_REDIS_MARKER_KEY, FixtureStores } from "./dataStoreGuard";
+import { ISOLATED_REDIS_MARKER_KEY, IsolatedStores } from "../../isolation/dataStoreGuard";
+import { IsolationSafetyError } from "../../isolation/errors";
 import { DEFAULT_FIXTURE_SEED, FixtureDataset, generateFixture } from "./generateFixture";
 import { loadFixture } from "./loadFixture";
 import { validateFixture } from "./validateFixture";
@@ -24,7 +24,7 @@ describeIntegration("benchmark fixture against the isolated environment", () => 
   let mysql: Pool;
   let cacheRedis: AppRedisClient;
   let vectorRedis: AppRedisClient;
-  let stores: FixtureStores;
+  let stores: IsolatedStores;
   let dataset: FixtureDataset;
 
   const countPosts = async () => {
@@ -71,36 +71,36 @@ describeIntegration("benchmark fixture against the isolated environment", () => 
     expect(first).toEqual({ public_id: dataset.posts[0].public_id, title: dataset.posts[0].title });
   });
 
-  it("preserves reference data and benchmark markers across resets", async () => {
+  it("preserves reference data and isolation markers across resets", async () => {
     const [[reference]] = await mysql.query<RowDataPacket[]>(`
       SELECT (SELECT COUNT(*) FROM categories) AS categories,
              (SELECT COUNT(*) FROM conditions) AS conditions,
-             (SELECT COUNT(*) FROM benchmark_environment) AS markers
+             (SELECT COUNT(*) FROM isolated_environment) AS markers
     `);
 
     expect(reference).toEqual({ categories: 10, conditions: 5, markers: 1 });
-    expect(await cacheRedis.get(BENCHMARK_REDIS_MARKER_KEY)).toBe("megaweave-isolated");
-    expect(await vectorRedis.get(BENCHMARK_REDIS_MARKER_KEY)).toBe("megaweave-isolated");
+    expect(await cacheRedis.get(ISOLATED_REDIS_MARKER_KEY)).toBe("megaweave-isolated");
+    expect(await vectorRedis.get(ISOLATED_REDIS_MARKER_KEY)).toBe("megaweave-isolated");
   });
 
   it("refuses to reset a MySQL database without the marker", async () => {
-    await mysql.query("DELETE FROM benchmark_environment");
+    await mysql.query("DELETE FROM isolated_environment");
     try {
-      await expect(loadFixture(stores, dataset)).rejects.toBeInstanceOf(BenchmarkSafetyError);
+      await expect(loadFixture(stores, dataset)).rejects.toBeInstanceOf(IsolationSafetyError);
       expect(await countPosts()).toBe(1_000);
     } finally {
-      await mysql.query("INSERT INTO benchmark_environment (marker) VALUES ('megaweave-isolated')");
+      await mysql.query("INSERT INTO isolated_environment (marker) VALUES ('megaweave-isolated')");
     }
   });
 
   it("refuses to reset when a Redis instance lacks the marker", async () => {
-    await vectorRedis.del(BENCHMARK_REDIS_MARKER_KEY);
+    await vectorRedis.del(ISOLATED_REDIS_MARKER_KEY);
     try {
-      await expect(loadFixture(stores, dataset)).rejects.toBeInstanceOf(BenchmarkSafetyError);
+      await expect(loadFixture(stores, dataset)).rejects.toBeInstanceOf(IsolationSafetyError);
       expect(await countPosts()).toBe(1_000);
       expect(await cacheRedis.zCard("feed:trending")).toBe(dataset.counts.trendingPosts);
     } finally {
-      await vectorRedis.set(BENCHMARK_REDIS_MARKER_KEY, "megaweave-isolated");
+      await vectorRedis.set(ISOLATED_REDIS_MARKER_KEY, "megaweave-isolated");
     }
   });
 

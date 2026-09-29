@@ -46,16 +46,18 @@ Every check below runs before a profile starts. If any check fails, the runner e
 
    A `real-probe` additionally requires `BENCHMARK_REAL_PROBE_CONFIRMATION=allow-real-probe`, because it can spend money or trigger real side effects.
 4. **Profile name.** Profile names become artifact file names, so they may contain only lowercase letters, numbers, and single hyphens.
-5. **Data store markers.** Profiles that write MySQL or Redis directly (the `fixture-*` profiles) also require a marker inside each data store:
+5. **Data store markers.** Profiles that write MySQL or Redis directly (the `fixture-*` profiles) also require the isolation marker inside each data store. The same markers and guard (`server/src/isolation`) protect the [E2E environment](e2e.md):
 
    | Store | Marker |
    | --- | --- |
-   | MySQL | table `benchmark_environment` containing exactly one row, `megaweave-isolated` |
-   | Redis cache and vector | key `benchmark:environment` = `megaweave-isolated` |
+   | MySQL | table `isolated_environment` containing exactly one row, `megaweave-isolated` |
+   | Redis cache and vector | key `isolated:environment` = `megaweave-isolated` |
 
    `queue-burst-*` profiles also enqueue jobs and drain leftover jobs, so they require the same marker in the queue Redis, and refuse to run unless `OPENAI_BASE_URL` and `AWS_ENDPOINT_URL_S3` point to a mock on `127.0.0.1` with an explicit port.
 
-   MySQL is checked before connecting to Redis, so a wrong database fails immediately. The markers are created only by `docker-compose.benchmark.yml` (`server/db/benchmark-marker.sql` and the `benchmark-marker` job) and the application never writes them, so a production database or Redis instance cannot pass this check.
+   MySQL is checked before connecting to Redis, so a wrong database fails immediately. The markers are created only by `docker-compose.benchmark.yml` and `docker-compose.e2e.yml` (`server/db/isolated-marker.sql` and the marker jobs) and the application never writes them, so a production database or Redis instance cannot pass this check.
+
+   Volumes created before the markers were renamed from `benchmark_environment` / `benchmark:environment` need `make benchmark-reset`.
 
 ## Benchmark environment
 
@@ -63,7 +65,7 @@ Every check below runs before a profile starts. If any check fails, the runner e
 
 | Service | Image | Host port | Notes |
 | --- | --- | --- | --- |
-| MySQL | `mysql:8.0` | `127.0.0.1:13306` | Same major version as production; initialized from `server/db/schema.sql`, `reference-data.sql`, and `benchmark-marker.sql` |
+| MySQL | `mysql:8.0` | `127.0.0.1:13306` | Same major version as production; initialized from `server/db/schema.sql`, `reference-data.sql`, `isolated-marker.sql`, and `benchmark-grants.sql` |
 | Redis cache | `redis:7-alpine` | `127.0.0.1:16379` | Production memory and eviction settings |
 | Redis queue | `redis:7-alpine` | `127.0.0.1:16380` | Production memory and eviction settings |
 | Redis vector | `redis/redis-stack-server` | `127.0.0.1:16381` | Production memory and eviction settings |
@@ -143,7 +145,7 @@ The `fixture-*` profiles reset the benchmark data stores, load a deterministic d
 
 **Validation** after every load compares expected and actual counts: every table, active and deleted posts, embeddings with 1536 dimensions, Redis vector documents, user vectors, trending members, and per-post `likes_count` and `comment_count` consistency. Any mismatch fails the run.
 
-**Reset** truncates every table except `categories`, `conditions`, and `benchmark_environment`, then flushes the cache and vector Redis and restores their markers. Restart any running API or worker after a load, because they cache post and user vectors in memory.
+**Reset** truncates every table except `categories`, `conditions`, and `isolated_environment`, then flushes the cache and vector Redis and restores their markers. Restart any running API or worker after a load, because they cache post and user vectors in memory.
 
 `user_stats`, messages, notifications, and payment tables are left empty, because the feed and search paths do not read them.
 
@@ -223,7 +225,7 @@ Resource observations cover the measurement window of each run:
 | API `/health` | Process CPU time and percent of one core, peak RSS and heap (sampled every 5 s) |
 | Feed caches | Candidate vector lookups, cache hit rate, Redis reads, failures, missing vectors, cache sizes |
 
-Global counters include the runner's own few snapshot queries. Metrics that are not collected, such as MySQL and Redis server CPU and memory, are listed with a reason under `result.unavailableMetrics`. `performance_schema` requires the read grant in `server/db/benchmark-marker.sql`. Existing benchmark volumes need `make benchmark-reset` to apply it.
+Global counters include the runner's own few snapshot queries. Metrics that are not collected, such as MySQL and Redis server CPU and memory, are listed with a reason under `result.unavailableMetrics`. `performance_schema` requires the read grant in `server/db/benchmark-grants.sql`. Existing benchmark volumes need `make benchmark-reset` to apply it.
 
 The run fails (exit code 1, artifacts still written) if any request returns an error, any response did not apply the requested strategy, or any candidate vector read failed. A relative claim such as "reduced p95 by X%" should come only from a passing `feed-10k` run on hardware that matches production.
 

@@ -1,7 +1,7 @@
 # MegaWeaving E2E 隔離環境（與 dev / benchmark 使用不同 port 與 volume，可同時存在）
 # 啟動：make e2e-up    清空資料並重建測試帳號：make e2e-seed    刪除 MySQL volume 重新初始化：make e2e-reset
-# 沿用 benchmark 的隔離標記（benchmark_environment / benchmark:environment = megaweave-isolated），
-# 讓 server/src/e2e 可以直接重用 benchmark 的 dataStoreGuard 與 resetFixture。
+# 與 benchmark 共用隔離標記（isolated_environment / isolated:environment = megaweave-isolated），
+# server/src/isolation 只會清空帶有標記的資料儲存。
 name: megaweave-e2e
 
 services:
@@ -21,7 +21,7 @@ services:
       - e2e-mysql-data:/var/lib/mysql
       - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./server/db/reference-data.sql:/docker-entrypoint-initdb.d/02-reference-data.sql:ro
-      - ./server/db/e2e-marker.sql:/docker-entrypoint-initdb.d/03-e2e-marker.sql:ro
+      - ./server/db/isolated-marker.sql:/docker-entrypoint-initdb.d/03-isolated-marker.sql:ro
     healthcheck:
       # 走 TCP：初始化期間暫時 server 不開放網路，確保匯入完成前不會回報 healthy
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pe2e-root"]
@@ -79,7 +79,7 @@ services:
       - -c
       - |
         for host in redis-cache redis-queue redis-vector; do
-          redis-cli -h "$$host" SET benchmark:environment megaweave-isolated || exit 1
+          redis-cli -h "$$host" SET isolated:environment megaweave-isolated || exit 1
         done
 
 volumes:

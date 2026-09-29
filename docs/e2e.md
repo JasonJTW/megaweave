@@ -14,7 +14,7 @@ npm run e2e:worker  # BullMQ worker
 
 | Service | Image | Host port | Notes |
 | --- | --- | --- | --- |
-| MySQL | `mysql:8.0` | `127.0.0.1:23306` | Database `megaweave_e2e`; initialized from `server/db/schema.sql`, `reference-data.sql`, and `e2e-marker.sql` |
+| MySQL | `mysql:8.0` | `127.0.0.1:23306` | Database `megaweave_e2e`; initialized from `server/db/schema.sql`, `reference-data.sql`, and `isolated-marker.sql` |
 | Redis cache | `redis:7-alpine` | `127.0.0.1:26379` | Not persisted |
 | Redis queue | `redis:7-alpine` | `127.0.0.1:26380` | Not persisted |
 | Redis vector | `redis/redis-stack-server` | `127.0.0.1:26381` | Not persisted |
@@ -41,11 +41,11 @@ Redis does not persist data, so rerun `make e2e-up` after its containers restart
 
 ## Safety gates
 
-`make e2e-seed` reuses the benchmark isolation markers and refuses to modify anything unless every store is marked:
+`make e2e-seed` uses the isolation guard shared with the benchmark runner (`server/src/isolation`) and refuses to modify anything unless every store is marked:
 
 | Store | Marker |
 | --- | --- |
-| MySQL | table `benchmark_environment` containing exactly one row, `megaweave-isolated` |
-| Redis cache, queue, vector | key `benchmark:environment` = `megaweave-isolated` |
+| MySQL | table `isolated_environment` containing exactly one row, `megaweave-isolated` |
+| Redis cache, queue, vector | key `isolated:environment` = `megaweave-isolated` |
 
 All markers are verified before any data is deleted. Only `docker-compose.e2e.yml` creates them, so a production database or Redis instance cannot pass the check.

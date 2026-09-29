@@ -1,8 +1,8 @@
 // server/src/scripts/e2eSeed.ts
 // npm run e2e:seed：重置 E2E 隔離環境並建立測試帳號（需先 make e2e-up）。
 
-import { assertBenchmarkMysql } from "../benchmark/fixture/dataStoreGuard";
-import { openAppStores } from "../benchmark/fixture/fixtureProfile";
+import { openAppStores } from "../isolation/appStores";
+import { assertIsolatedMysql } from "../isolation/dataStoreGuard";
 import { resetAndSeedE2e, resolveE2eUser } from "../e2e/seed";
 
 async function main(): Promise<void> {
@@ -14,7 +14,7 @@ async function main(): Promise<void> {
 
   try {
     // 先確認 MySQL 標記再連 Redis：指向錯誤資料庫時立即失敗，不必等待 Redis 重連逾時
-    await assertBenchmarkMysql(stores.mysql);
+    await assertIsolatedMysql(stores.mysql);
     await stores.connectRedis();
     await queueRedis.connect();
     await resetAndSeedE2e(stores, queueRedis, user);

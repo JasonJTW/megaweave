@@ -3,21 +3,10 @@
 // posts.embedding 與 postEmbedding worker 相同、post:{id} / user:{id}:vector 與 worker 相同、
 // feed:trending 與 hot score worker 相同，確保 benchmark 走的是真實程式路徑。
 
-import { RowDataPacket } from "mysql2";
 import type { Pool } from "mysql2/promise";
 import { calculatePostHotScore } from "../../queue/jobs/hotScore";
-import {
-  createPostVectorIndex,
-  POST_VECTOR_INDEX,
-} from "../../services/vectorIndexService";
-import type { AppRedisClient } from "../../utils/redis";
-import {
-  assertBenchmarkDataStores,
-  BENCHMARK_DATA_MARKER,
-  BENCHMARK_MARKER_TABLE,
-  BENCHMARK_REDIS_MARKER_KEY,
-  FixtureStores,
-} from "./dataStoreGuard";
+import type { IsolatedStores } from "../../isolation/dataStoreGuard";
+import { resetIsolatedStores } from "../../isolation/resetStores";
 import {
   SyntheticEmbeddingModel,
   toEmbeddingJson,
@@ -25,8 +14,6 @@ import {
 } from "./embeddings";
 import { FixtureDataset, FixturePost } from "./generateFixture";
 
-/** 參考資料由 reference-data.sql 匯入，reset 時保留 */
-const PRESERVED_TABLES = new Set(["categories", "conditions", BENCHMARK_MARKER_TABLE]);
 const ROW_BATCH_SIZE = 1000;
 /** 每篇貼文的 embedding JSON 約 30KB，縮小批次以避開 max_allowed_packet */
 const POST_BATCH_SIZE = 100;
@@ -55,50 +42,6 @@ async function insertRows(
   }
 }
 
-async function resetMysql(mysql: Pool): Promise<void> {
-  const connection = await mysql.getConnection();
-  try {
-    const [tables] = await connection.query<RowDataPacket[]>(
-      `SELECT table_name AS name FROM information_schema.tables
-       WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
-    );
-    // TRUNCATE 需暫停外鍵檢查；僅作用於此連線
-    await connection.query("SET FOREIGN_KEY_CHECKS = 0");
-    for (const { name } of tables) {
-      if (!PRESERVED_TABLES.has(name as string)) {
-        await connection.query("TRUNCATE TABLE ??", [name]);
-      }
-    }
-  } finally {
-    await connection.query("SET FOREIGN_KEY_CHECKS = 1").catch(() => {});
-    connection.release();
-  }
-}
-
-async function resetRedis(redis: AppRedisClient): Promise<void> {
-  await redis.flushDb();
-  await redis.set(BENCHMARK_REDIS_MARKER_KEY, BENCHMARK_DATA_MARKER);
-}
-
-async function dropPostVectorIndex(redis: AppRedisClient): Promise<void> {
-  try {
-    await redis.sendCommand(["FT.DROPINDEX", POST_VECTOR_INDEX]);
-  } catch (error) {
-    const message = String((error as Error)?.message ?? error).toLowerCase();
-    if (!message.includes("unknown index") && !message.includes("not found")) throw error;
-  }
-}
-
-/** 清空 benchmark 資料儲存並重建空的向量索引；參考資料與標記保留。 */
-export async function resetFixture(stores: FixtureStores): Promise<void> {
-  await assertBenchmarkDataStores(stores);
-  await dropPostVectorIndex(stores.vectorRedis);
-  await resetMysql(stores.mysql);
-  await resetRedis(stores.cacheRedis);
-  await resetRedis(stores.vectorRedis);
-  await createPostVectorIndex(stores.vectorRedis);
-}
-
 async function inChunks<T>(
   values: readonly T[],
   size: number,
@@ -110,7 +53,7 @@ async function inChunks<T>(
 }
 
 export async function loadFixture(
-  stores: FixtureStores,
+  stores: IsolatedStores,
   dataset: FixtureDataset,
   anchor: Date = new Date(),
 ): Promise<FixtureLoadTimings> {
@@ -120,7 +63,7 @@ export async function loadFixture(
   const { mysql, cacheRedis, vectorRedis } = stores;
 
   let started = Date.now();
-  await resetFixture(stores);
+  await resetIsolatedStores(stores);
   const resetDuration = Date.now() - started;
 
   started = Date.now();

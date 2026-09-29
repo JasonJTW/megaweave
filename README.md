@@ -1,3 +1,4 @@
+
 <div align="left">
   <img src="client/public/icons/weaving.svg" alt="Megaweaving" width="160">
   <h1>Megaweaving</h1>
@@ -12,7 +13,7 @@ Megaweaving grew out of an 11k-member [Facebook group](https://www.facebook.com/
 ## Design decisions
 
 <p align="center">
-<img width="3230" height="1955" alt="system-architecture" src="https://github.com/user-attachments/assets/69f80a9b-c514-46c2-949a-f63a1415f91e" />
+<img width="3180" height="1905" alt="system-architecture" src="https://github.com/user-attachments/assets/1e874db5-1fd5-41c7-b9fa-6c37ca39a6f3" />
 </p>
 
 **Three Redis instances, three eviction policies.** Cache, job queue, and vector index have conflicting needs: the cache may evict, the other two must not. Splitting them means memory pressure on the cache can never drop queued jobs or embeddings that cost money to rebuild — which matters when everything shares one small instance.

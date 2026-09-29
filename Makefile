@@ -5,7 +5,8 @@
 
 .PHONY: help dev dev-client dev-server dev-worker build build-dev test e2e lint typecheck install \
         redis redis-stop logs clean \
-        benchmark-up benchmark-down benchmark-reset
+        benchmark-up benchmark-down benchmark-reset \
+        e2e-up e2e-down e2e-reset e2e-seed
 
 # 預設：顯示說明
 help:
@@ -26,6 +27,10 @@ help:
 	@echo "  make build-dev    Dev build（client + server）"
 	@echo "  make test         執行所有測試"
 	@echo "  make e2e          執行 Playwright E2E 測試（需先啟動 server + worker + Redis）"
+	@echo "  make e2e-up       啟動 E2E 隔離環境（MySQL:23306, Redis:26379-26381）"
+	@echo "  make e2e-down     停止 E2E 環境（保留 MySQL 資料）"
+	@echo "  make e2e-reset    刪除 E2E MySQL 資料並重新初始化"
+	@echo "  make e2e-seed     清空 E2E 資料並重建測試帳號"
 	@echo "  make lint         執行所有 linter"
 	@echo "  make typecheck    TypeScript 型別檢查"
 	@echo "  make logs         追蹤 Docker Compose 生產容器 log"
@@ -91,6 +96,23 @@ benchmark-down:
 benchmark-reset:
 	docker compose -f docker-compose.benchmark.yml down -v
 	$(MAKE) benchmark-up
+
+# -----------------------------------------------------------------------------
+# E2E 隔離環境（詳見 docs/e2e.md）
+# -----------------------------------------------------------------------------
+e2e-up:
+	docker compose -f docker-compose.e2e.yml up -d --wait mysql redis-cache redis-queue redis-vector
+	docker compose -f docker-compose.e2e.yml run --rm e2e-marker
+
+e2e-down:
+	docker compose -f docker-compose.e2e.yml down
+
+e2e-reset:
+	docker compose -f docker-compose.e2e.yml down -v
+	$(MAKE) e2e-up
+
+e2e-seed:
+	cd server && npm run e2e:seed
 
 # -----------------------------------------------------------------------------
 # Build

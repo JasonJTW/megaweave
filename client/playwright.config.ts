@@ -91,11 +91,14 @@ export default defineConfig({
         },
         {
           name: "client",
-          command: "npm run dev:e2e",
+          // CI tests the production build; locally the dev server starts faster
+          command: process.env.CI
+            ? "npm run build:e2e && npm run start:e2e"
+            : "npm run dev:e2e",
           url: baseURL,
           ignoreHTTPSErrors: true,
           reuseExistingServer,
-          timeout: 120_000,
+          timeout: process.env.CI ? 600_000 : 120_000,
         },
       ],
 });

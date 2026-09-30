@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": " dotenv -e .env.development -- next dev --turbopack --experimental-https",
-    "dev:e2e": "dotenv -e e2e.env -e .env.development -- next dev --turbopack --experimental-https --port 3100",
+    "dev:e2e": "dotenv -e e2e.env -- next dev --turbopack --experimental-https --port 3100",
+    "build:e2e": "dotenv -e e2e.env -- next build",
+    "start:e2e": "dotenv -e e2e.env -- node e2e/serve-https.mjs",
     "build": "dotenv -e .env.production -- next build",
     "build:dev": "dotenv -e .env.development --next build",
     "start": "next start",

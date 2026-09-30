@@ -24,7 +24,10 @@ npm run e2e:api          # API on https://localhost:8543
 npm run e2e:worker       # BullMQ worker
 cd ../client
 npm run dev:e2e          # client on https://localhost:3100 (build dir .next-e2e)
+npm run build:e2e && npm run start:e2e  # production build, served over HTTPS by e2e/serve-https.mjs
 ```
+
+Locally the client runs `next dev`. With `CI` set, Playwright builds and serves the production build instead (`CI=1 npx playwright test` reproduces the CI run).
 
 ## Services
 
@@ -49,7 +52,7 @@ Redis does not persist data, so rerun `make e2e-up` after its containers restart
 
 ## Configuration
 
-`server/e2e.env` and `client/e2e.env` are committed and hold only local addresses, docker credentials, the test account, and fake API keys. `npm run e2e:*` loads `server/e2e.env` with override, so shell variables cannot redirect a run to another database. `npm run dev:e2e` loads `client/e2e.env` before `.env.development`.
+`server/e2e.env` and `client/e2e.env` are committed and hold only local addresses, docker credentials, the test account, and fake API keys or placeholders. `npm run e2e:*` loads `server/e2e.env` with override, so shell variables cannot redirect a run to another database. The client E2E scripts load only `client/e2e.env`, never `.env.development`, so local and CI runs use the same configuration.
 
 | Setting | Value |
 | --- | --- |
@@ -68,6 +71,12 @@ In the browser, `client/e2e/fixtures/base.ts` blocks ads, analytics, Google Maps
 | `e2e/fixtures/auth` | Signed-in pages; the session comes from `auth.setup.ts` |
 
 Give created data a unique name (for example the project name plus `Date.now()`), because the three browser projects run in parallel against the same database.
+
+## CI
+
+`.github/workflows/e2e.yml` runs the full suite on every pull request to `main`, on GitHub-hosted runners: it generates a throwaway localhost certificate, runs `make e2e-up`, then `npx playwright test`. The HTML report and failure traces are uploaded as the `playwright-report` artifact for 7 days.
+
+To block merging on failures, add the `E2E (Playwright)` check as required in the branch protection rule for `main`.
 
 ## Remote targets
 

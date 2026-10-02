@@ -17,17 +17,13 @@ export async function shouldIncrementView(
   const key = `${REDIS_VIEW_KEY_PREFIX}:${postId}:${viewerIdentifier}`;
 
   try {
-    const exists = await redis.get(key);
-
-    if (exists) {
-      return false; // 還在冷卻時間內
-    }
-
-    await redis.set(key, "1", {
+    //* SET NX EX 單一原子指令：key 不存在才寫入（回 "OK"），避免併發請求重複計數
+    const result = await redis.set(key, "1", {
       EX: VIEW_COOLDOWN_SECONDS,
+      NX: true,
     });
 
-    return true;
+    return result === "OK"; // null 代表還在冷卻時間內
   } catch (error) {
     console.error("Redis view counter error:", error);
     // Redis 錯誤時預設允許計數，避免功能完全停擺

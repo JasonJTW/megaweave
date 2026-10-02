@@ -240,7 +240,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const [rows] = await dbPool.execute<RowDataPacket[]>(query, [user.email]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ errorMessage: "User not found" });
+      return res
+        .status(401)
+        .json({ errorMessage: "Invalid email or password" });
     }
 
     const foundUser = rows[0];
@@ -271,7 +273,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     );
 
     if (!isCorrectPassword) {
-      return res.status(401).json({ errorMessage: "Invalid password" });
+      return res
+        .status(401)
+        .json({ errorMessage: "Invalid email or password" });
     }
 
     // 5. 創建 session

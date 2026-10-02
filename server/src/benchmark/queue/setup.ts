@@ -4,7 +4,7 @@
 import { randomUUID } from "crypto";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import type { Pool } from "mysql2/promise";
-import type { AppStores } from "../fixture/fixtureProfile";
+import type { AppStores } from "../../isolation/appStores";
 import type { BurstCandidates, BurstUnit } from "./burstPlan";
 import type { BurstPost } from "./injection";
 

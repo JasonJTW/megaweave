@@ -245,7 +245,6 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     const foundUser = rows[0];
-    console.log("foundUser:", foundUser);
     // 3. 檢查用戶是否支持 native 登入
     const userProviders: string[] = parseProviders(foundUser.providers);
     // 檢查是否支持 native 登入

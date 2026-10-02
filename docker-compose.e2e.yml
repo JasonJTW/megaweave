@@ -1,0 +1,101 @@
+# MegaWeaving E2E 隔離環境（與 dev / benchmark 使用不同 port 與 volume，可同時存在）
+# 啟動：make e2e-up    清空資料並重建測試帳號：make e2e-seed    刪除 MySQL volume 重新初始化：make e2e-reset
+# 與 benchmark 共用隔離標記（isolated_environment / isolated:environment = megaweave-isolated），
+# server/src/isolation 只會清空帶有標記的資料儲存。
+name: megaweave-e2e
+
+services:
+  mysql:
+    container_name: megaweave-e2e-mysql
+    # 與 production 相同主版本 (MySQL 8.0)
+    image: mysql:8.0
+    command: ["--default-time-zone=+00:00", "--max_allowed_packet=64M"]
+    environment:
+      MYSQL_DATABASE: megaweave_e2e
+      MYSQL_USER: e2e
+      MYSQL_PASSWORD: e2e
+      MYSQL_ROOT_PASSWORD: e2e-root
+    ports:
+      - "127.0.0.1:23306:3306"
+    volumes:
+      - e2e-mysql-data:/var/lib/mysql
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./server/db/reference-data.sql:/docker-entrypoint-initdb.d/02-reference-data.sql:ro
+      - ./server/db/isolated-marker.sql:/docker-entrypoint-initdb.d/03-isolated-marker.sql:ro
+    healthcheck:
+      # 走 TCP：初始化期間暫時 server 不開放網路，確保匯入完成前不會回報 healthy
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pe2e-root"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  # 測試資料每次執行前都會清空，不需要持久化
+  redis-cache:
+    container_name: megaweave-e2e-redis-cache
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "127.0.0.1:26379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  redis-queue:
+    container_name: megaweave-e2e-redis-queue
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --maxmemory-policy noeviction
+    ports:
+      - "127.0.0.1:26380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  redis-vector:
+    container_name: megaweave-e2e-redis-vector
+    image: redis/redis-stack-server:latest
+    ports:
+      - "127.0.0.1:26381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  # S3 相容儲存（Adobe S3Mock）：支援 presigned URL 與 CORS，瀏覽器可直接上傳，worker 再搬移到正式 bucket。
+  # 不驗證簽章與權限，物件可匿名讀取以顯示圖片；資料只存在容器內，容器重建即清空。
+  # 對外只開 HTTPS（自簽憑證）：WebKit 會阻擋 https 頁面上傳到 http 的 loopback 位址。
+  s3:
+    container_name: megaweave-e2e-s3
+    image: adobe/s3mock:5
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: megaweave-e2e,megaweave-e2e-staging
+    ports:
+      - "127.0.0.1:29000:9191"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/"]
+      interval: 2s
+      retries: 30
+
+  # 一次性工作：在每個 Redis 寫入隔離標記（由 make e2e-up 執行；Redis 不持久化，重啟後需重新執行）
+  e2e-marker:
+    image: redis:7-alpine
+    restart: "no"
+    profiles: ["init"]
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      redis-queue:
+        condition: service_healthy
+      redis-vector:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        for host in redis-cache redis-queue redis-vector; do
+          redis-cli -h "$$host" SET isolated:environment megaweave-isolated || exit 1
+        done
+
+volumes:
+  e2e-mysql-data:

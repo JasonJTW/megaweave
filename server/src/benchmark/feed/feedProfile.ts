@@ -4,7 +4,7 @@
 
 import { RowDataPacket } from "mysql2";
 import type { BenchmarkProfile, BenchmarkProfileOutcome } from "../profiles";
-import type { AppStores } from "../fixture/fixtureProfile";
+import type { AppStores } from "../../isolation/appStores";
 import { DEFAULT_FIXTURE_SEED } from "../fixture/generateFixture";
 import { EMBEDDING_MODEL_VERSION } from "../fixture/embeddings";
 import type { ComparisonPlan } from "./comparison";
@@ -243,12 +243,12 @@ export function createFeedProfile(options: FeedProfileOptions): BenchmarkProfile
     dependencies: { mysql: "benchmark", redis: "benchmark", openai: "mock" },
 
     async assertSafeToRun() {
-      const { openAppStores } = await import("../fixture/fixtureProfile");
-      const { assertBenchmarkDataStores, assertBenchmarkMysql } = await import("../fixture/dataStoreGuard");
+      const { openAppStores } = await import("../../isolation/appStores");
+      const { assertIsolatedDataStores, assertIsolatedMysql } = await import("../../isolation/dataStoreGuard");
       stores = await openAppStores();
-      await assertBenchmarkMysql(stores.mysql);
+      await assertIsolatedMysql(stores.mysql);
       await stores.connectRedis();
-      await assertBenchmarkDataStores(stores);
+      await assertIsolatedDataStores(stores);
     },
 
     async run({ targetUrl }): Promise<BenchmarkProfileOutcome> {
@@ -341,7 +341,7 @@ export function createFeedProfile(options: FeedProfileOptions): BenchmarkProfile
     },
 
     async describeServices() {
-      const { describeDataStores } = await import("../fixture/dataStoreGuard");
+      const { describeDataStores } = await import("../../isolation/dataStoreGuard");
       return describeDataStores(stores!);
     },
 

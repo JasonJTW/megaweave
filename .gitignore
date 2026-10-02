@@ -15,6 +15,7 @@
 
 # next.js
 /client/.next/
+/client/.next-e2e/
 /out/
 
 # production
@@ -45,3 +46,10 @@ services/**/**.zip
 
 # Local dev TLS certs — generate with mkcert, never commit
 server/cert/
+
+# Playwright
+/client/test-results/
+/client/playwright-report/
+/client/blob-report/
+/client/playwright/.cache/
+/client/e2e/.auth/

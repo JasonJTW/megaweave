@@ -7,7 +7,7 @@ import {
   getNumDocsFromFtInfo,
   POST_VECTOR_INDEX,
 } from "../../services/vectorIndexService";
-import { FixtureStores } from "./dataStoreGuard";
+import { IsolatedStores } from "../../isolation/dataStoreGuard";
 import { EMBEDDING_DIMENSIONS } from "./embeddings";
 import { FixtureDataset } from "./generateFixture";
 
@@ -28,7 +28,7 @@ export class FixtureValidationError extends Error {
   }
 }
 
-async function countKeys(stores: FixtureStores, pattern: string): Promise<number> {
+async function countKeys(stores: IsolatedStores, pattern: string): Promise<number> {
   let count = 0;
   for await (const keys of stores.vectorRedis.scanIterator({ MATCH: pattern, COUNT: 1000 })) {
     count += Array.isArray(keys) ? keys.length : 1;
@@ -37,7 +37,7 @@ async function countKeys(stores: FixtureStores, pattern: string): Promise<number
 }
 
 export async function validateFixture(
-  stores: FixtureStores,
+  stores: IsolatedStores,
   dataset: FixtureDataset,
 ): Promise<FixtureCheck[]> {
   const [[mysqlCounts]] = await stores.mysql.query<RowDataPacket[]>(`

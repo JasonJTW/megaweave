@@ -19,9 +19,6 @@ export async function verifyPassword(
   hashedPassword: string,
 ) {
   const inputHashedPassword = await hashPassword(password, salt);
-  console.log("inputHashedPassword:", inputHashedPassword);
-  console.log("hashedPassword:", hashedPassword);
-  console.log("salt:", salt);
   return crypto.timingSafeEqual(
     Buffer.from(inputHashedPassword, "hex"),
     Buffer.from(hashedPassword, "hex"),

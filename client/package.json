@@ -4,12 +4,17 @@
   "private": true,
   "scripts": {
     "dev": " dotenv -e .env.development -- next dev --turbopack --experimental-https",
+    "dev:e2e": "dotenv -e e2e.env -- next dev --turbopack --experimental-https --port 3100",
+    "build:e2e": "dotenv -e e2e.env -- next build",
+    "start:e2e": "dotenv -e e2e.env -- node e2e/serve-https.mjs",
     "build": "dotenv -e .env.production -- next build",
     "build:dev": "dotenv -e .env.development --next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@hashintel/refractive": "^0.0.3",
@@ -50,11 +55,13 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.63.0",
     "@types/facebook-js-sdk": "^3.3.12",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.6.1",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
     "eslint-config-prettier": "^10.1.8",

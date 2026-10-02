@@ -2,7 +2,7 @@
 // 讀取 burst 結束後實際留下的結果：MySQL 貼文向量與圖片列、Redis 向量，以及 mock S3 的上傳與 staging 物件。
 
 import { RowDataPacket } from "mysql2";
-import type { AppStores } from "../fixture/fixtureProfile";
+import type { AppStores } from "../../isolation/appStores";
 import { REDIS_BATCH_SIZE } from "../fixture/loadFixture";
 import type { MockS3 } from "../mocks/mockS3";
 import type { ConsistencyInput, ObservedState } from "./consistency";

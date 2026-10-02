@@ -1,6 +1,6 @@
 //* posts.ts
 
-import { Request, Response, Router } from "express";
+import { NextFunction, Request, Response, Router } from "express";
 import { z } from "zod";
 import dotenv from "dotenv";
 import path from "path";
@@ -12,7 +12,6 @@ import {
 } from "./middleware/auth";
 import likeRouter from "./like";
 import { getUserFromCookie } from "./session";
-import { handleError } from "./utils/errorHandler";
 import { postService } from "./services/postService";
 import { feedService } from "./services/feedService";
 import { FEED_STRATEGY_HEADER, resolveFeedStrategy } from "./benchmark/feedStrategy";
@@ -95,7 +94,7 @@ const PresignedUrlsSchema = z.object({
 router.post(
   "/presigned-urls",
   requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const validationResult = PresignedUrlsSchema.parse(req.body);
       const urls = await Promise.all(
@@ -116,7 +115,7 @@ router.post(
       res.status(200).json({ urls });
     } catch (error) {
       console.error("Presigned URL generation error:", error);
-      return handleError(error, res);
+      return next(error);
     }
   },
 );
@@ -125,7 +124,7 @@ router.post(
 router.post(
   "/",
   requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const userId = req.user!.userId;
 
     let validationResult: CreatePostSchemaType;
@@ -160,7 +159,7 @@ router.post(
       validationResult = CreatePostSchema.parse(postData);
     } catch (error) {
       console.error("Create post validation error: ", error);
-      return handleError(error, res);
+      return next(error);
     }
 
     try {
@@ -292,7 +291,7 @@ type EditPostSchemaType = z.infer<typeof EditPostSchema>;
 router.put(
   "/:id",
   requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const publicId = req.params.id;
     const userId = req.user!.userId;
 
@@ -346,7 +345,7 @@ router.put(
       incoming = EditPostSchema.parse(raw);
     } catch (error) {
       console.error("Edit post validation error:", error);
-      return handleError(error, res);
+      return next(error);
     }
 
     const userRole = req.user!.role;

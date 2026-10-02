@@ -1,7 +1,17 @@
-import { Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
-export function handleError(error: unknown, res: Response) {
+//* Express error-handling middleware（4 個參數才會被 Express 辨識為 error handler）
+//* 路由 catch 裡 `return next(error)`，由這裡統一處理
+export function errorMiddleware(
+  error: unknown,
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  //* response 已經開始送出，交還給 Express 預設 handler 關閉連線
+  if (res.headersSent) return next(error);
+
   //* Zod error
   if (error instanceof z.ZodError) {
     console.log("Zod error:", error.issues[0]?.message || "Validation failed");
@@ -45,10 +55,11 @@ export function handleError(error: unknown, res: Response) {
     errorDetails = JSON.stringify(error);
   }
 
+  //* stack trace 只進 server log，不回給 client
   console.error("Error:", errorDetails);
   console.log(`--------`);
-  return res.status(statusCode).json({
-    errorMessage,
-    details: errorDetails,
-  });
+
+  //* 5xx 不回內部訊息（SQL / 連線等），只回固定文字
+  if (statusCode >= 500) errorMessage = "Internal server error";
+  return res.status(statusCode).json({ errorMessage });
 }

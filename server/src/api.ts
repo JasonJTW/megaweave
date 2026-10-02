@@ -13,7 +13,6 @@ import memberAPI from "./member";
 import commentAPI from "./comments";
 import statsAPI from "./stats";
 import weavesAPI from "./weaves";
-import healthAPI from "./health";
 import notificationsAPI from "./notifications";
 import messagesAPI from "./messages";
 import sendAPI from "./send";
@@ -21,17 +20,6 @@ import meAPI from "./me";
 import lalamoveAPI from "./lalamove";
 import paymentAPI from "./payments";
 import adminAPI from "./admin";
-
-//* Test api
-router.post("/test", (_req, res) => {
-  console.log("API test called");
-  res.json({ message: "You're inside docker!" });
-});
-
-router.get("/test", (_req, res) => {
-  console.log("API test called");
-  res.json({ message: "You're inside docker!" });
-});
 
 router.use("/signup", signupAPI);
 router.use("/signin", signinAPI);
@@ -46,7 +34,6 @@ router.use("/member", memberAPI);
 router.use("/comments", commentAPI);
 router.use("/user/stats", statsAPI);
 router.use("/weaves", weavesAPI);
-router.use("/health", healthAPI);
 router.use("/notifications", notificationsAPI);
 router.use("/messages", messagesAPI);
 router.use("/send", sendAPI);

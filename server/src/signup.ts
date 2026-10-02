@@ -1,12 +1,11 @@
 //* signup.ts
-import express, { Request, Response, Router } from "express";
+import express, { NextFunction, Request, Response, Router } from "express";
 import dotenv from "dotenv";
 dotenv.config();
 import { User } from "./types/user";
 import { userRoles, UserSession } from "./schema";
 import { SignupUserSchema } from "./validations";
 import { hashPassword, generateSalt } from "./passwordHasher";
-import { handleError } from "./utils/errorHandler";
 import { randomUUID } from "crypto";
 import { authRateLimiter } from "./middleware/rateLimiter";
 
@@ -18,7 +17,7 @@ import { createUserSession } from "./session";
 // Apply tiered strict rate limiting to all auth signup routes
 router.use(authRateLimiter);
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   console.log("API signup called");
 
   //* 1. Validate the input
@@ -35,7 +34,7 @@ router.post("/", async (req: Request, res: Response) => {
     SignupUserSchema.parse(user);
   } catch (error) {
     console.error(`Validation error:`, error);
-    return handleError(error, res);
+    return next(error);
   }
 
   //* 2. Check if the user already exists
@@ -60,7 +59,7 @@ router.post("/", async (req: Request, res: Response) => {
   } catch (error) {
     console.error(`Error checking if user exists: `, error);
     console.log(`result`, result);
-    return handleError(error, res);
+    return next(error);
   }
   console.log(`userExisted:`, userExisted);
 
@@ -127,7 +126,7 @@ router.post("/", async (req: Request, res: Response) => {
       user: safeUser,
     });
   } catch (error) {
-    return handleError(error, res);
+    return next(error);
   }
 });
 

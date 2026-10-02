@@ -146,9 +146,6 @@ export default function Signup() {
       // /// handle error
       if (!response.ok) {
         setSignupError(data.errorMessage || "Sign in failed");
-        if (data.details) {
-          console.error("ErrorDetails", data.details);
-        }
         throw new Error(data.errorMessage || "Sign in failed");
       }
       /// Sign in success

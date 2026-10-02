@@ -1,4 +1,4 @@
-import React from "react";
+export {};
 
 declare module "*.css" {
   const classes: { [key: string]: string };

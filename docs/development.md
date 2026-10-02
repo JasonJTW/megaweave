@@ -49,7 +49,7 @@ make dev-server   # API on :8443
 make dev-client   # Next.js on :3000
 ```
 
-The app is at **https://localhost:3000**. `make dev-server` starts the API alone, matching production's split topology — run `cd server && npm run dev:worker` in a second terminal to process jobs, or set `RUN_WORKERS_INLINE=true` for a single-process loop.
+The app is at **https://localhost:3000**. `make dev-server` starts the API alone, matching production's split topology — run `cd server && npm run dev:worker` in a second terminal to process jobs, or run `cd server && npm run dev:inline` instead of `make dev-server` for a single-process loop (sets `RUN_WORKERS_INLINE=true`).
 
 Once posts exist, populate the vector index:
 

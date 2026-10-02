@@ -1,10 +1,9 @@
 //* signin.ts
 
-import { Request, Response, Router } from "express";
+import { NextFunction, Request, Response, Router } from "express";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { SigninUserSchema, SigninUserSchemaType } from "./validations";
-import { handleError } from "./utils/errorHandler";
 import { verifyPassword } from "./passwordHasher";
 import { createUserSession } from "./session";
 import { UserSession } from "./schema";
@@ -210,7 +209,7 @@ async function findOrCreateUser(
 }
 
 // Native sign in
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   console.log("API signin called");
   const user = {
     email: req.body.email,
@@ -223,7 +222,7 @@ router.post("/", async (req: Request, res: Response) => {
     validationResult = SigninUserSchema.parse(user);
   } catch (error) {
     console.error("signin validation error: ", error);
-    return handleError(error, res);
+    return next(error);
   }
 
   if (!validationResult) {
@@ -241,7 +240,9 @@ router.post("/", async (req: Request, res: Response) => {
     const [rows] = await dbPool.execute<RowDataPacket[]>(query, [user.email]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ errorMessage: "User not found" });
+      return res
+        .status(401)
+        .json({ errorMessage: "Invalid email or password" });
     }
 
     const foundUser = rows[0];
@@ -272,7 +273,9 @@ router.post("/", async (req: Request, res: Response) => {
     );
 
     if (!isCorrectPassword) {
-      return res.status(401).json({ errorMessage: "Invalid password" });
+      return res
+        .status(401)
+        .json({ errorMessage: "Invalid email or password" });
     }
 
     // 5. 創建 session

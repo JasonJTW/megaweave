@@ -6,6 +6,7 @@ dotenv.config();
 import express from "express";
 import cookieParser from "cookie-parser";
 import apiRoutes from "./api";
+import { errorMiddleware } from "./utils/errorHandler";
 import cors from "cors";
 import https from "https";
 import http from "http";
@@ -58,6 +59,7 @@ app.use(globalRateLimiter);
 app.get("/health", (_req, res) => {
   res.json({
     status: "OK",
+    uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     ssl: ENABLE_HTTPS,
     ...getBenchmarkHealthFields(process.env, () => {
@@ -181,6 +183,9 @@ async function startServer() {
     });
 
     app.use("/api", apiRoutes);
+
+    //* 必須掛在所有路由之後
+    app.use(errorMiddleware);
 
     //* start server
     server.listen(PORT, () => {

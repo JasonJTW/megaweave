@@ -34,6 +34,75 @@ jobs:
               - '.github/workflows/megaweaving-cicd.yaml'
 
   # ─────────────────────────────────────────────────────────
+  # 1b. Quality Gate（GitHub Cloud Runner — typecheck / lint / test 失敗就不 build、不 deploy）
+  # ─────────────────────────────────────────────────────────
+  test-server:
+    name: Test Backend (typecheck, lint, jest)
+    needs: detect-changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.server-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: server
+
+      - name: Lint
+        run: npm run lint
+        working-directory: server
+
+      - name: Unit tests
+        run: npm test
+        working-directory: server
+
+  test-client:
+    name: Test Frontend (typecheck, lint)
+    needs: detect-changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.client-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: client
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: client
+
+      - name: Lint
+        run: npm run lint
+        working-directory: client
+
+  # ─────────────────────────────────────────────────────────
   # 2. EC2 Pre-Deploy Cleanup（與 Build 平行執行，節省總時間）
   # ─────────────────────────────────────────────────────────
   pre-deploy-cleanup:
@@ -90,7 +159,7 @@ jobs:
   # ─────────────────────────────────────────────────────────
   build-backend:
     name: Build & Push Backend Image
-    needs: detect-changes
+    needs: [detect-changes, test-server]
     if: >
       github.event_name == 'workflow_dispatch' ||
       needs.detect-changes.outputs.server-changed == 'true'
@@ -118,7 +187,9 @@ jobs:
           context: ./server
           dockerfile: ./server/Dockerfile
           push: true
-          tags: ghcr.io/jasonjtw/megaweaving-backend:latest
+          tags: |
+            ghcr.io/jasonjtw/megaweaving-backend:latest
+            ghcr.io/jasonjtw/megaweaving-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=min
 
@@ -127,7 +198,7 @@ jobs:
   # ─────────────────────────────────────────────────────────
   build-frontend:
     name: Build & Push Frontend Image
-    needs: detect-changes
+    needs: [detect-changes, test-client]
     if: >
       github.event_name == 'workflow_dispatch' ||
       needs.detect-changes.outputs.client-changed == 'true'
@@ -159,7 +230,9 @@ jobs:
           context: ./client
           dockerfile: ./client/Dockerfile
           push: true
-          tags: ghcr.io/jasonjtw/megaweaving-frontend:latest
+          tags: |
+            ghcr.io/jasonjtw/megaweaving-frontend:latest
+            ghcr.io/jasonjtw/megaweaving-frontend:${{ github.sha }}
           secrets: |
             sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           cache-from: type=gha

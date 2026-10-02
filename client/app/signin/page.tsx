@@ -267,9 +267,6 @@ function SigninForm() {
       // /// handle error
       if (!response.ok) {
         toast.error(data.errorMessage || "Sign in failed");
-        if (data.details) {
-          console.error("ErrorDetails", data.details);
-        }
         throw new Error(data.errorMessage || "Sign in failed");
       }
       /// Sign in success

@@ -168,7 +168,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
             transition={{ duration: 0.22, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="flex max-h-[200px] flex-col gap-2 overflow-y-auto border-t border-primary-30/40 bg-primary-15 px-3 py-4">
+            <div className="flex max-h-[200px] flex-col overflow-y-auto border-t border-primary-30/40 bg-primary-5 py-4">
               {draft.items.map((it) => {
                 const hasStock = it.quantityLeft > 0;
                 const isChecked = it.selected && hasStock;
@@ -178,12 +178,8 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                 return (
                   <div
                     key={it.id}
-                    className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 transition-colors ${
-                      !hasStock
-                        ? "border border-gray-100 bg-gray-50 opacity-60"
-                        : isChecked
-                          ? "border border-primary/20 bg-primary/10"
-                          : "border border-gray-100 bg-gray-50 hover:bg-gray-100"
+                    className={`flex items-center justify-between gap-2 border-t px-3 py-1.5 transition-colors ${
+                      !hasStock ? "bg-gray-50 opacity-60" : ""
                     }`}
                   >
                     <label
@@ -196,8 +192,17 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                         checked={isChecked}
                         onChange={() => handleToggleItem(it.id)}
                         disabled={!hasStock}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-40"
+                        className="sr-only"
                       />
+                      {/* Custom checkbox: outer border + inset fill when checked */}
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 border-gray-300 bg-white ${!hasStock ? "opacity-40" : ""}`}
+                      >
+                        {isChecked && (
+                          <span className="h-3.5 w-3.5 rounded-[2px] bg-primary-75" />
+                        )}
+                      </span>
                       <span
                         className={`truncate text-[13px] font-semibold ${
                           hasStock ? "text-gray-800" : "text-gray-400"
@@ -205,7 +210,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                       >
                         {it.title}
                       </span>
-                      <span className="shrink-0 text-[11px] text-gray-400">
+                      <span className="shrink-0 text-[11px] text-primary-75">
                         (Left: {it.quantityLeft})
                       </span>
                     </label>

@@ -10,17 +10,17 @@
 使用者張貼的一則物品供需訊息。是平台上所有交換的起點。
 _Avoid_: Listing, Ad, 商品
 
-**Share**:
+**Share (分享)**:
 「我有，可以給出去」的 Post。
 _Avoid_: Offer, Donation, 贈送
 
-**Wish**:
+**Wish (許願)**:
 「我想要」的 Post。
 _Avoid_: Request, Want, 徵求
 
 **Commons (地球公物)**:
 開放給社群**借用**的物品：提供出來，由他人在約定時間內領取使用。與 Share 的差別在於物品會回到提供者手上，所有權不移轉。
-_Avoid_: Loan, Lending, 共享物
+_Avoid_: Loan, Lending, 共享物, Common Share, Share Commons
 
 **Item**:
 一則 Post 裡列出的具體物品與數量。一個 Weave 可以只針對其中幾個 Item，不必涵蓋整則 Post。
@@ -31,11 +31,11 @@ _Avoid_: Loan, Lending, 共享物
 一次物品交換的完整關係，從提出請求那一刻就存在，不是配對成功後才誕生。
 _Avoid_: Transaction, Trade, Deal, Order, 訂單
 
-**Giver**:
+**Giver (提供者)**:
 物品從這一方**流出**。描述的是物品的方向，不是所有權移轉 —— Commons 的保管者雖然物品之後會回來，在該次 Weave 中仍然是 Giver。
-_Avoid_: Donor, Seller, Owner, 贈送者
+_Avoid_: Donor, Seller, Owner, 贈送者, 分享者
 
-**Receiver**:
+**Receiver (接收者)**:
 物品**流入**這一方。同樣只描述方向 —— Commons 的借用者在該次 Weave 中是 Receiver，即使他只是暫時持有。
 _Avoid_: Recipient, Buyer, Claimer, 收受者
 
@@ -65,12 +65,19 @@ _Avoid_: Pending, In progress
 **Completed**:
 雙方都已 Confirm，交換結束。
 
-**Declined**:
-Post Author 拒絕了這次 Weave 請求。
+**Declined (已婉拒)**:
+Post Author 在 Requested 階段拒絕了這次 Weave 請求。不涉及違背承諾。
 _Avoid_: Rejected, Refused
 
-**Cancelled**:
-Weave 在完成前被一方中止。
+**Withdrawn (已撤回)**:
+Initiator 在 Requested 階段收回自己的請求。不涉及違背承諾。
+_Avoid_: Cancelled（Requested 階段的退出不叫取消）
+
+**Cancelled (已取消)**:
+Weave 在 Approved 之後、Completed 之前被任一方中止。雙方已有約定，屬於違背承諾。
+_Avoid_: Withdrawn, Aborted
+
+> Requested 階段的退出由「誰」決定名稱（Initiator → Withdrawn，Post Author → Declined）；Approved 之後任一方退出都是 Cancelled。
 
 ### 探索
 

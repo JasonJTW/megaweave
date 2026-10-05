@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import type { Weave } from "@/services/weaveService";
 import { useSocket } from "@/hooks/useSocket";
+import { getWeaveViewModel, type WeaveAction } from "@/utils/weaveViewModel";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -17,6 +18,8 @@ export interface WeaveActions {
   isReceiver: boolean;
   hasIConfirmed: boolean;
   hasOtherConfirmed: boolean;
+  /** Actions the current user may take, from the Weave view model. */
+  availableActions: ReadonlySet<WeaveAction>;
 
   // Status
   localStatus: Weave["status"] | undefined;
@@ -27,6 +30,7 @@ export interface WeaveActions {
   handleRejectWeave: (e: React.MouseEvent) => Promise<void>;
   handleCompleteWeave: (e: React.MouseEvent) => Promise<void>;
   handleCancelWeave: (e: React.MouseEvent) => Promise<void>;
+  handleWithdrawWeave: (e: React.MouseEvent) => Promise<void>;
 }
 
 export function useWeaveActions({
@@ -86,11 +90,23 @@ export function useWeaveActions({
     ? localReceiverConfirmed
     : localGiverConfirmed;
 
+  const availableActions = weave
+    ? getWeaveViewModel({
+        status: localStatus,
+        viewerId: currentUserId,
+        postAuthorId: weave.post?.user_id,
+        giverId: weave.giver_id,
+        receiverId: weave.receiver_id,
+        giverConfirmed: localGiverConfirmed,
+        receiverConfirmed: localReceiverConfirmed,
+      }).actions
+    : new Set<WeaveAction>();
+
   const handleApproveWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!weave || isProcessing) return;
-    if (!isGiver) {
-      toast.error("Only the item giver can approve this request");
+    if (!availableActions.has("approve")) {
+      toast.error("Only the post author can approve this request");
       return;
     }
     if (localStatus !== "requested") {
@@ -128,12 +144,8 @@ export function useWeaveActions({
   const handleRejectWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!weave || isProcessing) return;
-    if (!isGiver) {
-      toast.error("Only the item giver can reject this request");
-      return;
-    }
-    if (localStatus !== "requested") {
-      toast.error(`Weave request is no longer pending approval`);
+    if (!availableActions.has("decline")) {
+      toast.error("Only the post author can decline this request");
       return;
     }
     if (!window.confirm("Are you sure you want to reject this request?")) return;
@@ -168,8 +180,8 @@ export function useWeaveActions({
   const handleCompleteWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!weave || isProcessing || hasIConfirmed) return;
-    if (!isGiver && !isReceiver) {
-      toast.error("You are not authorized to complete this weave");
+    if (!availableActions.has("confirm")) {
+      toast.error("You cannot confirm this weave right now");
       return;
     }
 
@@ -216,15 +228,8 @@ export function useWeaveActions({
   const handleCancelWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!weave || isProcessing) return;
-    if (
-      currentUserId !== weave.giver_id &&
-      currentUserId !== weave.receiver_id
-    ) {
-      toast.error("You are not authorized to cancel this weave");
-      return;
-    }
-    if (localStatus !== "requested" && localStatus !== "pending") {
-      toast.error(`Weave is already ${localStatus}`);
+    if (!availableActions.has("cancel")) {
+      toast.error("You cannot cancel this weave right now");
       return;
     }
     if (!window.confirm("Are you sure you want to cancel this weave?")) return;
@@ -256,16 +261,55 @@ export function useWeaveActions({
     }
   };
 
+  const handleWithdrawWeave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!weave || isProcessing) return;
+    if (!availableActions.has("withdraw")) {
+      toast.error("You cannot withdraw this request right now");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to withdraw this request?"))
+      return;
+
+    setIsProcessing(true);
+    try {
+      const response = await fetch(
+        `${hostName}/api/weaves/${weave.id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ status: "withdrawn" }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.errorMessage || "Failed to withdraw request");
+
+      setLocalStatus("withdrawn");
+      toast.success("Request withdrawn.");
+      onWeaveStatusChange?.();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to withdraw request",
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return {
     isGiver,
     isReceiver,
     hasIConfirmed,
     hasOtherConfirmed,
+    availableActions,
     localStatus,
     isProcessing,
     handleApproveWeave,
     handleRejectWeave,
     handleCompleteWeave,
     handleCancelWeave,
+    handleWithdrawWeave,
   };
 }

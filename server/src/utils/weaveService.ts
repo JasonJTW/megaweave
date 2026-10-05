@@ -30,6 +30,7 @@ export type WeaveStatus =
   | "requested"
   | "rejected"
   | "cancelled"
+  | "withdrawn"
   | "completed";
 
 export interface RequestWeaveParams {
@@ -66,6 +67,8 @@ interface WeaveRow extends RowDataPacket {
   post_id: number;
   giver_id: number;
   receiver_id: number;
+  /** Joined from posts: the Weave's Post Author (never the Initiator). */
+  post_author_id: number;
   status: WeaveStatus;
   giver_confirmed: boolean | number;
   receiver_confirmed: boolean | number;
@@ -176,6 +179,7 @@ export type WeaveActionType =
   | "approved"
   | "declined"
   | "cancelled"
+  | "withdrawn"
   | "confirmed"
   | "completed";
 
@@ -212,6 +216,11 @@ function getWeaveNoticeCopy(
       return {
         title: "Weave Cancelled",
         content: `${actorName} cancelled the weave for "${postTitle}"`,
+      };
+    case "withdrawn":
+      return {
+        title: "Weave Request Withdrawn",
+        content: `${actorName} withdrew their weave request for "${postTitle}"`,
       };
     case "confirmed":
       return {
@@ -328,6 +337,7 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
         approved: "pending",
         declined: "rejected",
         cancelled: "cancelled",
+        withdrawn: "withdrawn",
         confirmed: "pending",
         completed: "completed",
       };
@@ -469,7 +479,9 @@ export async function approveWeave(
     await connection.beginTransaction();
 
     const [weaves] = await connection.execute<WeaveRow[]>(
-      `SELECT * FROM weaves WHERE id = ? FOR UPDATE`,
+      `SELECT w.*, p.user_id AS post_author_id
+       FROM weaves w JOIN posts p ON p.id = w.post_id
+       WHERE w.id = ? FOR UPDATE`,
       [weaveId],
     );
     if (weaves.length === 0) throw new WeaveError(404, "Not found");
@@ -481,24 +493,32 @@ export async function approveWeave(
     const isGiver = weave.giver_id === userId;
     const isReceiver = weave.receiver_id === userId;
     if (!isGiver && !isReceiver) throw new WeaveError(403, "Unauthorized");
+    // Requested stage is judged by Post Author / Initiator (not Giver / Receiver).
+    // The Initiator is the party who is not the Post Author.
+    const isPostAuthor = weave.post_author_id === userId;
+    const isInitiator = !isPostAuthor;
 
     // ── State machine ─────────────────────────────────────────────────────────
     if (weave.status === "requested") {
       if (newStatus === "pending") {
-        if (!isGiver) throw new WeaveError(403, "Only giver can approve");
+        if (!isPostAuthor)
+          throw new WeaveError(403, "Only post author can approve");
         await connection.execute(
           `UPDATE weaves SET status = 'pending' WHERE id = ?`,
           [weaveId],
         );
       } else if (newStatus === "rejected") {
-        if (!isGiver) throw new WeaveError(403, "Only giver can reject");
+        if (!isPostAuthor)
+          throw new WeaveError(403, "Only post author can decline");
         await connection.execute(
           `UPDATE weaves SET status = 'rejected' WHERE id = ?`,
           [weaveId],
         );
-      } else if (newStatus === "cancelled") {
+      } else if (newStatus === "withdrawn") {
+        if (!isInitiator)
+          throw new WeaveError(403, "Only initiator can withdraw");
         await connection.execute(
-          `UPDATE weaves SET status = 'cancelled' WHERE id = ?`,
+          `UPDATE weaves SET status = 'withdrawn' WHERE id = ?`,
           [weaveId],
         );
       } else {
@@ -615,6 +635,8 @@ export async function approveWeave(
         action = "approved";
       } else if (newStatus === "rejected") {
         action = "declined";
+      } else if (newStatus === "withdrawn") {
+        action = "withdrawn";
       } else if (newStatus === "cancelled") {
         action = "cancelled";
       } else if (newStatus === "completed") {

@@ -40,3 +40,11 @@ export type UserSchemaType = z.infer<typeof UserSchema>;
 export type SignupUserSchemaType = z.infer<typeof SignupUserSchema>;
 export type UpdateUserSchemaType = z.infer<typeof UpdateUserSchema>;
 export type SigninUserSchemaType = z.infer<typeof SigninUserSchema>;
+
+//* Account language for server-generated text (emails); mirrors the client's routing locales
+export const LOCALES = ["zh-TW", "en"] as const;
+export type Locale = (typeof LOCALES)[number];
+
+export const UpdateLocaleSchema = z.object({
+  locale: z.enum(LOCALES),
+});

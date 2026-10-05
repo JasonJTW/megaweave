@@ -29,5 +29,15 @@
     "copyright": "© megaweaving 2025",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service"
+  },
+  "LanguageSwitcher": {
+    "label": "Change language",
+    "zh-TW": "繁體中文",
+    "en": "English"
+  },
+  "LanguagePrompt": {
+    "message": "Switch to English?",
+    "accept": "Switch",
+    "dismiss": "Dismiss"
   }
 }

@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
 import { RefractiveNav } from "./Refractive.client";
+import LanguageSwitcher from "./LanguageSwitcher";
 // 型別定義
 type MainNavigationItem = {
   href: string;
@@ -372,6 +373,15 @@ const Navbar = () => {
                       </NavigationMenuItem>
                     );
                   })}
+                  <NavigationMenuItem className="hidden sm:block">
+                    <LanguageSwitcher
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "bg-transparent px-3 text-[16px] font-semibold text-megaweave-forest-dark transition-all duration-200 hover:bg-primary-30",
+                      )}
+                      iconClassName="h-[16px] w-[18px]"
+                    />
+                  </NavigationMenuItem>
                 </NavigationMenuList>
               </NavigationMenu>
               {/* //* nav bar hamburger menu */}
@@ -450,6 +460,11 @@ const Navbar = () => {
                           </Link>
                         );
                       })}
+                      <LanguageSwitcher
+                        onSwitch={() => setIsMobileMenuOpen(false)}
+                        className="w-full space-x-1 rounded-xl px-4 py-3 text-[16px] font-medium text-white transition-all duration-200"
+                        iconClassName="h-5 w-5"
+                      />
                     </div>
                   </div>
                 </SheetContent>

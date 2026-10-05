@@ -641,10 +641,10 @@ CREATE TABLE `weave_items` (
 CREATE TABLE `weaves` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `post_id` bigint unsigned NOT NULL COMMENT '哪篇貼文',
-  `giver_id` bigint unsigned NOT NULL COMMENT '給予者（原 post 作者）',
-  `receiver_id` bigint unsigned NOT NULL COMMENT '接收者（索取者）',
+  `giver_id` bigint unsigned NOT NULL COMMENT '給予者（交出物品的一方；Share 為 Post Author，Wish 為 Initiator，見 ADR 0001）',
+  `receiver_id` bigint unsigned NOT NULL COMMENT '接收者（收到物品的一方；Share 為 Initiator，Wish 為 Post Author，見 ADR 0001）',
   `conversation_id` bigint unsigned DEFAULT NULL,
-  `status` enum('pending','completed','cancelled','requested','rejected') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'pending',
+  `status` enum('approved','completed','cancelled','requested','declined','withdrawn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'requested',
   `giver_confirmed` tinyint(1) DEFAULT '0',
   `receiver_confirmed` tinyint(1) DEFAULT '0',
   `notes` text COLLATE utf8mb4_unicode_ci COMMENT '備註',

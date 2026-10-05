@@ -25,16 +25,16 @@ describe("buildWeavesFilter", () => {
     expect(params).toEqual([10]);
   });
 
-  it("filters by postId and status='pending'", () => {
+  it("filters by postId and status='approved'", () => {
     const { whereClause, params } = buildWeavesFilter({
       userId: 10,
       postId: 42,
-      status: "pending",
+      status: "approved",
     });
     expect(whereClause).toBe(
       "WHERE (w.giver_id = ? OR w.receiver_id = ?) AND w.post_id = ? AND w.status = ?",
     );
-    expect(params).toEqual([10, 10, 42, "pending"]);
+    expect(params).toEqual([10, 10, 42, "approved"]);
   });
 
   it("combines role with postId", () => {
@@ -52,9 +52,9 @@ describe("WeavesListQuerySchema", () => {
   it("coerces postId from query string", () => {
     const parsed = WeavesListQuerySchema.parse({
       postId: "42",
-      status: "pending",
+      status: "approved",
     });
-    expect(parsed).toEqual({ postId: 42, status: "pending" });
+    expect(parsed).toEqual({ postId: 42, status: "approved" });
   });
 
   it("rejects unknown status and non-numeric postId", () => {

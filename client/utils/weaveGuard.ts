@@ -9,7 +9,7 @@ export interface WeaveItemCheck {
 
 /**
  * Checks whether the given list of weaves contains at least one weave
- * for the specified post ID with a status of 'pending'.
+ * for the specified post ID with a status of 'approved'.
  */
 export function hasPendingWeaveForPost(
   weaves: WeaveItemCheck[] | null | undefined,
@@ -19,7 +19,7 @@ export function hasPendingWeaveForPost(
     return false;
   }
 
-  return weaves.some((w) => w.post_id === postId && w.status === "pending");
+  return weaves.some((w) => w.post_id === postId && w.status === "approved");
 }
 
 export type LalamoveAction = "recalculate" | "book" | "weave_this";
@@ -27,8 +27,8 @@ export type LalamoveAction = "recalculate" | "book" | "weave_this";
 /**
  * Determines the action button state for the Lalamove quotation summary.
  * - If quotation is expired, always prompt recalculation.
- * - If quotation is valid and user has a pending weave for this post, allow booking.
- * - Otherwise (no pending weave), restrict to 'weave_this'.
+ * - If quotation is valid and user has a approved weave for this post, allow booking.
+ * - Otherwise (no approved weave), restrict to 'weave_this'.
  */
 export function getLalamoveAction({
   isQuoteExpired,
@@ -50,7 +50,7 @@ export function getLalamoveAction({
 
 /**
  * Determines whether LalamoveQuotation should be displayed below WeavingCard.
- * It is displayed only when in chat window, the weave status is 'pending', and post data exists.
+ * It is displayed only when in chat window, the weave status is 'approved', and post data exists.
  */
 export function shouldShowLalamoveQuotation({
   isInChatWindow,
@@ -61,5 +61,5 @@ export function shouldShowLalamoveQuotation({
   status?: WeaveStatus | null;
   hasPost?: boolean;
 }): boolean {
-  return Boolean(isInChatWindow && status === "pending" && hasPost);
+  return Boolean(isInChatWindow && status === "approved" && hasPost);
 }

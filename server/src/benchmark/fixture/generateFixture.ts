@@ -27,7 +27,7 @@ const POSTS_PER_LOCATION = 25;
 const MIN_LIKES_FOR_INTEREST_VECTOR = 3;
 
 export type FixturePostType = "share" | "wish" | "commons";
-export type FixtureWeaveStatus = "pending" | "completed" | "cancelled" | "requested";
+export type FixtureWeaveStatus = "approved" | "completed" | "cancelled" | "requested";
 
 export interface FixtureOptions {
   seed: number;
@@ -432,7 +432,7 @@ export function generateFixture(options: FixtureOptions): FixtureDataset {
     if (post.type !== "wish" && interactionRandom.chance(0.06)) {
       let receiverId = interactionRandom.int(1, userCount);
       if (receiverId === post.user_id) receiverId = (receiverId % userCount) + 1;
-      const status = interactionRandom.weighted([["completed", 50], ["pending", 20], ["requested", 20], ["cancelled", 10]] as const);
+      const status = interactionRandom.weighted([["completed", 50], ["approved", 20], ["requested", 20], ["cancelled", 10]] as const);
       const createdOffset = interactionRandom.int(0, post.created_offset_s);
       weaves.push({
         id: weaves.length + 1,

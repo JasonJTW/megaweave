@@ -115,7 +115,7 @@ export class PaymentService {
       // 必須是該貼文某筆 pending weave 的 giver 或 receiver 才能叫車（鎖定該 weave 列避免同時被取消/完成）
       const [pendingWeaveRows] = await conn.query<RowDataPacket[]>(
         `SELECT id FROM weaves
-         WHERE post_id = ? AND status = 'pending' AND (giver_id = ? OR receiver_id = ?)
+         WHERE post_id = ? AND status = 'approved' AND (giver_id = ? OR receiver_id = ?)
          LIMIT 1 FOR UPDATE`,
         [input.postId, input.userId, input.userId]
       );

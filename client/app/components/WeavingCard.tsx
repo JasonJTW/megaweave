@@ -172,7 +172,6 @@ const WeavingCard = ({
 
   const {
     hasIConfirmed,
-    hasOtherConfirmed,
     availableActions,
     statusKey: viewModelStatusKey,
     hintKey,

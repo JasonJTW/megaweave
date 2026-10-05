@@ -25,8 +25,9 @@ import { UserProvider } from "@/app/contexts/UserContext";
 import { SWRConfig } from "swr";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
-import { routing } from "@/i18n/routing";
+import { getTranslations, setRequestLocale } from "next-intl/server";
+import { SITE_NAME, siteUrl } from "@/lib/seo";
+import { toLocale, routing } from "@/i18n/routing";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -75,23 +76,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "megaweaving",
-  description: "Create by megaweavingHQ",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "megaweaving", // 主畫面上顯示的名稱
-  },
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
-  other: {
-    ...Sentry.getTraceData(),
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const t = await getTranslations({
+    locale: toLocale((await params).locale),
+    namespace: "Metadata",
+  });
+
+  return {
+    metadataBase: new URL(siteUrl()),
+    // Pages set a short title; this appends the site name in their language
+    title: { default: SITE_NAME, template: t("titleTemplate") },
+    description: t("home.description"),
+    manifest: "/manifest.json",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: SITE_NAME, // 主畫面上顯示的名稱
+    },
+    icons: {
+      icon: "/favicon.ico",
+      apple: "/apple-touch-icon.png",
+    },
+    other: {
+      ...Sentry.getTraceData(),
+    },
+  };
+}
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));

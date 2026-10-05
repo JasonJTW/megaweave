@@ -41,3 +41,66 @@ test.describe("locale routing", () => {
     });
   });
 });
+
+test.describe("localized metadata", () => {
+  test("/ has a zh-TW title and hreflang alternates", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveTitle(/免費物品交換與共享平台/);
+    await expect(
+      page.locator('link[rel="alternate"][hreflang="zh-TW"]'),
+    ).toHaveAttribute("href", /\/$|localhost:3100$/);
+    await expect(
+      page.locator('link[rel="alternate"][hreflang="en"]'),
+    ).toHaveAttribute("href", /\/en$/);
+    await expect(
+      page.locator('link[rel="alternate"][hreflang="x-default"]'),
+    ).toHaveAttribute("href", /localhost:3100$/);
+  });
+
+  test("/en has an English title and hreflang alternates", async ({ page }) => {
+    await page.goto("/en");
+    await expect(page).toHaveTitle(/free item exchange and sharing/i);
+    await expect(
+      page.locator('link[rel="alternate"][hreflang="en"]'),
+    ).toHaveAttribute("href", /\/en$/);
+    await expect(
+      page.locator('link[rel="alternate"][hreflang="x-default"]'),
+    ).toHaveAttribute("href", /localhost:3100$/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      /\/en$/,
+    );
+  });
+
+  test("a sub page localizes its title and canonical per language", async ({
+    page,
+  }) => {
+    await page.goto("/about");
+    await expect(page).toHaveTitle(/關於我們/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      /\/about$/,
+    );
+
+    await page.goto("/en/about");
+    await expect(page).toHaveTitle(/About Us/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      "href",
+      /\/en\/about$/,
+    );
+  });
+
+  test("the sitemap lists both languages of every public page", async ({
+    request,
+  }) => {
+    const response = await request.get("/sitemap.xml");
+    expect(response.ok()).toBeTruthy();
+    const xml = await response.text();
+    for (const path of ["", "/en", "/about", "/en/about", "/tinder", "/en/tinder"]) {
+      expect(xml).toContain(`<loc>https://localhost:3100${path}</loc>`);
+    }
+    expect(xml).toContain('hreflang="x-default"');
+    expect(xml).not.toContain("/messages");
+    expect(xml).not.toContain("/Card");
+  });
+});

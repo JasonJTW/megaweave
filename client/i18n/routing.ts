@@ -1,3 +1,4 @@
+import { hasLocale } from "next-intl";
 import { defineRouting } from "next-intl/routing";
 
 // ADR 0002: zh-TW is the default and unprefixed, English lives under /en,
@@ -34,4 +35,9 @@ export function splitLocalePrefix(pathname: string): {
 export function localizePath(locale: Locale, path: string): string {
   if (locale === routing.defaultLocale) return path;
   return path === "/" ? `/${locale}` : `/${locale}${path}`;
+}
+
+/** Narrows a route param to a Locale, falling back to the default locale. */
+export function toLocale(locale: string): Locale {
+  return hasLocale(routing.locales, locale) ? locale : routing.defaultLocale;
 }

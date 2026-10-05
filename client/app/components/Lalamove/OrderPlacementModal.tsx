@@ -26,45 +26,23 @@ import {
   GOOGLE_AUTOCOMPLETE_FIELDS,
   ParsedGooglePlace,
 } from "@/utils/locationUtils";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  VEHICLE_TYPES,
+  VEHICLE_SIZE_LIMITS,
+  VehicleType,
+  isVehicleType,
+  toLalamoveLanguage,
+} from "@/utils/lalamove";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
-export const VEHICLE_OPTIONS = [
-  {
-    id: "MOTORCYCLE",
-    name: "機車",
-    nameEn: "Motorcycle",
-    desc: "40×40×40 cm / 20kg 內（文件、小型包裹、餐點）",
-    icon: "bike",
-  },
-  {
-    id: "SUV",
-    name: "廂型貨車（半車）",
-    nameEn: "Van (Half)",
-    desc: "100×100×100 cm / 200kg 內（中型物資、行李箱）",
-    icon: "car",
-  },
-  {
-    id: "VAN",
-    name: "廂型貨車（全車）",
-    nameEn: "Van (Full)",
-    desc: "150×100×100 cm / 300kg 內（學生搬宿、多箱行李）",
-    icon: "van",
-  },
-  {
-    id: "TRUCK175",
-    name: "1.75噸 貨車",
-    nameEn: "1.75T Truck",
-    desc: "200×120×120 cm / 500kg 內（小家庭、租屋搬家）",
-    icon: "truck",
-  },
-  {
-    id: "TRUCK330",
-    name: "3.49噸 貨車",
-    nameEn: "3.49T Truck",
-    desc: "300×150×150 cm / 1,000kg 內（家庭搬遷、辦公室大件）",
-    icon: "truck",
-  },
-];
+const VEHICLE_ICONS: Record<VehicleType, "bike" | "car" | "van" | "truck"> = {
+  MOTORCYCLE: "bike",
+  SUV: "car",
+  VAN: "van",
+  TRUCK175: "truck",
+  TRUCK330: "truck",
+};
 
 export interface QuotationItem {
   quotationId: string;
@@ -116,7 +94,6 @@ interface OrderPlacementModalProps {
     username?: string;
     email?: string;
   } | null;
-  locale?: "en" | "zh";
 }
 
 function sanitizeTwAddress(address: string): string {
@@ -179,9 +156,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   destinationCoords: initialDestinationCoords,
   initialDestinationDetails,
   currentUser,
-  locale = "zh",
 }) => {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("Lalamove");
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
   const [currentQuotation, setCurrentQuotation] =
@@ -194,7 +172,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   // 地址狀態
   const [originAddr, setOriginAddr] = useState(initialOriginAddress);
   const [destAddr, setDestAddr] = useState(initialDestinationAddress);
-  const [originDetails, setOriginDetails] = useState<ParsedGooglePlace | null>(null);
+  const [originDetails, setOriginDetails] = useState<ParsedGooglePlace | null>(
+    null,
+  );
   const [destDetails, setDestDetails] = useState<ParsedGooglePlace | null>(
     initialDestinationDetails || null,
   );
@@ -233,13 +213,15 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   const [isRecalculating, setIsRecalculating] = useState(false);
 
   // 聯絡人狀態
-  const [senderName, setSenderName] = useState(post.username || "寄件人");
+  const [senderName, setSenderName] = useState(
+    post.username || t("order.defaultSenderName"),
+  );
   const [senderPhone, setSenderPhone] = useState("+886912345678");
   const [senderFloorUnit, setSenderFloorUnit] = useState("");
   const [senderRemarks, setSenderRemarks] = useState("");
 
   const [recipientName, setRecipientName] = useState(
-    currentUser?.username || "收件人",
+    currentUser?.username || t("order.defaultRecipientName"),
   );
   const [recipientPhone, setRecipientPhone] = useState("+886987654321");
   const [recipientFloorUnit, setRecipientFloorUnit] = useState("");
@@ -389,7 +371,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   // 批量重新試算所有車型運費（並更新 quotesMap 與 currentQuotation）
   const handleBatchRecalculate = async (targetServiceType?: string) => {
     if (!originAddr.trim() || !destAddr.trim()) {
-      setErrorMessage("取件與送達地址皆不能為空");
+      setErrorMessage(t("order.addressesRequired"));
       return;
     }
 
@@ -445,9 +427,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          serviceTypes: ["MOTORCYCLE", "SUV", "VAN", "TRUCK175", "TRUCK330"],
+          serviceTypes: VEHICLE_TYPES,
           stops,
-          language: locale === "en" ? "en_TW" : "zh_TW",
+          language: toLalamoveLanguage(locale),
         }),
       });
 
@@ -458,7 +440,9 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         !data.quotations ||
         data.quotations.length === 0
       ) {
-        throw new Error(data.message || data.error || "重新計算報價失敗");
+        throw new Error(
+          data.message || data.error || t("order.recalculateFailed"),
+        );
       }
 
       const quotesMapNew: Record<string, QuotationItem> = {};
@@ -497,13 +481,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         onQuotationsUpdate?.(quotesMapNew, activeQuote);
       }
 
-      toast.success(
-        locale === "en"
-          ? "Fare quotes updated for all vehicles!"
-          : "所有車型運費報價已更新！",
-      );
+      toast.success(t("order.allQuotesUpdated"));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "重新計算報價失敗";
+      const msg =
+        err instanceof Error ? err.message : t("order.recalculateFailed");
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
@@ -558,17 +539,13 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         typeof window !== "undefined"
           ? window.location.pathname + window.location.search
           : "/";
-      toast.error(
-        locale === "en"
-          ? "Please sign in before checking out."
-          : "請先登入後再進行結帳付款",
-      );
+      toast.error(t("order.signInToCheckout"));
       router.push(`/signin?returnTo=${encodeURIComponent(currentPath)}`);
       return;
     }
 
     if (!currentQuotation) {
-      setErrorMessage("請先取得有效報價");
+      setErrorMessage(t("order.quoteRequired"));
       return;
     }
     if (
@@ -576,38 +553,24 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       (currentQuotation.expiresAt &&
         new Date(currentQuotation.expiresAt).getTime() <= Date.now())
     ) {
-      setErrorMessage(
-        locale === "en"
-          ? "Fare quotation has expired. Please recalculate."
-          : "運費報價已過期，請點擊「重新試算」更新報價後再送出",
-      );
+      setErrorMessage(t("order.quoteExpiredError"));
       setIsQuoteExpired(true);
       return;
     }
     if (!senderName.trim()) {
-      setErrorMessage(
-        locale === "en" ? "Sender name is required" : "請填寫寄件人姓名",
-      );
+      setErrorMessage(t("order.senderNameRequired"));
       return;
     }
     if (!senderPhone.trim()) {
-      setErrorMessage(
-        locale === "en" ? "Sender phone is required" : "請填寫寄件人手機電話",
-      );
+      setErrorMessage(t("order.senderPhoneRequired"));
       return;
     }
     if (!recipientName.trim()) {
-      setErrorMessage(
-        locale === "en" ? "Recipient name is required" : "請填寫收件人姓名",
-      );
+      setErrorMessage(t("order.recipientNameRequired"));
       return;
     }
     if (!recipientPhone.trim()) {
-      setErrorMessage(
-        locale === "en"
-          ? "Recipient phone is required"
-          : "請填寫收件人手機電話",
-      );
+      setErrorMessage(t("order.recipientPhoneRequired"));
       return;
     }
 
@@ -615,18 +578,22 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       setIsSubmitting(true);
 
       const senderFullRemarks = [
-        senderFloorUnit ? `樓層門牌：${senderFloorUnit}` : "",
+        senderFloorUnit
+          ? t("order.floorUnitRemark", { floorUnit: senderFloorUnit })
+          : "",
         senderRemarks,
       ]
         .filter(Boolean)
-        .join("，");
+        .join(t("order.remarksSeparator"));
 
       const recipientFullRemarks = [
-        recipientFloorUnit ? `樓層門牌：${recipientFloorUnit}` : "",
+        recipientFloorUnit
+          ? t("order.floorUnitRemark", { floorUnit: recipientFloorUnit })
+          : "",
         recipientRemarks,
       ]
         .filter(Boolean)
-        .join("，");
+        .join(t("order.remarksSeparator"));
 
       // 呼叫金流結帳 API
       const checkoutPayload = {
@@ -649,10 +616,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
           province: originDetails?.province || post.province || undefined,
           city: originDetails?.city || post.city || undefined,
           route: originDetails?.route || post.route || undefined,
-          zipCode:
-            originDetails?.zip_code ||
-            post.zip_code ||
-            undefined,
+          zipCode: originDetails?.zip_code || post.zip_code || undefined,
           url: originDetails?.url || post.location_url || undefined,
         },
         pickupRemarks: senderFullRemarks || undefined,
@@ -691,11 +655,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
           typeof window !== "undefined"
             ? window.location.pathname + window.location.search
             : "/";
-        toast.error(
-          locale === "en"
-            ? "Session expired. Please sign in again."
-            : "登入已逾期，請重新登入",
-        );
+        toast.error(t("order.sessionExpired"));
         router.push(`/signin?returnTo=${encodeURIComponent(currentPath)}`);
         return;
       }
@@ -703,21 +663,22 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || data.error || "建立結帳訂單失敗");
+        throw new Error(
+          data.message || data.error || t("order.checkoutFailed"),
+        );
       }
 
       // 儲存 MerchantTradeNo 與當前貼文網址到 sessionStorage，供付款後查詢與返回
       const tradeNo = data.session?.formData?.MerchantTradeNo;
       if (typeof window !== "undefined") {
         if (tradeNo) sessionStorage.setItem("lastMerchantTradeNo", tradeNo);
-        sessionStorage.setItem("lastPostUrl", window.location.pathname + window.location.search);
+        sessionStorage.setItem(
+          "lastPostUrl",
+          window.location.pathname + window.location.search,
+        );
       }
 
-      toast.success(
-        locale === "en"
-          ? "Redirecting to secure payment..."
-          : "正在跳轉至綠界安全結帳頁面...",
-      );
+      toast.success(t("order.redirectingToPayment"));
 
       // 注入綠界自動跳轉 Form 並送出，瀏覽器將被導向綠界付款頁
       const htmlForm = data.session?.htmlForm as string | undefined;
@@ -732,10 +693,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         }
       }
 
-      throw new Error("未收到有效的付款表單，請重試");
+      throw new Error(t("order.paymentFormMissing"));
     } catch (err: unknown) {
       console.error("Checkout failed:", err);
-      const msg = err instanceof Error ? err.message : "下單失敗，請稍後再試";
+      const msg = err instanceof Error ? err.message : t("order.orderFailed");
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
@@ -781,14 +742,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               </div>
               <div>
                 <Dialog.Title className="text-base font-bold text-gray-900 sm:text-lg">
-                  {locale === "en"
-                    ? "Confirm Lalamove Delivery Order"
-                    : "確認 Lalamove 配送訂單"}
+                  {t("order.title")}
                 </Dialog.Title>
                 <Dialog.Description className="text-xs text-gray-500">
-                  {locale === "en"
-                    ? "Confirm details, vehicle type, edit addresses or remarks."
-                    : "可在此切換車型、修改地址與聯絡人資訊。"}
+                  {t("order.description")}
                 </Dialog.Description>
               </div>
             </div>
@@ -809,9 +766,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     <MapPin className="h-3 w-3" />
                   </div>
                   <h4 className="text-xs font-bold text-gray-900">
-                    {locale === "en"
-                      ? "1. Pickup / Sender Info"
-                      : "1. 取件 / 寄件人資訊"}
+                    {t("order.senderSection")}
                   </h4>
                 </div>
 
@@ -822,7 +777,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 hover:text-orange-700"
                   >
                     <Edit3 className="h-3 w-3" />
-                    修改地址
+                    {t("order.editAddress")}
                   </button>
                 ) : null}
               </div>
@@ -831,21 +786,21 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               {isEditingAddresses ? (
                 <div className="mb-3 space-y-2 rounded-xl border border-orange-200/60 bg-orange-50/50 p-2.5">
                   <label className="block text-[11px] font-semibold text-orange-800">
-                    修改取件地址：
+                    {t("order.editPickupAddress")}
                   </label>
                   <input
                     ref={originInputRef}
                     type="text"
                     value={originAddr}
                     onChange={(e) => setOriginAddr(e.target.value)}
-                    placeholder="輸入新取件地址"
+                    placeholder={t("order.pickupAddressPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs focus:border-orange-500 focus:outline-none"
                   />
                 </div>
               ) : (
                 <p className="mb-3 rounded-xl bg-gray-50 p-2 text-xs text-gray-600">
                   <span className="font-semibold text-gray-700">
-                    取件地址：
+                    {t("order.pickupAddress")}
                   </span>
                   {originAddr}
                 </p>
@@ -854,7 +809,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    寄件人姓名 <span className="text-red-500">*</span>
+                    {t("order.senderName")}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -863,7 +819,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       required
                       value={senderName}
                       onChange={(e) => setSenderName(e.target.value)}
-                      placeholder="例：王小明"
+                      placeholder={t("order.senderNamePlaceholder")}
                       className="w-full rounded-xl border border-gray-200 py-1.5 pl-8 pr-3 text-xs focus:border-orange-500 focus:outline-none"
                     />
                   </div>
@@ -871,7 +827,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    寄件人電話 <span className="text-red-500">*</span>
+                    {t("order.senderPhone")}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -880,7 +837,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       required
                       value={senderPhone}
                       onChange={(e) => setSenderPhone(e.target.value)}
-                      placeholder="例：0912345678"
+                      placeholder={t("order.senderPhonePlaceholder")}
                       className="w-full rounded-xl border border-gray-200 py-1.5 pl-8 pr-3 text-xs focus:border-orange-500 focus:outline-none"
                     />
                   </div>
@@ -890,20 +847,20 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    取件樓層 / 門牌 (選填)
+                    {t("order.pickupFloorUnit")}
                   </label>
                   <input
                     type="text"
                     value={senderFloorUnit}
                     onChange={(e) => setSenderFloorUnit(e.target.value)}
-                    placeholder="例：3樓之1、A棟"
+                    placeholder={t("order.pickupFloorUnitPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-xs focus:border-orange-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    取件備註給司機 (選填)
+                    {t("order.pickupRemarks")}
                   </label>
                   <div className="relative">
                     <FileText className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -911,7 +868,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       type="text"
                       value={senderRemarks}
                       onChange={(e) => setSenderRemarks(e.target.value)}
-                      placeholder="例：請按電鈴、放置管理室"
+                      placeholder={t("order.pickupRemarksPlaceholder")}
                       className="w-full rounded-xl border border-gray-200 py-1.5 pl-8 pr-3 text-xs focus:border-orange-500 focus:outline-none"
                     />
                   </div>
@@ -927,9 +884,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     <MapPin className="h-3 w-3" />
                   </div>
                   <h4 className="text-xs font-bold text-gray-900">
-                    {locale === "en"
-                      ? "2. Drop-off / Recipient Info"
-                      : "2. 送達 / 收件人資訊"}
+                    {t("order.recipientSection")}
                   </h4>
                 </div>
 
@@ -940,7 +895,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     className="flex items-center gap-1 text-[11px] font-semibold text-orange-600 hover:text-orange-700"
                   >
                     <Edit3 className="h-3 w-3" />
-                    修改地址
+                    {t("order.editAddress")}
                   </button>
                 ) : null}
               </div>
@@ -949,21 +904,21 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               {isEditingAddresses ? (
                 <div className="mb-3 space-y-2 rounded-xl border border-orange-200/60 bg-orange-50/50 p-2.5">
                   <label className="block text-[11px] font-semibold text-orange-800">
-                    修改送達地址：
+                    {t("order.editDropoffAddress")}
                   </label>
                   <input
                     ref={destInputRef}
                     type="text"
                     value={destAddr}
                     onChange={(e) => setDestAddr(e.target.value)}
-                    placeholder="輸入新送達地址"
+                    placeholder={t("order.dropoffAddressPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 bg-white p-2 text-xs focus:border-orange-500 focus:outline-none"
                   />
                 </div>
               ) : (
                 <p className="mb-3 rounded-xl bg-gray-50 p-2 text-xs text-gray-600">
                   <span className="font-semibold text-gray-700">
-                    送達地址：
+                    {t("order.dropoffAddress")}
                   </span>
                   {destAddr}
                 </p>
@@ -972,7 +927,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    收件人姓名 <span className="text-red-500">*</span>
+                    {t("order.recipientName")}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <User className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -981,7 +937,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       required
                       value={recipientName}
                       onChange={(e) => setRecipientName(e.target.value)}
-                      placeholder="例：陳大華"
+                      placeholder={t("order.recipientNamePlaceholder")}
                       className="w-full rounded-xl border border-gray-200 py-1.5 pl-8 pr-3 text-xs focus:border-orange-500 focus:outline-none"
                     />
                   </div>
@@ -989,7 +945,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    收件人電話 <span className="text-red-500">*</span>
+                    {t("order.recipientPhone")}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -998,7 +955,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       required
                       value={recipientPhone}
                       onChange={(e) => setRecipientPhone(e.target.value)}
-                      placeholder="例：0987654321"
+                      placeholder={t("order.recipientPhonePlaceholder")}
                       className="w-full rounded-xl border border-gray-200 py-1.5 pl-8 pr-3 text-xs focus:border-orange-500 focus:outline-none"
                     />
                   </div>
@@ -1008,20 +965,20 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    送達樓層 / 門牌 (選填)
+                    {t("order.dropoffFloorUnit")}
                   </label>
                   <input
                     type="text"
                     value={recipientFloorUnit}
                     onChange={(e) => setRecipientFloorUnit(e.target.value)}
-                    placeholder="例：5樓之2、管理室"
+                    placeholder={t("order.dropoffFloorUnitPlaceholder")}
                     className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-xs focus:border-orange-500 focus:outline-none"
                   />
                 </div>
 
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-gray-600">
-                    送件備註給司機 (選填)
+                    {t("order.dropoffRemarks")}
                   </label>
                   <div className="relative">
                     <FileText className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
@@ -1029,7 +986,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       type="text"
                       value={recipientRemarks}
                       onChange={(e) => setRecipientRemarks(e.target.value)}
-                      placeholder="例：到達前先電聯、門口鞋櫃"
+                      placeholder={t("order.dropoffRemarksPlaceholder")}
                       className="w-full rounded-xl border border-gray-200 py-1.5 pl-8 pr-3 text-xs focus:border-orange-500 focus:outline-none"
                     />
                   </div>
@@ -1045,7 +1002,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   onClick={() => setIsEditingAddresses(false)}
                   className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  取消修改
+                  {t("order.cancelEdit")}
                 </button>
                 <button
                   type="button"
@@ -1056,12 +1013,12 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   {isRecalculating ? (
                     <>
                       <RotateCw className="h-3.5 w-3.5 animate-spin" />
-                      重新計算中...
+                      {t("order.recalculating")}
                     </>
                   ) : (
                     <>
                       <Check className="h-3.5 w-3.5" />
-                      儲存新地址並重算運費
+                      {t("order.saveAndRecalculate")}
                     </>
                   )}
                 </button>
@@ -1072,30 +1029,31 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
             <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-800">
-                  {locale === "en" ? "Select Vehicle Type" : "選擇配送車型"}
+                  {t("order.selectVehicle")}
                 </span>
                 {isRecalculating && (
                   <span className="flex items-center gap-1 text-[11px] font-semibold text-orange-600">
                     <RotateCw className="h-3 w-3 animate-spin" />
-                    重新計算中...
+                    {t("order.recalculating")}
                   </span>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {VEHICLE_OPTIONS.map((v) => {
-                  const isSelected = currentQuotation.serviceType === v.id;
+                {VEHICLE_TYPES.map((id) => {
+                  const isSelected = currentQuotation.serviceType === id;
+                  const icon = VEHICLE_ICONS[id];
                   const quoteForVehicle =
-                    quotesMap[v.id] ||
-                    (v.id === "TRUCK175" ? quotesMap["TRUCK330"] : undefined) ||
-                    (v.id === "TRUCK330" ? quotesMap["TRUCK175"] : undefined);
+                    quotesMap[id] ||
+                    (id === "TRUCK175" ? quotesMap["TRUCK330"] : undefined) ||
+                    (id === "TRUCK330" ? quotesMap["TRUCK175"] : undefined);
 
                   return (
                     <button
-                      key={v.id}
+                      key={id}
                       type="button"
                       disabled={isRecalculating}
-                      onClick={() => handleSwitchVehicle(v.id)}
+                      onClick={() => handleSwitchVehicle(id)}
                       className={`flex flex-col items-center justify-center rounded-xl border p-2.5 text-center transition-all ${
                         isSelected
                           ? "border-orange-500 bg-orange-50/90 text-orange-700 shadow-sm ring-2 ring-orange-400/30"
@@ -1109,14 +1067,20 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                             : "bg-gray-100 text-gray-500"
                         }`}
                       >
-                        {v.icon === "bike" && <Bike className="h-4 w-4" />}
-                        {v.icon === "van" && <Truck className="h-4 w-4" />}
-                        {v.icon === "car" && <Car className="h-4 w-4" />}
-                        {v.icon === "truck" && <Truck className="h-4 w-4" />}
+                        {icon === "bike" && <Bike className="h-4 w-4" />}
+                        {icon === "van" && <Truck className="h-4 w-4" />}
+                        {icon === "car" && <Car className="h-4 w-4" />}
+                        {icon === "truck" && <Truck className="h-4 w-4" />}
                       </div>
-                      <span className="text-xs font-bold">{v.name}</span>
+                      <span className="text-xs font-bold">
+                        {t(`vehicles.${id}.name`)}
+                      </span>
                       <span className="mt-0.5 text-[10px] text-gray-400">
-                        {v.desc.split("(")[1]?.replace(")", "") || v.desc}
+                        {t("order.vehicleDescription", {
+                          size: VEHICLE_SIZE_LIMITS[id],
+                          weight: t(`vehicles.${id}.weightLimit`),
+                          useCase: t(`vehicles.${id}.useCase`),
+                        })}
                       </span>
                       {quoteForVehicle && (
                         <span className="mt-1 font-ddin text-[11px] font-extrabold text-orange-600">
@@ -1133,13 +1097,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
             <QuotationSummaryCard
               variant="pill"
               quotation={currentQuotation}
-              locale={locale}
               vehicleName={
-                VEHICLE_OPTIONS.find(
-                  (v) => v.id === currentQuotation.serviceType,
-                )?.name ||
-                currentQuotation.serviceName ||
-                currentQuotation.serviceType
+                isVehicleType(currentQuotation.serviceType)
+                  ? t(`vehicles.${currentQuotation.serviceType}.name`)
+                  : currentQuotation.serviceName || currentQuotation.serviceType
               }
               postTitle={post.title}
               originAddress={originAddr}
@@ -1162,7 +1123,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
             <div className="flex items-center justify-between border-t border-gray-100 pt-3">
               <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
                 <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <span>Lalamove 官方即時媒合保障</span>
+                <span>{t("order.guarantee")}</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -1172,7 +1133,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                   disabled={isSubmitting}
                   className="rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
                 >
-                  取消
+                  {t("order.cancel")}
                 </button>
 
                 {isQuoteExpired ? (
@@ -1186,10 +1147,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                       className={`h-3.5 w-3.5 ${isRecalculating ? "animate-spin" : ""}`}
                     />
                     {isRecalculating
-                      ? "重新計算中..."
-                      : locale === "en"
-                        ? "Quote Expired · Recalculate"
-                        : "報價已過期 · 點此重新試算"}
+                      ? t("order.recalculating")
+                      : t("quoteExpiredRecalculate")}
                   </button>
                 ) : (
                   <button
@@ -1200,16 +1159,14 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
                     {isSubmitting ? (
                       <>
                         <RotateCw className="h-3.5 w-3.5 animate-spin" />
-                        {locale === "en"
-                          ? "Connecting to payment..."
-                          : "正在建立安全交易通道..."}
+                        {t("order.connectingPayment")}
                       </>
                     ) : (
                       <>
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        {locale === "en"
-                          ? `Pay Securely (NT$ ${currentQuotation.priceBreakdown.total})`
-                          : `前往安全付款 (NT$ ${currentQuotation.priceBreakdown.total})`}
+                        {t("order.paySecurely", {
+                          total: currentQuotation.priceBreakdown.total,
+                        })}
                         <ArrowRight className="h-3.5 w-3.5" />
                       </>
                     )}
@@ -1225,4 +1182,3 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 };
 
 export default OrderPlacementModal;
-

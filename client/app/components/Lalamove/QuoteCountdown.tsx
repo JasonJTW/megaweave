@@ -5,8 +5,8 @@ import { CheckCircle2 } from "lucide-react";
 
 export interface QuoteCountdownProps {
   expiresAt?: string;
-  labelCountdown?: string;
-  labelExpired?: string;
+  labelCountdown: string;
+  labelExpired: string;
   onExpireChange?: (isExpired: boolean) => void;
   className?: string;
 }
@@ -17,8 +17,8 @@ export interface QuoteCountdownProps {
  */
 export const QuoteCountdown = React.memo(function QuoteCountdown({
   expiresAt,
-  labelCountdown = "報價保留倒數：",
-  labelExpired = "報價已過期",
+  labelCountdown,
+  labelExpired,
   onExpireChange,
   className = "flex items-center gap-1.5 text-xs text-gray-500",
 }: QuoteCountdownProps) {
@@ -91,7 +91,7 @@ export const QuoteCountdown = React.memo(function QuoteCountdown({
 
   return (
     <div className={className}>
-      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
       {/* rowRef hides when expired; expiredSpanRef shows */}
       <span ref={rowRef}>
         {labelCountdown}{" "}

@@ -35,6 +35,6 @@ export function useSwitchLocale() {
     }
 
     const { search, hash } = window.location;
-    router.replace(`${pathname}${search}${hash}`, { locale });
+    router.push(`${pathname}${search}${hash}`, { locale });
   };
 }

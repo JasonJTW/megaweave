@@ -32,6 +32,10 @@ const LanguageSwitcher = ({
       hrefLang={target}
       title={t("label")}
       onClick={(event) => {
+        // Let modified clicks open the plain link in a new tab or window
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+          return;
+        }
         event.preventDefault();
         onSwitch?.();
         switchLocale(target);

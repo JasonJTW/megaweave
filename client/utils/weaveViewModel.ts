@@ -42,6 +42,8 @@ export function getWeaveViewModel(input: WeaveViewModelInput): WeaveViewModel {
   if (!isGiver && !isReceiver) return { actions };
 
   if (status === "requested") {
+    // Unknown Post Author: show nothing rather than guess the viewer's role.
+    if (input.postAuthorId === undefined) return { actions };
     if (viewerId === input.postAuthorId) {
       actions.add("approve");
       actions.add("decline");

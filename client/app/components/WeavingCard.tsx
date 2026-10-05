@@ -502,6 +502,15 @@ const WeavingCard = ({
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
                 )}
+                {currentStatus === "pending" && hasIConfirmed && (
+                  <span
+                    className="text-green-500"
+                    title="You have confirmed"
+                    aria-label="You have confirmed"
+                  >
+                    <AcceptIcon className="h-auto w-[18px] stroke-[3px]" />
+                  </span>
+                )}
                 {availableActions.has("confirm") && (
                   <button
                     onClick={handleCompleteWeave}

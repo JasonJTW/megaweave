@@ -114,6 +114,19 @@ describe("getWeaveViewModel actions", () => {
     });
   }
 
+  it("requested with unknown Post Author yields no actions", () => {
+    const { actions } = getWeaveViewModel({
+      status: "requested",
+      viewerId: AUTHOR,
+      postAuthorId: undefined,
+      giverId: AUTHOR,
+      receiverId: INITIATOR,
+      giverConfirmed: false,
+      receiverConfirmed: false,
+    });
+    assert.equal(actions.size, 0);
+  });
+
   it("undefined status or viewer yields no actions", () => {
     assert.deepEqual(
       getWeaveViewModel({

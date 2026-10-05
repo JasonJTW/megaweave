@@ -32,6 +32,13 @@ export interface EmailTemplateProps {
   toEmail: string;
 }
 
+const DEFAULT_STATUS_BADGE = { backgroundColor: "#D1FAE5", color: "#065F46" };
+const STATUS_BADGE: Partial<
+  Record<WeaveStatus, { backgroundColor: string; color: string }>
+> = {
+  withdrawn: { backgroundColor: "#EAEAEA", color: "#7C7C7C" },
+};
+
 const EmailTemplate = ({
   username,
   title,
@@ -277,8 +284,7 @@ const EmailTemplate = ({
                   <Text
                     style={{
                       display: "inline-block",
-                      backgroundColor: "#D1FAE5",
-                      color: "#065F46",
+                      ...(STATUS_BADGE[weaving_status] ?? DEFAULT_STATUS_BADGE),
                       fontSize: 12,
                       fontWeight: 600,
                       padding: "3px 10px",

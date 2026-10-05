@@ -137,6 +137,8 @@ build-dev:
 test:
 	@echo "🧪 執行 server 測試..."
 	cd server && npm test -- --forceExit
+	@echo "🧪 執行 client 單元測試..."
+	cd client && npm test
 	@echo "✅ 測試完成"
 
 e2e:

@@ -8,9 +8,9 @@ import {
 describe("hasPendingWeaveForPost", () => {
   const currentPostId = 42;
 
-  it("returns true when weaves contains an item with post_id === currentPostId and status === 'pending'", () => {
+  it("returns true when weaves contains an item with post_id === currentPostId and status === 'approved'", () => {
     const weaves: WeaveItemCheck[] = [
-      { post_id: 42, status: "pending" },
+      { post_id: 42, status: "approved" },
       { post_id: 99, status: "completed" },
     ];
     assert.equal(hasPendingWeaveForPost(weaves, currentPostId), true);
@@ -22,20 +22,20 @@ describe("hasPendingWeaveForPost", () => {
     assert.equal(hasPendingWeaveForPost(undefined, currentPostId), false);
   });
 
-  it("returns false when post_id matches but status is not pending (e.g. requested, completed, cancelled, rejected)", () => {
+  it("returns false when post_id matches but status is not approved (e.g. requested, completed, cancelled, declined)", () => {
     const weaves: WeaveItemCheck[] = [
       { post_id: 42, status: "requested" },
       { post_id: 42, status: "completed" },
       { post_id: 42, status: "cancelled" },
-      { post_id: 42, status: "rejected" },
+      { post_id: 42, status: "declined" },
     ];
     assert.equal(hasPendingWeaveForPost(weaves, currentPostId), false);
   });
 
-  it("returns false when status is pending but for a different post_id", () => {
+  it("returns false when status is approved but for a different post_id", () => {
     const weaves: WeaveItemCheck[] = [
-      { post_id: 100, status: "pending" },
-      { post_id: 101, status: "pending" },
+      { post_id: 100, status: "approved" },
+      { post_id: 101, status: "approved" },
     ];
     assert.equal(hasPendingWeaveForPost(weaves, currentPostId), false);
   });

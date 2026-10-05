@@ -38,29 +38,29 @@ describe("getLalamoveAction", () => {
 });
 
 describe("shouldShowLalamoveQuotation", () => {
-  it("returns true only when in chat window, status is pending, and post exists", () => {
+  it("returns true only when in chat window, status is approved, and post exists", () => {
     assert.equal(
       shouldShowLalamoveQuotation({
         isInChatWindow: true,
-        status: "pending",
+        status: "approved",
         hasPost: true,
       }),
       true,
     );
   });
 
-  it("returns false when not in chat window even if status is pending", () => {
+  it("returns false when not in chat window even if status is approved", () => {
     assert.equal(
       shouldShowLalamoveQuotation({
         isInChatWindow: false,
-        status: "pending",
+        status: "approved",
         hasPost: true,
       }),
       false,
     );
   });
 
-  it("returns false when status is not pending", () => {
+  it("returns false when status is not approved", () => {
     assert.equal(
       shouldShowLalamoveQuotation({
         isInChatWindow: true,
@@ -91,7 +91,7 @@ describe("shouldShowLalamoveQuotation", () => {
     assert.equal(
       shouldShowLalamoveQuotation({
         isInChatWindow: true,
-        status: "pending",
+        status: "approved",
         hasPost: false,
       }),
       false,

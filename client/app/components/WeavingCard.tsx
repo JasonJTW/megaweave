@@ -61,6 +61,7 @@ type WeaveStatusLabel =
   | "Weaved"
   | "Weaving"
   | "Rejected"
+  | "Withdrawn"
   | "Canceled";
 
 function getWeaveStatusLabel(
@@ -73,10 +74,12 @@ function getWeaveStatusLabel(
       return isGiverRole ? "New Request" : "Request Sent";
     case "completed":
       return "Weaved";
-    case "pending":
+    case "approved":
       return "Weaving";
-    case "rejected":
+    case "declined":
       return "Rejected";
+    case "withdrawn":
+      return "Withdrawn";
     case "cancelled":
       return "Canceled";
     default:
@@ -97,6 +100,10 @@ const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> =
     Weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
     Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
     Rejected: { badge: "bg-[#FEE2E2] text-[#991B1B]", icon: "text-[#991B1B]" },
+    Withdrawn: {
+      badge: "bg-[#EAEAEA] text-[#7C7C7C]",
+      icon: "text-[#7C7C7C]",
+    },
     Canceled: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
   };
 
@@ -171,12 +178,14 @@ const WeavingCard = ({
     isReceiver,
     hasIConfirmed,
     hasOtherConfirmed,
+    availableActions,
     localStatus,
     isProcessing,
     handleApproveWeave,
     handleRejectWeave,
     handleCompleteWeave,
     handleCancelWeave,
+    handleWithdrawWeave,
   } = useWeaveActions({
     weave: activeWeave,
     currentUserId,
@@ -426,14 +435,14 @@ const WeavingCard = ({
               {currentStatus === "requested" && (
                 <div className="mt-1 flex flex-col gap-1">
                   <span className="text-xs font-medium text-amber-600">
-                    {isGiver
-                      ? "Requested by receiver. Approve or reject this request?"
-                      : "Waiting for giver's approval..."}
+                    {availableActions.has("approve")
+                      ? "Approve or reject this request?"
+                      : "Waiting for the post author's approval..."}
                   </span>
                 </div>
               )}
 
-              {currentStatus === "pending" && (
+              {currentStatus === "approved" && (
                 <div className="mt-1 flex flex-col gap-1">
                   {!hasIConfirmed ? (
                     <span className="text-xs font-medium text-orange-500">
@@ -460,34 +469,68 @@ const WeavingCard = ({
               )}
             </div>
 
-            {/* Action buttons — requested state */}
-            {currentStatus === "requested" && (
+            {/* Action buttons — rendered only from the Weave view model */}
+            {(currentStatus === "requested" || currentStatus === "approved") && (
               <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
-                {isGiver ? (
-                  <>
-                    <button
-                      onClick={handleApproveWeave}
-                      disabled={isProcessing}
-                      className={`transition-all hover:text-green-600 ${isProcessing ? "opacity-50" : ""}`}
-                      title="Approve request"
-                    >
-                      <AcceptIcon className="h-auto w-[18px]" />
-                    </button>
-                    <button
-                      onClick={handleRejectWeave}
-                      disabled={isProcessing}
-                      className={`transition-all hover:text-red-600 ${isProcessing ? "opacity-50" : ""}`}
-                      title="Reject request"
-                    >
-                      <CancelIcon className="h-auto w-[18px]" />
-                    </button>
-                  </>
-                ) : (
+                {availableActions.has("approve") && (
+                  <button
+                    onClick={handleApproveWeave}
+                    disabled={isProcessing}
+                    className={`transition-all hover:text-green-600 ${isProcessing ? "opacity-50" : ""}`}
+                    title="Approve request"
+                  >
+                    <AcceptIcon className="h-auto w-[18px]" />
+                  </button>
+                )}
+                {availableActions.has("decline") && (
+                  <button
+                    onClick={handleRejectWeave}
+                    disabled={isProcessing}
+                    className={`transition-all hover:text-red-600 ${isProcessing ? "opacity-50" : ""}`}
+                    title="Decline request"
+                  >
+                    <CancelIcon className="h-auto w-[18px]" />
+                  </button>
+                )}
+                {availableActions.has("withdraw") && (
+                  <button
+                    onClick={handleWithdrawWeave}
+                    disabled={isProcessing}
+                    className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
+                    title="Withdraw request"
+                  >
+                    <CancelIcon className="h-auto w-[18px]" />
+                  </button>
+                )}
+                {currentStatus === "approved" && hasIConfirmed && (
+                  <span
+                    className="text-green-500"
+                    title="You have confirmed"
+                    aria-label="You have confirmed"
+                  >
+                    <AcceptIcon className="h-auto w-[18px] stroke-[3px]" />
+                  </span>
+                )}
+                {availableActions.has("confirm") && (
+                  <button
+                    onClick={handleCompleteWeave}
+                    disabled={isProcessing}
+                    className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
+                    title={
+                      hasIConfirmed ? "You have confirmed" : "Complete weave"
+                    }
+                  >
+                    <AcceptIcon
+                      className={`h-auto w-[18px] ${hasIConfirmed ? "stroke-[3px]" : ""}`}
+                    />
+                  </button>
+                )}
+                {availableActions.has("cancel") && (
                   <button
                     onClick={handleCancelWeave}
                     disabled={isProcessing}
                     className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
-                    title="Cancel request"
+                    title="Cancel weave"
                   >
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
@@ -495,49 +538,25 @@ const WeavingCard = ({
               </div>
             )}
 
-            {/* Action buttons — pending state */}
-            {currentStatus === "pending" && (
-              <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
-                <button
-                  onClick={handleCompleteWeave}
-                  disabled={isProcessing || hasIConfirmed}
-                  className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
-                  title={
-                    hasIConfirmed ? "You have confirmed" : "Complete weave"
-                  }
-                >
-                  <AcceptIcon
-                    className={`h-auto w-[18px] ${hasIConfirmed ? "stroke-[3px]" : ""}`}
-                  />
-                </button>
-                <button
-                  onClick={handleCancelWeave}
-                  disabled={isProcessing}
-                  className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
-                  title="Cancel weave"
-                >
-                  <CancelIcon className="h-auto w-[18px]" />
-                </button>
-              </div>
-            )}
-
             {/* Final status */}
-            {currentStatus !== "requested" && currentStatus !== "pending" && (
+            {currentStatus !== "requested" && currentStatus !== "approved" && (
               <div className="ml-auto">
                 <span
                   className={`text-sm font-semibold ${
                     currentStatus === "completed"
                       ? "text-green-600"
-                      : currentStatus === "rejected"
+                      : currentStatus === "declined"
                         ? "text-red-600"
                         : "text-gray-500"
                   }`}
                 >
                   {currentStatus === "completed"
                     ? "✓ Completed"
-                    : currentStatus === "rejected"
+                    : currentStatus === "declined"
                       ? "✗ Rejected"
-                      : "✗ Cancelled"}
+                      : currentStatus === "withdrawn"
+                        ? "✗ Withdrawn"
+                        : "✗ Cancelled"}
                 </span>
               </div>
             )}

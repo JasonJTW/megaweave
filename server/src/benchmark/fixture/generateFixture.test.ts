@@ -40,7 +40,7 @@ describe("benchmark fixture generator", () => {
       // 否則不同 commit 的 benchmark 結果會在不同資料上比較
       expect(fixture10k.version).toBe("megaweave-fixture-v1-posts10000-seed20260922");
       expect(fixture10k.fingerprint).toBe(
-        "926f66add0b05bc3c61bd92aefdf904aaece0546428ddff23bd48c90731728b0",
+        "44275d1b05615c9319e1db1ca3185d3f5bb7fc15d39bec4ed50f8563a79aef09",
       );
     });
 

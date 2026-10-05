@@ -644,7 +644,7 @@ CREATE TABLE `weaves` (
   `giver_id` bigint unsigned NOT NULL COMMENT '給予者（交出物品的一方；Share 為 Post Author，Wish 為 Initiator，見 ADR 0001）',
   `receiver_id` bigint unsigned NOT NULL COMMENT '接收者（收到物品的一方；Share 為 Initiator，Wish 為 Post Author，見 ADR 0001）',
   `conversation_id` bigint unsigned DEFAULT NULL,
-  `status` enum('approved','completed','cancelled','requested','declined','withdrawn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'approved',
+  `status` enum('approved','completed','cancelled','requested','declined','withdrawn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'requested',
   `giver_confirmed` tinyint(1) DEFAULT '0',
   `receiver_confirmed` tinyint(1) DEFAULT '0',
   `notes` text COLLATE utf8mb4_unicode_ci COMMENT '備註',

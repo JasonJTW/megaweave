@@ -1,9 +1,8 @@
 "use client";
 
+import { Link, useRouter } from "@/i18n/navigation";
 import type { Post } from "@/app/types/schema";
 import Image from "next/image";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import CompactPostCard from "./PostCard/CompactPostCard";
 import CommonShareIcon from "./icons/CommonShareIcon";
 import ElfIcon from "./icons/ElfIcon";

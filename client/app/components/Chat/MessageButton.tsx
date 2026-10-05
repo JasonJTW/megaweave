@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";

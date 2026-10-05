@@ -1,11 +1,11 @@
 "use client";
+import { useRouter } from "@/i18n/navigation";
 import {
   useNotification,
   NotificationItem,
 } from "../contexts/NotificationContext";
 import { motion, AnimatePresence } from "framer-motion";
 import MessageIcon from "./icons/MessageIcon";
-import { useRouter } from "next/navigation";
 
 export default function NotificationList() {
   // Use context hooks

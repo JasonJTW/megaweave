@@ -1,9 +1,9 @@
+import { useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import ExpandIcon from "./icons/ExpandIcon";
 import Feed from "./PostCard/Feed";
 import type { Post, Condition } from "../types/schema";
-import { useRouter } from "next/navigation";
 import ExpandedIcon from "./icons/ExpandedIcon";
 import type { Weave } from "@/services/weaveService";
 import { LucideRefreshCcw } from "lucide-react";

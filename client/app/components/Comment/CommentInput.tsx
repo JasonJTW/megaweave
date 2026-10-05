@@ -1,8 +1,8 @@
 // components/Comment/CommentInput.tsx
 "use client";
+import { useRouter } from "@/i18n/navigation";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createComment } from "@/services/commentService";
 import User from "../../types/user";
 import Image from "next/image";

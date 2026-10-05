@@ -1,4 +1,5 @@
 "use client";
+import { usePathname } from "@/i18n/navigation";
 import React, {
   createContext,
   useContext,
@@ -6,7 +7,6 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { usePathname } from "next/navigation";
 
 interface NavbarContextType {
   isNavbarVisible: boolean;

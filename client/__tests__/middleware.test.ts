@@ -7,6 +7,7 @@ import {
   matchesAnyRoute,
   getSafeReturnTo,
   normalizePathname,
+  splitLocalePrefix,
   VALID_ROLES,
   PROTECTED_ROUTES,
   GUEST_ONLY_ROUTES,
@@ -19,9 +20,10 @@ function createMockRequest(
   options: {
     method?: string;
     cookies?: Record<string, string>;
+    headers?: Record<string, string>;
   } = {}
 ): NextRequest {
-  const headers = new Headers();
+  const headers = new Headers(options.headers);
   if (options.cookies) {
     const cookieHeader = Object.entries(options.cookies)
       .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
@@ -296,6 +298,109 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       const res = await middleware(req);
       assert.equal(res.status, 200);
       assert.equal(res.headers.get("location"), null);
+    });
+  });
+
+  describe("Locale Routing", () => {
+    const authedUser = { "session-id": "valid-session", "user-role": "user" };
+
+    it("splits the locale prefix from the pathname", () => {
+      assert.deepEqual(splitLocalePrefix("/"), { locale: "zh-TW", pathname: "/" });
+      assert.deepEqual(splitLocalePrefix("/messages/1"), {
+        locale: "zh-TW",
+        pathname: "/messages/1",
+      });
+      assert.deepEqual(splitLocalePrefix("/en"), { locale: "en", pathname: "/" });
+      assert.deepEqual(splitLocalePrefix("/en/messages"), {
+        locale: "en",
+        pathname: "/messages",
+      });
+      assert.deepEqual(splitLocalePrefix("/zh-TW/user"), {
+        locale: "zh-TW",
+        pathname: "/user",
+      });
+      assert.deepEqual(splitLocalePrefix("/english"), {
+        locale: "zh-TW",
+        pathname: "/english",
+      });
+    });
+
+    it("rewrites unprefixed pages to the default locale without redirecting", async () => {
+      const res = await middleware(createMockRequest("/about"));
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("location"), null);
+      const rewrite = res.headers.get("x-middleware-rewrite");
+      assert.ok(rewrite && new URL(rewrite).pathname === "/zh-TW/about");
+    });
+
+    it("serves /en pages without redirecting", async () => {
+      for (const path of ["/en", "/en/about", "/en/item/some-id"]) {
+        const res = await middleware(createMockRequest(path));
+        assert.equal(res.status, 200, `Expected 200 for ${path}`);
+        assert.equal(res.headers.get("location"), null);
+      }
+    });
+
+    it("does not redirect / for an English Accept-Language", async () => {
+      const res = await middleware(
+        createMockRequest("/", { headers: { "accept-language": "en-US,en;q=0.9" } })
+      );
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("location"), null);
+    });
+
+    it("redirects the redundant /zh-TW prefix to the unprefixed URL", async () => {
+      const res = await middleware(createMockRequest("/zh-TW/about?x=1"));
+      assert.ok([307, 308].includes(res.status));
+      const location = new URL(res.headers.get("location")!);
+      assert.equal(`${location.pathname}${location.search}`, "/about?x=1");
+    });
+
+    it("guards prefixed protected routes and keeps the locale on sign-in", async () => {
+      const res = await middleware(createMockRequest("/en/messages?page=2"));
+      assert.equal(res.status, 307);
+      const location = new URL(res.headers.get("location")!);
+      assert.equal(location.pathname, "/en/signin");
+      assert.equal(location.searchParams.get("returnTo"), "/en/messages?page=2");
+    });
+
+    it("lets authenticated users into prefixed protected routes", async () => {
+      const res = await middleware(
+        createMockRequest("/en/messages", { cookies: authedUser })
+      );
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("location"), null);
+    });
+
+    it("guards prefixed admin routes", async () => {
+      const guest = await middleware(createMockRequest("/en/admin"));
+      const guestLocation = new URL(guest.headers.get("location")!);
+      assert.equal(guestLocation.pathname, "/en/signin");
+      assert.equal(guestLocation.searchParams.get("returnTo"), "/en/admin");
+
+      const user = await middleware(
+        createMockRequest("/en/admin", { cookies: authedUser })
+      );
+      assert.equal(user.status, 307);
+      assert.equal(new URL(user.headers.get("location")!).pathname, "/en");
+    });
+
+    it("sends authenticated users on /en/signin back to returnTo or the English home", async () => {
+      const withReturnTo = await middleware(
+        createMockRequest("/en/signin?returnTo=%2Fen%2Fmessages", { cookies: authedUser })
+      );
+      assert.equal(new URL(withReturnTo.headers.get("location")!).pathname, "/en/messages");
+
+      const withoutReturnTo = await middleware(
+        createMockRequest("/en/signup", { cookies: authedUser })
+      );
+      assert.equal(new URL(withoutReturnTo.headers.get("location")!).pathname, "/en");
+    });
+
+    it("rejects prefixed auth pages as returnTo", () => {
+      assert.equal(getSafeReturnTo("/en/signin"), "/");
+      assert.equal(getSafeReturnTo("/en/signup?x=1", "/en"), "/en");
+      assert.equal(getSafeReturnTo("/en/messages"), "/en/messages");
     });
   });
 });

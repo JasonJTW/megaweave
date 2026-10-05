@@ -1,5 +1,5 @@
+import { useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Post } from "@/app/types/schema";
 import {

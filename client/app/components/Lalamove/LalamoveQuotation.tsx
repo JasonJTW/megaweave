@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import useSWR from "swr";
 import { Post } from "@/app/types/schema";
@@ -23,7 +24,7 @@ import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
 import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   parseGooglePlace,
   GOOGLE_AUTOCOMPLETE_FIELDS,

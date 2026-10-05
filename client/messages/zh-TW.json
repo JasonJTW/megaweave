@@ -1,0 +1,32 @@
+{
+  "Navbar": {
+    "tinder": "滑卡探索",
+    "tinderDescription": "左右滑動，探索更多貼文",
+    "messages": "收件夾",
+    "notifications": "通知",
+    "profile": "個人檔案",
+    "profileDescription": "查看您的個人檔案",
+    "history": "瀏覽紀錄",
+    "historyDescription": "您最近瀏覽過的貼文",
+    "about": "關於我們",
+    "aboutDescription": "認識 megaweaving",
+    "earthday": "Jumbo",
+    "earthdayDescription": "世界地球日",
+    "install": "安裝",
+    "installDescription": "加入主畫面",
+    "signOut": "登出",
+    "signOutDescription": "登出您的帳號",
+    "openMenu": "開啟主選單",
+    "menuTitle": "導覽選單",
+    "menuDescription": "瀏覽所有導覽選項",
+    "notSignedIn": "您尚未登入",
+    "unexpectedError": "發生未預期的錯誤"
+  },
+  "Footer": {
+    "about": "關於我們",
+    "team": "團隊介紹",
+    "copyright": "© megaweaving 2025",
+    "privacyPolicy": "隱私權政策",
+    "termsOfService": "服務條款"
+  }
+}

@@ -1,8 +1,8 @@
 "use client";
 
+import { Link } from "@/i18n/navigation";
 import type { Weave } from "@/services/weaveService";
 import Image from "next/image";
-import Link from "next/link";
 import { User as UserIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";

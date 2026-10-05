@@ -1,12 +1,12 @@
 // components/Comment/CommentItem.tsx
 "use client";
+import { useRouter } from "@/i18n/navigation";
 
 import React, { useState } from "react";
 import { Comment } from "@/services/commentService";
 import CommentInput from "./CommentInput";
 import User from "../../types/user";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import UnlockIcon from "../icons/UnlockIcon";
 import MessageIcon from "../icons/MessageIcon";
 

@@ -1,10 +1,10 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import type { Post } from "@/app/types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { Heart } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import CommonShareIcon from "../icons/CommonShareIcon";
 import ElfIcon from "../icons/ElfIcon";
 import ReuseIcon from "../icons/ReuseIcon";

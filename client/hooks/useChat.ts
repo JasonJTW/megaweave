@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useSocket } from "./useSocket";
 import { Conversation, Message } from "@/app/types/schema";
 import { useUser } from "@/app/contexts/UserContext";
+import { splitLocalePrefix } from "@/i18n/routing";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 // Fetcher function
@@ -177,7 +178,7 @@ export const useChatSocket = (conversationId: number | null) => {
             );
 
             if (existingIndex !== -1) {
-              const path = window.location.pathname;
+              const path = splitLocalePrefix(window.location.pathname).pathname;
               const pathParts = path.split("/");
               const activeConversationId =
                 pathParts[1] === "messages" && pathParts[2]

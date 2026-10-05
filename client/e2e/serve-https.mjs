@@ -9,9 +9,13 @@ import https from "node:https";
 const HTTPS_PORT = 3100;
 const APP_PORT = 3101;
 
+// Bind to "localhost", not an IP: with an IP hostname, next-intl's rewrites
+// (e.g. / -> /zh-TW) resolve to a different origin and loop back as redirects.
+const APP_HOST = "localhost";
+
 const next = spawn(
   "npx",
-  ["next", "start", "--port", String(APP_PORT), "--hostname", "127.0.0.1"],
+  ["next", "start", "--port", String(APP_PORT), "--hostname", APP_HOST],
   { stdio: "inherit" },
 );
 next.on("exit", (code) => process.exit(code ?? 1));
@@ -25,7 +29,7 @@ const server = https.createServer(
   (req, res) => {
     const upstream = http.request(
       {
-        host: "127.0.0.1",
+        host: APP_HOST,
         port: APP_PORT,
         path: req.url,
         method: req.method,

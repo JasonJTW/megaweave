@@ -1,0 +1,32 @@
+{
+  "Navbar": {
+    "tinder": "Tinder",
+    "tinderDescription": "Swipe to discover posts",
+    "messages": "Messages",
+    "notifications": "Notifications",
+    "profile": "Profile",
+    "profileDescription": "View your profile",
+    "history": "Viewing History",
+    "historyDescription": "Posts you recently browsed",
+    "about": "About Us",
+    "aboutDescription": "About megaweaving",
+    "earthday": "Jumbo",
+    "earthdayDescription": "Earth Day",
+    "install": "Install",
+    "installDescription": "Add to Home Screen",
+    "signOut": "Sign Out",
+    "signOutDescription": "Log out of your account",
+    "openMenu": "Open menu",
+    "menuTitle": "Navigation Menu",
+    "menuDescription": "Browse through the navigation options",
+    "notSignedIn": "You are not signed in",
+    "unexpectedError": "An unexpected error occurred"
+  },
+  "Footer": {
+    "about": "About Us",
+    "team": "megaweaving Team",
+    "copyright": "© megaweaving 2025",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service"
+  }
+}

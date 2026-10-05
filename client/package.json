@@ -14,7 +14,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test": "tsx --test __tests__/*.test.ts"
   },
   "dependencies": {
     "@hashintel/refractive": "^0.0.3",
@@ -68,6 +69,7 @@
     "postcss": "^8",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

@@ -7,13 +7,13 @@ import {
   matchesAnyRoute,
   getSafeReturnTo,
   normalizePathname,
-  splitLocalePrefix,
   VALID_ROLES,
   PROTECTED_ROUTES,
   GUEST_ONLY_ROUTES,
   ADMIN_ROUTES,
   PUBLIC_ROUTES,
 } from "../middleware";
+import { splitLocalePrefix } from "../i18n/routing";
 
 function createMockRequest(
   url: string,

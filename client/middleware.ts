@@ -3,8 +3,6 @@ import type { NextRequest } from "next/server";
 import createIntlMiddleware from "next-intl/middleware";
 import { routing, splitLocalePrefix, localizePath } from "./i18n/routing";
 
-export { splitLocalePrefix };
-
 export type UserRole = "user" | "admin" | "contributor";
 
 export const VALID_ROLES: ReadonlySet<string> = new Set<UserRole>([

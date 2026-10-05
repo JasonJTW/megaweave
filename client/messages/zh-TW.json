@@ -1,6 +1,7 @@
 {
   "Navbar": {
     "tinder": "滑卡探索",
+    "tinderFeed": "滑卡探索",
     "tinderDescription": "左右滑動，探索更多貼文",
     "messages": "收件夾",
     "notifications": "通知",

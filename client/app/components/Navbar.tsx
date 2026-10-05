@@ -151,7 +151,7 @@ const Navbar = () => {
   const mobileNavItems: NavigationItem[] = [
     {
       href: "/tinder",
-      title: t("tinder"),
+      title: t("tinderFeed"),
       description: t("tinderDescription"),
       icon: Flame,
     },

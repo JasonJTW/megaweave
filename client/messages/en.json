@@ -1,6 +1,7 @@
 {
   "Navbar": {
     "tinder": "Tinder",
+    "tinderFeed": "Tinder Feed",
     "tinderDescription": "Swipe to discover posts",
     "messages": "Messages",
     "notifications": "Notifications",

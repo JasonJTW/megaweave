@@ -1,6 +1,8 @@
 import type { Locale } from "@/i18n/routing";
 
-const LALAMOVE_LANGUAGES: Record<Locale, string> = {
+export type LalamoveLanguage = "zh_TW" | "en_TW";
+
+const LALAMOVE_LANGUAGES: Record<Locale, LalamoveLanguage> = {
   "zh-TW": "zh_TW",
   en: "en_TW",
 };
@@ -9,7 +11,7 @@ const LALAMOVE_LANGUAGES: Record<Locale, string> = {
  * Lalamove market language for the current UI locale, so driver-facing text
  * matches the language the user is browsing in.
  */
-export function toLalamoveLanguage(locale: Locale): string {
+export function toLalamoveLanguage(locale: Locale): LalamoveLanguage {
   return LALAMOVE_LANGUAGES[locale];
 }
 

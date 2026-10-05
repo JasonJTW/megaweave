@@ -2,7 +2,12 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import type { Weave } from "@/services/weaveService";
 import { useSocket } from "@/hooks/useSocket";
-import { getWeaveViewModel, type WeaveAction } from "@/utils/weaveViewModel";
+import {
+  getWeaveViewModel,
+  type WeaveAction,
+  type WeaveHintKey,
+  type WeaveStatusKey,
+} from "@/utils/weaveViewModel";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -36,6 +41,9 @@ export interface WeaveActions {
   hasOtherConfirmed: boolean;
   /** Actions the current user may take, from the Weave view model. */
   availableActions: ReadonlySet<WeaveAction>;
+  /** Status badge / hint i18n keys, from the Weave view model. */
+  statusKey: WeaveStatusKey | null;
+  hintKey: WeaveHintKey | null;
 
   // Status
   localStatus: Weave["status"] | undefined;
@@ -106,7 +114,7 @@ export function useWeaveActions({
     ? localReceiverConfirmed
     : localGiverConfirmed;
 
-  const availableActions = weave
+  const viewModel = weave
     ? getWeaveViewModel({
         status: localStatus,
         viewerId: currentUserId,
@@ -115,8 +123,9 @@ export function useWeaveActions({
         receiverId: weave.receiver_id,
         giverConfirmed: localGiverConfirmed,
         receiverConfirmed: localReceiverConfirmed,
-      }).actions
-    : new Set<WeaveAction>();
+      })
+    : undefined;
+  const availableActions = viewModel?.actions ?? new Set<WeaveAction>();
 
   const handleApproveWeave = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -285,6 +294,8 @@ export function useWeaveActions({
     hasIConfirmed,
     hasOtherConfirmed,
     availableActions,
+    statusKey: viewModel?.statusKey ?? null,
+    hintKey: viewModel?.hintKey ?? null,
     localStatus,
     isProcessing,
     handleApproveWeave,

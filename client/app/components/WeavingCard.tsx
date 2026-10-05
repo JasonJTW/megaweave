@@ -14,6 +14,11 @@ import { useWeaveActions } from "@/hooks/useWeaveActions";
 import { useSocket } from "@/hooks/useSocket";
 import LalamoveQuotation from "./Lalamove/LalamoveQuotation";
 import { shouldShowLalamoveQuotation } from "@/utils/weaveGuard";
+import {
+  getWeaveStatusKey,
+  type WeaveHintKey,
+  type WeaveStatusKey,
+} from "@/utils/weaveViewModel";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -33,6 +38,7 @@ interface WeavesCardProps {
     imageUrl?: string;
     weaveId: number | string;
     isGiver: boolean;
+    isPostAuthor: boolean;
   };
 }
 
@@ -55,57 +61,48 @@ function getDisplayUsername(
   return post.username;
 }
 
-type WeaveStatusLabel =
-  | "New Request"
-  | "Request Sent"
-  | "Weaved"
-  | "Weaving"
-  | "Rejected"
-  | "Withdrawn"
-  | "Canceled";
+const STATUS_LABELS: Record<WeaveStatusKey, string> = {
+  newRequest: "New Request",
+  requestSent: "Request Sent",
+  weaving: "Weaving",
+  weaved: "Weaved",
+  declined: "Declined",
+  withdrawn: "Withdrawn",
+  cancelled: "Cancelled",
+};
 
-function getWeaveStatusLabel(
-  status: Weave["status"] | undefined,
-  isGiverRole: boolean,
-): WeaveStatusLabel | null {
-  if (!status) return null;
-  switch (status) {
-    case "requested":
-      return isGiverRole ? "New Request" : "Request Sent";
-    case "completed":
-      return "Weaved";
-    case "approved":
-      return "Weaving";
-    case "declined":
-      return "Rejected";
-    case "withdrawn":
-      return "Withdrawn";
-    case "cancelled":
-      return "Canceled";
-    default:
-      return null;
-  }
-}
+const HINT_TEXTS: Record<WeaveHintKey, string> = {
+  "requested.decideOnRequest": "Approve or decline this request?",
+  "requested.awaitingAuthor": "Waiting for the post author's approval...",
+  "approved.confirmHandover":
+    "Handed over the item? Click the checkmark to confirm.",
+  "approved.confirmReceipt":
+    "Received the item? Click the checkmark to confirm.",
+  "approved.waitingForReceiver":
+    "Handover confirmed. Waiting for the receiver to confirm receipt...",
+  "approved.waitingForGiver":
+    "Receipt confirmed. Waiting for the giver to confirm handover...",
+  "approved.receiverConfirmedPleaseConfirmHandover":
+    "The receiver confirmed receipt. Please confirm handover!",
+  "approved.giverConfirmedPleaseConfirmReceipt":
+    "The giver confirmed handover. Please confirm receipt!",
+};
 
-const statusStyles: Record<WeaveStatusLabel, { badge: string; icon: string }> =
-  {
-    "New Request": {
-      badge: "bg-[#FEF3C7] text-[#92400E]",
-      icon: "text-[#92400E]",
-    },
-    "Request Sent": {
-      badge: "bg-[#FEF3C7] text-[#92400E]",
-      icon: "text-[#92400E]",
-    },
-    Weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
-    Weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
-    Rejected: { badge: "bg-[#FEE2E2] text-[#991B1B]", icon: "text-[#991B1B]" },
-    Withdrawn: {
-      badge: "bg-[#EAEAEA] text-[#7C7C7C]",
-      icon: "text-[#7C7C7C]",
-    },
-    Canceled: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
-  };
+const statusStyles: Record<WeaveStatusKey, { badge: string; icon: string }> = {
+  newRequest: {
+    badge: "bg-[#FEF3C7] text-[#92400E]",
+    icon: "text-[#92400E]",
+  },
+  requestSent: {
+    badge: "bg-[#FEF3C7] text-[#92400E]",
+    icon: "text-[#92400E]",
+  },
+  weaved: { badge: "bg-[#E2E7E0] text-[#3B6232]", icon: "text-[#3B6232]" },
+  weaving: { badge: "bg-[#F5E6D3] text-[#CB5E32]", icon: "text-[#CB5E32]" },
+  declined: { badge: "bg-[#FEE2E2] text-[#991B1B]", icon: "text-[#991B1B]" },
+  withdrawn: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
+  cancelled: { badge: "bg-[#EAEAEA] text-[#7C7C7C]", icon: "text-[#7C7C7C]" },
+};
 
 const WeavingCard = ({
   post,
@@ -174,11 +171,11 @@ const WeavingCard = ({
   }, [socket, targetWeaveId, onWeaveStatusChange]);
 
   const {
-    isGiver,
-    isReceiver,
     hasIConfirmed,
     hasOtherConfirmed,
     availableActions,
+    statusKey: viewModelStatusKey,
+    hintKey,
     localStatus,
     isProcessing,
     handleApproveWeave,
@@ -204,7 +201,7 @@ const WeavingCard = ({
       : undefined;
 
   const username = isInChatWindow
-    ? inChatWindow.isGiver
+    ? inChatWindow.isPostAuthor
       ? "Weaving Request Received"
       : "Weaving Request Sent"
     : post
@@ -216,11 +213,14 @@ const WeavingCard = ({
     activeWeave?.status ||
     (isInChatWindow ? "requested" : undefined);
 
-  const isGiverRole =
-    isGiver || (isInChatWindow ? inChatWindow.isGiver : false);
-  const statusLabel = currentStatus
-    ? getWeaveStatusLabel(currentStatus, isGiverRole)
-    : null;
+  // Weave not loaded yet (chat window): fall back to the Post Author flag.
+  const statusKey =
+    viewModelStatusKey ??
+    getWeaveStatusKey(
+      currentStatus,
+      isInChatWindow ? inChatWindow.isPostAuthor : false,
+    );
+  const statusLabel = statusKey ? STATUS_LABELS[statusKey] : null;
 
   const cardTitle = isInChatWindow
     ? activeWeave?.post_title ||
@@ -309,10 +309,10 @@ const WeavingCard = ({
               <span className="type-h5 text-primary">{username}</span>
               {statusLabel && (
                 <span
-                  className={`type-body-t5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-bold ${statusStyles[statusLabel].badge}`}
+                  className={`type-body-t5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-bold ${statusStyles[statusKey!].badge}`}
                 >
                   <WeavingIcon
-                    className={`h-3 w-3 ${statusStyles[statusLabel].icon}`}
+                    className={`h-3 w-3 ${statusStyles[statusKey!].icon}`}
                   />
                   {statusLabel}
                 </span>
@@ -432,40 +432,21 @@ const WeavingCard = ({
                 {displayUser.role}
               </span>
 
-              {currentStatus === "requested" && (
-                <div className="mt-1 flex flex-col gap-1">
-                  <span className="text-xs font-medium text-amber-600">
-                    {availableActions.has("approve")
-                      ? "Approve or reject this request?"
-                      : "Waiting for the post author's approval..."}
-                  </span>
-                </div>
-              )}
-
-              {currentStatus === "approved" && (
-                <div className="mt-1 flex flex-col gap-1">
-                  {!hasIConfirmed ? (
-                    <span className="text-xs font-medium text-orange-500">
-                      {isReceiver
-                        ? "Received the item? Click the checkmark to confirm."
-                        : "Handed over the item? Click the checkmark to confirm."}
-                    </span>
-                  ) : !hasOtherConfirmed ? (
-                    <span className="mt-1 animate-pulse text-xs text-blue-600">
-                      {isReceiver
-                        ? `Received confirmed. Waiting for ${displayUser.name} to confirm handover...`
-                        : `Handover confirmed. Waiting for ${displayUser.name} to confirm receipt...`}
-                    </span>
-                  ) : null}
-
-                  {!hasIConfirmed && hasOtherConfirmed && (
-                    <span className="text-xs font-bold text-green-600">
-                      {isReceiver
-                        ? `${displayUser.name} confirmed handover. Please confirm receipt!`
-                        : `${displayUser.name} confirmed receipt. Please confirm handover!`}
-                    </span>
-                  )}
-                </div>
+              {hintKey && (
+                <span
+                  className={`mt-1 text-xs ${
+                    hintKey === "requested.decideOnRequest" ||
+                    hintKey === "requested.awaitingAuthor"
+                      ? "font-medium text-amber-600"
+                      : hintKey.startsWith("approved.waiting")
+                        ? "animate-pulse text-blue-600"
+                        : hintKey.includes("Please")
+                          ? "font-bold text-green-600"
+                          : "font-medium text-orange-500"
+                  }`}
+                >
+                  {HINT_TEXTS[hintKey]}
+                </span>
               )}
             </div>
 
@@ -550,13 +531,7 @@ const WeavingCard = ({
                         : "text-gray-500"
                   }`}
                 >
-                  {currentStatus === "completed"
-                    ? "✓ Completed"
-                    : currentStatus === "declined"
-                      ? "✗ Rejected"
-                      : currentStatus === "withdrawn"
-                        ? "✗ Withdrawn"
-                        : "✗ Cancelled"}
+                  {statusLabel}
                 </span>
               </div>
             )}

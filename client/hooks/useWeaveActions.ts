@@ -141,11 +141,7 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(
-        weave.id,
-        "approved",
-        "Failed to approve request",
-      );
+      await patchWeaveStatus(weave.id, "approved", "Failed to approve request");
 
       setLocalStatus("approved");
       toast.success("Request approved! Transaction is now in progress.");
@@ -166,15 +162,12 @@ export function useWeaveActions({
       toast.error("Only the post author can decline this request");
       return;
     }
-    if (!window.confirm("Are you sure you want to decline this request?")) return;
+    if (!window.confirm("Are you sure you want to decline this request?"))
+      return;
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(
-        weave.id,
-        "declined",
-        "Failed to reject request",
-      );
+      await patchWeaveStatus(weave.id, "declined", "Failed to reject request");
 
       setLocalStatus("declined");
       toast.success("Request declined.");
@@ -240,11 +233,7 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(
-        weave.id,
-        "cancelled",
-        "Failed to cancel weave",
-      );
+      await patchWeaveStatus(weave.id, "cancelled", "Failed to cancel weave");
 
       setLocalStatus("cancelled");
       toast.success("Weave cancelled successfully!");

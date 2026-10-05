@@ -307,12 +307,12 @@ const WeavingCard = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <span className="type-h5 text-primary">{username}</span>
-              {statusLabel && (
+              {statusKey && statusLabel && (
                 <span
-                  className={`type-body-t5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-bold ${statusStyles[statusKey!].badge}`}
+                  className={`type-body-t5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-bold ${statusStyles[statusKey].badge}`}
                 >
                   <WeavingIcon
-                    className={`h-3 w-3 ${statusStyles[statusKey!].icon}`}
+                    className={`h-3 w-3 ${statusStyles[statusKey].icon}`}
                   />
                   {statusLabel}
                 </span>
@@ -451,7 +451,8 @@ const WeavingCard = ({
             </div>
 
             {/* Action buttons — rendered only from the Weave view model */}
-            {(currentStatus === "requested" || currentStatus === "approved") && (
+            {(currentStatus === "requested" ||
+              currentStatus === "approved") && (
               <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
                 {availableActions.has("approve") && (
                   <button
@@ -516,23 +517,6 @@ const WeavingCard = ({
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
                 )}
-              </div>
-            )}
-
-            {/* Final status */}
-            {currentStatus !== "requested" && currentStatus !== "approved" && (
-              <div className="ml-auto">
-                <span
-                  className={`text-sm font-semibold ${
-                    currentStatus === "completed"
-                      ? "text-green-600"
-                      : currentStatus === "declined"
-                        ? "text-red-600"
-                        : "text-gray-500"
-                  }`}
-                >
-                  {statusLabel}
-                </span>
               </div>
             )}
           </div>

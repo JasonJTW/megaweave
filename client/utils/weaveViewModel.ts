@@ -7,11 +7,7 @@ export type WeaveViewStatus =
   | "withdrawn";
 
 export type WeaveAction =
-  | "approve"
-  | "decline"
-  | "withdraw"
-  | "confirm"
-  | "cancel";
+  "approve" | "decline" | "withdraw" | "confirm" | "cancel";
 
 export interface WeaveViewModelInput {
   status: WeaveViewStatus | undefined;
@@ -97,7 +93,7 @@ export function getWeaveViewModel(input: WeaveViewModelInput): WeaveViewModel {
 
   if (status === "requested") {
     // Unknown Post Author: show nothing rather than guess the viewer's role.
-    if (input.postAuthorId === undefined) return { statusKey: null, hintKey, actions };
+    if (input.postAuthorId === undefined) return result();
     if (isPostAuthor) {
       actions.add("approve");
       actions.add("decline");

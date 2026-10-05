@@ -502,10 +502,10 @@ const WeavingCard = ({
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
                 )}
-                {currentStatus === "pending" && (
+                {availableActions.has("confirm") && (
                   <button
                     onClick={handleCompleteWeave}
-                    disabled={isProcessing || !availableActions.has("confirm")}
+                    disabled={isProcessing}
                     className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
                     title={
                       hasIConfirmed ? "You have confirmed" : "Complete weave"

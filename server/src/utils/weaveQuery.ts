@@ -5,7 +5,14 @@ export const WeavesListQuerySchema = z.object({
   role: z.enum(["giver", "receiver"]).optional(),
   postId: z.coerce.number().int().positive().optional(),
   status: z
-    .enum(["requested", "pending", "completed", "rejected", "cancelled", "withdrawn"])
+    .enum([
+      "requested",
+      "pending",
+      "completed",
+      "rejected",
+      "cancelled",
+      "withdrawn",
+    ])
     .optional(),
 });
 

@@ -148,7 +148,7 @@ export function useWeaveActions({
       toast.error("Only the post author can decline this request");
       return;
     }
-    if (!window.confirm("Are you sure you want to reject this request?")) return;
+    if (!window.confirm("Are you sure you want to decline this request?")) return;
 
     setIsProcessing(true);
     try {

@@ -59,35 +59,35 @@ describe("getWeaveViewModel actions", () => {
 
       for (const viewer of [AUTHOR, INITIATOR]) {
         const who = viewer === AUTHOR ? "Post Author" : "Initiator";
-        it(`pending: ${who} can confirm and cancel when nobody confirmed`, () => {
-          assert.deepEqual(actions(postType, "pending", viewer), [
+        it(`approved: ${who} can confirm and cancel when nobody confirmed`, () => {
+          assert.deepEqual(actions(postType, "approved", viewer), [
             "cancel",
             "confirm",
           ]);
         });
 
-        it(`pending: ${who} can only cancel after confirming own side`, () => {
+        it(`approved: ${who} can only cancel after confirming own side`, () => {
           const { giverId } = parties(postType);
           const mine =
             viewer === giverId ? { giver: true } : { receiver: true };
-          assert.deepEqual(actions(postType, "pending", viewer, mine), [
+          assert.deepEqual(actions(postType, "approved", viewer, mine), [
             "cancel",
           ]);
         });
 
-        it(`pending: ${who} can still confirm when only the other side confirmed`, () => {
+        it(`approved: ${who} can still confirm when only the other side confirmed`, () => {
           const { giverId } = parties(postType);
           const theirs =
             viewer === giverId ? { receiver: true } : { giver: true };
-          assert.deepEqual(actions(postType, "pending", viewer, theirs), [
+          assert.deepEqual(actions(postType, "approved", viewer, theirs), [
             "cancel",
             "confirm",
           ]);
         });
 
-        it(`pending: ${who} can only cancel when both confirmed`, () => {
+        it(`approved: ${who} can only cancel when both confirmed`, () => {
           assert.deepEqual(
-            actions(postType, "pending", viewer, {
+            actions(postType, "approved", viewer, {
               giver: true,
               receiver: true,
             }),
@@ -96,13 +96,13 @@ describe("getWeaveViewModel actions", () => {
         });
       }
 
-      it("pending: non-party has no actions", () => {
-        assert.deepEqual(actions(postType, "pending", STRANGER), []);
+      it("approved: non-party has no actions", () => {
+        assert.deepEqual(actions(postType, "approved", STRANGER), []);
       });
 
       for (const status of [
         "completed",
-        "rejected",
+        "declined",
         "withdrawn",
         "cancelled",
       ] as WeaveViewStatus[]) {

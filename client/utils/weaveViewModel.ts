@@ -1,8 +1,8 @@
 export type WeaveViewStatus =
   | "requested"
-  | "pending"
+  | "approved"
   | "completed"
-  | "rejected"
+  | "declined"
   | "cancelled"
   | "withdrawn";
 
@@ -29,7 +29,7 @@ export interface WeaveViewModel {
 
 /**
  * Requested stage is judged by Post Author / Initiator;
- * Approved ("pending") stage by Giver / Receiver (ADR 0001).
+ * Approved stage by Giver / Receiver (ADR 0001).
  * The Initiator is the party who is not the Post Author.
  */
 export function getWeaveViewModel(input: WeaveViewModelInput): WeaveViewModel {
@@ -50,7 +50,7 @@ export function getWeaveViewModel(input: WeaveViewModelInput): WeaveViewModel {
     } else {
       actions.add("withdraw");
     }
-  } else if (status === "pending") {
+  } else if (status === "approved") {
     const confirmedMine = isGiver
       ? input.giverConfirmed
       : input.receiverConfirmed;

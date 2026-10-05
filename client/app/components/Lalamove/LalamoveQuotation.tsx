@@ -62,7 +62,7 @@ export type LalamoveLocale = "en" | "zh";
 export interface LalamoveQuotationProps {
   post: Post;
   locale?: LalamoveLocale;
-  /** Caller already knows a pending weave exists (e.g. rendered under a pending WeavingCard); skips the lookup. */
+  /** Caller already knows a approved weave exists (e.g. rendered under a approved WeavingCard); skips the lookup. */
   hasPendingWeave?: boolean;
 }
 
@@ -296,10 +296,10 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const { openChat } = useChatPopup();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
-  // Weaves query to check if there is a pending weave for this post
+  // Weaves query to check if there is a approved weave for this post
   const { data: weavesData } = useSWR(
     user && hasPendingWeaveProp === undefined
-      ? `${hostName}/api/weaves?postId=${post.id}&status=pending`
+      ? `${hostName}/api/weaves?postId=${post.id}&status=approved`
       : null,
     async (url: string) => {
       const res = await fetch(url, { credentials: "include" });

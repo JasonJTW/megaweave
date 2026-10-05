@@ -6,6 +6,22 @@ import { getWeaveViewModel, type WeaveAction } from "@/utils/weaveViewModel";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
+async function patchWeaveStatus(
+  weaveId: number,
+  status: Weave["status"],
+  fallbackError: string,
+) {
+  const response = await fetch(`${hostName}/api/weaves/${weaveId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ status }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.errorMessage || fallbackError);
+  return data;
+}
+
 interface UseWeaveActionsOptions {
   weave: Weave | undefined;
   currentUserId: number | undefined;
@@ -110,26 +126,19 @@ export function useWeaveActions({
       return;
     }
     if (localStatus !== "requested") {
-      toast.error(`Weave request is no longer pending approval`);
+      toast.error(`Weave request is no longer awaiting approval`);
       return;
     }
 
     setIsProcessing(true);
     try {
-      const response = await fetch(
-        `${hostName}/api/weaves/${weave.id}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: "pending" }),
-        },
+      await patchWeaveStatus(
+        weave.id,
+        "approved",
+        "Failed to approve request",
       );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.errorMessage || "Failed to approve request");
 
-      setLocalStatus("pending");
+      setLocalStatus("approved");
       toast.success("Request approved! Transaction is now in progress.");
       onWeaveStatusChange?.();
     } catch (error) {
@@ -152,21 +161,14 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(
-        `${hostName}/api/weaves/${weave.id}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: "rejected" }),
-        },
+      await patchWeaveStatus(
+        weave.id,
+        "declined",
+        "Failed to reject request",
       );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.errorMessage || "Failed to reject request");
 
-      setLocalStatus("rejected");
-      toast.success("Request rejected.");
+      setLocalStatus("declined");
+      toast.success("Request declined.");
       onWeaveStatusChange?.();
     } catch (error) {
       toast.error(
@@ -192,18 +194,11 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(
-        `${hostName}/api/weaves/${weave.id}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: "completed" }),
-        },
+      const data = await patchWeaveStatus(
+        weave.id,
+        "completed",
+        "Failed to update",
       );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.errorMessage || "Failed to update");
 
       if (data.newStatus === "completed") {
         setLocalStatus("completed");
@@ -236,18 +231,11 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(
-        `${hostName}/api/weaves/${weave.id}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: "cancelled" }),
-        },
+      await patchWeaveStatus(
+        weave.id,
+        "cancelled",
+        "Failed to cancel weave",
       );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.errorMessage || "Failed to cancel weave");
 
       setLocalStatus("cancelled");
       toast.success("Weave cancelled successfully!");
@@ -273,18 +261,11 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const response = await fetch(
-        `${hostName}/api/weaves/${weave.id}/status`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: "withdrawn" }),
-        },
+      await patchWeaveStatus(
+        weave.id,
+        "withdrawn",
+        "Failed to withdraw request",
       );
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.errorMessage || "Failed to withdraw request");
 
       setLocalStatus("withdrawn");
       toast.success("Request withdrawn.");

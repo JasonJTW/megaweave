@@ -57,6 +57,7 @@ Weave 已提出，等待 Post Author 回應。
 
 **Approved**:
 Post Author 已同意，交換進行中，等待雙方各自 Confirm。
+DB `weaves.status` 值為 `approved`。
 _Avoid_: Pending, In progress
 
 **Confirm**:
@@ -67,6 +68,7 @@ _Avoid_: Pending, In progress
 
 **Declined (已婉拒)**:
 Post Author 在 Requested 階段拒絕了這次 Weave 請求。不涉及違背承諾。
+DB `weaves.status` 值為 `declined`。
 _Avoid_: Rejected, Refused
 
 **Withdrawn (已撤回)**:

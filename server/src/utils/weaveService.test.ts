@@ -36,9 +36,9 @@ const ACTOR_IDS: Record<Actor, number> = {
 
 const ALL_STATUSES: WeaveStatus[] = [
   "requested",
-  "pending",
+  "approved",
   "completed",
-  "rejected",
+  "declined",
   "cancelled",
   "withdrawn",
 ];
@@ -112,10 +112,10 @@ function expected(
   actor: Actor,
   target: WeaveStatus,
 ): 200 | 400 | 403 {
-  if (status !== "requested" && status !== "pending") return 400;
+  if (status !== "requested" && status !== "approved") return 400;
   if (actor === "stranger") return 403;
   if (status === "requested") {
-    if (target === "pending" || target === "rejected")
+    if (target === "approved" || target === "declined")
       return actor === "author" ? 200 : 403;
     if (target === "withdrawn") return actor === "initiator" ? 200 : 403;
     return 400;
@@ -131,7 +131,7 @@ beforeEach(() => {
 describe("approveWeave authorization (first test)", () => {
   it("Wish: Initiator approving their own request gets 403", async () => {
     setupDb("wish", "requested");
-    await expect(run("initiator", "pending")).rejects.toMatchObject({
+    await expect(run("initiator", "approved")).rejects.toMatchObject({
       httpStatus: 403,
     });
     expect(connection.rollback).toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe("approveWeave notifications", () => {
   });
 
   it("cancel in Approved stage sends the cancelled notice", async () => {
-    setupDb("wish", "pending");
+    setupDb("wish", "approved");
     await run("author", "cancelled", fakeIo());
     expect(titles()).toEqual(["Weave Cancelled"]);
     expect(recipients()).toEqual([INITIATOR]);
@@ -181,7 +181,7 @@ describe("approveWeave notifications", () => {
 
   it("decline notifies the Initiator", async () => {
     setupDb("wish", "requested");
-    await run("author", "rejected", fakeIo());
+    await run("author", "declined", fakeIo());
     expect(titles()).toEqual(["Weave Request Declined"]);
     expect(recipients()).toEqual([INITIATOR]);
   });

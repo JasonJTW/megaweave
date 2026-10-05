@@ -26,9 +26,9 @@ export class WeaveError extends Error {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type WeaveStatus =
-  | "pending"
+  | "approved"
   | "requested"
-  | "rejected"
+  | "declined"
   | "cancelled"
   | "withdrawn"
   | "completed";
@@ -334,11 +334,11 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
       // 映射 action 至 Email 的 weaving_status 呈現
       const emailStatusMap: Record<WeaveActionType, WeaveStatus> = {
         requested: "requested",
-        approved: "pending",
-        declined: "rejected",
+        approved: "approved",
+        declined: "declined",
         cancelled: "cancelled",
         withdrawn: "withdrawn",
-        confirmed: "pending",
+        confirmed: "approved",
         completed: "completed",
       };
 
@@ -487,7 +487,7 @@ export async function approveWeave(
     if (weaves.length === 0) throw new WeaveError(404, "Not found");
 
     const weave = weaves[0];
-    if (weave.status !== "requested" && weave.status !== "pending")
+    if (weave.status !== "requested" && weave.status !== "approved")
       throw new WeaveError(400, "Already closed");
 
     const isGiver = weave.giver_id === userId;
@@ -500,18 +500,18 @@ export async function approveWeave(
 
     // ── State machine ─────────────────────────────────────────────────────────
     if (weave.status === "requested") {
-      if (newStatus === "pending") {
+      if (newStatus === "approved") {
         if (!isPostAuthor)
           throw new WeaveError(403, "Only post author can approve");
         await connection.execute(
-          `UPDATE weaves SET status = 'pending' WHERE id = ?`,
+          `UPDATE weaves SET status = 'approved' WHERE id = ?`,
           [weaveId],
         );
-      } else if (newStatus === "rejected") {
+      } else if (newStatus === "declined") {
         if (!isPostAuthor)
           throw new WeaveError(403, "Only post author can decline");
         await connection.execute(
-          `UPDATE weaves SET status = 'rejected' WHERE id = ?`,
+          `UPDATE weaves SET status = 'declined' WHERE id = ?`,
           [weaveId],
         );
       } else if (newStatus === "withdrawn") {
@@ -524,7 +524,7 @@ export async function approveWeave(
       } else {
         throw new WeaveError(400, "Invalid status transition");
       }
-    } else if (weave.status === "pending") {
+    } else if (weave.status === "approved") {
       if (newStatus === "cancelled") {
         await connection.execute(
           `UPDATE weaves SET status = 'cancelled' WHERE id = ?`,
@@ -573,13 +573,13 @@ export async function approveWeave(
               );
               io.to(`user_${recipientId}`).emit("weave_status_updated", {
                 weaveId: Number(weaveId),
-                status: (latestRows[0]?.status as string) || "pending",
+                status: (latestRows[0]?.status as string) || "approved",
                 giver_confirmed: Boolean(latestRows[0]?.giver_confirmed),
                 receiver_confirmed: Boolean(latestRows[0]?.receiver_confirmed),
               });
               io.to(`user_${userId}`).emit("weave_status_updated", {
                 weaveId: Number(weaveId),
-                status: (latestRows[0]?.status as string) || "pending",
+                status: (latestRows[0]?.status as string) || "approved",
                 giver_confirmed: Boolean(latestRows[0]?.giver_confirmed),
                 receiver_confirmed: Boolean(latestRows[0]?.receiver_confirmed),
               });
@@ -610,7 +610,7 @@ export async function approveWeave(
             console.error("Notification/Email failed on partial confirm:", err),
           );
 
-          return { newStatus: "pending", fullyCompleted: false };
+          return { newStatus: "approved", fullyCompleted: false };
         }
       } else {
         throw new WeaveError(400, "Invalid status transition");
@@ -631,9 +631,9 @@ export async function approveWeave(
 
       // 判斷觸發的 Action 類型
       let action: WeaveActionType | null = null;
-      if (newStatus === "pending" && weave.status === "requested") {
+      if (newStatus === "approved" && weave.status === "requested") {
         action = "approved";
-      } else if (newStatus === "rejected") {
+      } else if (newStatus === "declined") {
         action = "declined";
       } else if (newStatus === "withdrawn") {
         action = "withdrawn";

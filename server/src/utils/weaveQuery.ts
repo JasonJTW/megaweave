@@ -7,9 +7,9 @@ export const WeavesListQuerySchema = z.object({
   status: z
     .enum([
       "requested",
-      "pending",
+      "approved",
       "completed",
-      "rejected",
+      "declined",
       "cancelled",
       "withdrawn",
     ])

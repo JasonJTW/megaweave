@@ -33,10 +33,10 @@ export interface Weave {
   item_title?: string;
   quantity?: number;
   status:
-    | "pending"
+    | "approved"
     | "completed"
     | "cancelled"
-    | "rejected"
+    | "declined"
     | "requested"
     | "withdrawn";
   giver_confirmed: boolean;

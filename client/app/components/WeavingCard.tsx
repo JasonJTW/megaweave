@@ -74,9 +74,9 @@ function getWeaveStatusLabel(
       return isGiverRole ? "New Request" : "Request Sent";
     case "completed":
       return "Weaved";
-    case "pending":
+    case "approved":
       return "Weaving";
-    case "rejected":
+    case "declined":
       return "Rejected";
     case "withdrawn":
       return "Withdrawn";
@@ -442,7 +442,7 @@ const WeavingCard = ({
                 </div>
               )}
 
-              {currentStatus === "pending" && (
+              {currentStatus === "approved" && (
                 <div className="mt-1 flex flex-col gap-1">
                   {!hasIConfirmed ? (
                     <span className="text-xs font-medium text-orange-500">
@@ -470,7 +470,7 @@ const WeavingCard = ({
             </div>
 
             {/* Action buttons — rendered only from the Weave view model */}
-            {(currentStatus === "requested" || currentStatus === "pending") && (
+            {(currentStatus === "requested" || currentStatus === "approved") && (
               <div className="ml-auto flex shrink-0 gap-[16px] text-megaweave-forest-dark">
                 {availableActions.has("approve") && (
                   <button
@@ -502,7 +502,7 @@ const WeavingCard = ({
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
                 )}
-                {currentStatus === "pending" && hasIConfirmed && (
+                {currentStatus === "approved" && hasIConfirmed && (
                   <span
                     className="text-green-500"
                     title="You have confirmed"
@@ -539,20 +539,20 @@ const WeavingCard = ({
             )}
 
             {/* Final status */}
-            {currentStatus !== "requested" && currentStatus !== "pending" && (
+            {currentStatus !== "requested" && currentStatus !== "approved" && (
               <div className="ml-auto">
                 <span
                   className={`text-sm font-semibold ${
                     currentStatus === "completed"
                       ? "text-green-600"
-                      : currentStatus === "rejected"
+                      : currentStatus === "declined"
                         ? "text-red-600"
                         : "text-gray-500"
                   }`}
                 >
                   {currentStatus === "completed"
                     ? "✓ Completed"
-                    : currentStatus === "rejected"
+                    : currentStatus === "declined"
                       ? "✗ Rejected"
                       : currentStatus === "withdrawn"
                         ? "✗ Withdrawn"

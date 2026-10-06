@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, useMotionValue, useTransform, PanInfo, MotionValue } from "framer-motion";
+import { useTranslations } from "next-intl";
+import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import Image from "next/image";
 import type { Post } from "../../types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
@@ -38,6 +40,9 @@ export default function TinderCard({
   onDetailClick,
   forcedDirection,
 }: TinderCardProps) {
+  const t = useTranslations("Tinder.card");
+  const categoryName = useCategoryName();
+  const conditionText = useConditionText();
   const { coords } = useLocation();
   const distanceStr = getPostDistance(coords, post.lat, post.lng);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -221,6 +226,14 @@ export default function TinderCard({
     : false;
 
   const isWish = post.type === "wish";
+  const categoryLabel = categoryName({
+    id: post.category_id,
+    name_en: post.category_name_en,
+  });
+  const conditionLabel = conditionText.name(
+    post.condition_level,
+    post.condition_name,
+  );
   const activeImageUrl = isTop
     ? imageUrls[currentImageIndex] || imageUrls[0]
     : imageUrls[0];
@@ -307,7 +320,7 @@ export default function TinderCard({
             className="pointer-events-none absolute left-6 top-8 z-40 -rotate-12 rounded-xl border-[3px] border-emerald-400 bg-emerald-950/85 px-4 py-1.5 text-center shadow-lg"
           >
             <span className="font-ddin text-2xl font-black tracking-wider text-emerald-400">
-              LIKE +1
+              {t("like")}
             </span>
           </motion.div>
 
@@ -316,7 +329,7 @@ export default function TinderCard({
             className="pointer-events-none absolute right-6 top-8 z-40 rotate-12 rounded-xl border-[3px] border-rose-500 bg-rose-950/85 px-4 py-1.5 text-center shadow-lg"
           >
             <span className="font-ddin text-2xl font-black tracking-wider text-rose-500">
-              PASS
+              {t("pass")}
             </span>
           </motion.div>
         </>
@@ -354,7 +367,7 @@ export default function TinderCard({
               {post.title}
             </p>
             <p className="mt-1 font-ddin text-sm text-stone-300">
-              {post.category_name_en || "Resource Post"}
+              {categoryLabel || t("fallbackCategory")}
             </p>
           </div>
         )}
@@ -399,36 +412,37 @@ export default function TinderCard({
           >
             {isWish ? (
               <>
-                <ElfIcon className="h-3.5 w-3.5 text-[#C05421]" /> Wish
+                <ElfIcon className="h-3.5 w-3.5 text-[#C05421]" /> {t("wish")}
               </>
             ) : (
               <>
-                <ReuseIcon className="h-3.5 w-3.5 text-[#FABE50]" /> Share
+                <ReuseIcon className="h-3.5 w-3.5 text-[#FABE50]" />{" "}
+                {t("share")}
               </>
             )}
           </Badge>
 
-          {post.category_name_en && (
+          {categoryLabel && (
             <Badge
               variant="secondary"
               className="border-white/10 bg-black/60 px-2.5 py-1 font-ddin text-xs font-semibold text-white shadow-sm"
             >
-              {post.category_name_en}
+              {categoryLabel}
             </Badge>
           )}
 
-          {post.condition_name && (
+          {conditionLabel && (
             <Badge
               variant="outline"
               className="border-white/20 bg-black/50 px-2.5 py-1 font-ddin text-xs text-stone-200 shadow-sm"
             >
-              {post.condition_name}
+              {conditionLabel}
             </Badge>
           )}
 
           {isExpired && (
             <Badge className="border-red-400/30 bg-red-600/90 text-xs font-bold text-white shadow-sm">
-              已過期
+              {t("overdue")}
             </Badge>
           )}
         </div>
@@ -441,7 +455,7 @@ export default function TinderCard({
               onDetailClick(post);
             }}
             className="absolute right-4 top-5 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white/90 shadow-md transition-transform hover:scale-110 active:scale-95"
-            aria-label="查看詳情"
+            aria-label={t("viewDetail")}
           >
             <Info className="h-4 w-4 stroke-[2.5]" />
           </button>
@@ -474,7 +488,7 @@ export default function TinderCard({
               ))}
               {post.items.length > 3 && (
                 <span className="rounded-md bg-white/15 px-1.5 py-0.5 text-xs text-stone-300">
-                  +{post.items.length - 3} more
+                  {t("moreItems", { count: post.items.length - 3 })}
                 </span>
               )}
             </div>

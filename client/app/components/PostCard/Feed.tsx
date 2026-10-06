@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslations } from "next-intl";
 import { useInView } from "react-intersection-observer";
 import { usePost } from "../../contexts/PostContext";
 import type { Condition, Post, PostLocationField } from "../../types/schema";
@@ -51,6 +52,7 @@ export default function Feed({
   const rafRef = useRef<number | null>(null);
   const debounceTimer = useRef<number | null>(null);
   const { categories } = usePost();
+  const t = useTranslations("Feed");
 
   const handleMascotFilterClick = useCallback(
     (filter: MascotFilter) => {
@@ -318,9 +320,7 @@ export default function Feed({
                 className="relative hidden w-full cursor-pointer flex-col items-center md:flex"
               >
                 <div className="relative z-0 mb-3 w-[190px] max-w-[85%] rounded-[32px] rounded-br-[12px] bg-white px-5 py-4 font-ddin text-[16px] font-bold leading-snug text-gray-900">
-                  Looking for
-                  <br />
-                  some books?
+                  {t("mascotBooks")}
                   <svg
                     aria-hidden
                     className="pointer-events-none absolute -bottom-[18px] right-4 h-[20px] w-[18px]"
@@ -347,7 +347,7 @@ export default function Feed({
               >
                 <CommonShareMascotIcon className="h-auto w-full" />
                 <div className="relative z-0 mt-2 w-[190px] max-w-[85%] rounded-[32px] rounded-tl-[12px] bg-white px-5 py-4 text-center font-ddin text-[16px] font-bold leading-snug text-gray-900">
-                  Find some tools
+                  {t("mascotTools")}
                   <svg
                     aria-hidden
                     className="pointer-events-none absolute -top-[18px] left-4 h-[20px] w-[18px]"
@@ -374,7 +374,7 @@ export default function Feed({
                 className="relative hidden w-full cursor-pointer flex-col items-center md:flex"
               >
                 <div className="relative z-0 mb-3 w-[190px] max-w-[85%] rounded-[32px] rounded-br-[12px] bg-white px-5 py-4 text-center font-ddin text-[16px] font-bold leading-snug text-gray-900">
-                  Styling ur home!
+                  {t("mascotHome")}
                   <svg
                     aria-hidden
                     className="pointer-events-none absolute -bottom-[18px] right-4 h-[20px] w-[18px]"
@@ -404,7 +404,7 @@ export default function Feed({
               >
                 <CommonShareWIcon className="h-auto w-full" />
                 <div className="relative z-0 mt-2 w-[190px] max-w-[85%] rounded-[32px] rounded-tr-[12px] bg-white px-5 py-4 text-center font-ddin text-[16px] font-bold leading-snug text-gray-900">
-                  NEED materials!
+                  {t("mascotMaterials")}
                   <svg
                     aria-hidden
                     className="pointer-events-none absolute -top-[18px] right-4 h-[20px] w-[18px]"

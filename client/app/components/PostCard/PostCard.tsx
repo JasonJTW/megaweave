@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { getPostDistance, buildLocationDisplayParts } from "@/utils/locationUtils";
 import { motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import React from "react";
 import { useLocation } from "../../contexts/LocationContext";
@@ -133,6 +134,7 @@ function PostCardInner({
     onError: handleImageError,
   } = useImageWithRetry(primarySrc, fallbackSrc);
 
+  const t = useTranslations("PostCard");
   const { coords } = useLocation();
   const distanceStr = getPostDistance(coords, post.lat, post.lng);
 
@@ -225,7 +227,7 @@ function PostCardInner({
                   aria-hidden="true"
                 >
                   <span className="font-ddin text-[28px] font-bold tracking-[0.12em] text-white sm:text-[32px]">
-                    OVERDUE
+                    {t("overdue")}
                   </span>
                 </div>
               )}

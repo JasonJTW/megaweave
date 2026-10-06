@@ -250,5 +250,138 @@
       "paymentFormMissing": "No valid payment form received, please retry",
       "orderFailed": "Failed to place the order, please try again later"
     }
+  },
+  "Categories": {
+    "1": "Appliances",
+    "2": "Pets",
+    "3": "Materials",
+    "4": "Others",
+    "5": "Books & Crafts",
+    "6": "Fashion",
+    "7": "Home & Living",
+    "8": "Kids & Baby",
+    "9": "Electronics",
+    "10": "Audio & Games"
+  },
+  "Conditions": {
+    "1": {
+      "name": "Brand New",
+      "description": "Unused, sealed in original packaging"
+    },
+    "2": {
+      "name": "Like New",
+      "description": "Minimal signs of use"
+    },
+    "3": {
+      "name": "Good",
+      "description": "Normal wear, fully functional"
+    },
+    "4": {
+      "name": "Fair",
+      "description": "Noticeable wear, fully functional"
+    },
+    "5": {
+      "name": "For Parts or Repair",
+      "description": "Damaged or not fully functional"
+    }
+  },
+  "HomeFeed": {
+    "wish": "+ Wish",
+    "share": "+ Share",
+    "commons": "+ Commons",
+    "comingSoon": "Coming soon",
+    "weaving": "+ Weaving",
+    "searchPlaceholder": "Search items or keywords...",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "openFilters": "Open search and filters",
+    "categoryPlaceholder": "Categories",
+    "allCategories": "All categories",
+    "clearCategory": "Clear category",
+    "locationPlaceholder": "Location",
+    "wishOnly": "Wish Only",
+    "shareOnly": "Share Only",
+    "hideOverdue": "Hide Overdue",
+    "unknownCategory": "Unknown category",
+    "categoryFilter": "Category: {name}",
+    "provinceFilter": "County/City: {value}",
+    "cityFilter": "District: {value}",
+    "locationFilter": "Location: {value}",
+    "postCreated": "Post created successfully!",
+    "postFailed": "Failed to create post",
+    "networkError": "Network error, please try again later.",
+    "bannerTitle": "Let's start weaving!"
+  },
+  "Feed": {
+    "mascotBooks": "Looking for some books?",
+    "mascotTools": "Find some tools",
+    "mascotHome": "Styling ur home!",
+    "mascotMaterials": "NEED materials!"
+  },
+  "PostCard": {
+    "overdue": "OVERDUE"
+  },
+  "Tinder": {
+    "radiusTitle": "Search radius",
+    "tiers": {
+      "3": {
+        "label": "3 km",
+        "badgeLabel": "3 km (walking distance)",
+        "desc": "Walking distance"
+      },
+      "8": {
+        "label": "8 km",
+        "badgeLabel": "8 km (nearby)",
+        "desc": "Nearby"
+      },
+      "15": {
+        "label": "15 km",
+        "badgeLabel": "15 km (same city)",
+        "desc": "Same city"
+      },
+      "30": {
+        "label": "30 km",
+        "badgeLabel": "30 km (wider area)",
+        "desc": "Wider area"
+      },
+      "unlimited": {
+        "label": "Any",
+        "badgeLabel": "Any distance (everywhere)",
+        "desc": "Everywhere"
+      }
+    },
+    "tierHint": "{label} • {desc}",
+    "gps": "GPS location",
+    "gpsApplied": "GPS location applied",
+    "gpsLocating": "Locating...",
+    "gpsOff": "No location",
+    "gpsEnable": "(enable)",
+    "loadingFeed": "Loading Feed...",
+    "allCaughtUpTitle": "All caught up!",
+    "allCaughtUpDescription": "You have swiped through every recommended post for now. Reload below or widen the search radius to see more shares.",
+    "reload": "Reload recommendations",
+    "showPrevious": "See the previous card",
+    "undo": "Undo last card",
+    "pass": "Pass",
+    "postInfo": "Post info",
+    "like": "Like",
+    "messageAuthor": "Message author",
+    "alreadyLiked": "You already liked this one!",
+    "likeSuccess": "Liked!",
+    "undone": "Brought back the last post",
+    "signInToMessage": "Please sign in to send a message",
+    "authorUnavailable": "Could not load the author",
+    "messageFailed": "Could not open the conversation",
+    "card": {
+      "like": "LIKE +1",
+      "pass": "PASS",
+      "wish": "Wish",
+      "share": "Share",
+      "fallbackCategory": "Resource Post",
+      "overdue": "Overdue",
+      "viewDetail": "View details",
+      "moreItems": "+{count} more"
+    },
+    "likeCounted": "Liked!"
   }
 }

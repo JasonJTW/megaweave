@@ -25,14 +25,11 @@ async function getCategoryName(categoryId: number): Promise<string | undefined> 
 
   if (!categoryCache || isExpired || isMissing) {
     const [rows] = await dbPool.query<RowDataPacket[]>(
-      "SELECT id, name, name_en FROM categories WHERE status = 'active'",
+      "SELECT id, name_en FROM categories WHERE status = 'active'",
     );
     categoryCache = new Map<number, string>();
     for (const row of rows) {
-      categoryCache.set(
-        row.id,
-        (row.name_en as string) || (row.name as string),
-      );
+      if (row.name_en) categoryCache.set(row.id, row.name_en as string);
     }
     lastCategoryCacheTime = now;
   }

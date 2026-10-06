@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import TinderFeed from "@/app/components/TinderFeed/TinderFeed";
 import { Slider } from "@/components/ui/slider";
 import { useLocation } from "@/app/contexts/LocationContext";
-import { DISTANCE_TIERS, DistanceTier } from "@/utils/tinderAlgorithm";
+import { DISTANCE_TIERS, DistanceTier, tierKey } from "@/utils/tinderAlgorithm";
 import { MapPin, Navigation, Compass } from "lucide-react";
 
 export default function TinderPage() {
+  const t = useTranslations("Tinder");
   const { coords, requestLocation, loading: locationLoading } = useLocation();
   const [mounted, setMounted] = useState(false);
   const [, startTransition] = useTransition();
@@ -58,13 +60,13 @@ export default function TinderPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
               <Compass className="h-4 w-4 text-emerald-600" />
-              <span>搜尋半徑級距</span>
+              <span>{t("radiusTitle")}</span>
             </div>
 
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-600/20">
                 <MapPin className="h-3 w-3" />
-                {currentDisplayTier.badgeLabel}
+                {t(`tiers.${tierKey(currentDisplayTier)}.badgeLabel`)}
               </span>
             </div>
           </div>
@@ -89,8 +91,10 @@ export default function TinderPage() {
 
           {/* 5-Tier Scale Ticks & Location Status */}
           <div className="flex items-center justify-between font-ddin text-[11px] text-stone-400">
-            {tiers.map((t, idx) => {
+            {tiers.map((tier, idx) => {
               const isActive = sliderIndex === idx;
+              const key = tierKey(tier);
+              const label = t(`tiers.${key}.label`);
               return (
                 <button
                   key={idx}
@@ -100,9 +104,12 @@ export default function TinderPage() {
                       ? "font-extrabold text-megaweave-forest underline underline-offset-4"
                       : "text-stone-400"
                   }`}
-                  title={`${t.label} • ${t.desc}`}
+                  title={t("tierHint", {
+                    label,
+                    desc: t(`tiers.${key}.desc`),
+                  })}
                 >
-                  {t.label}
+                  {label}
                 </button>
               );
             })}
@@ -118,12 +125,12 @@ export default function TinderPage() {
               />
               <span suppressHydrationWarning>
                 {!mounted
-                  ? "GPS 定位"
+                  ? t("gps")
                   : coords
-                    ? "已套用 GPS 定位"
+                    ? t("gpsApplied")
                     : locationLoading
-                      ? "定位中..."
-                      : "未定位"}
+                      ? t("gpsLocating")
+                      : t("gpsOff")}
               </span>
             </div>
 
@@ -133,7 +140,7 @@ export default function TinderPage() {
                 disabled={locationLoading}
                 className="font-semibold text-emerald-700 hover:underline disabled:opacity-50"
               >
-                (點此啟用)
+                {t("gpsEnable")}
               </button>
             )}
           </div>

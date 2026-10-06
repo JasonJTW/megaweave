@@ -5,6 +5,7 @@ import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { User as UserIcon } from "lucide-react";
 import Image from "next/image";
 import { motion, MotionValue, useTransform } from "framer-motion";
+import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import { Badge } from "@/components/ui/badge";
 import TagIcon from "../icons/TagIcon";
 import { formatLocationText } from "@/utils/locationUtils";
@@ -33,10 +34,17 @@ const CardV2 = ({
   targetScale,
 }: PostCardProps) => {
   const container = useRef(null);
+  const categoryName = useCategoryName();
+  const conditionText = useConditionText();
 
   const scale = useTransform(progress, range, [1, targetScale]);
 
   const category = categories.find((c) => c.id === post.category_id);
+  const categoryLabel = categoryName(category);
+  const conditionLabel = conditionText.name(
+    post.condition_level,
+    post.condition_name,
+  );
 
   const s3Keys = parseS3Keys(post);
 
@@ -90,15 +98,15 @@ const CardV2 = ({
 
               <div className="absolute bottom-0 right-0 m-3 flex flex-row gap-[6px]">
                 {/* Category tag */}
-                {category && (
+                {categoryLabel && (
                   <div className="flex items-center">
-                    <Badge>{category.name_en}</Badge>
+                    <Badge>{categoryLabel}</Badge>
                   </div>
                 )}
                 {/* Condition tag */}
-                {post.condition_name && (
+                {conditionLabel && (
                   <div className="flex items-center">
-                    <Badge>{post.condition_name}</Badge>
+                    <Badge>{conditionLabel}</Badge>
                   </div>
                 )}
               </div>

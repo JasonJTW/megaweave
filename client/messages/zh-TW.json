@@ -39,5 +39,86 @@
     "message": "Switch to English?",
     "accept": "Switch",
     "dismiss": "Dismiss"
+  },
+  "Metadata": {
+    "titleTemplate": "%s｜megaweaving",
+    "home": {
+      "title": "megaweaving 大量交織｜免費物品交換與共享平台",
+      "description": "張貼你有的或想要的物品，和附近的人完成一次免費交換。分享、許願、地球公物，讓物品繼續被使用。"
+    },
+    "about": {
+      "title": "關於我們",
+      "description": "認識 megaweaving 團隊，以及我們為什麼打造這個免費的物品交換平台。"
+    },
+    "install": {
+      "title": "安裝",
+      "description": "把 megaweaving 加到手機主畫面，像 App 一樣開啟。"
+    },
+    "earthday": {
+      "title": "Jumbo 世界地球日",
+      "description": "和 megaweaving 一起參與世界地球日，讓更多物品被重新使用。"
+    },
+    "promote": {
+      "title": "認識 megaweaving",
+      "description": "megaweaving 怎麼運作：張貼物品、配對、完成一次交織。"
+    },
+    "tinder": {
+      "title": "滑卡探索",
+      "description": "左右滑動，探索附近的分享與許願貼文。"
+    },
+    "signin": {
+      "title": "登入",
+      "description": "登入 megaweaving，繼續你的交織。"
+    },
+    "signup": {
+      "title": "註冊",
+      "description": "建立 megaweaving 帳號，免費張貼分享與許願。"
+    },
+    "messages": {
+      "title": "收件夾",
+      "description": "和交織對象的聊天訊息。"
+    },
+    "chat": {
+      "title": "聊天室",
+      "description": "和交織對象的聊天訊息。"
+    },
+    "user": {
+      "title": "我的帳號",
+      "description": "管理你的帳號設定。"
+    },
+    "history": {
+      "title": "瀏覽紀錄",
+      "description": "你最近瀏覽過的貼文。"
+    },
+    "posts": {
+      "title": "我的貼文",
+      "description": "管理你張貼的分享與許願。"
+    },
+    "notifications": {
+      "title": "通知",
+      "description": "你的交織與貼文通知。"
+    },
+    "deliveryOrder": {
+      "title": "配送進度",
+      "description": "查看這筆配送訂單的進度。"
+    },
+    "deliveryPaymentResult": {
+      "title": "付款結果",
+      "description": "這筆配送訂單的付款結果。"
+    },
+    "profile": {
+      "title": "個人檔案",
+      "description": "查看這位使用者的貼文與交織紀錄。"
+    },
+    "member": {
+      "title": "會員",
+      "description": "查看這位會員的介紹。"
+    },
+    "item": {
+      "title": "{title}｜{username} 的{type}",
+      "type": "{type, select, share {分享} wish {許願} commons {地球公物} other {貼文}}",
+      "fallbackTitle": "貼文",
+      "fallbackDescription": "在 megaweaving 看看這則貼文。"
+    }
   }
 }

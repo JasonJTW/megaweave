@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/pageMetadata";
-import HomeFeed from "./HomeFeed";
 
 export async function generateMetadata({
   params,
@@ -8,9 +7,13 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  return pageMetadata(locale, "home", "/");
+  return pageMetadata(locale, "about", "/about");
 }
 
-export default function HomePage() {
-  return <HomeFeed />;
+export default function AboutLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return children;
 }

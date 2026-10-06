@@ -39,5 +39,86 @@
     "message": "Switch to English?",
     "accept": "Switch",
     "dismiss": "Dismiss"
+  },
+  "Metadata": {
+    "titleTemplate": "%s | megaweaving",
+    "home": {
+      "title": "megaweaving — free item exchange and sharing",
+      "description": "Post what you have or what you need and swap it with someone nearby, for free. Shares, Wishes and Commons keep items in use."
+    },
+    "about": {
+      "title": "About Us",
+      "description": "Meet the megaweaving team and why we built this free item exchange platform."
+    },
+    "install": {
+      "title": "Install",
+      "description": "Add megaweaving to your home screen and open it like an app."
+    },
+    "earthday": {
+      "title": "Jumbo Earth Day",
+      "description": "Join megaweaving for Earth Day and put more items back into use."
+    },
+    "promote": {
+      "title": "How megaweaving works",
+      "description": "How megaweaving works: post an item, get matched, complete a weave."
+    },
+    "tinder": {
+      "title": "Tinder Feed",
+      "description": "Swipe to discover Shares and Wishes near you."
+    },
+    "signin": {
+      "title": "Sign In",
+      "description": "Sign in to megaweaving and pick up where you left off."
+    },
+    "signup": {
+      "title": "Sign Up",
+      "description": "Create a megaweaving account and post Shares and Wishes for free."
+    },
+    "messages": {
+      "title": "Messages",
+      "description": "Your chats with the people you weave with."
+    },
+    "chat": {
+      "title": "Chat",
+      "description": "Your chats with the people you weave with."
+    },
+    "user": {
+      "title": "My Account",
+      "description": "Manage your account settings."
+    },
+    "history": {
+      "title": "Viewing History",
+      "description": "Posts you recently browsed."
+    },
+    "posts": {
+      "title": "My Posts",
+      "description": "Manage the Shares and Wishes you posted."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Updates on your weaves and posts."
+    },
+    "deliveryOrder": {
+      "title": "Delivery Status",
+      "description": "Track this delivery order."
+    },
+    "deliveryPaymentResult": {
+      "title": "Payment Result",
+      "description": "The payment result for this delivery order."
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "See this user's posts and weaves."
+    },
+    "member": {
+      "title": "Member",
+      "description": "See this team member's introduction."
+    },
+    "item": {
+      "title": "{title} — a {type} by {username}",
+      "type": "{type, select, share {Share} wish {Wish} commons {Commons} other {Post}}",
+      "fallbackTitle": "Post",
+      "fallbackDescription": "Take a look at this post on megaweaving."
+    }
   }
 }

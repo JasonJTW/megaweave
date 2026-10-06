@@ -17,8 +17,9 @@ test.describe("create post", () => {
     );
     await page.goto("/");
     await currentUser;
+    // The home page runs in zh-TW on the unprefixed URL
     await page
-      .getByRole("button", { name: "+ Share" })
+      .getByRole("button", { name: "+ 分享" })
       .filter({ visible: true })
       .first()
       .click();
@@ -27,9 +28,9 @@ test.describe("create post", () => {
     await form.locator("#image-upload").setInputFiles(SAMPLE_IMAGE);
 
     await form.getByRole("combobox").filter({ hasText: "Category" }).click();
-    await page.getByRole("option", { name: "Appliances" }).click();
+    await page.getByRole("option", { name: "電器用品" }).click();
     await form.getByRole("combobox").filter({ hasText: "Condition" }).click();
-    await page.getByRole("option", { name: /^Like New/ }).click();
+    await page.getByRole("option", { name: /^近全新/ }).click();
 
     await form.getByPlaceholder("Title").fill(title);
     await form.getByPlaceholder("Location").fill("台北市信義區");
@@ -42,7 +43,7 @@ test.describe("create post", () => {
 
     await form.getByRole("button", { name: "Post", exact: true }).click();
 
-    await expect(page.getByText("Post created successfully!")).toBeVisible();
+    await expect(page.getByText("貼文已發布！")).toBeVisible();
     await page.getByText(title).click();
     // The dev server compiles the post page on first visit
     await expect(page).toHaveURL(/\/item\/[\w-]+$/, { timeout: 20_000 });

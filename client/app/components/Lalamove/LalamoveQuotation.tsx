@@ -25,13 +25,13 @@ import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
 import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
 import { useSearchParams } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   VEHICLE_TYPES,
   VEHICLE_SIZE_LIMITS,
   VehicleType,
   isVehicleType,
-  toLalamoveLanguage,
+  LALAMOVE_LANGUAGE,
 } from "@/utils/lalamove";
 import {
   parseGooglePlace,
@@ -109,7 +109,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   hasPendingWeave: hasPendingWeaveProp,
 }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
-  const locale = useLocale();
   const t = useTranslations("Lalamove");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -311,7 +310,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           body: JSON.stringify({
             serviceTypes: targetTypes,
             stops,
-            language: toLalamoveLanguage(locale),
+            language: LALAMOVE_LANGUAGE,
           }),
         });
 
@@ -379,7 +378,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       originLat,
       originLng,
       selectedService,
-      locale,
       t,
     ],
   );

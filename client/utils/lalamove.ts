@@ -1,19 +1,9 @@
-import type { Locale } from "@/i18n/routing";
-
-export type LalamoveLanguage = "zh_TW" | "en_TW";
-
-const LALAMOVE_LANGUAGES: Record<Locale, LalamoveLanguage> = {
-  "zh-TW": "zh_TW",
-  en: "en_TW",
-};
-
 /**
- * Lalamove market language for the current UI locale, so driver-facing text
- * matches the language the user is browsing in.
+ * Language of the addresses sent to Lalamove. Fixed to zh_TW whatever the UI locale:
+ * the service only runs in Taiwan, the TW market only documents zh_TW, and the
+ * addresses (from Google, TW-restricted) and driver remarks are always Chinese.
  */
-export function toLalamoveLanguage(locale: Locale): LalamoveLanguage {
-  return LALAMOVE_LANGUAGES[locale];
-}
+export const LALAMOVE_LANGUAGE = "zh_TW";
 
 /**
  * Vehicle types offered for Lalamove TW. Display names, weight limits and use cases
@@ -41,8 +31,8 @@ export function isVehicleType(value: string): value is VehicleType {
   return (VEHICLE_TYPES as readonly string[]).includes(value);
 }
 
-// Text sent to the Lalamove driver stays in Chinese whatever the UI locale,
-// since TW drivers read Chinese; it is order data, not UI, so it lives outside the catalogs.
+// Text sent to the Lalamove driver stays in Chinese whatever the UI locale (see
+// LALAMOVE_LANGUAGE); it is order data, not UI, so it lives outside the catalogs.
 export const DEFAULT_SENDER_NAME = "寄件人";
 export const DEFAULT_RECIPIENT_NAME = "收件人";
 

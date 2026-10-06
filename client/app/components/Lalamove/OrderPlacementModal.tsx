@@ -26,7 +26,7 @@ import {
   GOOGLE_AUTOCOMPLETE_FIELDS,
   ParsedGooglePlace,
 } from "@/utils/locationUtils";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
   DEFAULT_RECIPIENT_NAME,
   DEFAULT_SENDER_NAME,
@@ -35,7 +35,7 @@ import {
   VehicleType,
   isVehicleType,
   buildDriverRemarks,
-  toLalamoveLanguage,
+  LALAMOVE_LANGUAGE,
 } from "@/utils/lalamove";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
@@ -161,7 +161,6 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   currentUser,
 }) => {
   const router = useRouter();
-  const locale = useLocale();
   const t = useTranslations("Lalamove");
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
@@ -432,7 +431,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         body: JSON.stringify({
           serviceTypes: VEHICLE_TYPES,
           stops,
-          language: toLalamoveLanguage(locale),
+          language: LALAMOVE_LANGUAGE,
         }),
       });
 

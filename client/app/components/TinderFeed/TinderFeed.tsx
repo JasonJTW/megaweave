@@ -1,9 +1,9 @@
 "use client";
 
+import { useRouter } from "@/i18n/navigation";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useSWRInfinite from "swr/infinite";
 import { useMotionValue } from "framer-motion";
-import { useRouter } from "next/navigation";
 import { useUser } from "../../contexts/UserContext";
 import { useLocation } from "../../contexts/LocationContext";
 import type { Post, PostsResponse } from "../../types/schema";

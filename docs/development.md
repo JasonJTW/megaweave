@@ -22,6 +22,8 @@ mysql -u <user> -p <database> < server/db/schema.sql
 mysql -u <user> -p <database> < server/db/reference-data.sql
 ```
 
+`schema.sql` is always current. An existing database is upgraded by applying the files in `server/db/migrations/` that it has not run yet, in filename order.
+
 Copy the environment templates — every variable is documented inline with defaults:
 
 ```bash
@@ -97,7 +99,7 @@ All routes are mounted under `/api` ([`server/src/api.ts`](../server/src/api.ts)
 
 ```
 client/                 Next.js App Router frontend, Radix UI primitives, SWR hooks
-server/db               schema.sql, reference-data.sql
+server/db               schema.sql, reference-data.sql, migrations/ (ALTERs for existing databases)
 server/src              Route modules (posts.ts, weaves.ts, payments.ts, ...)
   services/             Feed, embeddings, vector index, payment, lalamove
   queue/                BullMQ queues, workers, job definitions

@@ -1,5 +1,6 @@
 // components/Comment/CommentSection.tsx
 "use client";
+import { useRouter } from "@/i18n/navigation";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,7 +9,6 @@ import User from "../../types/user";
 import CommentCard from "./CommentCard";
 import CommentInput from "./CommentInput";
 import CommentItem from "./CommentItem";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
 import {

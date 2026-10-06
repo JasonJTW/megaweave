@@ -1,5 +1,8 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 // E2E only (npm run dev:e2e): images come from the local S3 mock, see docs/e2e.md
 const e2eImageOrigin = process.env.E2E_IMAGE_ORIGIN
@@ -46,8 +49,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withNextIntl(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 

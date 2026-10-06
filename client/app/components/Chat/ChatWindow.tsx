@@ -1,3 +1,4 @@
+import { Link, useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect, useRef } from "react";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
@@ -20,9 +21,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import Link from "next/link";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { safeCompressImage } from "@/utils/imageProcessor";

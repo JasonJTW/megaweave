@@ -1,9 +1,9 @@
+import { Link } from "@/i18n/navigation";
 import React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { useConversations } from "@/hooks/useChat";
 
 interface ConversationListProps {

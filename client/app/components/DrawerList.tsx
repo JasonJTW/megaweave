@@ -1,7 +1,7 @@
+import { useRouter } from "@/i18n/navigation";
 import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
 import { ChevronDown, LucideLoader2, LucideRefreshCcw } from "lucide-react";
-import { useRouter } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
 import WeavingCard from "./WeavingCard";

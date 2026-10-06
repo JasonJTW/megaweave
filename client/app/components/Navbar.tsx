@@ -1,14 +1,15 @@
 "use client";
 
+import { Link, usePathname } from "@/i18n/navigation";
+import { localizePath } from "@/i18n/routing";
+import { useLocale, useTranslations } from "next-intl";
 import React, { useState } from "react";
 import { useNavbar } from "../contexts/NavBarContext";
 import { useConversations, useChatSocket } from "@/hooks/useChat";
-import Link from "next/link";
 import UserIcon from "./icons/UserIcon";
 import TeamIcon from "./icons/TeamIcon";
 import MenuIcon from "./icons/MenuIcon";
 import DirectMessageIcon from "./icons/DirectMessageIcon";
-import { usePathname } from "next/navigation";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useUser } from "../contexts/UserContext";
 import NotificationIcon from "./icons/NotificationIcon";
@@ -44,6 +45,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
 import { RefractiveNav } from "./Refractive.client";
+import LanguageSwitcher from "./LanguageSwitcher";
 // 型別定義
 type MainNavigationItem = {
   href: string;
@@ -69,6 +71,8 @@ const Navbar = () => {
   const { isNavbarVisible, isAtTop } = useNavbar();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations("Navbar");
   const { unreadCount } = useNotification(); // Notifications
 
   // Listen for new messages globally
@@ -93,7 +97,7 @@ const Navbar = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          toast.error("You are not signed in");
+          toast.error(t("notSignedIn"));
           return;
         }
 
@@ -103,11 +107,11 @@ const Navbar = () => {
 
       await mutate({ user: null }, false);
       setIsMobileMenuOpen(false);
-      window.location.href = "/";
+      window.location.href = localizePath(locale, "/");
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        error instanceof Error ? error.message : t("unexpectedError"),
       );
     }
   };
@@ -118,14 +122,14 @@ const Navbar = () => {
 
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
-    { href: "/tinder", label: "Tinder", icon: Flame },
+    { href: "/tinder", label: t("tinder"), icon: Flame },
     ...(user
       ? [
-          { href: "/messages", label: "Messages", icon: DirectMessageIcon },
-          { href: "/notifications", label: "Notifications", icon: NotificationIcon },
+          { href: "/messages", label: t("messages"), icon: DirectMessageIcon },
+          { href: "/notifications", label: t("notifications"), icon: NotificationIcon },
         ]
       : []),
-    { href: "/user", label: "Profile", icon: UserIcon },
+    { href: "/user", label: t("profile"), icon: UserIcon },
   ];
 
   // 下拉菜單項目
@@ -148,50 +152,50 @@ const Navbar = () => {
   const mobileNavItems: NavigationItem[] = [
     {
       href: "/tinder",
-      title: "Tinder Feed",
-      description: "Swipe to discover posts",
+      title: t("tinderFeed"),
+      description: t("tinderDescription"),
       icon: Flame,
     },
     {
       href: "/user",
-      title: "Profile",
-      description: "User Profile",
+      title: t("profile"),
+      description: t("profileDescription"),
       icon: UserIcon,
     },
     ...(user
       ? [
           {
             href: "/history",
-            title: "Viewing History",
-            description: "Posts you recently browsed",
+            title: t("history"),
+            description: t("historyDescription"),
             icon: History,
           },
         ]
       : []),
     {
       href: "/about",
-      title: "About Us",
-      description: "About Megaweaving",
+      title: t("about"),
+      description: t("aboutDescription"),
       icon: TeamIcon,
     },
     {
       href: "/earthday",
-      title: "Jumbo",
-      description: "Earth Day",
+      title: t("earthday"),
+      description: t("earthdayDescription"),
       icon: NewspaperIcon,
     },
     {
       href: "/install",
-      title: "Install",
-      description: "Add to Home Screen",
+      title: t("install"),
+      description: t("installDescription"),
       icon: SquarePlus,
     },
     ...(user
       ? [
           {
             href: "#",
-            title: "Sign Out",
-            description: "Log out of your account",
+            title: t("signOut"),
+            description: t("signOutDescription"),
             icon: LogOut,
             action: "logout" as const,
           },
@@ -266,13 +270,13 @@ const Navbar = () => {
               <div className="flex items-center space-x-3 sm:hidden">
                 <Link href="/tinder" className="group relative">
                   <Flame className="h-[18px] w-[18px] text-orange-500 transition-colors hover:text-orange-600" />
-                  <span className="sr-only">Tinder</span>
+                  <span className="sr-only">{t("tinder")}</span>
                 </Link>
 
                 {!user && (
                   <Link href="/user" className="">
                     <UserIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
-                    <span className="sr-only">Profile</span>
+                    <span className="sr-only">{t("profile")}</span>
                   </Link>
                 )}
 
@@ -280,7 +284,7 @@ const Navbar = () => {
                   <>
                     <Link href="/messages" className="group relative mr-2">
                       <DirectMessageIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
-                      <span className="sr-only">Messages</span>
+                      <span className="sr-only">{t("messages")}</span>
                       {messageUnreadCount > 0 && (
                         <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 animate-in items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm duration-200 zoom-in">
                           {messageUnreadCount > 99 ? "99+" : messageUnreadCount}
@@ -289,7 +293,7 @@ const Navbar = () => {
                     </Link>
                     <Link href="/notifications" className="group relative">
                       <NotificationIcon className="h-[16px] w-[18px] text-megaweave-forest-dark" />
-                      <span className="sr-only">Notifications</span>
+                      <span className="sr-only">{t("notifications")}</span>
                       {unreadCount > 0 && (
                         <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 animate-in items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm duration-200 zoom-in">
                           {unreadCount > 99 ? "99+" : unreadCount}
@@ -369,6 +373,15 @@ const Navbar = () => {
                       </NavigationMenuItem>
                     );
                   })}
+                  <NavigationMenuItem className="hidden sm:block">
+                    <LanguageSwitcher
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        "bg-transparent px-3 text-[16px] font-semibold text-megaweave-forest-dark transition-all duration-200 hover:bg-primary-30",
+                      )}
+                      iconClassName="h-[16px] w-[18px]"
+                    />
+                  </NavigationMenuItem>
                 </NavigationMenuList>
               </NavigationMenu>
               {/* //* nav bar hamburger menu */}
@@ -383,15 +396,13 @@ const Navbar = () => {
                     )}
                   >
                     <MenuIcon className="h-6 w-6" />
-                    <span className="sr-only">Open menu</span>
+                    <span className="sr-only">{t("openMenu")}</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right">
                   <VisuallyHidden>
-                    <SheetTitle>Navigation Menu</SheetTitle>
-                    <SheetDescription>
-                      Browse through the navigation options
-                    </SheetDescription>
+                    <SheetTitle>{t("menuTitle")}</SheetTitle>
+                    <SheetDescription>{t("menuDescription")}</SheetDescription>
                   </VisuallyHidden>
                   <div className="flex h-full flex-col justify-center space-y-2 sm:items-center">
                     <div className="items-start">
@@ -449,6 +460,11 @@ const Navbar = () => {
                           </Link>
                         );
                       })}
+                      <LanguageSwitcher
+                        onSwitch={() => setIsMobileMenuOpen(false)}
+                        className="w-full space-x-1 rounded-xl px-4 py-3 text-[16px] font-medium text-white transition-all duration-200"
+                        iconClassName="h-5 w-5"
+                      />
                     </div>
                   </div>
                 </SheetContent>

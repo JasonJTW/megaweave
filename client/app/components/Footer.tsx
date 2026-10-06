@@ -1,15 +1,17 @@
 "use client";
 
-import Link from "next/link";
+import { Link, usePathname } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { FC } from "react";
 import WeavingIcon from "./icons/WeavingIcon";
+import LanguageSwitcher from "./LanguageSwitcher";
 // import { useNavbar } from "../contexts/NavBarContext";
 import { cn } from "@/lib/utils";
-import { usePathname } from "next/navigation";
 
 const Footer: FC = () => {
   // const { isNavbarVisible } = useNavbar();
   const pathname = usePathname();
+  const t = useTranslations("Footer");
   if (pathname.startsWith("/messages") || pathname.startsWith("/tinder")) {
     return null;
   }
@@ -49,7 +51,7 @@ const Footer: FC = () => {
                       href="/about"
                       className="inline-block transition-all duration-200 hover:underline"
                     >
-                      About Us
+                      {t("about")}
                     </Link>
                   </li>
                   <li>
@@ -57,8 +59,14 @@ const Footer: FC = () => {
                       href="/about#our-team"
                       className="inline-block transition-all duration-200 hover:underline"
                     >
-                      megaweaving Team
+                      {t("team")}
                     </Link>
+                  </li>
+                  <li>
+                    <LanguageSwitcher
+                      className="transition-all duration-200 hover:underline"
+                      iconClassName="h-3 w-3 sm:h-4 sm:w-4"
+                    />
                   </li>
                 </ul>
               </div>
@@ -109,19 +117,19 @@ const Footer: FC = () => {
           {/* Tablet & Desktop: 三欄布局 */}
           <div className="w-full text-[8px] font-medium sm:type-body-t5">
             <div className="grid grid-cols-3 text-center sm:flex sm:items-center sm:justify-between">
-              <div className="text-left">© megaweaving 2025</div>
+              <div className="text-left">{t("copyright")}</div>
 
               <Link
                 href="#"
                 className="transition-all duration-200 hover:underline sm:ml-auto sm:mr-6"
               >
-                Privacy Policy
+                {t("privacyPolicy")}
               </Link>
               <Link
                 href="#"
                 className="text-right transition-all duration-200 hover:underline"
               >
-                Terms of Service
+                {t("termsOfService")}
               </Link>
             </div>
           </div>

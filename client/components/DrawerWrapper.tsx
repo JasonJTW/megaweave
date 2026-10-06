@@ -1,12 +1,13 @@
 // components/DrawerWrapper.tsx
 "use client";
+import { useRouter } from "@/i18n/navigation";
 
 import DrawerList from "@/app/components/DrawerList";
 import UserPostCard from "@/app/components/PostCard/UserPostCard";
 import { usePost } from "@/app/contexts/PostContext";
 import type { Condition, Post } from "@/app/types/schema";
 import type { Weave } from "@/services/weaveService";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import React from "react";
 
 interface DrawerWrapperProps {

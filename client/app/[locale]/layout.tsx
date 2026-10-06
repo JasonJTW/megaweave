@@ -15,6 +15,7 @@ import { Toaster } from "react-hot-toast";
 // import AdSense from "@/components/AdSense";
 import dotenv from "dotenv";
 import Footer from "@/app/components/Footer";
+import SwitchToEnglishPrompt from "@/app/components/SwitchToEnglishPrompt";
 import { ChatPopupProvider } from "@/app/contexts/ChatPopupContext";
 import { ChatPopup } from "@/app/components/Chat/ChatPopup";
 import { LocationProvider } from "@/app/contexts/LocationContext";
@@ -224,6 +225,7 @@ export default async function RootLayout({
                         </TeamProvider>
                       </GoogleOAuthProvider>
                       <Footer />
+                      <SwitchToEnglishPrompt />
                     </ChatPopupProvider>
                   </NotificationProvider>
                 </NavbarProvider>

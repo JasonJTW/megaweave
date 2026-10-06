@@ -2,6 +2,8 @@ import { defineRouting } from "next-intl/routing";
 
 // ADR 0002: zh-TW is the default and unprefixed, English lives under /en,
 // and the locale comes from the URL only (no Accept-Language / cookie redirects).
+// Adding a locale? Also update LOCALES in server/src/validations.ts and the
+// users.locale enum (server/db/schema.sql + a migration).
 export const routing = defineRouting({
   locales: ["zh-TW", "en"],
   defaultLocale: "zh-TW",

@@ -14,6 +14,7 @@ import {
   PUBLIC_ROUTES,
 } from "../middleware";
 import { splitLocalePrefix } from "../i18n/routing";
+import { EN_PROMPT_DISMISSED_COOKIE } from "../i18n/languagePrompt";
 
 function createMockRequest(
   url: string,
@@ -347,6 +348,19 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       );
       assert.equal(res.status, 200);
       assert.equal(res.headers.get("location"), null);
+    });
+
+    it("never redirects on the dismissed English prompt cookie", async () => {
+      for (const path of ["/", "/about", "/en", "/en/about"]) {
+        const res = await middleware(
+          createMockRequest(path, {
+            headers: { "accept-language": "en-US,en;q=0.9" },
+            cookies: { [EN_PROMPT_DISMISSED_COOKIE]: "1" },
+          })
+        );
+        assert.equal(res.status, 200, path);
+        assert.equal(res.headers.get("location"), null, path);
+      }
     });
 
     it("redirects the redundant /zh-TW prefix to the unprefixed URL", async () => {

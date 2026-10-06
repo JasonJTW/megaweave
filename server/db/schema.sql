@@ -614,6 +614,7 @@ CREATE TABLE `users` (
   `avatar_key` varchar(500) DEFAULT NULL,
   `contact_line` varchar(255) DEFAULT NULL,
   `public_id` char(36) NOT NULL,
+  `locale` enum('zh-TW','en') NOT NULL DEFAULT 'zh-TW',
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `idx_public_id` (`public_id`),

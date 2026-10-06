@@ -34,6 +34,10 @@ export default defineConfig({
     baseURL,
     // Dev servers run with self-signed certificates
     ignoreHTTPSErrors: true,
+    // Core users browse in Chinese; English-browser specs override this (and the
+    // "Switch to English?" prompt would otherwise cover the page in every spec)
+    locale: "zh-TW",
+    extraHTTPHeaders: { "Accept-Language": "zh-TW,zh;q=0.9" },
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "on-first-retry",

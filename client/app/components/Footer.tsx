@@ -4,6 +4,7 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { FC } from "react";
 import WeavingIcon from "./icons/WeavingIcon";
+import LanguageSwitcher from "./LanguageSwitcher";
 // import { useNavbar } from "../contexts/NavBarContext";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,12 @@ const Footer: FC = () => {
                     >
                       {t("team")}
                     </Link>
+                  </li>
+                  <li>
+                    <LanguageSwitcher
+                      className="transition-all duration-200 hover:underline"
+                      iconClassName="h-3 w-3 sm:h-4 sm:w-4"
+                    />
                   </li>
                 </ul>
               </div>

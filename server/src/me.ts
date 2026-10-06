@@ -3,11 +3,12 @@
 // Replaces: /api/userprofile/bio, /custom_name, /contact_email, /contact_phone,
 //           /api/user/stats, /api/posts/user, /api/weaves
 
-import Router, { Request, Response } from "express";
+import Router, { NextFunction, Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { WeaveOutput, processWeaveRows } from "./weaves";
+import { UpdateLocaleSchema } from "./validations";
 
 const router = Router();
 
@@ -143,5 +144,25 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.status(500).json({ errorMessage: "Failed to fetch user data" });
   }
 });
+
+// ─── PUT /api/me/locale ───────────────────────────────────────────────────────
+// Called only by the client's language switcher, so visiting /en never changes it.
+
+router.put(
+  "/locale",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { locale } = UpdateLocaleSchema.parse(req.body);
+      await dbPool.execute("UPDATE users SET locale = ? WHERE id = ?", [
+        locale,
+        req.user!.userId,
+      ]);
+      return res.status(200).json({ locale });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 export default router;

@@ -71,21 +71,21 @@ const STATUS_LABELS: Record<WeaveStatusKey, string> = {
   cancelled: "Cancelled",
 };
 
-const HINT_TEXTS: Record<WeaveHintKey, string> = {
-  "requested.decideOnRequest": "Approve or decline this request?",
-  "requested.awaitingAuthor": "Waiting for the post author's approval...",
-  "approved.confirmHandover":
+const HINT_TEXTS: Record<WeaveHintKey, (otherName: string) => string> = {
+  "requested.decideOnRequest": () => "Approve or decline this request?",
+  "requested.awaitingAuthor": () => "Waiting for the post author's approval...",
+  "approved.confirmHandover": () =>
     "Handed over the item? Click the checkmark to confirm.",
-  "approved.confirmReceipt":
+  "approved.confirmReceipt": () =>
     "Received the item? Click the checkmark to confirm.",
-  "approved.waitingForReceiver":
-    "Handover confirmed. Waiting for the receiver to confirm receipt...",
-  "approved.waitingForGiver":
-    "Receipt confirmed. Waiting for the giver to confirm handover...",
-  "approved.receiverConfirmedPleaseConfirmHandover":
-    "The receiver confirmed receipt. Please confirm handover!",
-  "approved.giverConfirmedPleaseConfirmReceipt":
-    "The giver confirmed handover. Please confirm receipt!",
+  "approved.waitingForReceiver": (name) =>
+    `Handover confirmed. Waiting for ${name} to confirm receipt...`,
+  "approved.waitingForGiver": (name) =>
+    `Received confirmed. Waiting for ${name} to confirm handover...`,
+  "approved.receiverConfirmedPleaseConfirmHandover": (name) =>
+    `${name} confirmed receipt. Please confirm handover!`,
+  "approved.giverConfirmedPleaseConfirmReceipt": (name) =>
+    `${name} confirmed handover. Please confirm receipt!`,
 };
 
 const statusStyles: Record<WeaveStatusKey, { badge: string; icon: string }> = {
@@ -444,7 +444,7 @@ const WeavingCard = ({
                           : "font-medium text-orange-500"
                   }`}
                 >
-                  {HINT_TEXTS[hintKey]}
+                  {HINT_TEXTS[hintKey](displayUser.name)}
                 </span>
               )}
             </div>

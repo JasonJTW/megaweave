@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useId, useRef } from "react";
-import { format } from "date-fns";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { enUS, zhTW, type Locale as DateFnsLocale } from "date-fns/locale";
+import type { Locale } from "@/i18n/routing";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import { Button } from "@/components/ui/button";
@@ -42,31 +44,54 @@ const MAX_CONTENT_LENGTH = 1000;
 const MIN_CONTENT_LENGTH = 3;
 const MAX_ITEMS_COUNT = 20;
 const MAX_ITEM_TITLE_LENGTH = 20;
+const MAX_IMAGES_COUNT = 5;
+const MAX_IMAGE_SIZE_MB = 10;
+
+/** react-day-picker localises month and weekday names from a date-fns locale. */
+const CALENDAR_LOCALES: Record<Locale, DateFnsLocale> = {
+  "zh-TW": zhTW,
+  en: enUS,
+};
 
 export type { PostFormSubmitData };
+
+/**
+ * Which post the form is for. The modal owns its own heading and submit label,
+ * so callers never pass UI copy that would need translating at the call site.
+ */
+export type PostFormMode = Post["type"] | "edit";
 
 interface PostFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
-  submitButtonText: string;
+  mode: PostFormMode;
   isSubmitting: boolean;
   initialData?: Omit<CreatePostFormData, "type">;
   existingImages?: { id: number; image_url: string }[];
   onSubmit: (data: PostFormSubmitData) => Promise<void>;
 }
 
+/** Heading and submit-button copy per mode, so `mode` is only switched on once. */
+const MODE_COPY = {
+  share: { heading: "titleShare", submit: "submit" },
+  wish: { heading: "titleWish", submit: "submit" },
+  commons: { heading: "titleCommons", submit: "submit" },
+  edit: { heading: "titleEdit", submit: "submitEdit" },
+} as const;
+
 export default function PostFormModal({
   isOpen,
   onClose,
-  title,
-  submitButtonText,
+  mode,
   isSubmitting,
   initialData,
   existingImages = [],
   onSubmit,
 }: PostFormModalProps) {
   const titleId = useId();
+  const t = useTranslations("PostForm");
+  const formatter = useFormatter();
+  const locale = useLocale();
   const { categories, conditions } = usePost();
   const categoryName = useCategoryName();
   const conditionText = useConditionText();
@@ -374,18 +399,20 @@ export default function PostFormModal({
       existingImages.filter((img) => !deletedImageIds.includes(img.id)).length +
       selectedImages.length;
 
-    if (activeImageCount + files.length > 5) {
-      toast.error("Limit of 5 images exceeded");
+    if (activeImageCount + files.length > MAX_IMAGES_COUNT) {
+      toast.error(t("imageLimitExceeded", { max: MAX_IMAGES_COUNT }));
       return;
     }
 
     const validFiles = files.filter((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} exceeds 10MB size limit`);
+      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+        toast.error(
+          t("fileTooLarge", { filename: file.name, limit: MAX_IMAGE_SIZE_MB }),
+        );
         return false;
       }
       if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name} is not a valid image file`);
+        toast.error(t("invalidFileType", { filename: file.name }));
         return false;
       }
       return true;
@@ -461,13 +488,13 @@ export default function PostFormModal({
 
     const validationResult = validateForm();
     if (validationResult === "too_many_items") {
-      toast.error(`At most ${MAX_ITEMS_COUNT} items are allowed.`);
+      toast.error(t("tooManyItems", { max: MAX_ITEMS_COUNT }));
       return;
     } else if (validationResult === "duplicate_items") {
-      toast.error("Item titles cannot be duplicated.");
+      toast.error(t("duplicateItems"));
       return;
     } else if (validationResult === "missing_fields") {
-      toast.error("Required fields cannot be empty.");
+      toast.error(t("missingFields"));
       return;
     }
 
@@ -524,10 +551,11 @@ export default function PostFormModal({
               id={titleId}
               className="text-2xl font-bold capitalize text-gray-900"
             >
-              {title}
+              {t(MODE_COPY[mode].heading)}
             </h2>
             <button
               onClick={onClose}
+              aria-label={t("close")}
               className="absolute -right-2 -top-1 text-gray-400 hover:text-gray-600"
             >
               <DeleteIcon />
@@ -550,7 +578,7 @@ export default function PostFormModal({
                       (img) => !deletedImageIds.includes(img.id),
                     ).length +
                       selectedImages.length >=
-                    5
+                    MAX_IMAGES_COUNT
                   }
                 />
               </div>
@@ -570,7 +598,7 @@ export default function PostFormModal({
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={img.image_url}
-                          alt={`Existing ${index + 1}`}
+                          alt={t("existingImageAlt", { index: index + 1 })}
                           className="h-full w-full object-cover"
                         />
                       </div>
@@ -578,6 +606,7 @@ export default function PostFormModal({
                         <button
                           type="button"
                           onClick={() => toggleExistingImageDeletion(img.id)}
+                          aria-label={t("removeImage")}
                           className="absolute -right-1 -top-1 rounded-full bg-red-600 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <X className="h-3 w-3" />
@@ -586,6 +615,7 @@ export default function PostFormModal({
                         <button
                           type="button"
                           onClick={() => toggleExistingImageDeletion(img.id)}
+                          aria-label={t("restoreImage")}
                           className="absolute -right-1 -top-1 flex items-center justify-center rounded-full bg-green-600 p-0.5 text-[10px] text-white"
                           style={{ width: "16px", height: "16px" }}
                         >
@@ -603,13 +633,14 @@ export default function PostFormModal({
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={previewUrls[index]}
-                        alt={`New preview ${index + 1}`}
+                        alt={t("newImageAlt", { index: index + 1 })}
                         className="h-full w-full object-cover"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => removeSelectedImage(index)}
+                      aria-label={t("removeImage")}
                       className="absolute -right-1 -top-1 rounded-full bg-red-600 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
@@ -626,12 +657,13 @@ export default function PostFormModal({
               >
                 <label
                   htmlFor="image-upload"
+                  aria-label={t("addImage")}
                   className={`inline-flex cursor-pointer items-center px-4 py-2 transition-all duration-200 ease-in-out hover:scale-125 ${
                     existingImages.filter(
                       (img) => !deletedImageIds.includes(img.id),
                     ).length +
                       selectedImages.length >=
-                    5
+                    MAX_IMAGES_COUNT
                       ? "pointer-events-none cursor-not-allowed opacity-50"
                       : ""
                   }`}
@@ -664,7 +696,7 @@ export default function PostFormModal({
                       formErrors.categoryId,
                     )}`}
                   >
-                    <SelectValue placeholder="Category" />
+                    <SelectValue placeholder={t("categoryPlaceholder")} />
                   </SelectTrigger>
 
                   <SelectContent>
@@ -703,7 +735,7 @@ export default function PostFormModal({
                       formErrors.conditionLevel,
                     )}`}
                   >
-                    <SelectValue placeholder="Condition">
+                    <SelectValue placeholder={t("conditionPlaceholder")}>
                       {formData.conditionLevel !== null &&
                         conditionText.name(
                           formData.conditionLevel,
@@ -720,11 +752,16 @@ export default function PostFormModal({
                         key={condition.id}
                         value={String(condition.level)}
                       >
-                        {conditionText.name(condition.level, condition.name)} -{" "}
-                        {conditionText.description(
-                          condition.level,
-                          condition.description,
-                        )}
+                        {t("conditionOption", {
+                          name: conditionText.name(
+                            condition.level,
+                            condition.name,
+                          ),
+                          description: conditionText.description(
+                            condition.level,
+                            condition.description,
+                          ),
+                        })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -736,7 +773,7 @@ export default function PostFormModal({
                 <Input
                   type="text"
                   required
-                  placeholder="Title"
+                  placeholder={t("titlePlaceholder")}
                   value={formData.title}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -757,7 +794,7 @@ export default function PostFormModal({
                   <TagIcon className="h-[24px] w-[24px] shrink-0 text-primary" />
                   <input
                     type="text"
-                    placeholder="Add tag, press Space"
+                    placeholder={t("tagPlaceholder")}
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleTagKeyDown}
@@ -777,7 +814,7 @@ export default function PostFormModal({
                           type="button"
                           onClick={() => removeTag(i)}
                           className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-primary/60 transition-colors hover:bg-primary/20 hover:text-primary"
-                          aria-label={`Remove tag ${tag}`}
+                          aria-label={t("removeTag", { tag })}
                         >
                           <X className="h-2.5 w-2.5" />
                         </button>
@@ -797,7 +834,7 @@ export default function PostFormModal({
                     ref={locationInputRef}
                     type="text"
                     required
-                    placeholder="Location"
+                    placeholder={t("locationPlaceholder")}
                     value={formData.location}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -827,10 +864,12 @@ export default function PostFormModal({
                         )}`}
                       >
                         {formData.expires_at ? (
-                          format(formData.expires_at, "PPP")
+                          formatter.dateTime(formData.expires_at, {
+                            dateStyle: "long",
+                          })
                         ) : (
                           <span className="text-[18px] font-medium tracking-normal text-primary-75">
-                            Expiry date
+                            {t("expiryDate")}
                           </span>
                         )}
                         <CalendarIcon className="h-4 w-4 opacity-50" />
@@ -839,6 +878,11 @@ export default function PostFormModal({
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
+                        locale={CALENDAR_LOCALES[locale]}
+                        labels={{
+                          labelPrevious: () => t("previousMonth"),
+                          labelNext: () => t("nextMonth"),
+                        }}
                         selected={formData.expires_at}
                         onSelect={(date) => {
                           setFormErrors((prev) =>
@@ -872,7 +916,9 @@ export default function PostFormModal({
                         : "text-gray-400"
                     }`}
                   >
-                    {formData.status === "active" ? "Public" : "Hidden"}
+                    {formData.status === "active"
+                      ? t("statusPublic")
+                      : t("statusHidden")}
                   </span>
                   <Switch
                     checked={formData.status === "active"}
@@ -892,7 +938,7 @@ export default function PostFormModal({
                   required
                   rows={4}
                   maxLength={MAX_CONTENT_LENGTH}
-                  placeholder="description..."
+                  placeholder={t("descriptionPlaceholder")}
                   className={`w-full rounded-[20px] border px-3 py-2 placeholder:text-lg placeholder:font-semibold placeholder:text-primary-75 ${
                     formErrors.content ? "border-red-500" : "border-gray-300"
                   }`}
@@ -915,7 +961,10 @@ export default function PostFormModal({
                       : "text-gray-400"
                   }`}
                 >
-                  {formData.content.length} / {MAX_CONTENT_LENGTH}
+                  {t("characterCount", {
+                    count: formatter.number(formData.content.length),
+                    max: formatter.number(MAX_CONTENT_LENGTH),
+                  })}
                 </div>
               </div>
 
@@ -928,7 +977,7 @@ export default function PostFormModal({
                     <Input
                       type="text"
                       maxLength={MAX_ITEM_TITLE_LENGTH}
-                      placeholder={`Item (Optional)`}
+                      placeholder={t("itemPlaceholder")}
                       value={item.title}
                       forceShowClear={true}
                       onClear={() => {
@@ -982,7 +1031,7 @@ export default function PostFormModal({
                       type="number"
                       min={1}
                       className="!flex-[1] text-center text-[18px] placeholder:text-center placeholder:text-[14px]"
-                      placeholder="Quantity"
+                      placeholder={t("quantityPlaceholder")}
                       value={item.quantity ?? ""}
                       onChange={(e) => {
                         const items = [...formData.items];
@@ -1011,11 +1060,10 @@ export default function PostFormModal({
                 <Button
                   type="button"
                   disabled={formData.items.length >= MAX_ITEMS_COUNT}
+                  aria-label={t("addItem")}
                   onClick={() => {
                     if (formData.items.length >= MAX_ITEMS_COUNT) {
-                      toast.error(
-                        `At most ${MAX_ITEMS_COUNT} items are allowed`,
-                      );
+                      toast.error(t("tooManyItems", { max: MAX_ITEMS_COUNT }));
                       return;
                     }
                     setFormData({
@@ -1035,7 +1083,10 @@ export default function PostFormModal({
                         : "text-gray-400"
                     }`}
                   >
-                    {formData.items.length} / {MAX_ITEMS_COUNT} items
+                    {t("itemCount", {
+                      count: formatter.number(formData.items.length),
+                      max: formatter.number(MAX_ITEMS_COUNT),
+                    })}
                   </span>
                 )}
               </div>
@@ -1047,7 +1098,7 @@ export default function PostFormModal({
                   disabled={isSubmitting}
                   className="py-5 disabled:opacity-50"
                 >
-                  {isSubmitting ? "Processing..." : submitButtonText}
+                  {isSubmitting ? t("submitting") : t(MODE_COPY[mode].submit)}
                 </Button>
               </div>
             </div>

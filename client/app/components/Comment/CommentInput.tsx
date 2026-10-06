@@ -146,8 +146,10 @@ const CommentInput: React.FC<CommentInputProps> = ({
                   : "text-gray-400"
               }`}
             >
-              {formatter.number(content.length)} /{" "}
-              {formatter.number(MAX_CHARACTER_LIMIT)}
+              {t("characterCount", {
+                count: formatter.number(content.length),
+                max: formatter.number(MAX_CHARACTER_LIMIT),
+              })}
             </div>
           )}
         </div>

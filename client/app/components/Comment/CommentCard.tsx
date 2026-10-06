@@ -9,7 +9,6 @@ import ExpandIcon from "../icons/ExpandIcon";
 // import WeavingIcon from "../icons/WeavingIcon";
 import ExpandedIcon from "../icons/ExpandedIcon";
 import { motion } from "framer-motion";
-import toast from "react-hot-toast";
 // import PrivateMessageIcon from "../icons/PrivateMessageIcon";
 import WeavingIcon from "../icons/WeavingIcon";
 interface CommentCardProps {
@@ -22,7 +21,7 @@ interface CommentCardProps {
   isOpen?: boolean;
   onToggle?: () => void;
   onWeaving?: () => void;
-  onPrivateMessage?: () => void;
+  onPrivateMessage: () => void;
 }
 const CommentCard: React.FC<CommentCardProps> = ({
   title,
@@ -53,14 +52,6 @@ const CommentCard: React.FC<CommentCardProps> = ({
   //     toast.success("Weaving action triggered (No callback provided).");
   //   }
   // };
-
-  const handleWeavingMessageClick = () => {
-    if (onPrivateMessage) {
-      onPrivateMessage();
-    } else {
-      toast.success(t("messageAboutItem"));
-    }
-  };
 
   return (
     <div
@@ -96,7 +87,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
           variant="ghost"
           aria-label={t("messageAboutItem")}
           className={`flex items-center gap-1 px-0 py-0 hover:bg-transparent ${isAllItems || (quantity && quantity > 0) ? "" : "hidden"}`}
-          onClick={handleWeavingMessageClick}
+          onClick={onPrivateMessage}
         >
           <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
         </Button>

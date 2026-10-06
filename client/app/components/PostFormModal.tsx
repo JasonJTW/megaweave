@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useId, useRef } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { enUS, zhTW } from "date-fns/locale";
+import { enUS, zhTW, type Locale as DateFnsLocale } from "date-fns/locale";
+import type { Locale } from "@/i18n/routing";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,10 @@ const MAX_IMAGES_COUNT = 5;
 const MAX_IMAGE_SIZE_MB = 10;
 
 /** react-day-picker localises month and weekday names from a date-fns locale. */
-const CALENDAR_LOCALES = { "zh-TW": zhTW, en: enUS } as const;
+const CALENDAR_LOCALES: Record<Locale, DateFnsLocale> = {
+  "zh-TW": zhTW,
+  en: enUS,
+};
 
 export type { PostFormSubmitData };
 
@@ -55,7 +59,7 @@ export type { PostFormSubmitData };
  * Which post the form is for. The modal owns its own heading and submit label,
  * so callers never pass UI copy that would need translating at the call site.
  */
-export type PostFormMode = "share" | "wish" | "edit";
+export type PostFormMode = Post["type"] | "edit";
 
 interface PostFormModalProps {
   isOpen: boolean;
@@ -67,10 +71,12 @@ interface PostFormModalProps {
   onSubmit: (data: PostFormSubmitData) => Promise<void>;
 }
 
-const HEADING_KEYS = {
-  share: "titleShare",
-  wish: "titleWish",
-  edit: "titleEdit",
+/** Heading and submit-button copy per mode, so `mode` is only switched on once. */
+const MODE_COPY = {
+  share: { heading: "titleShare", submit: "submit" },
+  wish: { heading: "titleWish", submit: "submit" },
+  commons: { heading: "titleCommons", submit: "submit" },
+  edit: { heading: "titleEdit", submit: "submitEdit" },
 } as const;
 
 export default function PostFormModal({
@@ -545,7 +551,7 @@ export default function PostFormModal({
               id={titleId}
               className="text-2xl font-bold capitalize text-gray-900"
             >
-              {t(HEADING_KEYS[mode])}
+              {t(MODE_COPY[mode].heading)}
             </h2>
             <button
               onClick={onClose}
@@ -872,11 +878,11 @@ export default function PostFormModal({
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
-                        locale={
-                          CALENDAR_LOCALES[
-                            locale as keyof typeof CALENDAR_LOCALES
-                          ]
-                        }
+                        locale={CALENDAR_LOCALES[locale]}
+                        labels={{
+                          labelPrevious: () => t("previousMonth"),
+                          labelNext: () => t("nextMonth"),
+                        }}
                         selected={formData.expires_at}
                         onSelect={(date) => {
                           setFormErrors((prev) =>
@@ -1092,9 +1098,7 @@ export default function PostFormModal({
                   disabled={isSubmitting}
                   className="py-5 disabled:opacity-50"
                 >
-                  {isSubmitting
-                    ? t("submitting")
-                    : t(mode === "edit" ? "submitEdit" : "submit")}
+                  {isSubmitting ? t("submitting") : t(MODE_COPY[mode].submit)}
                 </Button>
               </div>
             </div>

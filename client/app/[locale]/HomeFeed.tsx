@@ -1306,7 +1306,7 @@ const PostsApp = () => {
         <PostFormModal
           isOpen={showCreateForm}
           onClose={() => setShowCreateForm(false)}
-          mode={postType === "wish" ? "wish" : "share"}
+          mode={postType}
           isSubmitting={isCreating}
           onSubmit={handleCreatePost}
         />

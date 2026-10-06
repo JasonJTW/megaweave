@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormatter, useTranslations } from "next-intl";
-import { useConditionText } from "@/i18n/referenceNames";
+import { usePostConditionName } from "@/i18n/referenceNames";
 import EyesIcon from "@/app/components/icons/EyesIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import type { Post } from "@/app/types/schema";
@@ -31,7 +31,7 @@ const PostShareModal = ({
 }: PostShareModalProps) => {
   const t = useTranslations("PostDetail");
   const formatter = useFormatter();
-  const conditionText = useConditionText();
+  const conditionLabel = usePostConditionName();
   const s3Keys = parseS3Keys(post);
 
   const imageSrc = s3Keys[0]?.startsWith("http")
@@ -44,10 +44,7 @@ const PostShareModal = ({
     post.full_address ||
     "";
 
-  const conditionName = conditionText.name(
-    post.condition_level,
-    post.condition_name,
-  );
+  const conditionName = conditionLabel(post);
 
   const tags = post.tags
     ? post.tags

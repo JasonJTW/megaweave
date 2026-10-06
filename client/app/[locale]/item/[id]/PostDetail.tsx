@@ -2,7 +2,7 @@
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
+import { useCategoryName, usePostConditionName } from "@/i18n/referenceNames";
 import { MessageButton } from "@/app/components/Chat/MessageButton";
 import ClockIcon from "@/app/components/icons/ClockIcon";
 import EditIcon from "@/app/components/icons/EditIcon";
@@ -80,7 +80,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const tItem = useTranslations("Metadata.item");
   const formatter = useFormatter();
   const categoryName = useCategoryName();
-  const conditionText = useConditionText();
+  const conditionLabel = usePostConditionName();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
@@ -218,8 +218,14 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         city: data.city || undefined,
         route: data.route || undefined,
         zip: data.zip_code || data.zip || undefined,
-        lat: data.lat !== undefined && data.lat !== null ? Number(data.lat) : undefined,
-        lng: data.lng !== undefined && data.lng !== null ? Number(data.lng) : undefined,
+        lat:
+          data.lat !== undefined && data.lat !== null
+            ? Number(data.lat)
+            : undefined,
+        lng:
+          data.lng !== undefined && data.lng !== null
+            ? Number(data.lng)
+            : undefined,
         expiresAt: data.expires_at ? data.expires_at.toISOString() : null,
         items: validItems && validItems.length > 0 ? validItems : undefined,
         deleteImageIds:
@@ -414,10 +420,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
   const locationText = formatLocationText(post);
 
-  const conditionName = conditionText.name(
-    post.condition_level,
-    post.condition_name,
-  );
+  const conditionName = conditionLabel(post);
 
   const initialFormData = {
     title: post.title,
@@ -565,7 +568,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                         {author && (
                           <p className="mb-1">
                             <span className="font-medium">
-                              {t("sourceAuthor")}:
+                              {t("sourceAuthor")}
                             </span>{" "}
                             {author}
                           </p>

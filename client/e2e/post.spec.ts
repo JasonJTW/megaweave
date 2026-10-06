@@ -8,15 +8,17 @@ const SAMPLE_IMAGE = path.join(__dirname, "fixtures/files/sample.jpg");
 // The flow runs once per language, driven by that language's catalog so the spec
 // follows the translations instead of restating them. zh-TW is unprefixed (ADR 0002).
 const LOCALES = [
-  { locale: "zh-TW", home: "/", messages: zhTW },
-  { locale: "en", home: "/en", messages: en },
+  // `heading` restates the form title on purpose: the rest of the spec reads its
+  // selectors from the catalog, so one literal per locale is what proves the copy.
+  { locale: "zh-TW", home: "/", messages: zhTW, heading: "分享" },
+  { locale: "en", home: "/en", messages: en, heading: "Share" },
 ] as const;
 
 // Seeded reference data the form needs: category id 1 and condition level 2
 const CATEGORY_ID = "1";
 const CONDITION_LEVEL = "2";
 
-for (const { locale, home, messages } of LOCALES) {
+for (const { locale, home, messages, heading } of LOCALES) {
   test.describe(`create post (${locale})`, () => {
     test("shares an item with a photo and shows it in the feed", async ({
       page,
@@ -38,7 +40,8 @@ for (const { locale, home, messages } of LOCALES) {
         .first()
         .click();
 
-      const form = page.getByRole("dialog", { name: copy.titleShare });
+      expect(copy.titleShare).toBe(heading);
+      const form = page.getByRole("dialog", { name: heading });
       await form.locator("#image-upload").setInputFiles(SAMPLE_IMAGE);
 
       await form
@@ -68,8 +71,7 @@ for (const { locale, home, messages } of LOCALES) {
         .fill("Created by Playwright");
 
       await form.getByRole("button", { name: copy.expiryDate }).click();
-      // react-day-picker's navigation labels stay English whatever the locale
-      await page.getByRole("button", { name: /next month/i }).click();
+      await page.getByRole("button", { name: copy.nextMonth }).click();
       await page.getByRole("gridcell", { name: "15" }).click();
       await page.keyboard.press("Escape");
 

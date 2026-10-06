@@ -29,6 +29,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const router = useRouter();
   const t = useTranslations("Comments");
   const formatter = useFormatter();
+  const authorName =
+    comment.username || t("userFallback", { publicId: comment.public_id });
 
   // 回覆成功後
   const handleReplySuccess = () => {
@@ -87,11 +89,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           {comment.avatar_url ? (
             <Image
               src={comment.avatar_url}
-              alt={t("avatarAlt", {
-                username:
-                  comment.username ||
-                  t("userFallback", { publicId: comment.public_id }),
-              })}
+              alt={t("avatarAlt", { username: authorName })}
               fill
               className="rounded-full object-cover"
             />
@@ -109,8 +107,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             onClick={handleAvatarClick}
             className="whitespace-nowrap text-[14px] font-medium leading-[14px] text-gray-900 transition-colors hover:text-primary hover:underline" // 保持用戶名不換行
           >
-            {comment.username ||
-              t("userFallback", { publicId: comment.public_id })}
+            {authorName}
           </button>
           <div className="mt-1 flex min-h-[32px] w-full items-center justify-between rounded-[16px] bg-white pl-3 pr-2">
             {" "}
@@ -171,11 +168,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             itemId={comment.item_id === null ? "all" : comment.item_id}
             parentId={comment.id}
             user={user}
-            placeholder={t("replyTo", {
-              username:
-                comment.username ||
-                t("userFallback", { publicId: comment.public_id }),
-            })}
+            placeholder={t("replyTo", { username: authorName })}
             onSuccess={handleReplySuccess}
             onCancel={() => setShowReplyInput(false)}
             autoFocus

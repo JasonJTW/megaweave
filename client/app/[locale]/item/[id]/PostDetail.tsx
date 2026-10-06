@@ -1,6 +1,8 @@
 //* item/id/page.tsx
 "use client";
+import { useFormatter, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
+import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import { MessageButton } from "@/app/components/Chat/MessageButton";
 import ClockIcon from "@/app/components/icons/ClockIcon";
 import EditIcon from "@/app/components/icons/EditIcon";
@@ -73,6 +75,12 @@ function parsePostContent(content: string): {
 
 const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const router = useRouter();
+  const t = useTranslations("PostDetail");
+  // The share sheet reuses the page's own OG title copy
+  const tItem = useTranslations("Metadata.item");
+  const formatter = useFormatter();
+  const categoryName = useCategoryName();
+  const conditionText = useConditionText();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
@@ -157,16 +165,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         }
       } else {
         if (response.status !== 404) {
-          toast.error("Failed to fetch post");
+          toast.error(t("fetchFailed"));
         }
       }
     } catch (error) {
       console.error("Error fetching post:", error);
-      toast.error("Failed to fetch post");
+      toast.error(t("fetchFailed"));
     } finally {
       setLoading(false);
     }
-  }, [hostName, postId, user, fetchOwnerSidebar]);
+  }, [hostName, postId, user, fetchOwnerSidebar, t]);
 
   // 處理更新貼文
   const handleUpdatePost = async (data: PostFormSubmitData) => {
@@ -231,18 +239,18 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       });
 
       if (response.ok) {
-        toast.success("Post updated successfully");
+        toast.success(t("updated"));
         setShowEditForm(false);
         fetchPost(); // Refresh page data without changing URL layout
         mutate(() => true, undefined, { revalidate: true }); // Revalidate all SWR caches (including main page feed)
       } else {
         const errorData = await response.json();
-        toast.error(errorData.errorMessage || "Failed to update post");
+        toast.error(errorData.errorMessage || t("updateFailed"));
       }
     } catch (error: unknown) {
       console.error("Error updating post:", error);
       const message =
-        error instanceof Error ? error.message : "Failed to update post";
+        error instanceof Error ? error.message : t("updateFailed");
       toast.error(message);
     } finally {
       setIsUpdating(false);
@@ -252,7 +260,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // 處理按讚
   const handleLike = async () => {
     if (!user) {
-      toast.error("Please log in to like");
+      toast.error(t("signInToLike"));
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
@@ -281,11 +289,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   const handleDelete = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this post? This action cannot be undone.",
-      )
-    ) {
+    if (!window.confirm(t("deleteConfirm"))) {
       return;
     }
 
@@ -296,7 +300,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       });
 
       if (response.ok) {
-        toast.success("Post deleted successfully");
+        toast.success(t("deleted"));
         mutate(
           (key) =>
             typeof key === "string" && key.startsWith(`${hostName}/api/posts?`),
@@ -306,11 +310,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         router.push("/");
       } else {
         const errorData = await response.json();
-        toast.error(errorData.errorMessage || "Failed to delete post");
+        toast.error(errorData.errorMessage || t("deleteFailed"));
       }
     } catch (error) {
       console.error("Error deleting post:", error);
-      toast.error("Failed to delete post");
+      toast.error(t("deleteFailed"));
     }
   };
 
@@ -329,16 +333,20 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       }
       const blob = await response.blob();
       const shareCard = new File([blob], "post.png", { type: "image/png" });
-      const title = `${post?.title} | ${post?.type} by ${post?.username}`;
+      const title = tItem("title", {
+        title: post?.title ?? tItem("fallbackTitle"),
+        username: post?.username ?? t("userFallback"),
+        type: tItem("type", { type: post?.type ?? "other" }),
+      });
       await navigator.share({
-        title: title,
+        title,
         url: window.location.href,
         files: [shareCard],
       });
     } catch (error) {
       if (error instanceof DOMException && error.name !== "AbortError") {
         console.error(error);
-        toast.error("Failed to share");
+        toast.error(t("shareFailed"));
       }
     }
   };
@@ -355,13 +363,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <h2 className="mb-4 text-2xl font-bold text-gray-900">
-            Invalid Post ID
+            {t("invalidPostId")}
           </h2>
           <Button
-            onClick={() => router.push("/forms")}
+            onClick={() => router.push("/")}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Back
+            {t("back")}
           </Button>
         </div>
       </div>
@@ -381,13 +389,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
           <h2 className="mb-4 text-2xl font-bold text-gray-900">
-            {"Post not found"}
+            {t("notFound")}
           </h2>
           <Button
             onClick={() => router.back()}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Back
+            {t("back")}
           </Button>
         </div>
       </div>
@@ -405,6 +413,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   );
 
   const locationText = formatLocationText(post);
+
+  const conditionName = conditionText.name(
+    post.condition_level,
+    post.condition_name,
+  );
 
   const initialFormData = {
     title: post.title,
@@ -456,6 +469,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <Button
                   variant="ghost"
                   onClick={() => router.back()}
+                  aria-label={t("back")}
                   className="p-4"
                 >
                   <ArrowLeft className="h-8 w-8" />
@@ -465,6 +479,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <Button
                   variant="ghost"
                   onClick={() => setShareModalOpen(true)}
+                  aria-label={t("sharePost")}
                   className="p-4"
                 >
                   <Share2 className="h-8 w-8" />
@@ -497,15 +512,20 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                           <div className="pointer-events-none absolute bottom-0 flex w-full flex-row justify-between px-5 py-5">
                             {post.view_count > 0 && (
                               <div className="flex items-center">
-                                <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
+                                <Badge
+                                  aria-label={t("viewCount", {
+                                    count: post.view_count,
+                                  })}
+                                  className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white"
+                                >
                                   <EyesIcon className="mr-[4px]" />
-                                  {post.view_count}
+                                  {formatter.number(post.view_count)}
                                 </Badge>
                               </div>
                             )}
-                            {post.condition_name && (
+                            {conditionName && (
                               <div className="flex items-center">
-                                <Badge>{post.condition_name}</Badge>
+                                <Badge>{conditionName}</Badge>
                               </div>
                             )}
                           </div>
@@ -520,7 +540,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
               </h1>
               {/* 分類和狀況 */}
               <div className="mb-4 flex flex-wrap gap-2">
-                <Badge>{post.category_name_en}</Badge>
+                <Badge>
+                  {categoryName({
+                    id: post.category_id,
+                    name_en: post.category_name_en,
+                  })}
+                </Badge>
               </div>
               {/* 內容 */}
               {(() => {
@@ -539,7 +564,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       <div className="mb-6 rounded-lg border border-primary-30 bg-primary-15 px-4 py-3 text-sm text-megaweave-forest">
                         {author && (
                           <p className="mb-1">
-                            <span className="font-medium">Author:</span>{" "}
+                            <span className="font-medium">
+                              {t("sourceAuthor")}:
+                            </span>{" "}
                             {author}
                           </p>
                         )}
@@ -551,17 +578,18 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 font-medium hover:opacity-70"
                             >
-                              Original Post
+                              {t("sourceOriginalPost")}
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                           </p>
                         )}
                         {hasDisclaimer && (
                           <p className="mt-2 border-t border-megaweave-forest pt-2 text-xs font-semibold text-megaweave-red-light">
-                            This content is reposted from Facebook by{" "}
-                            <span className="font-extrabold">@megaweaving</span>
-                            . In case of any discrepancies, the original
-                            Facebook post shall prevail.
+                            {t.rich("sourceDisclaimer", {
+                              handle: (chunks) => (
+                                <span className="font-extrabold">{chunks}</span>
+                              ),
+                            })}
                           </p>
                         )}
                       </div>
@@ -615,7 +643,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 {post.expires_at && (
                   <div className="flex items-center gap-2">
                     <ClockIcon className="text-primary" />
-                    {new Date(post.expires_at).toLocaleDateString()}
+                    {formatter.dateTime(new Date(post.expires_at), {
+                      dateStyle: "long",
+                    })}
                   </div>
                 )}
               </div>
@@ -630,7 +660,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                     <Image
                       fill
                       src={post!.avatar_url!}
-                      alt={`${post!.username}'s avatar`}
+                      alt={t("avatarAlt", {
+                        username: post!.username ?? t("userFallback"),
+                      })}
                       className="rounded-full object-cover"
                     />
                   ) : (
@@ -650,6 +682,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <Button
                   variant="ghost"
                   onClick={handleLike}
+                  aria-label={t("like")}
+                  aria-pressed={isLiked}
                   className={`inline-flex w-14 items-center space-x-[1px] ${
                     isLiked ? "text-red-500" : "text-gray-500"
                   }`}
@@ -657,10 +691,13 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   <Heart
                     className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`}
                   />
-                  <span className="text-black">{likeCount}</span>
+                  <span className="text-black">
+                    {formatter.number(likeCount)}
+                  </span>
                 </Button>
                 <Button
                   variant="ghost"
+                  aria-label={t("jumpToComments")}
                   className="w-14 items-center space-x-[1px] text-gray-500"
                   onClick={() =>
                     document
@@ -673,7 +710,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 {post.user_id && user?.userId !== post.user_id && (
                   <MessageButton
                     recipientPublicId={post.author_public_id}
-                    recipientName={post.username || "User"}
+                    recipientName={post.username || t("userFallback")}
                     className="ml-2 h-auto border-0 p-0 text-gray-500 hover:bg-transparent hover:text-primary"
                   />
                 )}
@@ -685,7 +722,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       className="flex items-center gap-1 text-gray-500 hover:bg-gray-50 hover:text-primary"
                     >
                       <EditIcon className="h-5 w-5" />
-                      <span>Edit</span>
+                      <span>{t("edit")}</span>
                     </Button>
                     <Button
                       variant="ghost"
@@ -693,7 +730,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       className="flex items-center gap-1 text-red-500 hover:bg-red-50 hover:text-red-700"
                     >
                       <Trash2 className="h-5 w-5" />
-                      <span>Delete</span>
+                      <span>{t("delete")}</span>
                     </Button>
                   </div>
                 )}
@@ -729,8 +766,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       <PostFormModal
         isOpen={showEditForm}
         onClose={() => setShowEditForm(false)}
-        title="Edit Post"
-        submitButtonText="Save Changes"
+        mode="edit"
         isSubmitting={isUpdating}
         initialData={initialFormData}
         existingImages={existingImages}

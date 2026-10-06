@@ -3,7 +3,9 @@
 import { useRouter } from "@/i18n/navigation";
 
 import React, { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Comment } from "@/services/commentService";
+import { commentTimeDisplay } from "@/utils/commentTime";
 import CommentInput from "./CommentInput";
 import User from "../../types/user";
 import Image from "next/image";
@@ -25,6 +27,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
 }) => {
   const [showReplyInput, setShowReplyInput] = useState(false);
   const router = useRouter();
+  const t = useTranslations("Comments");
+  const formatter = useFormatter();
 
   // 回覆成功後
   const handleReplySuccess = () => {
@@ -51,25 +55,18 @@ const CommentItem: React.FC<CommentItemProps> = ({
   //   )
   // );
 
-  // 格式化時間（相對時間）
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hrs ago`;
-    if (diffDays < 7) return `${diffDays} days ago`;
-
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
+  // 近期留言顯示相對時間，一週以上改成日期，兩者都依語言格式化
+  const now = new Date();
+  const timestamp = commentTimeDisplay(comment.created_at, now);
+  const timestampText =
+    timestamp === null
+      ? ""
+      : timestamp.kind === "relative"
+        ? formatter.relativeTime(timestamp.value, now)
+        : formatter.dateTime(timestamp.value, {
+            month: "short",
+            day: "numeric",
+          });
 
   return (
     // 移除 `py-3`，讓外部容器控制間距
@@ -90,7 +87,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
           {comment.avatar_url ? (
             <Image
               src={comment.avatar_url}
-              alt={`${comment.username}'s avatar` || "User's avatar"}
+              alt={t("avatarAlt", {
+                username:
+                  comment.username ||
+                  t("userFallback", { publicId: comment.public_id }),
+              })}
               fill
               className="rounded-full object-cover"
             />
@@ -108,7 +109,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
             onClick={handleAvatarClick}
             className="whitespace-nowrap text-[14px] font-medium leading-[14px] text-gray-900 transition-colors hover:text-primary hover:underline" // 保持用戶名不換行
           >
-            {comment.username || `User ${comment.public_id}`}
+            {comment.username ||
+              t("userFallback", { publicId: comment.public_id })}
           </button>
           <div className="mt-1 flex min-h-[32px] w-full items-center justify-between rounded-[16px] bg-white pl-3 pr-2">
             {" "}
@@ -140,16 +142,22 @@ const CommentItem: React.FC<CommentItemProps> = ({
           onClick={() => setShowReplyInput(!showReplyInput)}
           className="transition-colors hover:text-primary"
         >
-          {showReplyInput ? "cancel" : "reply"}
+          {showReplyInput ? t("cancelReply") : t("reply")}
         </button>
-        <span className="text-xs text-gray-400">
-          {formatDate(comment.created_at)}
-        </span>
+        <span className="text-xs text-gray-400">{timestampText}</span>
         {/* 其他操作按鈕，如讚數和回覆數，可以考慮是否在此處顯示或放在其他位置 */}
-        {comment.like_count > 0 && <span>❤️ {comment.like_count}</span>}
+        {comment.like_count > 0 && (
+          <span aria-label={t("likeCount", { count: comment.like_count })}>
+            ❤️ {formatter.number(comment.like_count)}
+          </span>
+        )}
         {comment.reply_count > 0 && (
-          <div className="flex gap-1">
-            <MessageIcon className="w-4" /> {comment.reply_count}
+          <div
+            className="flex gap-1"
+            aria-label={t("replyCount", { count: comment.reply_count })}
+          >
+            <MessageIcon className="w-4" />{" "}
+            {formatter.number(comment.reply_count)}
           </div>
         )}
       </div>
@@ -163,7 +171,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
             itemId={comment.item_id === null ? "all" : comment.item_id}
             parentId={comment.id}
             user={user}
-            placeholder={`Reply ${comment.username || "User"}...`}
+            placeholder={t("replyTo", {
+              username:
+                comment.username ||
+                t("userFallback", { publicId: comment.public_id }),
+            })}
             onSuccess={handleReplySuccess}
             onCancel={() => setShowReplyInput(false)}
             autoFocus

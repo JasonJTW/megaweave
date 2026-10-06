@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import MessageIcon from "../icons/MessageIcon";
 import { Button } from "@/components/ui/button";
 import ExpandIcon from "../icons/ExpandIcon";
@@ -12,7 +13,10 @@ import toast from "react-hot-toast";
 // import PrivateMessageIcon from "../icons/PrivateMessageIcon";
 import WeavingIcon from "../icons/WeavingIcon";
 interface CommentCardProps {
+  /** The item's own title, or the translated "All" label for the catch-all row */
   title: string;
+  /** The catch-all row: it has no stock, so weaving is always offered */
+  isAllItems?: boolean;
   count?: number;
   quantity?: number; // ✅ 新增：剩餘數量 (Optional)
   isOpen?: boolean;
@@ -22,6 +26,7 @@ interface CommentCardProps {
 }
 const CommentCard: React.FC<CommentCardProps> = ({
   title,
+  isAllItems = false,
   count = 0,
   quantity, // ✅ 解構取出 quantity
   isOpen = false,
@@ -29,6 +34,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
   // onWeaving,
   onPrivateMessage,
 }) => {
+  const t = useTranslations("Comments");
+  const formatter = useFormatter();
   // ✅ 新增：控制數量選單的顯示狀態
 
   // 處理 WeavingIcon 點擊
@@ -51,7 +58,7 @@ const CommentCard: React.FC<CommentCardProps> = ({
     if (onPrivateMessage) {
       onPrivateMessage();
     } else {
-      toast.success("Weaving Message action triggered.");
+      toast.success(t("messageAboutItem"));
     }
   };
 
@@ -73,7 +80,11 @@ const CommentCard: React.FC<CommentCardProps> = ({
         {quantity !== undefined && (
           <div className="flex h-[22px] flex-shrink-0 items-center justify-center rounded-[6px] bg-primary-30 px-[8px]">
             <span className="whitespace-nowrap text-[13px] font-bold tracking-tight text-[#1a1a1a]">
-              Left : {quantity.toString().padStart(2, "0")}
+              {t("quantityLeft", {
+                quantity: formatter.number(quantity, {
+                  minimumIntegerDigits: 2,
+                }),
+              })}
             </span>
           </div>
         )}
@@ -83,7 +94,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
         {/* Private message for weaving button */}
         <Button
           variant="ghost"
-          className={`flex items-center gap-1 px-0 py-0 hover:bg-transparent ${title.toLowerCase() === "all" || (quantity && quantity > 0) ? "" : "hidden"}`}
+          aria-label={t("messageAboutItem")}
+          className={`flex items-center gap-1 px-0 py-0 hover:bg-transparent ${isAllItems || (quantity && quantity > 0) ? "" : "hidden"}`}
           onClick={handleWeavingMessageClick}
         >
           <WeavingIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
@@ -92,12 +104,15 @@ const CommentCard: React.FC<CommentCardProps> = ({
         {/* 留言按鈕 + 數量 */}
         <Button
           variant="ghost"
+          aria-label={t("commentCount", { count })}
           className="flex items-center gap-1 px-0 py-0 hover:bg-transparent"
           onClick={onToggle}
         >
           <MessageIcon className="!h-[19px] !w-[19px] text-megaweave-forest-dark" />
           {count > 0 && (
-            <span className="text-sm text-megaweave-forest-dark">{count}</span>
+            <span className="text-sm text-megaweave-forest-dark">
+              {formatter.number(count)}
+            </span>
           )}
         </Button>
 
@@ -113,6 +128,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
         {/* 展開/收合按鈕 */}
         <Button
           variant="ghost"
+          aria-label={t("toggle")}
+          aria-expanded={isOpen}
           className="px-0 hover:bg-transparent"
           onClick={onToggle}
         >

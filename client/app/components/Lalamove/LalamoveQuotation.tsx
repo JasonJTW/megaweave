@@ -25,6 +25,14 @@ import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
 import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import {
+  VEHICLE_TYPES,
+  VEHICLE_SIZE_LIMITS,
+  VehicleType,
+  isVehicleType,
+  LALAMOVE_LANGUAGE,
+} from "@/utils/lalamove";
 import {
   parseGooglePlace,
   GOOGLE_AUTOCOMPLETE_FIELDS,
@@ -58,179 +66,23 @@ function sanitizeTwAddress(address: string): string {
   );
 }
 
-export type LalamoveLocale = "en" | "zh";
-
 export interface LalamoveQuotationProps {
   post: Post;
-  locale?: LalamoveLocale;
   /** Caller already knows a approved weave exists (e.g. rendered under a approved WeavingCard); skips the lookup. */
   hasPendingWeave?: boolean;
 }
 
-interface ServiceOption {
-  id: string;
-  name: { en: string; zh: string };
-  subName: { en: string; zh: string };
-  icon: "bike" | "van" | "truck";
-  weightLimit: { en: string; zh: string };
-  sizeLimit: string;
-}
-
-const SERVICE_OPTIONS: ServiceOption[] = [
-  {
-    id: "MOTORCYCLE",
-    name: { en: "Motorcycle", zh: "機車" },
-    subName: { en: "Small Parcel", zh: "小型包裹 / 文件" },
-    icon: "bike",
-    weightLimit: { en: "Max 20kg", zh: "20kg 內" },
-    sizeLimit: "40×40×40 cm",
-  },
-  {
-    id: "SUV",
-    name: { en: "Van (Half)", zh: "廂型貨車（半車）" },
-    subName: { en: "Medium Cargo", zh: "中型物資 / 20-32吋行李" },
-    icon: "van",
-    weightLimit: { en: "Max 200kg", zh: "200kg 內" },
-    sizeLimit: "100×100×100 cm",
-  },
-  {
-    id: "VAN",
-    name: { en: "Van (Full)", zh: "廂型貨車（全車）" },
-    subName: { en: "Boxes / Moving", zh: "學生搬宿 / 多箱行李" },
-    icon: "van",
-    weightLimit: { en: "Max 300kg", zh: "300kg 內" },
-    sizeLimit: "150×100×100 cm",
-  },
-  {
-    id: "TRUCK175",
-    name: { en: "1.75T Truck", zh: "1.75噸 貨車" },
-    subName: { en: "Moving / Heavy", zh: "租屋搬家 / 大型家具" },
-    icon: "truck",
-    weightLimit: { en: "Max 500kg", zh: "500kg 內" },
-    sizeLimit: "200×120×120 cm",
-  },
-  {
-    id: "TRUCK330",
-    name: { en: "3.49T Truck", zh: "3.49噸 貨車" },
-    subName: { en: "Full Move / Heavy", zh: "家庭搬遷 / 大件棧板" },
-    icon: "truck",
-    weightLimit: { en: "Max 1,000kg", zh: "1,000kg 內" },
-    sizeLimit: "300×150×150 cm",
-  },
-];
+const SERVICE_ICONS: Record<VehicleType, "bike" | "van" | "truck"> = {
+  MOTORCYCLE: "bike",
+  SUV: "van",
+  VAN: "van",
+  TRUCK175: "truck",
+  TRUCK330: "truck",
+};
 
 // FIXME: [Lalamove TW API Regional Limitation]
 // FIXME In Taipei (TW_TPE), Lalamove API only supports TRUCK330 (merging 1.75T & 3.49T into 500-1000kg).
 // FIXME Therefore, requesting TRUCK175 in Taipei falls back to TRUCK330 pricing (same price). Waiting for Lalamove support to clarify if 1.75T can be differentiated.
-
-interface TranslationSchema {
-  headerTitle: string;
-  headerBadge: string;
-  headerSubtitle: string;
-  expand: string;
-  collapse: string;
-  approxDistance: string;
-  pickupOrigin: string;
-  fallbackOrigin: string;
-  dropoffDestination: string;
-  useCurrentLocation: string;
-  locating: string;
-  placeholderDestination: string;
-  selectVehicle: string;
-  calcButton: string;
-  calculating: string;
-  inputAddressError: string;
-  quoteFailed: string;
-  estimatedFare: string;
-  approxDeliveryTime: (mins: number) => string;
-  distanceLabel: (km: string) => string;
-  priceBreakdown: string;
-  baseFare: string;
-  extraMileageFare: string;
-  surchargeFare: string;
-  quoteValidCountdown: string;
-  quoteExpired: string;
-  quoteExpiredRecalculate: string;
-  recalculate: string;
-  change: string;
-  gpsFallback: (lat: number, lng: number) => string;
-  capacityLimit: (name: string, size: string, weight: string) => string;
-}
-
-const TRANSLATIONS: Record<LalamoveLocale, TranslationSchema> = {
-  en: {
-    headerTitle: "Lalamove Instant Delivery Quote",
-    headerBadge: "On-Demand",
-    headerSubtitle:
-      "Enter destination address to estimate motorcycle or truck delivery fare",
-    expand: "Get Quote",
-    collapse: "Collapse",
-    approxDistance: "approx.",
-    pickupOrigin: "Pickup Location (Item Address)",
-    fallbackOrigin: "Item Location",
-    dropoffDestination: "Delivery Destination",
-    useCurrentLocation: "Use Current Location",
-    locating: "Locating...",
-    placeholderDestination:
-      "Enter delivery address (e.g. No. 7, Sec. 5, Xinyi Rd...)",
-    selectVehicle: "Select Vehicle Type",
-    calcButton: "Get Instant Quote",
-    calculating: "Calculating fare...",
-    inputAddressError: "Please enter a destination address",
-    quoteFailed: "Failed to get quote, please check address and retry",
-    estimatedFare: "Estimated Fare",
-    approxDeliveryTime: (mins: number) => `approx. ${mins} mins`,
-    distanceLabel: (km: string) => `Distance ${km} km`,
-    priceBreakdown: "Fare Breakdown",
-    baseFare: "Base Fare",
-    extraMileageFare: "Extra Mileage Fare",
-    surchargeFare: "Surcharge / Peak Fee",
-    quoteValidCountdown: "Quote valid for: ",
-    quoteExpired: "Quote Expired",
-    quoteExpiredRecalculate: "Quote Expired · Click to Recalculate",
-    recalculate: "Recalculate",
-    change: "Change",
-    gpsFallback: (lat: number, lng: number) =>
-      `GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-    capacityLimit: (name: string, size: string, weight: string) =>
-      `📦 ${name} Max Capacity: ${size} (${weight})`,
-  },
-  zh: {
-    headerTitle: "Lalamove 即時運費試算",
-    headerBadge: "即時媒合",
-    headerSubtitle: "輸入收件地址，快速試算機車或貨車直送費用",
-    expand: "展開試算",
-    collapse: "收合",
-    approxDistance: "約",
-    pickupOrigin: "取件起點 (此商品所在地)",
-    fallbackOrigin: "商品所在地點",
-    dropoffDestination: "送達地點 (目的地)",
-    useCurrentLocation: "使用目前位置",
-    locating: "定位中...",
-    placeholderDestination: "請輸入地址（如：台北市信義區信義路五段...）",
-    selectVehicle: "選擇配送車種",
-    calcButton: "開始即時試算",
-    calculating: "運費試算中...",
-    inputAddressError: "請輸入送達地址",
-    quoteFailed: "報價查詢失敗，請確認地址後重試",
-    estimatedFare: "預估配送運費",
-    approxDeliveryTime: (mins: number) => `約 ${mins} 分鐘送達`,
-    distanceLabel: (km: string) => `距離 ${km} km`,
-    priceBreakdown: "費用明細",
-    baseFare: "基本起程費",
-    extraMileageFare: "超里程運費",
-    surchargeFare: "時段加成費",
-    quoteValidCountdown: "報價保留倒數：",
-    quoteExpired: "報價已過期",
-    quoteExpiredRecalculate: "報價已過期 · 點此重新試算",
-    recalculate: "重新試算",
-    change: "變更",
-    gpsFallback: (lat: number, lng: number) =>
-      `GPS 定位 (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-    capacityLimit: (name: string, size: string, weight: string) =>
-      `📦 ${name} 載運上限：${size}（${weight}）`,
-  },
-};
 
 export interface QuotationItem {
   quotationId: string;
@@ -254,11 +106,10 @@ export interface QuotationItem {
 
 export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   post,
-  locale = "en",
   hasPendingWeave: hasPendingWeaveProp,
 }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
-  const t = TRANSLATIONS[locale] || TRANSLATIONS.en;
+  const t = useTranslations("Lalamove");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -314,7 +165,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
   const handleWeaveThisClick = async () => {
     if (!user) {
-      toast.error("Please log in to message.");
+      toast.error(t("quotation.signInToMessage"));
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
@@ -322,7 +173,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     }
 
     if (user.userId === (post.author_user_id ?? post.user_id)) {
-      toast.error("You cannot message yourself.");
+      toast.error(t("quotation.cannotMessageSelf"));
       return;
     }
 
@@ -350,7 +201,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       );
     } catch (error) {
       console.error("Message error:", error);
-      toast.error(`Could not message ${post.username}`);
+      toast.error(t("quotation.messageFailed", { username: post.username }));
     }
   };
 
@@ -363,7 +214,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     post.full_address ||
     post.location_name ||
     post.city ||
-    (post.province ? `${post.province} ${post.city || ""}` : t.fallbackOrigin);
+    (post.province
+      ? `${post.province} ${post.city || ""}`
+      : t("quotation.fallbackOrigin"));
 
   const originLat = post.lat || 25.033;
   const originLng = post.lng || 121.5654;
@@ -418,7 +271,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const handleFetchQuotation = useCallback(
     async (serviceTypesToFetch?: string[], targetServiceToSelect?: string) => {
       if (!destinationAddress.trim()) {
-        setErrorMsg(t.inputAddressError);
+        setErrorMsg(t("quotation.inputAddressError"));
         return;
       }
 
@@ -429,7 +282,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       const targetTypes =
         serviceTypesToFetch && serviceTypesToFetch.length > 0
           ? serviceTypesToFetch
-          : SERVICE_OPTIONS.map((s) => s.id);
+          : [...VEHICLE_TYPES];
 
       try {
         const stops = [
@@ -457,7 +310,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           body: JSON.stringify({
             serviceTypes: targetTypes,
             stops,
-            language: locale === "en" ? "en_TW" : "zh_TW",
+            language: LALAMOVE_LANGUAGE,
           }),
         });
 
@@ -465,7 +318,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         console.log("[Lalamove Client] Received quotation data:", data);
 
         if (!response.ok || !data.success) {
-          throw new Error(data.error || t.quoteFailed);
+          throw new Error(data.error || t("quotation.quoteFailed"));
         }
 
         const quotesMap: Record<string, QuotationItem> = {};
@@ -505,13 +358,12 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           data.quotations[0];
         if (current) {
           setActiveQuotation(current);
-          toast.success(
-            locale === "en" ? "Fare quote updated" : "運費報價已更新",
-          );
+          toast.success(t("quotation.quoteUpdated"));
         }
       } catch (err: unknown) {
         console.error("Fetch quotation error:", err);
-        const message = err instanceof Error ? err.message : t.quoteFailed;
+        const message =
+          err instanceof Error ? err.message : t("quotation.quoteFailed");
         setErrorMsg(message);
         toast.error(message);
       } finally {
@@ -526,7 +378,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       originLat,
       originLng,
       selectedService,
-      locale,
       t,
     ],
   );
@@ -555,11 +406,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   // Use current GPS location
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast.error(
-        locale === "en"
-          ? "Browser does not support geolocation"
-          : "您的瀏覽器不支援地理定位",
-      );
+      toast.error(t("quotation.geolocationUnsupported"));
       return;
     }
 
@@ -569,7 +416,10 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         const { latitude, longitude } = pos.coords;
         setDestinationCoords({ lat: latitude, lng: longitude });
 
-        const fallbackLabel = t.gpsFallback(latitude, longitude);
+        const fallbackLabel = t("quotation.gpsFallback", {
+          lat: latitude.toFixed(4),
+          lng: longitude.toFixed(4),
+        });
 
         // Try reverse geocoding — gracefully skip if Geocoding API is not enabled
         if (window.google?.maps?.Geocoder) {
@@ -615,11 +465,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       (err) => {
         setIsLocating(false);
         console.warn("Geolocation error:", err);
-        toast.error(
-          locale === "en"
-            ? "Failed to obtain your location permission"
-            : "無法獲取您當前的位置權限",
-        );
+        toast.error(t("quotation.geolocationFailed"));
       },
       { timeout: 10000, enableHighAccuracy: true },
     );
@@ -653,14 +499,14 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <h3 className="font-ddin text-[16px] font-bold leading-tight text-gray-900 sm:text-[17px]">
-                {t.headerTitle}
+                {t("quotation.headerTitle")}
               </h3>
               <span className="shrink-0 whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700 sm:text-[11px]">
-                {t.headerBadge}
+                {t("quotation.headerBadge")}
               </span>
             </div>
             <p className="mt-0.5 line-clamp-2 text-[11px] text-gray-500 sm:line-clamp-1 sm:text-[12px]">
-              {t.headerSubtitle}
+              {t("quotation.headerSubtitle")}
             </p>
           </div>
         </div>
@@ -679,12 +525,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
               const returnTo = encodeURIComponent(
                 `${currentPath}${separator}expand=1`,
               );
-              toast(
-                locale === "en"
-                  ? "Please sign in to get a delivery quote."
-                  : "請先登入以使用外送叫車服務",
-                { icon: "🔑" },
-              );
+              toast(t("quotation.signInForQuote"), { icon: "🔑" });
               router.push(`/signin?returnTo=${returnTo}`);
               return;
             }
@@ -692,7 +533,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           }}
           className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-orange-600 transition-colors hover:bg-orange-100/60 sm:text-[13px]"
         >
-          <span>{isExpanded ? t.collapse : t.expand}</span>
+          <span>
+            {isExpanded ? t("quotation.collapse") : t("quotation.expand")}
+          </span>
           <motion.div
             animate={{ rotate: isExpanded ? 180 : 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
@@ -716,17 +559,17 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
             <div className="shadow-xs flex items-center justify-between gap-2 rounded-xl border border-orange-100 bg-white/80 px-3.5 py-2.5 text-sm">
               <div className="flex min-w-0 flex-1 items-center gap-2 text-gray-600">
                 <span className="truncate font-medium text-gray-800">
-                  {SERVICE_OPTIONS.find(
-                    (s) => s.id === activeQuotation.serviceType,
-                  )?.name[locale] || activeQuotation.serviceType}
+                  {isVehicleType(activeQuotation.serviceType)
+                    ? t(`vehicles.${activeQuotation.serviceType}.name`)
+                    : activeQuotation.serviceType}
                 </span>
                 <span className="shrink-0">•</span>
                 <span className="shrink-0 whitespace-nowrap">
-                  {t.approxDistance}{" "}
-                  {(
-                    Number(activeQuotation.distance?.value || 0) / 1000
-                  ).toFixed(1)}{" "}
-                  km
+                  {t("quotation.approxDistance", {
+                    km: (
+                      Number(activeQuotation.distance?.value || 0) / 1000
+                    ).toFixed(1),
+                  })}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -737,7 +580,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   onClick={() => setIsExpanded(true)}
                   className="shrink-0 whitespace-nowrap text-xs text-orange-600 underline underline-offset-2"
                 >
-                  {t.change}
+                  {t("quotation.change")}
                 </button>
               </div>
             </div>
@@ -766,7 +609,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-[11px] font-semibold text-emerald-700">
-                      {t.pickupOrigin}
+                      {t("quotation.pickupOrigin")}
                     </span>
                     <p
                       className="truncate text-xs font-medium text-gray-800"
@@ -787,7 +630,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] font-semibold text-orange-700">
-                        {t.dropoffDestination}
+                        {t("quotation.dropoffDestination")}
                       </span>
                       <button
                         type="button"
@@ -796,7 +639,9 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                         className="flex items-center gap-1 text-[11px] font-medium text-orange-600 hover:text-orange-700 disabled:opacity-50"
                       >
                         <Navigation className="h-3 w-3" />
-                        {isLocating ? t.locating : t.useCurrentLocation}
+                        {isLocating
+                          ? t("quotation.locating")
+                          : t("quotation.useCurrentLocation")}
                       </button>
                     </div>
 
@@ -809,7 +654,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                           setDestinationAddress(e.target.value);
                           setErrorMsg(null);
                         }}
-                        placeholder={t.placeholderDestination}
+                        placeholder={t("quotation.placeholderDestination")}
                         className="w-full rounded-lg border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 placeholder-gray-400 transition-all focus:border-orange-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
                       />
                     </div>
@@ -820,25 +665,23 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
               {/* 2. Vehicle Selector */}
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                  {t.selectVehicle}
+                  {t("quotation.selectVehicle")}
                 </label>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {SERVICE_OPTIONS.map((opt) => {
-                    const isSelected = selectedService === opt.id;
+                  {VEHICLE_TYPES.map((id) => {
+                    const isSelected = selectedService === id;
                     const quote =
-                      quotations[opt.id] ||
-                      (opt.id === "TRUCK175"
+                      quotations[id] ||
+                      (id === "TRUCK175"
                         ? quotations["TRUCK330"]
                         : undefined) ||
-                      (opt.id === "TRUCK330"
-                        ? quotations["TRUCK175"]
-                        : undefined);
+                      (id === "TRUCK330" ? quotations["TRUCK175"] : undefined);
 
                     return (
                       <button
-                        key={opt.id}
+                        key={id}
                         type="button"
-                        onClick={() => handleSelectService(opt.id)}
+                        onClick={() => handleSelectService(id)}
                         className={`relative flex flex-col items-center justify-center rounded-xl p-2.5 text-center transition-all ${
                           isSelected
                             ? "shadow-xs border-2 border-orange-500 bg-orange-50/80 ring-1 ring-orange-400/20"
@@ -852,16 +695,16 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                               : "bg-gray-100 text-gray-600"
                           }`}
                         >
-                          {renderServiceIcon(opt.icon, "h-4 w-4")}
+                          {renderServiceIcon(SERVICE_ICONS[id], "h-4 w-4")}
                         </div>
                         <span className="text-xs font-bold text-gray-800">
-                          {opt.name[locale]}
+                          {t(`vehicles.${id}.name`)}
                         </span>
                         <span className="text-[10px] text-gray-500">
-                          {opt.weightLimit[locale]}
+                          {t(`vehicles.${id}.weightLimit`)}
                         </span>
                         <span className="text-[9px] text-gray-400">
-                          {opt.sizeLimit}
+                          {VEHICLE_SIZE_LIMITS[id]}
                         </span>
 
                         {quote && (
@@ -875,23 +718,17 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                 </div>
 
                 {/* Capacity Guide for Selected Vehicle */}
-                {(() => {
-                  const currentOpt = SERVICE_OPTIONS.find(
-                    (s) => s.id === selectedService,
-                  );
-                  if (!currentOpt) return null;
-                  return (
-                    <div className="mt-2 flex items-center justify-between rounded-lg border border-orange-100/60 bg-orange-50/60 px-2.5 py-1.5 text-[11px] text-orange-800">
-                      <span className="font-medium">
-                        {t.capacityLimit(
-                          currentOpt.name[locale],
-                          currentOpt.sizeLimit,
-                          currentOpt.weightLimit[locale],
-                        )}
-                      </span>
-                    </div>
-                  );
-                })()}
+                {isVehicleType(selectedService) && (
+                  <div className="mt-2 flex items-center justify-between rounded-lg border border-orange-100/60 bg-orange-50/60 px-2.5 py-1.5 text-[11px] text-orange-800">
+                    <span className="font-medium">
+                      {t("quotation.capacityLimit", {
+                        vehicle: t(`vehicles.${selectedService}.name`),
+                        size: VEHICLE_SIZE_LIMITS[selectedService],
+                        weight: t(`vehicles.${selectedService}.weightLimit`),
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Action Button if quotation not yet fetched */}
@@ -905,12 +742,12 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   {loading ? (
                     <>
                       <RotateCw className="h-4 w-4 animate-spin" />
-                      {t.calculating}
+                      {t("quotation.calculating")}
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4" />
-                      {t.calcButton}
+                      {t("quotation.calcButton")}
                     </>
                   )}
                 </button>
@@ -936,7 +773,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                   >
                     <QuotationSummaryCard
                       quotation={activeQuotation}
-                      locale={locale}
                       originAddress={originAddress}
                       destinationAddress={destinationAddress}
                       onExpireChange={handleExpireChange}
@@ -953,8 +789,8 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                             />
                             <span>
                               {loading
-                                ? t.calculating
-                                : t.quoteExpiredRecalculate}
+                                ? t("quotation.calculating")
+                                : t("quoteExpiredRecalculate")}
                             </span>
                           </button>
                         ) : lalamoveAction === "weave_this" ? (
@@ -964,7 +800,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                             className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-3 font-ddin text-sm font-semibold tracking-wider text-white shadow-md shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.99]"
                           >
                             <WeavingIcon className="!h-[19px] !w-[19px] text-white" />
-                            <span>weave this</span>
+                            <span>{t("quotation.weaveThis")}</span>
                           </button>
                         ) : (
                           <button
@@ -974,9 +810,10 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
                           >
                             <Truck className="h-4 w-4" />
                             <span>
-                              {locale === "en"
-                                ? `Book Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`
-                                : `立即呼叫 Lalamove (NT$ ${activeQuotation.priceBreakdown?.total || 0})`}
+                              {t("quotation.bookLalamove", {
+                                total:
+                                  activeQuotation.priceBreakdown?.total || 0,
+                              })}
                             </span>
                             <ArrowRight className="h-4 w-4" />
                           </button>
@@ -1013,7 +850,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         destinationCoords={destinationCoords || undefined}
         initialDestinationDetails={destinationDetails || undefined}
         currentUser={user}
-        locale={locale}
       />
     </div>
   );

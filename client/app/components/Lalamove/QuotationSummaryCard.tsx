@@ -1,8 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Navigation, Info, ChevronDown, RotateCw, MapPin } from "lucide-react";
+import {
+  Clock,
+  Navigation,
+  Info,
+  ChevronDown,
+  RotateCw,
+  MapPin,
+} from "lucide-react";
 import { QuoteCountdown } from "./QuoteCountdown";
 
 export interface QuotationItem {
@@ -35,7 +43,6 @@ export interface QuotationItem {
 
 export interface QuotationSummaryCardProps {
   quotation: QuotationItem;
-  locale?: "en" | "zh";
   postTitle?: string;
   vehicleName?: string;
   originAddress?: string;
@@ -53,7 +60,6 @@ export interface QuotationSummaryCardProps {
 
 export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
   quotation,
-  locale = "zh",
   postTitle,
   vehicleName,
   originAddress,
@@ -70,38 +76,9 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
 }) => {
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  const t = {
-    en: {
-      estimatedFare: "Estimated Fare",
-      approxDeliveryTime: (mins: number) => `approx. ${mins} mins`,
-      distanceLabel: (km: string) => `Distance ${km} km`,
-      priceBreakdown: "Fare Breakdown",
-      baseFare: "Base Fare",
-      extraMileageFare: "Extra Mileage Fare",
-      surchargeFare: "Surcharge / Peak Fee",
-      quoteValidCountdown: "Quote valid for: ",
-      quoteExpired: "Quote Expired",
-      recalculate: "Recalculate",
-      item: "Item: ",
-    },
-    zh: {
-      estimatedFare: "預估配送運費",
-      approxDeliveryTime: (mins: number) => `約 ${mins} 分鐘送達`,
-      distanceLabel: (km: string) => `距離 ${km} km`,
-      priceBreakdown: "費用明細",
-      baseFare: "基本起程費",
-      extraMileageFare: "超里程運費",
-      surchargeFare: "時段加成費",
-      quoteValidCountdown: "報價保留倒數：",
-      quoteExpired: "報價已過期",
-      recalculate: "重新試算",
-      item: "物品：",
-    },
-  }[locale];
+  const t = useTranslations("Lalamove");
 
-  const distanceKm = (
-    Number(quotation.distance?.value || 0) / 1000
-  ).toFixed(1);
+  const distanceKm = (Number(quotation.distance?.value || 0) / 1000).toFixed(1);
   const durationMins = quotation.durationMins || 15;
 
   const containerClasses =
@@ -117,17 +94,17 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
           {vehicleName ? (
             <div className="mb-0.5">
               <span className="text-xs font-semibold text-orange-800">
-                {vehicleName} 配送
+                {t("summary.vehicleDelivery", { vehicle: vehicleName })}
               </span>
               {postTitle && (
                 <p className="mt-0.5 line-clamp-1 text-xs text-gray-600">
-                  {t.item}{postTitle}
+                  {t("summary.item", { title: postTitle })}
                 </p>
               )}
             </div>
           ) : (
             <span className="text-xs font-medium text-gray-500">
-              {t.estimatedFare}
+              {t("summary.estimatedFare")}
             </span>
           )}
 
@@ -143,12 +120,14 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
           <div className="flex shrink-0 flex-col items-end pb-0.5 text-xs text-gray-600">
             <div className="flex items-center gap-1.5 whitespace-nowrap font-medium text-gray-700">
               <Clock className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-              <span>{t.approxDeliveryTime(durationMins)}</span>
+              <span>
+                {t("summary.approxDeliveryTime", { minutes: durationMins })}
+              </span>
             </div>
             {Number(quotation.distance?.value || 0) > 0 && (
               <div className="mt-1 flex items-center gap-1.5 whitespace-nowrap text-[11px] text-gray-500">
                 <Navigation className="h-3 w-3 shrink-0 text-gray-400" />
-                <span>{t.distanceLabel(distanceKm)}</span>
+                <span>{t("summary.distance", { km: distanceKm })}</span>
               </div>
             )}
           </div>
@@ -169,7 +148,7 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[11px] font-semibold text-gray-500">
-                    {locale === "en" ? "Pickup: " : "取件："}
+                    {t("summary.pickup")}
                   </span>
                   <span className="text-gray-700">{orig}</span>
                 </div>
@@ -182,7 +161,7 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[11px] font-semibold text-gray-500">
-                    {locale === "en" ? "Drop-off: " : "送達："}
+                    {t("summary.dropoff")}
                   </span>
                   <span className="text-gray-700">{dest}</span>
                 </div>
@@ -202,7 +181,7 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
           >
             <span className="flex items-center gap-1">
               <Info className="h-3.5 w-3.5" />
-              {t.priceBreakdown}
+              {t("summary.priceBreakdown")}
             </span>
             <motion.div
               animate={{ rotate: showBreakdown ? 180 : 0 }}
@@ -223,25 +202,19 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
               >
                 <div className="mt-2 space-y-1 rounded-lg bg-gray-50 p-2.5 text-xs text-gray-600">
                   <div className="flex justify-between">
-                    <span>{t.baseFare}</span>
-                    <span>
-                      NT$ {quotation.priceBreakdown?.base || 75}
-                    </span>
+                    <span>{t("summary.baseFare")}</span>
+                    <span>NT$ {quotation.priceBreakdown?.base || 75}</span>
                   </div>
                   {Number(quotation.priceBreakdown?.extraMileage || 0) > 0 && (
                     <div className="flex justify-between">
-                      <span>{t.extraMileageFare}</span>
-                      <span>
-                        NT$ {quotation.priceBreakdown?.extraMileage}
-                      </span>
+                      <span>{t("summary.extraMileageFare")}</span>
+                      <span>NT$ {quotation.priceBreakdown?.extraMileage}</span>
                     </div>
                   )}
                   {Number(quotation.priceBreakdown?.surcharge || 0) > 0 && (
                     <div className="flex justify-between">
-                      <span>{t.surchargeFare}</span>
-                      <span>
-                        NT$ {quotation.priceBreakdown?.surcharge}
-                      </span>
+                      <span>{t("summary.surchargeFare")}</span>
+                      <span>NT$ {quotation.priceBreakdown?.surcharge}</span>
                     </div>
                   )}
                 </div>
@@ -255,8 +228,8 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
       <div className="flex items-center justify-between pt-1 text-xs">
         <QuoteCountdown
           expiresAt={quotation.expiresAt}
-          labelCountdown={t.quoteValidCountdown}
-          labelExpired={t.quoteExpired}
+          labelCountdown={t("summary.quoteValidCountdown")}
+          labelExpired={t("quoteExpired")}
           onExpireChange={onExpireChange}
         />
 
@@ -270,7 +243,7 @@ export const QuotationSummaryCard: React.FC<QuotationSummaryCardProps> = ({
             <RotateCw
               className={`h-3 w-3 ${isRecalculating ? "animate-spin" : ""}`}
             />
-            <span>{t.recalculate}</span>
+            <span>{t("recalculate")}</span>
           </button>
         )}
       </div>

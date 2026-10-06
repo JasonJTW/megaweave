@@ -28,10 +28,13 @@ import {
 } from "@/utils/locationUtils";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  DEFAULT_RECIPIENT_NAME,
+  DEFAULT_SENDER_NAME,
   VEHICLE_TYPES,
   VEHICLE_SIZE_LIMITS,
   VehicleType,
   isVehicleType,
+  buildDriverRemarks,
   toLalamoveLanguage,
 } from "@/utils/lalamove";
 
@@ -214,14 +217,14 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
   // 聯絡人狀態
   const [senderName, setSenderName] = useState(
-    post.username || t("order.defaultSenderName"),
+    post.username || DEFAULT_SENDER_NAME,
   );
   const [senderPhone, setSenderPhone] = useState("+886912345678");
   const [senderFloorUnit, setSenderFloorUnit] = useState("");
   const [senderRemarks, setSenderRemarks] = useState("");
 
   const [recipientName, setRecipientName] = useState(
-    currentUser?.username || t("order.defaultRecipientName"),
+    currentUser?.username || DEFAULT_RECIPIENT_NAME,
   );
   const [recipientPhone, setRecipientPhone] = useState("+886987654321");
   const [recipientFloorUnit, setRecipientFloorUnit] = useState("");
@@ -577,24 +580,6 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
     try {
       setIsSubmitting(true);
 
-      const senderFullRemarks = [
-        senderFloorUnit
-          ? t("order.floorUnitRemark", { floorUnit: senderFloorUnit })
-          : "",
-        senderRemarks,
-      ]
-        .filter(Boolean)
-        .join(t("order.remarksSeparator"));
-
-      const recipientFullRemarks = [
-        recipientFloorUnit
-          ? t("order.floorUnitRemark", { floorUnit: recipientFloorUnit })
-          : "",
-        recipientRemarks,
-      ]
-        .filter(Boolean)
-        .join(t("order.remarksSeparator"));
-
       // 呼叫金流結帳 API
       const checkoutPayload = {
         postId: post.id,
@@ -619,7 +604,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
           zipCode: originDetails?.zip_code || post.zip_code || undefined,
           url: originDetails?.url || post.location_url || undefined,
         },
-        pickupRemarks: senderFullRemarks || undefined,
+        pickupRemarks: buildDriverRemarks(senderFloorUnit, senderRemarks),
         // 送達地點：附帶 place_id 與結構化地址（由 Google Places Autocomplete 取得）
         dropoff: {
           fullAddress: sanitizeTwAddress(destAddr),
@@ -633,7 +618,10 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
           zipCode: destDetails?.zip_code || undefined,
           url: destDetails?.url || undefined,
         },
-        dropoffRemarks: recipientFullRemarks || undefined,
+        dropoffRemarks: buildDriverRemarks(
+          recipientFloorUnit,
+          recipientRemarks,
+        ),
         senderName: senderName.trim(),
         senderPhone: formatPhone(senderPhone),
         recipientName: recipientName.trim(),

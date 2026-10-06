@@ -40,3 +40,19 @@ export const VEHICLE_SIZE_LIMITS: Record<VehicleType, string> = {
 export function isVehicleType(value: string): value is VehicleType {
   return (VEHICLE_TYPES as readonly string[]).includes(value);
 }
+
+// Text sent to the Lalamove driver stays in Chinese whatever the UI locale,
+// since TW drivers read Chinese; it is order data, not UI, so it lives outside the catalogs.
+export const DEFAULT_SENDER_NAME = "寄件人";
+export const DEFAULT_RECIPIENT_NAME = "收件人";
+
+/** Combines the optional floor/unit and note into the remarks shown to the driver. */
+export function buildDriverRemarks(
+  floorUnit: string,
+  note: string,
+): string | undefined {
+  const parts = [floorUnit ? `樓層門牌：${floorUnit}` : "", note].filter(
+    Boolean,
+  );
+  return parts.length > 0 ? parts.join("，") : undefined;
+}

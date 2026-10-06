@@ -855,6 +855,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                               imageUrl: imageUrl || undefined,
                               weaveId: weaveId!,
                               isGiver,
+                              isPostAuthor,
                             }}
                           />
                         </div>

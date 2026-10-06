@@ -142,3 +142,81 @@ describe("getWeaveViewModel actions", () => {
     );
   });
 });
+
+function view(
+  postType: PostType,
+  status: WeaveViewStatus,
+  viewerId: number,
+  confirmed: { giver?: boolean; receiver?: boolean } = {},
+) {
+  const { statusKey, hintKey } = getWeaveViewModel({
+    status,
+    viewerId,
+    postAuthorId: AUTHOR,
+    ...parties(postType),
+    giverConfirmed: confirmed.giver ?? false,
+    receiverConfirmed: confirmed.receiver ?? false,
+  });
+  return { statusKey, hintKey };
+}
+
+describe("getWeaveViewModel labels and hints", () => {
+  for (const postType of ["share", "wish"] as PostType[]) {
+    describe(postType, () => {
+      it("requested: Post Author sees New Request, Initiator sees Request Sent", () => {
+        assert.deepEqual(view(postType, "requested", AUTHOR), {
+          statusKey: "newRequest",
+          hintKey: "requested.decideOnRequest",
+        });
+        assert.deepEqual(view(postType, "requested", INITIATOR), {
+          statusKey: "requestSent",
+          hintKey: "requested.awaitingAuthor",
+        });
+      });
+
+      it("approved: hints follow Giver / Receiver and confirmation state", () => {
+        const { giverId, receiverId } = parties(postType);
+        const hint = (
+          viewer: number,
+          c: { giver?: boolean; receiver?: boolean },
+        ) => view(postType, "approved", viewer, c).hintKey;
+
+        assert.equal(hint(giverId, {}), "approved.confirmHandover");
+        assert.equal(hint(receiverId, {}), "approved.confirmReceipt");
+        assert.equal(
+          hint(giverId, { giver: true }),
+          "approved.waitingForReceiver",
+        );
+        assert.equal(
+          hint(receiverId, { receiver: true }),
+          "approved.waitingForGiver",
+        );
+        assert.equal(
+          hint(giverId, { receiver: true }),
+          "approved.receiverConfirmedPleaseConfirmHandover",
+        );
+        assert.equal(
+          hint(receiverId, { giver: true }),
+          "approved.giverConfirmedPleaseConfirmReceipt",
+        );
+        assert.equal(view(postType, "approved", giverId).statusKey, "weaving");
+      });
+
+      const terminal: [WeaveViewStatus, string][] = [
+        ["completed", "weaved"],
+        ["declined", "declined"],
+        ["withdrawn", "withdrawn"],
+        ["cancelled", "cancelled"],
+      ];
+      for (const [status, key] of terminal) {
+        it(`${status}: both parties see ${key} with no hint`, () => {
+          for (const viewer of [AUTHOR, INITIATOR])
+            assert.deepEqual(view(postType, status, viewer), {
+              statusKey: key,
+              hintKey: null,
+            });
+        });
+      }
+    });
+  }
+});

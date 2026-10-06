@@ -216,7 +216,7 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
    */
   router.post("/ecpay/order-result", (req: Request, res: Response): void => {
     const payload = req.body as Record<string, string>;
-    const rtnCode = payload.RtnCode || "1";
+    const rtnCode = payload.RtnCode || "0";
     const rtnMsg = encodeURIComponent(payload.RtnMsg || "");
     const merchantTradeNo = encodeURIComponent(payload.MerchantTradeNo || "");
     const clientHost =

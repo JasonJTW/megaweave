@@ -78,6 +78,8 @@ export interface ItemInput {
   quantity: number | "";
 }
 
+// Reference data: the display name shown to the user comes from the translation
+// catalogs keyed by id, with name_en as the fallback (see i18n/referenceNames.ts).
 export interface Category {
   id: number;
   name_en: string;
@@ -87,6 +89,8 @@ export interface Category {
   updated_at: string;
 }
 
+// Reference data keyed by level; `name` / `description` are the English source
+// strings used as the fallback (see i18n/referenceNames.ts).
 export interface Condition {
   id: number;
   level: number;

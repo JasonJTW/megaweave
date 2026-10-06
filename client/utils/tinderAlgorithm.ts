@@ -255,51 +255,34 @@ export function rankPostsWithTinderAlgorithm(
  */
 export interface DistanceTier {
   index: number;
-  distanceKm: number | null; // null represents "不限距離"
-  label: string; // e.g. "3 km" 或 "不限"
-  badgeLabel: string; // e.g. "15 km (同城生活圈)"
-  desc: string; // e.g. "同城生活圈"
+  distanceKm: number | null; // null means no distance limit
+}
+
+/** Key of a tier's wording in the Tinder.tiers translation namespace. */
+export function tierKey(tier: DistanceTier): "3" | "8" | "15" | "30" | "unlimited" {
+  switch (tier.distanceKm) {
+    case 3:
+      return "3";
+    case 8:
+      return "8";
+    case 15:
+      return "15";
+    case 30:
+      return "30";
+    default:
+      return "unlimited";
+  }
 }
 
 /**
  * 📊 固定 5 個標準生活圈距離級距 (穩定不隨背景分頁載入而跳動)
  */
 export const DISTANCE_TIERS: DistanceTier[] = [
-  {
-    index: 0,
-    distanceKm: 3,
-    label: "3 km",
-    badgeLabel: "3 km (超近步行圈)",
-    desc: "超近步行",
-  },
-  {
-    index: 1,
-    distanceKm: 8,
-    label: "8 km",
-    badgeLabel: "8 km (鄰近生活圈)",
-    desc: "鄰近生活圈",
-  },
-  {
-    index: 2,
-    distanceKm: 15,
-    label: "15 km",
-    badgeLabel: "15 km (同城生活圈)",
-    desc: "同城生活圈",
-  },
-  {
-    index: 3,
-    distanceKm: 30,
-    label: "30 km",
-    badgeLabel: "30 km (跨區大生活圈)",
-    desc: "跨區大生活圈",
-  },
-  {
-    index: 4,
-    distanceKm: null,
-    label: "不限",
-    badgeLabel: "不限距離 (全區推薦)",
-    desc: "全區推薦",
-  },
+  { index: 0, distanceKm: 3 },
+  { index: 1, distanceKm: 8 },
+  { index: 2, distanceKm: 15 },
+  { index: 3, distanceKm: 30 },
+  { index: 4, distanceKm: null },
 ];
 
 export function calculateDistanceTiers(): DistanceTier[] {

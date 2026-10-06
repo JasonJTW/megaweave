@@ -64,7 +64,7 @@ async function exportEmbeddings() {
         p.type,
         p.status,
         p.tags,
-        c.name AS category_name,
+        c.name_en AS category_name,
         cond.name AS condition_name,
         l.province,
         l.city,

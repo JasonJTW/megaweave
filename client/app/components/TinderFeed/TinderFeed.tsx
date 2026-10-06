@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import useSWRInfinite from "swr/infinite";
 import { useMotionValue } from "framer-motion";
@@ -36,6 +37,7 @@ export default function TinderFeed({
   maxDistanceKm = null,
   onPostsLoaded,
 }: TinderFeedProps) {
+  const t = useTranslations("Tinder");
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const { user } = useUser();
@@ -152,7 +154,7 @@ export default function TinderFeed({
         const alreadyLiked =
           currentPost.is_liked || likedIds.has(currentPost.id);
         if (alreadyLiked) {
-          toast("已加分過囉！", { icon: "💚", duration: 1500 });
+          toast(t("alreadyLiked"), { icon: "💚", duration: 1500 });
         } else if (user) {
           try {
             await fetch(`${hostName}/api/posts/${currentPost.public_id}/like`, {
@@ -160,7 +162,7 @@ export default function TinderFeed({
               credentials: "include",
             });
             setLikedIds((prev) => new Set(prev).add(currentPost.id));
-            toast.success("加分成功！", {
+            toast.success(t("likeSuccess"), {
               icon: "💚",
               duration: 1500,
             });
@@ -168,7 +170,7 @@ export default function TinderFeed({
             console.error("Error liking post:", err);
           }
         } else {
-          toast.success("已加分！", {
+          toast.success(t("likeCounted"), {
             icon: "💚",
             duration: 1500,
           });
@@ -177,6 +179,7 @@ export default function TinderFeed({
     },
     [
       availablePosts,
+      t,
       user,
       hostName,
       likedIds,
@@ -231,8 +234,8 @@ export default function TinderFeed({
       });
     }
 
-    toast("已復原上一則貼文", { icon: "↩️", duration: 1500 });
-  }, [history, user, hostName, likedIds]);
+    toast(t("undone"), { icon: "↩️", duration: 1500 });
+  }, [history, t, user, hostName, likedIds]);
 
   // Navigate to post detail
   const handleDetail = useCallback(
@@ -246,7 +249,7 @@ export default function TinderFeed({
   const handleMessage = useCallback(
     async (post: Post) => {
       if (!user) {
-        toast.error("請先登入以發送私訊");
+        toast.error(t("signInToMessage"));
         router.push(
           `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
         );
@@ -254,7 +257,7 @@ export default function TinderFeed({
       }
 
       if (!post.author_public_id) {
-        toast.error("無法取得作者資訊");
+        toast.error(t("authorUnavailable"));
         return;
       }
 
@@ -275,12 +278,12 @@ export default function TinderFeed({
         router.push(`/messages/${data.conversationId}`);
       } catch (error) {
         console.error("Message error:", error);
-        toast.error("無法開啟對話");
+        toast.error(t("messageFailed"));
       } finally {
         setIsMessaging(false);
       }
     },
-    [user, router, hostName],
+    [t, user, router, hostName],
   );
 
   // Reload / reset feed
@@ -310,7 +313,7 @@ export default function TinderFeed({
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-stone-500">
               <Loader2 className="h-10 w-10 animate-spin text-emerald-500" />
               <p className="font-ddin text-sm font-semibold tracking-wider text-stone-400">
-                Loading Feed...
+                {t("loadingFeed")}
               </p>
             </div>
             <div className="space-y-2">
@@ -325,17 +328,17 @@ export default function TinderFeed({
               <Sparkles className="h-10 w-10 animate-bounce text-emerald-500" />
             </div>
             <h3 className="font-ddin text-2xl font-bold text-gray-900">
-              全部瀏覽完畢！
+              {t("allCaughtUpTitle")}
             </h3>
             <p className="mt-2 max-w-xs font-ddin text-sm text-stone-500">
-              您已滑過目前所有的推薦貼文，可以點擊下方按鈕重新載入或調整搜尋半徑查看更多分享。
+              {t("allCaughtUpDescription")}
             </p>
             <div className="mt-6 flex w-full max-w-xs flex-col gap-3">
               <Button
                 onClick={handleReload}
                 className="flex items-center justify-center gap-2 bg-megaweave-forest text-white hover:bg-megaweave-forest-dark"
               >
-                <RefreshCw className="h-4 w-4" /> 重新整理推薦
+                <RefreshCw className="h-4 w-4" /> {t("reload")}
               </Button>
               {history.length > 0 && (
                 <Button
@@ -343,7 +346,7 @@ export default function TinderFeed({
                   onClick={handleUndo}
                   className="flex items-center justify-center gap-2 border-stone-300 text-stone-700"
                 >
-                  <RotateCcw className="h-4 w-4" /> 查看上一張
+                  <RotateCcw className="h-4 w-4" /> {t("showPrevious")}
                 </Button>
               )}
             </div>
@@ -380,7 +383,7 @@ export default function TinderFeed({
           onClick={handleUndo}
           disabled={history.length === 0}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-100 bg-white text-amber-500 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Undo"
+          aria-label={t("undo")}
         >
           <RotateCcw className="h-5 w-5 stroke-[2.5]" />
         </button>
@@ -390,7 +393,7 @@ export default function TinderFeed({
           onClick={() => triggerSwipe("left")}
           disabled={isOutOfCards || isLoadingInitial}
           className="h-15 w-15 flex items-center justify-center rounded-full border border-rose-100 bg-white text-rose-500 shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Pass / 不加分"
+          aria-label={t("pass")}
         >
           <X className="h-7 w-7 stroke-[3]" />
         </button>
@@ -400,7 +403,7 @@ export default function TinderFeed({
           onClick={() => currentPost && handleDetail(currentPost)}
           disabled={isOutOfCards || isLoadingInitial}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-sky-100 bg-white text-sky-600 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Post Info"
+          aria-label={t("postInfo")}
         >
           <Info className="h-5 w-5 stroke-[2.5]" />
         </button>
@@ -410,7 +413,7 @@ export default function TinderFeed({
           onClick={() => triggerSwipe("right")}
           disabled={isOutOfCards || isLoadingInitial}
           className="h-15 w-15 flex items-center justify-center rounded-full border border-emerald-100 bg-white text-emerald-500 shadow-lg transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Like / 加分"
+          aria-label={t("like")}
         >
           <Heart className="h-7 w-7 fill-emerald-500 stroke-emerald-500" />
         </button>
@@ -420,7 +423,7 @@ export default function TinderFeed({
           onClick={() => currentPost && handleMessage(currentPost)}
           disabled={isOutOfCards || isLoadingInitial || isMessaging}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-teal-100 bg-white text-teal-600 shadow-md transition-all duration-200 hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100"
-          aria-label="Message Author"
+          aria-label={t("messageAuthor")}
         >
           <MessageCircle className="h-5 w-5 stroke-[2.5]" />
         </button>

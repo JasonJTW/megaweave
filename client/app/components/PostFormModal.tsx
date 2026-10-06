@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useId, useRef } from "react";
 import { format } from "date-fns";
 import { X, Calendar as CalendarIcon } from "lucide-react";
+import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -67,6 +68,8 @@ export default function PostFormModal({
 }: PostFormModalProps) {
   const titleId = useId();
   const { categories, conditions } = usePost();
+  const categoryName = useCategoryName();
+  const conditionText = useConditionText();
   const locationInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteInstanceRef =
     useRef<google.maps.places.Autocomplete | null>(null);
@@ -667,7 +670,7 @@ export default function PostFormModal({
                   <SelectContent>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id.toString()}>
-                        {cat.name_en}
+                        {categoryName(cat)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -702,9 +705,12 @@ export default function PostFormModal({
                   >
                     <SelectValue placeholder="Condition">
                       {formData.conditionLevel !== null &&
-                        conditions.find(
-                          (c) => c.level === formData.conditionLevel,
-                        )?.name}
+                        conditionText.name(
+                          formData.conditionLevel,
+                          conditions.find(
+                            (c) => c.level === formData.conditionLevel,
+                          )?.name,
+                        )}
                     </SelectValue>
                   </SelectTrigger>
 
@@ -714,7 +720,11 @@ export default function PostFormModal({
                         key={condition.id}
                         value={String(condition.level)}
                       >
-                        {condition.name} - {condition.description}
+                        {conditionText.name(condition.level, condition.name)} -{" "}
+                        {conditionText.description(
+                          condition.level,
+                          condition.description,
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>

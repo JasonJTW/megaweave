@@ -1,9 +1,15 @@
 // components/LetsStartWeavingBanner.tsx
+"use client";
+import { useTranslations } from "next-intl";
+
+// The headline is drawn as glyph paths, so only its accessible name follows the
+// locale; a zh-TW wordmark needs new artwork from design.
 export default function LetsStartWeavingBanner({
   className,
 }: {
   className?: string;
 }) {
+  const t = useTranslations("HomeFeed");
   return (
     <svg
       width="1024"
@@ -12,6 +18,8 @@ export default function LetsStartWeavingBanner({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      role="img"
+      aria-label={t("bannerTitle")}
     >
       <path
         d="M53.3301 0C79.1049 0 100 20.5151 100 45.8213C100 20.5151 120.895 -3.01691e-07 146.67 0H153.33C179.105 3.01691e-07 200 20.5151 200 45.8213V134.179C200 159.485 179.105 180 153.33 180H146.67C120.895 180 100 159.485 100 134.179C100 159.485 79.1049 180 53.3301 180H46.6699C20.8951 180 0 159.485 0 134.179V45.8213C0 20.5151 20.8951 0 46.6699 0H53.3301ZM677.33 0C703.105 0 724 20.5151 724 45.8213C724 20.5151 744.895 -3.01691e-07 770.67 0H777.33C803.105 3.01691e-07 824 20.5151 824 45.8213C824 20.5151 844.895 0 870.67 0H877.33C903.105 0 924 20.5151 924 45.8213C924 20.5151 944.895 -3.01691e-07 970.67 0H977.33C1003.1 3.01691e-07 1024 20.5151 1024 45.8213V134.179C1024 159.485 1003.1 180 977.33 180H970.67C944.895 180 924 159.485 924 134.179C924 159.485 903.105 180 877.33 180H870.67C844.895 180 824 159.485 824 134.179C824 159.485 803.105 180 777.33 180H770.67C744.895 180 724 159.485 724 134.179C724 159.485 703.105 180 677.33 180H670.67C644.895 180 624 159.485 624 134.179V45.8213C624 20.5151 644.895 0 670.67 0H677.33Z"

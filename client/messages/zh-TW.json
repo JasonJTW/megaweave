@@ -250,5 +250,138 @@
       "paymentFormMissing": "未收到有效的付款表單，請重試",
       "orderFailed": "下單失敗，請稍後再試"
     }
+  },
+  "Categories": {
+    "1": "電器用品",
+    "2": "寵物用品",
+    "3": "原物料與材料",
+    "4": "其他",
+    "5": "書籍與手作",
+    "6": "服飾美妝",
+    "7": "居家生活",
+    "8": "嬰幼用品",
+    "9": "3C 電子",
+    "10": "影音與遊戲"
+  },
+  "Conditions": {
+    "1": {
+      "name": "全新",
+      "description": "全新未使用，包裝完整"
+    },
+    "2": {
+      "name": "近全新",
+      "description": "使用次數極少，幾乎全新"
+    },
+    "3": {
+      "name": "良好",
+      "description": "使用正常，功能外觀完好"
+    },
+    "4": {
+      "name": "普通",
+      "description": "有使用痕跡，但功能正常"
+    },
+    "5": {
+      "name": "需要維修",
+      "description": "有明顯瑕疵或需要修理"
+    }
+  },
+  "HomeFeed": {
+    "wish": "+ 許願",
+    "share": "+ 分享",
+    "commons": "+ 地球公物",
+    "comingSoon": "即將推出",
+    "weaving": "+ 交織",
+    "searchPlaceholder": "搜尋物品或關鍵字...",
+    "search": "搜尋",
+    "clearSearch": "清除搜尋",
+    "openFilters": "開啟搜尋與篩選",
+    "categoryPlaceholder": "資源分類",
+    "allCategories": "所有分類",
+    "clearCategory": "清除分類",
+    "locationPlaceholder": "選擇地區/縣市",
+    "wishOnly": "僅看許願",
+    "shareOnly": "僅看分享",
+    "hideOverdue": "隱藏已過期/已結束",
+    "unknownCategory": "未知分類",
+    "categoryFilter": "分類：{name}",
+    "provinceFilter": "縣市：{value}",
+    "cityFilter": "鄉鎮市區：{value}",
+    "locationFilter": "地點：{value}",
+    "postCreated": "貼文已發布！",
+    "postFailed": "貼文發布失敗",
+    "networkError": "網路錯誤，請稍後再試",
+    "bannerTitle": "開始大量交織！"
+  },
+  "Feed": {
+    "mascotBooks": "想找書嗎？",
+    "mascotTools": "來找找工具",
+    "mascotHome": "佈置你的家！",
+    "mascotMaterials": "需要材料！"
+  },
+  "PostCard": {
+    "overdue": "已過期"
+  },
+  "Tinder": {
+    "radiusTitle": "搜尋半徑級距",
+    "tiers": {
+      "3": {
+        "label": "3 km",
+        "badgeLabel": "3 km（超近步行圈）",
+        "desc": "超近步行"
+      },
+      "8": {
+        "label": "8 km",
+        "badgeLabel": "8 km（鄰近生活圈）",
+        "desc": "鄰近生活圈"
+      },
+      "15": {
+        "label": "15 km",
+        "badgeLabel": "15 km（同城生活圈）",
+        "desc": "同城生活圈"
+      },
+      "30": {
+        "label": "30 km",
+        "badgeLabel": "30 km（跨區大生活圈）",
+        "desc": "跨區大生活圈"
+      },
+      "unlimited": {
+        "label": "不限",
+        "badgeLabel": "不限距離（全區推薦）",
+        "desc": "全區推薦"
+      }
+    },
+    "tierHint": "{label} • {desc}",
+    "gps": "GPS 定位",
+    "gpsApplied": "已套用 GPS 定位",
+    "gpsLocating": "定位中...",
+    "gpsOff": "未定位",
+    "gpsEnable": "（點此啟用）",
+    "loadingFeed": "載入貼文中...",
+    "allCaughtUpTitle": "全部瀏覽完畢！",
+    "allCaughtUpDescription": "您已滑過目前所有的推薦貼文，可以點擊下方按鈕重新載入或調整搜尋半徑查看更多分享。",
+    "reload": "重新整理推薦",
+    "showPrevious": "查看上一張",
+    "undo": "復原上一張",
+    "pass": "跳過",
+    "postInfo": "貼文詳情",
+    "like": "加分",
+    "messageAuthor": "私訊作者",
+    "alreadyLiked": "已加分過囉！",
+    "likeSuccess": "加分成功！",
+    "undone": "已復原上一則貼文",
+    "signInToMessage": "請先登入以發送私訊",
+    "authorUnavailable": "無法取得作者資訊",
+    "messageFailed": "無法開啟對話",
+    "card": {
+      "like": "加分 +1",
+      "pass": "跳過",
+      "wish": "許願",
+      "share": "分享",
+      "fallbackCategory": "資源貼文",
+      "overdue": "已過期",
+      "viewDetail": "查看詳情",
+      "moreItems": "還有 {count} 項"
+    },
+    "likeCounted": "已加分！"
   }
 }

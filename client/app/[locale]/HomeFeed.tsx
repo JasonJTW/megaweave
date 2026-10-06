@@ -1,5 +1,7 @@
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
+import { useCategoryName } from "@/i18n/referenceNames";
 import React, {
   useState,
   useEffect,
@@ -54,6 +56,8 @@ import LetsStartWeavingBanner from "@/app/components/ui/LetsStartWeavingBanner";
 import CommonShareIcon from "@/app/components/icons/CommonShareIcon";
 import { useLocation } from "@/app/contexts/LocationContext";
 const PostsApp = () => {
+  const t = useTranslations("HomeFeed");
+  const categoryName = useCategoryName();
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const { user } = useUser();
@@ -557,18 +561,16 @@ const PostsApp = () => {
 
       if (response.ok) {
         setShowCreateForm(false);
-        toast.success("Post created successfully!");
+        toast.success(t("postCreated"));
         mutate(); // 重新獲取貼文列表
       } else {
         const errorData = await response.json();
-        toast.error(errorData.errorMessage || "Failed to create post");
+        toast.error(errorData.errorMessage || t("postFailed"));
       }
     } catch (error: unknown) {
       console.error("Create post error:", error);
       const message =
-        error instanceof Error
-          ? error.message
-          : "Network error, please try again later.";
+        error instanceof Error ? error.message : t("networkError");
       toast.error(message);
     } finally {
       setIsCreating(false);
@@ -624,7 +626,7 @@ const PostsApp = () => {
                 onClick={() => handleCreatePostButtonClick("wish")}
               >
                 <span className="relative z-10 ml-2 text-3xl font-bold tracking-wide text-megaweave-forest-dark">
-                  + Wish
+                  {t("wish")}
                 </span>
                 <div className="pointer-events-none absolute right-[-10px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
                   <ElfIcon className="!h-full !w-full text-[#CB5E32]" />
@@ -637,7 +639,7 @@ const PostsApp = () => {
                 onClick={() => handleCreatePostButtonClick("share")}
               >
                 <span className="relative z-10 ml-2 text-3xl font-bold tracking-wide text-megaweave-forest-dark">
-                  + Share
+                  {t("share")}
                 </span>
                 <div className="pointer-events-none absolute right-[-10px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
                   <WazowskiIcon className="!h-full !w-full" />
@@ -650,13 +652,10 @@ const PostsApp = () => {
               >
                 <div className="relative z-10 ml-2 flex flex-col text-left">
                   <span className="text-[20px] font-bold leading-tight text-white opacity-90">
-                    + Common
-                  </span>
-                  <span className="text-[20px] font-bold leading-tight text-white opacity-90">
-                    Share
+                    {t("commons")}
                   </span>
                   <span className="mt-1 text-xs font-bold tracking-wider text-white opacity-80">
-                    Coming soon
+                    {t("comingSoon")}
                   </span>
                 </div>
                 <div className="pointer-events-none absolute right-[-20px] top-1/2 flex aspect-square h-full -translate-y-1/2 items-center justify-center">
@@ -685,7 +684,7 @@ const PostsApp = () => {
               >
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder={t("searchPlaceholder")}
                   className={`h-auto w-full border-0 bg-transparent p-0 outline-none transition-all duration-300 placeholder:text-primary-50 focus:outline-none focus:ring-0 ${
                     isStuck ? "type-body-t2" : "type-h3"
                   }`}
@@ -694,7 +693,11 @@ const PostsApp = () => {
                   onKeyDown={handleSearchKeyDown}
                 />
                 {hasSearch ? (
-                  <button type="button" onClick={clearSearch} aria-label="Clear search">
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    aria-label={t("clearSearch")}
+                  >
                     <X className="ml-2 h-5 w-5 shrink-0 text-[#333]" />
                   </button>
                 ) : (
@@ -705,7 +708,7 @@ const PostsApp = () => {
                   onClick={submitSearch}
                   className="ml-3 shrink-0 rounded-full bg-megaweave-forest-dark px-4 py-2 text-sm font-semibold text-white hover:bg-megaweave-forest-dark/90"
                 >
-                  Search
+                  {t("search")}
                 </button>
               </div>
               <div
@@ -733,13 +736,13 @@ const PostsApp = () => {
                         isStuck ? "h-10 px-3 py-2 lg:px-4" : "px-4 py-6 lg:px-6"
                       }`}
                     >
-                      <SelectValue placeholder="Category" />
+                      <SelectValue placeholder={t("categoryPlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ALL">Categories</SelectItem>
+                      <SelectItem value="ALL">{t("allCategories")}</SelectItem>
                       {categories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id.toString()}>
-                          {cat.name_en}
+                          {categoryName(cat)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -756,7 +759,7 @@ const PostsApp = () => {
                     ref={desktopSearchLocationInputRef}
                     className="!type-body-t2 h-auto w-full min-w-0 border-0 bg-transparent pl-1 pr-4 font-semibold text-[#333] shadow-none outline-none placeholder:type-body-t2 placeholder:text-[#333] focus-visible:ring-0"
                     type="text"
-                    placeholder="Location"
+                    placeholder={t("locationPlaceholder")}
                     value={locationInput}
                     onChange={(e) => {
                       setLocationInput(e.target.value);
@@ -790,7 +793,7 @@ const PostsApp = () => {
                       )
                     }
                   >
-                    Wish Only{" "}
+                    {t("wishOnly")}{" "}
                     <ElfIcon className="h-4 w-4 shrink-0 text-[#CB5E32]" />
                   </button>
                   <button
@@ -807,7 +810,7 @@ const PostsApp = () => {
                       )
                     }
                   >
-                    Share Only{" "}
+                    {t("shareOnly")}{" "}
                     <ReuseIcon className="h-4 w-4 shrink-0 text-[#F0AF1E]" />
                   </button>
                   <button
@@ -820,7 +823,7 @@ const PostsApp = () => {
                     }`}
                     onClick={() => setHideOverdue((prev) => !prev)}
                   >
-                    Hide Overdue
+                    {t("hideOverdue")}
                   </button>
                 </div>
               </div>
@@ -872,7 +875,7 @@ const PostsApp = () => {
                           : "z-30 scale-100 opacity-100"
                       } `}
                     >
-                      + Weaving
+                      {t("weaving")}
                     </button>
 
                     {/* Expanded sub-buttons — anchored to right, expand left to cover banner */}
@@ -893,7 +896,7 @@ const PostsApp = () => {
                         className="relative flex h-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 pl-6 pr-16 tracking-wide text-megaweave-forest-dark transition-colors duration-150 hover:border-primary"
                       >
                         <span className="relative z-10 whitespace-nowrap">
-                          + Wish
+                          {t("wish")}
                         </span>
                         <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex aspect-square shrink-0 items-center justify-center">
                           <ElfIcon className="absolute -bottom-6 -right-4 !h-[95%] !w-full text-megaweave-red-dark" />
@@ -910,7 +913,7 @@ const PostsApp = () => {
                         className="relative flex h-full flex-1 items-center justify-start overflow-hidden rounded-full border-[2px] border-primary-30 bg-primary-15 pl-6 pr-16 tracking-wide text-megaweave-forest-dark transition-colors duration-150 hover:border-primary"
                       >
                         <span className="relative z-10 whitespace-nowrap">
-                          + Share
+                          {t("share")}
                         </span>
                         <div className="pointer-events-none absolute bottom-0 right-0 top-0 flex aspect-square shrink-0 items-center justify-center">
                           <ReuseIcon className="absolute -bottom-6 -right-4 !h-[95%] !w-full text-megaweave-gold" />
@@ -961,7 +964,7 @@ const PostsApp = () => {
                 handleCreatePostButtonClick("wish");
               }}
             >
-              + Wish
+              {t("wish")}
               <ElfIcon className="!h-[18px] !w-[18px] text-[#efd0c4]" />
             </Button>
             <Button
@@ -971,7 +974,7 @@ const PostsApp = () => {
                 handleCreatePostButtonClick("share");
               }}
             >
-              + Share
+              {t("share")}
               <ReuseIcon className="!h-[18px] !w-[18px] text-[#fbe7c6]" />
             </Button>
           </div>
@@ -984,9 +987,14 @@ const PostsApp = () => {
                 onClick={() => setSelectedCategory("")}
               >
                 <span>
-                  Category:{" "}
-                  {categories.find((c) => c.id.toString() === selectedCategory)
-                    ?.name_en || "Unknown"}
+                  {t("categoryFilter", {
+                    name:
+                      categoryName(
+                        categories.find(
+                          (c) => c.id.toString() === selectedCategory,
+                        ),
+                      ) || t("unknownCategory"),
+                  })}
                 </span>
                 <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
@@ -1001,7 +1009,7 @@ const PostsApp = () => {
                   // For now, allow independent clearing.
                 }}
               >
-                <span>Province: {searchProvince}</span>
+                <span>{t("provinceFilter", { value: searchProvince })}</span>
                 <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
@@ -1012,7 +1020,7 @@ const PostsApp = () => {
                   setSearchCity("");
                 }}
               >
-                <span>City: {searchCity}</span>
+                <span>{t("cityFilter", { value: searchCity })}</span>
                 <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
@@ -1024,7 +1032,9 @@ const PostsApp = () => {
                   setLocationInput(""); // Clear the input too as it's likely a direct text search
                 }}
               >
-                <span>Location: {selectedLocation}</span>
+                <span>
+                  {t("locationFilter", { value: selectedLocation })}
+                </span>
                 <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}
@@ -1100,7 +1110,7 @@ const PostsApp = () => {
                   <div className="mb-4 space-y-2">
                     <Input
                       type="text"
-                      placeholder="Search"
+                      placeholder={t("searchPlaceholder")}
                       className="h-12"
                       value={searchTerm}
                       onChange={(e) => updateSearchTerm(e.target.value)}
@@ -1113,7 +1123,7 @@ const PostsApp = () => {
                       onClick={submitSearch}
                       className="w-full rounded-full bg-white px-4 py-2 text-[18px] font-semibold tracking-wider text-megaweave-forest-dark hover:bg-gray-100"
                     >
-                      Search
+                      {t("search")}
                     </button>
                   </div>
 
@@ -1138,12 +1148,12 @@ const PostsApp = () => {
                         }}
                       >
                         <SelectTrigger className="w-full min-w-0">
-                          <SelectValue placeholder="Category" />
+                          <SelectValue placeholder={t("categoryPlaceholder")} />
                         </SelectTrigger>
                         <SelectContent>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={cat.id.toString()}>
-                              {cat.name_en}
+                              {categoryName(cat)}
                             </SelectItem>
                           ))}
                           <Button
@@ -1152,7 +1162,7 @@ const PostsApp = () => {
                               setSelectedCategory("");
                             }}
                           >
-                            Clear
+                            {t("clearCategory")}
                           </Button>
                         </SelectContent>
                       </Select>
@@ -1162,7 +1172,7 @@ const PostsApp = () => {
                         ref={searchLocationInputRef}
                         className="w-full text-megaweave-forest-dark"
                         type="text"
-                        placeholder="Location"
+                        placeholder={t("locationPlaceholder")}
                         value={locationInput}
                         onChange={(e) => {
                           setLocationInput(e.target.value);
@@ -1200,7 +1210,7 @@ const PostsApp = () => {
                         } else setPostFilterType("wish");
                       }}
                     >
-                      Wish Only
+                      {t("wishOnly")}
                       <ElfIcon className="h-5 w-5 flex-shrink-0" />
                     </Button>
                     <Button
@@ -1213,7 +1223,7 @@ const PostsApp = () => {
                         } else setPostFilterType("share");
                       }}
                     >
-                      Share Only
+                      {t("shareOnly")}
                       <ReuseIcon className="h-5 w-5 flex-shrink-0" />
                     </Button>
                   </div>
@@ -1227,7 +1237,7 @@ const PostsApp = () => {
                     }`}
                     onClick={() => setHideOverdue((prev) => !prev)}
                   >
-                    Hide Overdue
+                    {t("hideOverdue")}
                   </Button>
                 </motion.div>
               </>
@@ -1247,6 +1257,7 @@ const PostsApp = () => {
               bezelWidth: 20,
             }}
           >
+            <span className="sr-only">{t("openFilters")}</span>
             <SearchIcon className="text-white" />
           </RefractiveButton>
         </>

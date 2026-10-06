@@ -1,7 +1,9 @@
 /**
- * Language of the addresses sent to Lalamove. Fixed to zh_TW whatever the UI locale:
- * the service only runs in Taiwan, the TW market only documents zh_TW, and the
- * addresses (from Google, TW-restricted) and driver remarks are always Chinese.
+ * Language of the addresses sent to Lalamove (the `language` field of a quotation).
+ * Deliberately fixed to zh_TW instead of following the UI locale: delivery only runs
+ * in Taiwan for the foreseeable future, TW drivers mostly read Chinese, the TW market
+ * only documents zh_TW, and the addresses (from Google, TW-restricted) and driver
+ * remarks are always Chinese. Revisit when expanding to markets outside Taiwan.
  */
 export const LALAMOVE_LANGUAGE = "zh_TW";
 

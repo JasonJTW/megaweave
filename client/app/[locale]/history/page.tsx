@@ -13,7 +13,9 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 interface HistoryResponse {
   posts: (Post & { viewed_at?: string })[];
-  pagination: {
+  // 後端理論上一定會帶 pagination，但標成 optional 讓讀取端必須做防禦，
+  // 避免回傳體形狀改變時整頁以 TypeError 收場。
+  pagination?: {
     currentPage: number;
     totalPages: number;
     totalPosts: number;
@@ -66,15 +68,16 @@ export default function HistoryPage() {
 
         const data: HistoryResponse = await res.json();
 
+        const nextPosts = data.posts ?? [];
         if (append) {
-          setPosts((prev) => [...prev, ...data.posts]);
+          setPosts((prev) => [...prev, ...nextPosts]);
         } else {
-          setPosts(data.posts || []);
+          setPosts(nextPosts);
         }
 
-        setCurrentPage(data.pagination.currentPage);
-        setTotalPages(data.pagination.totalPages);
-        setTotalPosts(data.pagination.totalPosts);
+        setCurrentPage(data.pagination?.currentPage ?? page);
+        setTotalPages(data.pagination?.totalPages ?? 1);
+        setTotalPosts(data.pagination?.totalPosts ?? 0);
       } catch (err) {
         console.error("Error fetching history:", err);
         toast.error("Failed to load viewing history");

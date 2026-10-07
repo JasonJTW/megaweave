@@ -415,6 +415,26 @@ router.delete(
   },
 );
 
+//* Get user's viewed posts history API (GET /history)
+// 必須註冊在 GET /:id 之前，否則 "history" 會被當成 public_id
+router.get(
+  "/history",
+  requireAuth,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+
+      const result = await postService.getViewedPosts(userId, page, limit);
+      res.status(200).json(result);
+    } catch (error) {
+      console.error("Get viewed posts history error:", error);
+      return res.status(500).json({ errorMessage: "Internal server error" });
+    }
+  },
+);
+
 //* Get post details api (using public_id)
 router.get("/:id", async (req: Request, res: Response) => {
   try {

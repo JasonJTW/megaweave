@@ -3,6 +3,7 @@
 import { useRouter } from "@/i18n/navigation";
 
 import React, { useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { createComment } from "@/services/commentService";
 import User from "../../types/user";
 import Image from "next/image";
@@ -12,6 +13,7 @@ interface CommentInputProps {
   itemId?: "all" | number; // "all" = All 留言, 數字 = 特定 item
   parentId?: number | null; // 回覆哪則留言
   user: User | null;
+  /** Defaults to the generic "write a comment" prompt */
   placeholder?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -25,12 +27,14 @@ const CommentInput: React.FC<CommentInputProps> = ({
   itemId,
   parentId = null,
   user,
-  placeholder = "Write a comment",
+  placeholder,
   onSuccess,
   onCancel,
   autoFocus = false,
 }) => {
   const router = useRouter();
+  const t = useTranslations("Comments");
+  const formatter = useFormatter();
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,11 +62,11 @@ const CommentInput: React.FC<CommentInputProps> = ({
       onSuccess?.();
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message || "Failed to submit comment");
+        setError(err.message || t("submitFailed"));
       } else if (typeof err === "string") {
         setError(err);
       } else {
-        setError("Failed to submit comment");
+        setError(t("submitFailed"));
       }
     } finally {
       setIsSubmitting(false);
@@ -79,7 +83,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
 
   const handleNotLogIn = () => {
     if (!user) {
-      toast("Please log in to comment");
+      toast(t("signInToComment"));
       setTimeout(() => {
         router.push(
           `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
@@ -100,7 +104,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
           {user?.avatar_url ? (
             <Image
               src={user.avatar_url}
-              alt={user.username || "User"}
+              alt={t("yourAvatarAlt")}
               fill
               className="rounded-full object-cover"
             />
@@ -123,7 +127,9 @@ const CommentInput: React.FC<CommentInputProps> = ({
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={user ? placeholder : "Please sign in to comment"}
+            placeholder={
+              user ? (placeholder ?? t("writeComment")) : t("signInPlaceholder")
+            }
             onFocus={handleNotLogIn}
             autoFocus={autoFocus}
             disabled={isSubmitting}
@@ -140,7 +146,10 @@ const CommentInput: React.FC<CommentInputProps> = ({
                   : "text-gray-400"
               }`}
             >
-              {content.length} / {MAX_CHARACTER_LIMIT}
+              {t("characterCount", {
+                count: formatter.number(content.length),
+                max: formatter.number(MAX_CHARACTER_LIMIT),
+              })}
             </div>
           )}
         </div>
@@ -157,7 +166,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
             disabled={isSubmitting}
             className="px-4 py-1.5 text-sm text-gray-600 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Cancel
+            {t("cancel")}
           </button>
         )}
         <button
@@ -165,7 +174,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
           disabled={isSubmitting || !content.trim()}
           className="rounded-lg bg-primary px-4 py-1.5 text-sm text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {!user ? "Log in" : isSubmitting ? "Submitting" : "Submit"}
+          {!user ? t("logIn") : isSubmitting ? t("submitting") : t("submit")}
         </button>
       </div>
     </div>

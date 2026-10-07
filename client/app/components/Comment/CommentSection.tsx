@@ -3,6 +3,7 @@
 import { useRouter } from "@/i18n/navigation";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Post } from "../../types/schema";
 import User from "../../types/user";
@@ -26,6 +27,7 @@ type ItemKey = "all" | number;
 
 const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const router = useRouter();
+  const t = useTranslations("Comments");
   const [activeItemKey, setActiveItemKey] = useState<ItemKey | null>(null);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -37,7 +39,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     title: string;
   }) => {
     if (!user) {
-      toast.error("Please log in to message.");
+      toast.error(t("signInToMessage"));
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
@@ -45,7 +47,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     }
 
     if (user.userId === (post.author_user_id ?? post.user_id)) {
-      toast.error("You cannot message yourself.");
+      toast.error(t("cannotMessageSelf"));
       return;
     }
 
@@ -59,7 +61,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         body: JSON.stringify({ recipient_public_id: post.author_public_id }),
       });
 
-      if (!res.ok) throw new Error("Failed to start conversation");
+      if (!res.ok) throw new Error(t("startConversationFailed"));
 
       const data = await res.json();
       console.log("data: ", data);
@@ -76,7 +78,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       );
     } catch (error) {
       console.error("Message error:", error);
-      toast.error(`Could not message ${post.username}`);
+      toast.error(t("messageFailed", { username: post.username }));
     }
   };
 
@@ -101,13 +103,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         if (err instanceof Error) {
           toast.error(err.message);
         } else {
-          toast.error("Error fetching comments");
+          toast.error(t("fetchFailed"));
         }
       } finally {
         setIsLoading(false);
       }
     },
-    [post.id],
+    [post.id, t],
   );
 
   // 初始載入留言數量
@@ -206,7 +208,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
 
   // Items 列表
   const items: { key: ItemKey; title: string; quantity?: number }[] = [
-    { key: "all", title: "All" }, // All 沒有 quantity
+    { key: "all", title: t("all") }, // All 沒有 quantity
     ...(post.items?.map((item) => ({
       key: item.id as number,
       title: item.title,
@@ -221,6 +223,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         <div key={item.key} className="mb-[10px]">
           <CommentCard
             title={item.title}
+            isAllItems={item.key === "all"}
             count={getCount(item.key)}
             quantity={item.quantity}
             isOpen={activeItemKey === item.key}
@@ -243,8 +246,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                     user={user}
                     placeholder={
                       item.key === "all"
-                        ? "Write a comment"
-                        : `Comment on ${item.title}`
+                        ? t("writeComment")
+                        : t("commentOnItem", { title: item.title })
                     }
                     onSuccess={handleCommentSuccess}
                   />
@@ -254,11 +257,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
                     {isLoading ? (
                       <div className="py-4 text-center text-gray-500">
                         <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                        <p className="mt-2 text-sm">Loading...</p>
+                        <p className="mt-2 text-sm">{t("loading")}</p>
                       </div>
                     ) : getItemComments(item.key).length === 0 ? (
                       <div className="py-4 text-center text-sm text-gray-500">
-                        No comments yet. Be the first to comment!
+                        {t("empty")}
                       </div>
                     ) : (
                       <div className="divide-y divide-gray-100">

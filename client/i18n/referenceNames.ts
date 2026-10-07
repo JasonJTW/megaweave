@@ -38,9 +38,7 @@ export function useCategoryName() {
 
   return (
     category:
-      | { id?: number | null; name_en?: string | null }
-      | null
-      | undefined,
+      { id?: number | null; name_en?: string | null } | null | undefined,
   ) =>
     resolveReferenceName(
       {
@@ -63,9 +61,22 @@ export function useConditionText() {
   return {
     name: (level: number | null | undefined, fallback?: string | null) =>
       resolveReferenceName(field("name"), idKey(level), fallback),
-    description: (
-      level: number | null | undefined,
-      fallback?: string | null,
-    ) => resolveReferenceName(field("description"), idKey(level), fallback),
+    description: (level: number | null | undefined, fallback?: string | null) =>
+      resolveReferenceName(field("description"), idKey(level), fallback),
   };
+}
+
+/**
+ * The condition label to show for a post. `condition_level` and `condition_name`
+ * always travel together, so callers pass the post rather than both fields.
+ */
+export function usePostConditionName() {
+  const conditionText = useConditionText();
+
+  return (
+    post:
+      | { condition_level?: number | null; condition_name?: string | null }
+      | null
+      | undefined,
+  ) => conditionText.name(post?.condition_level, post?.condition_name);
 }

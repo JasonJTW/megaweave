@@ -206,7 +206,14 @@ export async function getUserSessionFromRedis(
 export async function getUserFromCookie(
   req: Request,
 ): Promise<UserSession | null> {
-  const sessionId = req.cookies[COOKIE_SESSION_KEY];
+  return getUserFromCookies(req.cookies);
+}
+
+//* 不依賴 Express Request 的版本，供 Socket.IO handshake 等非 HTTP route 使用
+export async function getUserFromCookies(
+  cookies: Record<string, string | undefined> | undefined,
+): Promise<UserSession | null> {
+  const sessionId = cookies?.[COOKIE_SESSION_KEY];
   if (!sessionId) {
     return null;
   }

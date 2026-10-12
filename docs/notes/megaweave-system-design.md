@@ -106,12 +106,17 @@ flowchart TD
 #### What it does
 Serves ranked item feeds to users. The ranking combines semantic similarity to the user's interest vector with item popularity (hot score) and geographic proximity.
 
-#### Four-path routing (`feedService.getFeed`)
+#### Five-path routing (`feedService.getFeed`)
+
+Conditions are checked in order; the first match wins.
 
 ```
 Request: GET /api/posts/feed?mode=tinder&lat=25.04&lng=121.53
 
-if (tinder mode OR hasFilters)
+if (search present)
+  → getSemanticSearchFeed(params)           ← query-embedding KNN (100–500), MySQL filters, 0.85·sim + 0.15·hot
+                                               (checked before the user vector is loaded; not personalized)
+else if (tinder mode OR hasFilters)         ← hasFilters = type / category_id / city / province / location
   → getFilteredFeed(params, userVector)     ← hybrid re-rank; works with or without vector
 else if (userVector exists)
   → getPersonalizedFeed(userVector, params) ← full HNSW KNN personalization
@@ -121,7 +126,22 @@ else
   → getTrendingFeed()                       ← Redis ZSET cold-start fallback
 ```
 
+`radius` is not part of `hasFilters`. A user with an interest vector who sends `radius` takes the personalized path, which does not apply `buildWhereConditions`, so the radius filter is ignored there (only the geo multiplier applies). The client does not send `radius` today.
+
+#### Cross-path fallback
+
+Every degraded path ends in `getFilteredFeed` (MySQL). Redis and OpenAI improve quality; MySQL is the only hard dependency.
+
+```
+getSemanticSearchFeed  query embedding fails / vector search throws  → getFilteredFeed(params, null)  (keyword LIKE search)
+getPersonalizedFeed    FT.SEARCH throws / KNN returns 0               → getFilteredFeed(params, userVector)
+getTrendingFeed        feed:trending empty or read error              → getFilteredFeed(params, null)
+getFilteredFeed        a candidate vector read fails                  → that post scores with neutral similarity 0.5
+```
+
 #### Late Materialization pattern
+
+Shown for `getFilteredFeed`. `getPersonalizedFeed` replaces Stage 1 with HNSW KNN recall (`k = max(150, (page + 2) * limit)`), then reads only the scoring fields (`posts` + `locations`) for those IDs before re-ranking.
 
 ```
 Stage 1 — Lightweight candidate retrieval
@@ -151,8 +171,8 @@ Stage 3 — Full hydration (current page only)
 
 | Cache | Location | Capacity / TTL | Purpose |
 |-------|----------|----------------|---------|
-| `postVectorMemoryCache` | Node.js process memory | 2000 entries, no TTL | Post embeddings don't change; avoid repeated Redis reads |
-| `userVectorMemoryCache` | Node.js process memory | Per user, 5-min TTL | User vectors change; TTL balances freshness vs Redis load |
+| `postVectorMemoryCache` | Node.js process memory | 2000 entries, no TTL, **no eviction** — once full, new vectors are not cached (#76) | Post embeddings don't change; avoid repeated Redis reads |
+| `userVectorMemoryCache` | Node.js process memory | Per user, 5-min TTL, **no size cap**; expired entries are only overwritten on the next read (#77) | User vectors change; TTL balances freshness vs Redis load |
 | Redis `user:{id}:vector` | Redis Stack | No expiry | Source of truth for user interest vector |
 | Redis `feed:trending` ZSET | Redis Stack | Refreshed every 15 min by hot-score cron | Pre-sorted post IDs for cold-start feed |
 
@@ -165,7 +185,7 @@ Stage 3 — Full hydration (current page only)
 - **Cold-start recovery:** On server start, `ensureVectorIndexExists()` checks if `num_docs` in index matches MySQL count. If Redis was flushed, auto-runs `syncVectorsFromMySQL()` with a distributed lock to prevent multi-replica duplicate sync.
 
 #### 🏆 Resume highlights
-- Four-path adaptive routing with graceful cross-path fallback
+- Five-path adaptive routing (semantic search, filtered, personalized, geo, trending) with graceful cross-path fallback
 - Late materialization: defers 6-table JOIN to current page slice only
 - Two-layer in-memory vector cache (post vectors permanent, user vectors 5-min TTL)
 - Hybrid FinalScore formula combining semantic similarity, hot score, and geo boost
@@ -656,7 +676,7 @@ Custom `Store` implementation that wraps `RedisStore` with a `MemoryStore` fallb
 
 | Highlight | Where in code | Claim |
 |-----------|--------------|-------|
-| Four-path adaptive feed routing | `feedService.getFeed` | Designed recommendation routing with HNSW recall, hybrid re-ranking, geo-proximity, and cold-start fallback |
+| Five-path adaptive feed routing | `feedService.getFeed` | Designed recommendation routing with semantic search, HNSW recall, hybrid re-ranking, geo-proximity, and cold-start fallback |
 | Late materialization | `getFilteredFeed`, `getPersonalizedFeed` Stage 3 | Deferred 6-table JOIN hydration to current page slice only |
 | EMA user vector + write-back | `userVector.ts`, `userVectorFlush.ts` | Online user preference learning via EMA; Redis write-back with dirty-set flush pattern |
 | GPS webhook pass-through | `lalamove.ts` L609-625 | High-frequency driver location pushed to Socket.IO rooms without DB writes |

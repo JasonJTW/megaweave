@@ -1,5 +1,7 @@
 "use client";
 
+import { useFormatter, useTranslations } from "next-intl";
+import { usePostConditionName } from "@/i18n/referenceNames";
 import EyesIcon from "@/app/components/icons/EyesIcon";
 import LocationIcon from "@/app/components/icons/LocationIcon";
 import type { Post } from "@/app/types/schema";
@@ -27,6 +29,9 @@ const PostShareModal = ({
   post,
   onInstagramShare,
 }: PostShareModalProps) => {
+  const t = useTranslations("PostDetail");
+  const formatter = useFormatter();
+  const conditionLabel = usePostConditionName();
   const s3Keys = parseS3Keys(post);
 
   const imageSrc = s3Keys[0]?.startsWith("http")
@@ -38,6 +43,8 @@ const PostShareModal = ({
     [post.province, post.city, post.route].filter(Boolean).join("") ||
     post.full_address ||
     "";
+
+  const conditionName = conditionLabel(post);
 
   const tags = post.tags
     ? post.tags
@@ -63,9 +70,11 @@ const PostShareModal = ({
             className="flex w-full max-w-[360px] flex-col items-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <Dialog.Title className="sr-only">Share post</Dialog.Title>
+            <Dialog.Title className="sr-only">
+              {t("shareModalTitle")}
+            </Dialog.Title>
             <Dialog.Description className="sr-only">
-              Preview and share this post to Instagram
+              {t("shareModalDescription")}
             </Dialog.Description>
 
             <div className="w-full">
@@ -86,20 +95,21 @@ const PostShareModal = ({
                     </div>
                   ) : (
                     <div className="type-body-t5 flex h-full w-full items-center justify-center text-primary-75">
-                      No image
+                      {t("shareModalNoImage")}
                     </div>
                   )}
 
                   <div className="absolute bottom-0 left-0 flex w-full items-end justify-between px-4 py-4">
                     {post.view_count > 0 && (
-                      <Badge className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white">
+                      <Badge
+                        aria-label={t("viewCount", { count: post.view_count })}
+                        className="bg-[#7c7c7c] px-2 font-ddin text-[14px] font-normal text-white"
+                      >
                         <EyesIcon className="mr-[4px]" />
-                        {post.view_count}
+                        {formatter.number(post.view_count)}
                       </Badge>
                     )}
-                    {post.condition_name && (
-                      <Badge>{post.condition_name}</Badge>
-                    )}
+                    {conditionName && <Badge>{conditionName}</Badge>}
                   </div>
                 </div>
 
@@ -136,7 +146,7 @@ const PostShareModal = ({
               onClick={handleInstagramShare}
               className="mt-8 font-ddin text-[16px] font-medium text-white transition-opacity hover:opacity-80"
             >
-              Share to Instagram ?
+              {t("shareToInstagram")}
             </button>
           </div>
         </Dialog.Content>

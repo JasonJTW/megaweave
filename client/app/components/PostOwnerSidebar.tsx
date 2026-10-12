@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Post } from "@/app/types/schema";
 import Image from "next/image";
@@ -27,6 +28,7 @@ export default function PostOwnerSidebar({
   currentPostId,
 }: PostOwnerSidebarProps) {
   const router = useRouter();
+  const t = useTranslations("PostDetail");
 
   return (
     <aside className="sticky top-28 hidden w-[280px] shrink-0 flex-col items-center font-ddin lg:flex xl:w-[300px]">
@@ -34,7 +36,7 @@ export default function PostOwnerSidebar({
       <Link
         href="/"
         className="mb-8 grid w-full max-w-[220px] grid-cols-2 grid-rows-2 gap-1"
-        aria-label="Megaweave home"
+        aria-label={t("ownerHome")}
       >
         <ReuseIcon className="h-full w-full text-megaweave-gold" />
         <WeavingIcon className="h-full w-full text-megaweave-forest" />
@@ -51,7 +53,7 @@ export default function PostOwnerSidebar({
         {avatarUrl ? (
           <Image
             src={avatarUrl}
-            alt={`${username}'s avatar`}
+            alt={t("avatarAlt", { username: username || t("userFallback") })}
             fill
             className="object-cover"
             sizes="220px"
@@ -69,7 +71,7 @@ export default function PostOwnerSidebar({
         onClick={() => router.push(`/profile/${authorPublicId}`)}
         className="mb-1 text-center text-[22px] font-bold text-gray-900 hover:text-primary"
       >
-        {username || "User"}
+        {username || t("userFallback")}
       </button>
       {contactEmail && (
         <a

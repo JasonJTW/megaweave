@@ -43,14 +43,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
     console.log("🔌 Initializing socket for user:", userId);
 
     const socketInstance = io(hostName || "", {
+      // Server 在 handshake 時讀 session cookie 驗證身分並自動加入個人 room
       withCredentials: true,
-      // Optional: add query params if needed for auth on connection
     });
 
     socketInstance.on("connect", () => {
       console.log("✅ Connected to Socket Server, ID:", socketInstance.id);
       setIsConnected(true);
-      socketInstance.emit("join_room", userId.toString());
     });
 
     socketInstance.on("disconnect", () => {

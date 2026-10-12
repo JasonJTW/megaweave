@@ -25,6 +25,7 @@ import { startWorkers, stopWorkers } from "./queue/workers";
 import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
+import { registerSocketHandlers } from "./socketHandlers";
 import { globalRateLimiter } from "./middleware/rateLimiter";
 import { getBenchmarkHealthFields, isBenchmarkTarget } from "./benchmark/targetMarker";
 import {
@@ -147,31 +148,8 @@ async function startServer() {
     //* 3.Attach Redis adapter to Socket.IO
     io.adapter(createAdapter(pubClient, subClient));
 
-    //* 4.Socket.IO connection handling
-    io.on("connection", (socket) => {
-      // console.log(`🔌 New client connected: ${socket.id}`);
-
-      //* 讓客戶端告知 User ID 並加入 Room
-      socket.on("join_room", (userId: string) => {
-        const roomName = `user_${userId}`;
-        socket.join(roomName);
-        // console.log(`👤User ${userId} joined room: ${roomName}`);
-      });
-      //* 加入特定訂單的配送即時追蹤 Room
-      socket.on("join_delivery", (orderId: string) => {
-        const roomName = `delivery_${orderId}`;
-        socket.join(roomName);
-        console.log(`📦 Socket ${socket.id} joined delivery room: ${roomName}`);
-      });
-      socket.on("leave_delivery", (orderId: string) => {
-        const roomName = `delivery_${orderId}`;
-        socket.leave(roomName);
-        console.log(`📦 Socket ${socket.id} left delivery room: ${roomName}`);
-      });
-      socket.on("disconnect", () => {
-        console.log(`❌ Client disconnected: ${socket.id}`);
-      });
-    });
+    //* 4.Socket.IO 驗證與 connection handling（handshake 讀 session，只能加入有權限的 room）
+    registerSocketHandlers(io);
     //* 5.將 io 實例存入 app，讓以後的 API Route 可以透過 req.app.get("io") 取得
     app.set("io", io);
     setSocketIO(io);

@@ -1,6 +1,7 @@
 // /app/install/page.tsx
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 import ShareLinkIcon from "@/app/components/icons/ShareLinkIcon";
 import InstallGroup from "@/app/components/icons/InstallGroup";
@@ -12,6 +13,7 @@ declare global {
   }
 }
 export default function InstallPage() {
+  const t = useTranslations("Install");
   const router = useRouter();
 
   useEffect(() => {
@@ -35,14 +37,14 @@ export default function InstallPage() {
           <div className="h-[130px] w-[130px] overflow-hidden rounded-[22%] border border-primary-30 bg-white">
             <Image
               src="/apple-touch-icon.png"
-              alt="Logo"
+              alt={t("logoAlt")}
               className="h-full w-full"
               width={128}
               height={128}
             />
           </div>
           <h1 className="mt-6 text-2xl font-bold text-gray-800">
-            Add to Home Screen?
+            {t("heading")}
           </h1>
         </div>
 
@@ -50,16 +52,18 @@ export default function InstallPage() {
           <div className="mx-10 flex flex-col items-end">
             <div className="relative mb-1 mt-10 flex rounded-2xl bg-primary-15 px-2 py-6 text-center">
               <p className="text-[16px] font-semibold leading-relaxed text-gray-700">
-                Tap the{" "}
-                <span className="inline-block px-1 align-baseline">
-                  <ShareLinkIcon className="ml-1 text-primary" />
-                </span>{" "}
-                /{" "}
-                <span className="inline-block px-1 align-baseline">
-                  <MoreIcon className="mr-1 text-primary" />
-                </span>{" "}
-                icon and select &quot;...More&quot; and then &quot;Add to Home
-                Screen&quot; to add a shortcut.
+                {t.rich("instructions", {
+                  share: () => (
+                    <span className="inline-block px-1 align-baseline">
+                      <ShareLinkIcon className="ml-1 text-primary" />
+                    </span>
+                  ),
+                  more: () => (
+                    <span className="inline-block px-1 align-baseline">
+                      <MoreIcon className="mr-1 text-primary" />
+                    </span>
+                  ),
+                })}
               </p>
             </div>
             <div className="mb-1 h-[18px] w-[18px] rounded-full bg-primary-15"></div>

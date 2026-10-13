@@ -483,5 +483,85 @@
       "moreItems": "+{count} more"
     },
     "likeCounted": "Liked!"
+  },
+  "Onboarding": {
+    "closeTour": "Close tour",
+    "previousStep": "Previous tour step",
+    "nextStep": "Next tour step",
+    "goToStep": "Go to step {number}",
+    "welcome": "megaweaving is a platform for resources sharing and circulation.\n\nThe concept of \"weaving\" allows users to exchange resources for free, creating a cycle that maximizes resource efficiency through collective sharing.\n\nBy \"weave\" user with those who \"share\" or \"wish\", we foster sustainability and strengthen community bonds.",
+    "wish": "Post a wish for the specific resources\nyou are looking for.",
+    "share": "Share resources you want to\npass on to the community.",
+    "scroll": "Scroll vertical to browse.",
+    "rules": "Free resources only.\n<warning>No monetary transactions</warning>\nor trades involved.",
+    "message": "Click <icon></icon> button to send a private message and request weaving with the post author.",
+    "mock": {
+      "postTitle": "Post Title",
+      "category": "Category",
+      "description": "This is a sample post description showing what the detail page looks like...",
+      "owner": "Username (post author)"
+    }
+  },
+  "About": {
+    "heroTagline1": "Weaving Commons of",
+    "heroTagline2": "Shared Resources.",
+    "loading": "Loading team members...",
+    "errorTitle": "Error loading team members",
+    "viewDetail": "View Detail",
+    "memberTitleFallback": "Weaver",
+    "sections": {
+      "megaweaving": "megaweaving",
+      "resources": "Resources",
+      "bridging": "Bridging",
+      "weaver": "Weaver"
+    },
+    "ourPartner": "OUR PARTNER"
+  },
+  "Install": {
+    "logoAlt": "megaweaving logo",
+    "heading": "Add to Home Screen?",
+    "instructions": "Tap the <share></share> / <more></more> icon and select \"...More\" and then \"Add to Home Screen\" to add a shortcut."
+  },
+  "Earthday": {
+    "toggleMenu": "Toggle Menu",
+    "nav": {
+      "about": "About megaweaving",
+      "regenerative": "Regenerative Design",
+      "follow": "Follow Us"
+    },
+    "about": {
+      "heading": "About megaweaving",
+      "body": "“megaweaving” began as a Facebook group and now boasts over 12,000 members. It acts like a bridge that supports the free flow of resources. On one end is “surplus,” and on the other is “need.” Those who have excess resources and those who are seeking them can connect, exchange, and support one another within the community."
+    },
+    "regenerative": {
+      "heading": "Regenerative Design",
+      "body1": "To take this spirit of sharing further, “megaweaving” has launched the “Regenerative Design” initiative. We invite partners passionate about creation to join us in giving materials new life through creativity, allowing design itself to become a force for restoring and regenerating the ecosystem, and transforming resources into more meaningful works!",
+      "body2": "Taking this Earth Day as an opportunity, we would like to introduce the partners who have joined us and share some of their recent experiments. We also welcome interested friends to join this project!"
+    },
+    "nancy": {
+      "body1": "“100 Teapots in 100 Days*” is an ongoing series brewed from reclaimed Liberty printed fabric samples. The project began by translating the curved surfaces of a teapot from 3D models into simplified 2D patterns, resulting in elegantly tailored and functional teapot cozies.",
+      "body2": "A trip to Berlin reframed the direction of the work. The city’s tension between rational order and cultivated decay inspired the piece “Sisyphos,” which uses elastic bands that expand and contract along set paths to form an insulating structure that reimagines the traditional teapot cozy.",
+      "body3": "The title “Sisyphos” references a well-known Berlin club and reflects a local attitude toward life: despite high taxes, secure housing reduces the emphasis on ownership, allowing space for freedom and everyday enjoyment — echoing Sisyphus, who, before his eternal labour, still revelled in the freedom and pleasures of life.",
+      "footnote": "*The series title is inspired by Marino Gamper’s 100 Chairs in 100 Days and Its 100 Ways (2007).",
+      "bio": "Nancy Ma is a Taiwanese architectural designer based in London. She explores new ways of seeing through ordinary objects, extending the possibilities of materials and forms through sculptural and material exploration, with a sensitive and intuitive approach to physical relationships. Her work focuses on ecological care and regenerative design, using spatial installations and essay films to give voice to overlooked human and non-humans."
+    },
+    "captions": {
+      "teapotCosy2": "Teapot Cosy No. 2",
+      "makingProcess": "Teapot Cosy Making Process",
+      "friedrichshain": "Beneath the overpasses near Friedrichshain, people often gather spontaneously to play techno music and dance."
+    },
+    "wwmm": {
+      "heading": "Starting with megaweaving",
+      "intro1": "Objects have no standard forms or fixed colors. Creating this work is like a “loose translation” — a way to move things from the past into the future.\nSince we cannot control where the materials come from, the three of us transform them into new forms: bubble wrap becomes a glowing skin; old earphone wires become the warp and weft; plastic nets and ropes tie it all together.",
+      "intro2": "When different materials meet, new ideas grow. What were these objects before they were thrown away? And what can they become next?",
+      "bio": "Founded by three architecture graduates, practice WWMM was formed through the project “Regenerative Design.” Our team thinks through space, material, and structure. We focus on the regenerative potential of waste, surplus materials, and existing objects—reconfiguring their form, function, and usage through design.\nUsing regeneration as a method rather than simple material replacement, we explore how objects generate new spatial perceptions and living interfaces during the circulation process. We strive to respond to the relationship between resources, the environment, and daily use through design practice."
+    },
+    "follow": {
+      "heading": "Weaving with us!",
+      "question": "Would you like to become a design partner?\nOr do you have ideas for regenerative design?",
+      "invite": "We warmly invite you to join us — please leave your contact information.",
+      "contactPlaceholder": "Email / Line ID / Instagram",
+      "submit": "Enter"
+    }
   }
 }

@@ -1,9 +1,11 @@
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
 import { ChevronDown, LucideLoader2, LucideRefreshCcw } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import type { Condition, Post } from "../types/schema";
+import type { DrawerKind } from "./Drawer";
 import WeavingCard from "./WeavingCard";
 
 const MAX_VISIBLE_POSTS = 5;
@@ -11,7 +13,7 @@ const LIST_ITEM_ESTIMATED_HEIGHT_PX = 120;
 const LIST_ITEM_GAP_PX = 12;
 
 interface DrawerListProps {
-  title: string;
+  kind: DrawerKind;
   posts: Post[];
   conditions: Condition[];
   weaves?: Weave[];
@@ -22,7 +24,7 @@ interface DrawerListProps {
 }
 
 const DrawerList: React.FC<DrawerListProps> = ({
-  title,
+  kind,
   posts,
   weaves,
   currentUserId,
@@ -31,6 +33,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
   onWeaveStatusChange,
 }) => {
   const router = useRouter();
+  const t = useTranslations("Drawer");
   const listRef = useRef<(HTMLDivElement | null)[]>([]);
   const shouldAutoExpand =
     weaves?.some((w) => w.id === highlightWeaveId) ?? false;
@@ -84,7 +87,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
     setIsExpanded(!isExpanded);
   };
 
-  const isWeavingTab = title === "Weaving";
+  const isWeavingTab = kind === "weaving";
   const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
   const postsToRender = isWeavingTab ? postsForWeaving : posts;
   const shouldScrollList = postsToRender.length > MAX_VISIBLE_POSTS;
@@ -97,9 +100,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
     postIdToWeaveMap.set(weave.post.id, weave);
   });
 
-  const emptyMessage = isWeavingTab
-    ? "You have no active weaving yet."
-    : `No posts in ${title} yet.`;
+  const emptyMessage = t("empty", { kind });
 
   return (
     <div className="mb-4">
@@ -107,7 +108,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
         onClick={handleExpand}
         className="type-h3 mx-4 my-5 flex cursor-pointer select-none items-center justify-between border-b border-primary-30 px-4 py-2 font-ddin text-megaweave-forest-dark"
       >
-        <div>{title}</div>
+        <div>{t(kind)}</div>
         <ChevronDown
           className={`h-5 w-5 transition-transform duration-200 ${
             isExpanded ? "rotate-180" : ""
@@ -151,7 +152,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
                 className="px-4"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                aria-label="Refresh list"
+                aria-label={t("refresh")}
               >
                 <motion.div
                   animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}
@@ -173,7 +174,7 @@ const DrawerList: React.FC<DrawerListProps> = ({
                 <div className="flex items-center gap-2.5 rounded-full border border-gray-100/50 bg-white/95 px-4 py-2 shadow-md dark:border-zinc-800 dark:bg-zinc-900/95">
                   <LucideLoader2 className="h-4 w-4 animate-spin text-megaweave-forest" />
                   <span className="text-xs font-semibold text-megaweave-forest-dark dark:text-zinc-200">
-                    Syncing status...
+                    {t("syncing")}
                   </span>
                 </div>
               </div>

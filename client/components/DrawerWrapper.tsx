@@ -1,6 +1,7 @@
 // components/DrawerWrapper.tsx
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 import DrawerList from "@/app/components/DrawerList";
 import UserPostCard from "@/app/components/PostCard/UserPostCard";
@@ -29,6 +30,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
   // 💥 只有在這個 Client Component 內才呼叫 useSearchParams
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations("Drawer");
   const highlightWeaveId = searchParams.get("highlightWeaveId");
   const { categories } = usePost();
 
@@ -41,7 +43,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
       <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-[3fr_2fr] lg:grid-cols-[4fr_5fr]">
         <div className="min-w-0">
           <DrawerList
-            title="Weaving"
+            kind="weaving"
             posts={[]}
             weaves={weaves}
             conditions={conditions}
@@ -53,7 +55,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
         </div>
         <div className="min-w-0">
           <div className="type-h3 mx-4 my-5 flex items-center justify-between px-4 py-2 font-ddin text-megaweave-forest-dark">
-            <div>Posts</div>
+            <div>{t("posts")}</div>
           </div>
 
           <div className="grid grid-cols-2 justify-items-center gap-4 px-4 sm:grid-cols-2 sm:px-0 lg:grid-cols-3 xl:grid-cols-4">
@@ -74,7 +76,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
         </div>
         {/* <div className="min-w-0">
           <DrawerList
-            title="Share"
+            kind="share"
             posts={sharePosts}
             conditions={conditions}
             fetchWeaves={fetchStats}
@@ -82,7 +84,7 @@ const DrawerWrapper: React.FC<DrawerWrapperProps> = ({
         </div> */}
       </div>
       {/*    <DrawerList
-        title="Wish"
+        kind="wish"
         posts={wishPosts}
         conditions={conditions}
         fetchWeaves={fetchStats}

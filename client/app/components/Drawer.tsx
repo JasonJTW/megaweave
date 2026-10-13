@@ -1,4 +1,5 @@
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import ExpandIcon from "./icons/ExpandIcon";
@@ -8,8 +9,10 @@ import ExpandedIcon from "./icons/ExpandedIcon";
 import type { Weave } from "@/services/weaveService";
 import { LucideRefreshCcw } from "lucide-react";
 
+export type DrawerKind = "weaving" | "share" | "wish";
+
 interface DrawerProps {
-  title: string;
+  kind: DrawerKind;
   posts: Post[];
   conditions: Condition[];
   weaves?: Weave[];
@@ -18,7 +21,7 @@ interface DrawerProps {
 }
 
 const Drawer: React.FC<DrawerProps> = ({
-  title,
+  kind,
   posts,
   conditions,
   weaves,
@@ -26,6 +29,7 @@ const Drawer: React.FC<DrawerProps> = ({
   fetchWeaves,
 }) => {
   const router = useRouter();
+  const t = useTranslations("Drawer");
   const shouldAutoExpand =
     weaves?.some((w) => w.id === highlightWeaveId) ?? false;
   const [isExpanded, setIsExpanded] = useState(shouldAutoExpand);
@@ -60,7 +64,7 @@ const Drawer: React.FC<DrawerProps> = ({
   const handleExpand = () => {
     setIsExpanded(!isExpanded);
   };
-  const isWeavingTab = title === "Weaving";
+  const isWeavingTab = kind === "weaving";
   // ✅ 1. 數據轉換：從 weaves 陣列中提取巢狀的 post 物件
   const postsForWeaving: Post[] = weaves ? weaves.map((w) => w.post) : [];
   // console.log("postsForWeaving: ", postsForWeaving);
@@ -69,14 +73,12 @@ const Drawer: React.FC<DrawerProps> = ({
   const postsToRender = isWeavingTab ? postsForWeaving : posts;
 
   // 決定空的提示訊息
-  const emptyMessage = isWeavingTab
-    ? "You have no active weaving yet."
-    : `No posts in ${title} yet.`;
+  const emptyMessage = t("empty", { kind });
 
   return (
     <div className="mb-4">
       <div className="type-button-b1 mx-4 my-[20px] flex justify-between border-b border-primary-30 px-[16px] py-[8px] font-ddin text-megaweave-forest-dark">
-        <div>{title}</div>
+        <div>{t(kind)}</div>
         <button
           onClick={handleExpand}
           className="transition-transform duration-300"
@@ -134,6 +136,7 @@ const Drawer: React.FC<DrawerProps> = ({
                 className="px-4"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
+                aria-label={t("refresh")}
               >
                 <motion.div
                   animate={isRefreshing ? { rotate: 360 } : { rotate: 0 }}

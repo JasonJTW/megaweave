@@ -1,5 +1,7 @@
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { localizePath } from "@/i18n/routing";
+import { useLocale, useTranslations } from "next-intl";
 //* Member Detail Page
 
 import React, { useState, useEffect } from "react";
@@ -23,8 +25,12 @@ import TitleBadgeIcon6 from "@/app/components/icons/TitleBadge6";
 import { RefractiveDiv } from "@/app/components/Refractive.client";
 import BgCloud from "@/app/components/icons/BgCloud";
 
+type MemberError = "invalidId" | "notFound" | "loadFailed";
+
 const MemberPage = () => {
   const router = useRouter();
+  const locale = useLocale();
+  const t = useTranslations("Members");
   const params = useParams();
   const routeMemberId = parseInt(params.id as string);
 
@@ -44,7 +50,7 @@ const MemberPage = () => {
 
   const [member, setMember] = useState<TeamMember | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MemberError | null>(null);
 
   const { isNavbarVisible, hasUserScrolled } = useNavbar();
 
@@ -65,20 +71,21 @@ const MemberPage = () => {
     }
 
     if (teamError) {
-      setError(teamError);
+      console.error("Error loading team members:", teamError);
+      setError("loadFailed");
       setLoading(false);
       return;
     }
 
     if (!currentId || isNaN(currentId)) {
-      setError("Invalid member ID");
+      setError("invalidId");
       setLoading(false);
       return;
     }
 
     const foundMember = getMemberById(currentId);
     if (!foundMember) {
-      setError("Member not found");
+      setError("notFound");
       setLoading(false);
       return;
     }
@@ -104,7 +111,11 @@ const MemberPage = () => {
     if (prevMember) {
       setDirection(-1);
       setCurrentId(prevMember.user_id);
-      window.history.replaceState(null, "", `/members/${prevMember.user_id}`);
+      window.history.replaceState(
+        null,
+        "",
+        localizePath(locale, `/members/${prevMember.user_id}`),
+      );
     }
   };
 
@@ -113,7 +124,11 @@ const MemberPage = () => {
     if (nextMember) {
       setDirection(1);
       setCurrentId(nextMember.user_id);
-      window.history.replaceState(null, "", `/members/${nextMember.user_id}`);
+      window.history.replaceState(
+        null,
+        "",
+        localizePath(locale, `/members/${nextMember.user_id}`),
+      );
     }
   };
 
@@ -164,7 +179,7 @@ const MemberPage = () => {
         <div className="flex min-h-screen items-center justify-center bg-primary-5">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-secondary"></div>
-            <p className="font-ddin text-[#222222]">Loading member data...</p>
+            <p className="font-ddin text-[#222222]">{t("loading")}</p>
           </div>
         </div>
       </>
@@ -178,13 +193,13 @@ const MemberPage = () => {
         <div className="flex min-h-screen items-center justify-center bg-primary-5">
           <div className="text-center">
             <h2 className="mb-4 text-2xl font-bold text-[#222222]">
-              {error || "Member not found"}
+              {t(error ?? "notFound")}
             </h2>
             <Button
               onClick={() => router.push("/about")}
               className="rounded-full bg-black px-6 py-2 text-white md:hover:bg-gray-400"
             >
-              Back to About
+              {t("backToAbout")}
             </Button>
           </div>
         </div>
@@ -209,6 +224,7 @@ const MemberPage = () => {
             size="sm"
             onClick={handlePrevious}
             disabled={!canGoPrevious}
+            aria-label={t("previous")}
             className={`rounded-full px-2 py-2 transition-colors duration-200 ${
               canGoPrevious
                 ? "text-[#222222] md:hover:bg-gray-400"
@@ -231,6 +247,7 @@ const MemberPage = () => {
             size="sm"
             onClick={handleNext}
             disabled={!canGoNext}
+            aria-label={t("next")}
             className={`rounded-full px-2 py-2 transition-colors duration-200 ${
               canGoNext
                 ? "text-[#222222] md:hover:bg-gray-400"
@@ -245,6 +262,7 @@ const MemberPage = () => {
           <Button
             variant="ghost"
             onClick={handleClose}
+            aria-label={t("close")}
             className="h-6 min-h-0 w-6 min-w-0 rounded-full bg-black p-0 text-white hover:bg-gray-800 [&_svg]:!size-3"
           >
             <X />
@@ -253,7 +271,7 @@ const MemberPage = () => {
 
         <div className="w-full px-10 md:px-20">
           <div className="type-h2-mobile mb-14 mt-0 flex justify-center border-b-[1px] border-[#AAA] py-3 text-center font-ddin tracking-wide text-[#222222]">
-            megaweaving Team
+            {t("team")}
           </div>
 
           <div className="relative w-full">
@@ -378,7 +396,7 @@ const MemberPage = () => {
                     {member.experience && member.experience.length > 0 && (
                       <div>
                         <h2 className="mb-6 border-b border-megaweave-stone pb-4 text-2xl text-[#222222]">
-                          Experience
+                          {t("experience")}
                         </h2>
                         <div className="space-y-6">
                           {member.experience.map((exp, index) => (
@@ -409,7 +427,7 @@ const MemberPage = () => {
                     {member.skills && member.skills.length > 0 && (
                       <div>
                         <h2 className="mb-6 border-b border-megaweave-stone pb-4 text-2xl text-[#222222]">
-                          Skills & Expertise
+                          {t("skills")}
                         </h2>
                         <div className="flex flex-wrap gap-3">
                           {member.skills.map((skill, index) => (

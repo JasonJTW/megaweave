@@ -1,6 +1,7 @@
 "use client";
 import type { Weave } from "@/services/weaveService";
 import { motion } from "framer-motion";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import React from "react";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
@@ -29,6 +30,8 @@ function UserPostCardInner({
   onPostClick,
   isFirstVisible,
 }: UserPostCardProps) {
+  const t = useTranslations("Drawer");
+  const formatter = useFormatter();
   const s3Keys = parseS3Keys(post);
 
   const primarySrc = s3Keys[0]?.startsWith("http")
@@ -50,10 +53,9 @@ function UserPostCardInner({
     : false;
 
   const dateText = post.created_at
-    ? new Date(post.created_at).toLocaleDateString()
+    ? formatter.dateTime(new Date(post.created_at))
     : "";
-  const typeText =
-    post.type === "share" ? "Share" : post.type === "wish" ? "Wish" : "Commons";
+  const typeText = t("postType", { type: post.type });
 
   return (
     <motion.div
@@ -95,14 +97,14 @@ function UserPostCardInner({
                 aria-hidden="true"
               >
                 <span className="font-ddin text-[14px] font-bold tracking-[0.12em] text-white">
-                  OVERDUE
+                  {t("overdue")}
                 </span>
               </div>
             ) : null}
           </>
         ) : (
           <div className="type-body-t5 flex h-full w-full items-center justify-center text-primary-75">
-            No image
+            {t("noImage")}
           </div>
         )}
 

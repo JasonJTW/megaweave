@@ -1,6 +1,7 @@
 //* Implement sign in page
 "use client";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 import React from "react";
 import { useEffect } from "react";
@@ -17,6 +18,7 @@ import toast from "react-hot-toast";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 export default function Signup() {
   const router = useRouter();
+  const t = useTranslations("Auth");
   const [username, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +42,7 @@ export default function Signup() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        setSignupError(data.errorMessage || "Facebook sign in failed");
+        setSignupError(data.errorMessage || t("facebookFailed"));
         return;
       }
 
@@ -48,11 +50,7 @@ export default function Signup() {
       handleSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
-      setSignupError(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during Facebook sign in",
-      );
+      setSignupError(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -70,7 +68,7 @@ export default function Signup() {
     setLoading(true);
 
     if (!credentialResponse.credential) {
-      setSignupError("Google sign in failed. Please try again.");
+      setSignupError(t("googleFailed"));
       setLoading(false);
       return;
     }
@@ -87,7 +85,7 @@ export default function Signup() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        setSignupError(data.errorMessage || "Google sign in failed");
+        setSignupError(data.errorMessage || t("googleFailed"));
         return;
       }
 
@@ -95,11 +93,7 @@ export default function Signup() {
       handleSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
-      setSignupError(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during Google sign in",
-      );
+      setSignupError(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -123,7 +117,7 @@ export default function Signup() {
 
     /// Validate input
     if (!username || !email || !password) {
-      setSignupError("All fields are required.");
+      setSignupError(t("allFieldsRequired"));
       setLoading(false);
       return;
     }
@@ -145,20 +139,15 @@ export default function Signup() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        setSignupError(data.errorMessage || "Sign in failed");
-        throw new Error(data.errorMessage || "Sign in failed");
+        setSignupError(data.errorMessage || t("signUpFailed"));
+        return;
       }
-      /// Sign in success
-
-      /// Add a 5-second delay to inspect the button text
-      // await new Promise((resolve) => setTimeout(resolve, 300));
-      toast.success(`Welcome to MegaWeave🥳🎉! ${username}`);
+      /// Sign up success
+      toast.success(t("welcomeToast", { username }));
       handleSignupSuccess();
     } catch (error) {
-      console.log(error);
-      setSignupError(
-        error instanceof Error ? error.message : "An unexpected error occurred",
-      );
+      console.error("Error during sign up:", error);
+      setSignupError(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -166,7 +155,7 @@ export default function Signup() {
 
   const handleFacebookLogin = () => {
     if (!isFBReady || !window.FB) {
-      setSignupError("Facebook SDK is not ready. Please try again.");
+      setSignupError(t("facebookNotReady"));
       return;
     }
 
@@ -181,7 +170,7 @@ export default function Signup() {
 
           if (!accessToken) {
             console.error("Facebook login failed or no access token received");
-            setSignupError("Facebook login failed: No access token received");
+            setSignupError(t("facebookNoToken"));
             setLoading(false);
             return;
           }
@@ -189,10 +178,10 @@ export default function Signup() {
           console.log("Facebook login successful:", response.authResponse);
           sendToYourBackend(accessToken);
         } else if (response.status === "not_authorized") {
-          setSignupError("Facebook login failed: App not authorized");
+          setSignupError(t("facebookNotAuthorized"));
           setLoading(false);
         } else {
-          setSignupError("Facebook login was cancelled or failed");
+          setSignupError(t("facebookCancelled"));
           setLoading(false);
         }
       },
@@ -213,10 +202,10 @@ export default function Signup() {
           <div className="m-6 space-y-6 rounded-2xl bg-secondary p-8 shadow-2xl">
             <div className="space-y-1 text-left">
               <h1 className="font-mono text-3xl tracking-wider text-primary">
-                Sign up
+                {t("signUpTitle")}
               </h1>
               <p className="font-mono text-sm tracking-tighter text-muted-foreground">
-                Good to have you here!
+                {t("signUpSubtitle")}
               </p>
               {signupError && (
                 <div className="justify-self-end text-sm text-red-400">
@@ -228,7 +217,7 @@ export default function Signup() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-primary-75">
-                    UserName
+                    {t("username")}
                   </Label>
                   <Input
                     type="username"
@@ -236,14 +225,14 @@ export default function Signup() {
                     value={username}
                     onChange={(e) => setUserName(e.target.value)}
                     required
-                    placeholder="Enter your username"
+                    placeholder={t("usernamePlaceholder")}
                     className="border-primary bg-secondary text-primary"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-primary">
-                    Email
+                    {t("email")}
                   </Label>
                   <Input
                     type="email"
@@ -251,13 +240,13 @@ export default function Signup() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="Enter your email"
+                    placeholder={t("emailPlaceholder")}
                     className="bg-secondary text-primary"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password" className="text-primary">
-                    Password
+                    {t("password")}
                   </Label>
                   <div className="relative">
                     <Input
@@ -266,11 +255,14 @@ export default function Signup() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      placeholder="Enter your password"
+                      placeholder={t("passwordPlaceholder")}
                       className="bg-secondary text-primary"
                     />
                     <button
                       type="button"
+                      aria-label={
+                        showPassword ? t("hidePassword") : t("showPassword")
+                      }
                       onClick={() => {
                         setShowPassword(!showPassword);
                         console.log(showPassword);
@@ -296,7 +288,7 @@ export default function Signup() {
                       }}
                     />
                     <Label htmlFor="remember" className="text-primary">
-                      Remember me
+                      {t("rememberMe")}
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -304,7 +296,7 @@ export default function Signup() {
                       href=""
                       className="text-primary underline hover:text-emerald-700"
                     >
-                      Forgot Password?
+                      {t("forgotPassword")}
                     </a>
                   </div>
                 </div>
@@ -316,7 +308,7 @@ export default function Signup() {
                   className="z-10 w-full bg-primary-50 from-primary to-primary-50 text-black shadow-2xl transition-all duration-200 hover:mb-8 hover:bg-gradient-to-br hover:shadow-primary-15"
                   disabled={!username || !email || !password || loading}
                 >
-                  {loading ? "Signing up..." : "Sign up"}
+                  {loading ? t("signingUp") : t("signUp")}
                 </Button>
               </div>
             </form>
@@ -326,7 +318,7 @@ export default function Signup() {
               </div>
               <div className="relative flex justify-center text-xs uppercase text-primary">
                 <span className="bg-secondary px-2 text-muted-foreground">
-                  Or continue with
+                  {t("orContinueWith")}
                 </span>
               </div>
             </div>
@@ -344,7 +336,7 @@ export default function Signup() {
                 >
                   <path d={siFacebook.path} />
                 </svg>
-                {isFBReady ? "Facebook" : "Loading Facebook..."}
+                {isFBReady ? "Facebook" : t("loadingFacebook")}
               </Button>
               <Button
                 className="w-full bg-primary-50 text-black transition-all duration-200 hover:bg-primary-30"
@@ -380,19 +372,19 @@ export default function Signup() {
                   onSuccess={handleGoogleSignin}
                   onError={() => {
                     console.log("Signin with google Failed");
-                    setSignupError("Google sign in failed. Please try again.");
+                    setSignupError(t("googleFailed"));
                     setLoading(false);
                   }}
                 />
               </div>
             </div>
             <div className="text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
+              {t("haveAccount")}{" "}
               <Link
                 href="/signin"
                 className="text-sm text-primary underline hover:text-emerald-700"
               >
-                Sign in
+                {t("signIn")}
               </Link>
             </div>
           </div>

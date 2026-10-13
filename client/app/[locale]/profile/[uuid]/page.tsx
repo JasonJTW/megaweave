@@ -1,6 +1,7 @@
 // app/profile/[uuid]/page.tsx
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 
 import Drawer from "@/app/components/Drawer";
 import type { Post, UserStats } from "@/app/types/schema";
@@ -28,9 +29,16 @@ interface PublicProfile {
   contact_phone?: string | null;
 }
 
+// The server's message when it sent one, else which translated message to show
+type ProfileError = {
+  serverMessage?: string;
+  fallback: "notFound" | "loadFailed";
+};
+
 const PublicProfilePage = () => {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations("Profile");
   const uuid = params.uuid as string;
   const { conditions } = usePost();
   const defaultStats: UserStats = {
@@ -41,7 +49,7 @@ const PublicProfilePage = () => {
   const [profileData, setProfileData] = useState<PublicProfile | null>(null);
   const [isContributor, setIsContributor] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ProfileError | null>(null);
   //* --- 新增 State 用於 Drawer ---
   const [posts, setPosts] = useState<Post[]>([]);
   // const [weaves, setWeaves] = useState<Weave[]>([]);
@@ -75,7 +83,11 @@ const PublicProfilePage = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.errorMessage || "Profile not found");
+        setError({
+          serverMessage: errorData.errorMessage,
+          fallback: "notFound",
+        });
+        return;
       }
 
       const data: PublicProfile = await response.json();
@@ -89,9 +101,7 @@ const PublicProfilePage = () => {
       setError(null);
     } catch (error) {
       console.error("Error fetching profile:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load profile",
-      );
+      setError({ fallback: "loadFailed" });
     }
     // 注意：這裡不設定 setLoading(false)，交給 init 統一處理
   };
@@ -160,7 +170,7 @@ const PublicProfilePage = () => {
           >
             <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-megaweave-gold/30 border-t-megaweave-red-light"></div>
             <h1 className="text-2xl font-medium text-megaweave-cream">
-              Loading...
+              {t("loading")}
             </h1>
           </motion.div>
         </div>
@@ -176,7 +186,7 @@ const PublicProfilePage = () => {
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
           <Alert className="max-w-md border-red-500/30 bg-red-950/50">
             <AlertDescription className="text-red-300">
-              {error}
+              {error.serverMessage || t(error.fallback)}
             </AlertDescription>
           </Alert>
         </div>
@@ -190,7 +200,7 @@ const PublicProfilePage = () => {
       <>
         <div className="fixed inset-0 -z-10 bg-megaweave-brown"></div>
         <div className="flex min-h-screen items-center justify-center">
-          <p className="text-gray-400">No profile data available</p>
+          <p className="text-gray-400">{t("notFound")}</p>
         </div>
       </>
     );
@@ -212,6 +222,7 @@ const PublicProfilePage = () => {
               variant="ghost"
               onClick={() => router.back()}
               className="w-8 p-4 text-left"
+              aria-label={t("back")}
             >
               <ArrowLeft className="h-8 w-8" />
             </Button>
@@ -236,7 +247,7 @@ const PublicProfilePage = () => {
                       <div className="absolute inset-0">
                         <Image
                           src={profileData.avatar_url}
-                          alt={`${profileData.username} avatar`}
+                          alt={t("avatarAlt", { username: profileData.username })}
                           fill
                           sizes="(max-width: 1024px) 300px, 288px"
                           className="object-cover"
@@ -269,7 +280,7 @@ const PublicProfilePage = () => {
                   {/* Role Badge */}
                   <div className="flex justify-center">
                     <span className="inline-flex items-center rounded-full border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 px-4 py-2 text-sm font-medium text-white">
-                      {profileData.role}
+                      {t("role", { role: profileData.role })}
                     </span>
                   </div>
 
@@ -293,13 +304,13 @@ const PublicProfilePage = () => {
                       <div className="flex items-center justify-center space-x-4">
                         <Image
                           src="/favicon2.ico"
-                          alt="contributor-badge"
+                          alt={t("contributorBadgeAlt")}
                           width={20}
                           height={20}
                           unoptimized
                         />
                         <p className="text-md font-ddin font-bold tracking-widest text-megaweave-blue-light">
-                          Contributor
+                          {t("contributor")}
                         </p>
                       </div>
                     </motion.div>
@@ -314,7 +325,7 @@ const PublicProfilePage = () => {
                       {String(stats.postCount).padStart(2, "0")}
                     </div>
                     <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
-                      post
+                      {t("statPosts")}
                     </div>
                   </div>
                   <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
@@ -322,7 +333,7 @@ const PublicProfilePage = () => {
                       {String(stats.weaveCount).padStart(2, "0")}
                     </div>
                     <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
-                      weaved
+                      {t("statWeaved")}
                     </div>
                   </div>
                   <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
@@ -330,7 +341,7 @@ const PublicProfilePage = () => {
                       {String(stats.points).padStart(2, "0")}
                     </div>
                     <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
-                      point
+                      {t("statPoints")}
                     </div>
                   </div>
                 </div>
@@ -350,7 +361,7 @@ const PublicProfilePage = () => {
                   <h3 className="flex items-center space-x-2 text-xl font-semibold">
                     <UserIcon className="h-5 w-5 text-megaweave-forest-dark" />
                     <div className="type-button-b1 text-megaweave-forest-dark">
-                      About Me
+                      {t("aboutMe")}
                     </div>
                   </h3>
                 </div>
@@ -364,7 +375,7 @@ const PublicProfilePage = () => {
                     renderTextWithUrls(profileData.bio)
                   ) : (
                     <span className="italic text-gray-500">
-                      No bio available
+                      {t("noBio")}
                     </span>
                   )}
                 </motion.p>
@@ -422,17 +433,17 @@ const PublicProfilePage = () => {
 
               {/* --- 4. 顯示 Drawers --- */}
               {/* <Drawer
-                title="Weaving"
+                kind="weaving"
                 posts={[]}
                 weaves={weaves}
                 conditions={conditions}
               /> */}
               <Drawer
-                title="Share"
+                kind="share"
                 posts={sharePosts}
                 conditions={conditions}
               />
-              <Drawer title="Wish" posts={wishPosts} conditions={conditions} />
+              <Drawer kind="wish" posts={wishPosts} conditions={conditions} />
             </motion.div>
           </div>
         </div>

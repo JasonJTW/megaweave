@@ -2,7 +2,7 @@
 
 import { useRouter } from "@/i18n/navigation";
 import { localizePath } from "@/i18n/routing";
-import { useLocale } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import DrawerWrapper from "@/components/DrawerWrapper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -162,6 +162,9 @@ const UserPage = () => {
   const [tempUsername, setTempUsername] = useState("");
   const router = useRouter();
   const locale = useLocale();
+  const t = useTranslations("UserSettings");
+  const tProfile = useTranslations("Profile");
+  const formatter = useFormatter();
   const { refetchTeamMembers } = useTeam();
   const { conditions } = usePost();
 
@@ -280,12 +283,12 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || "Failed to fetch member data");
+        throw new Error(result.errorMessage || t("memberFetchFailed"));
       }
 
       const result = await response.json();
       if (!result[0]) {
-        throw new Error("Member profile not found");
+        throw new Error(t("memberNotFound"));
       }
       const memberData = normalizeTeamMember(result[0]);
       setMember(memberData);
@@ -294,7 +297,7 @@ const UserPage = () => {
     } catch (err) {
       console.error("Error fetching member data:", err);
       setMemberError(
-        err instanceof Error ? err.message : "Failed to fetch member data",
+        err instanceof Error ? err.message : t("memberFetchFailed"),
       );
     } finally {
       if (!options?.silent) setMemberLoading(false);
@@ -321,7 +324,7 @@ const UserPage = () => {
 
     if (!response.ok) {
       const result = await response.json();
-      throw new Error(result.errorMessage || "Failed to save member data");
+      throw new Error(result.errorMessage || t("memberSaveFailed"));
     }
 
     setMemberError(null);
@@ -356,7 +359,7 @@ const UserPage = () => {
       memberForm.reset(memberToFormValues(updatedMember));
       setIsEditingMember(false);
       setMemberError(null);
-      toast.success("Team member info saved");
+      toast.success(t("memberSaved"));
 
       await refetchTeamMembers();
       if (user?.userId) {
@@ -364,12 +367,9 @@ const UserPage = () => {
       }
     } catch (err) {
       console.error("Error saving member data:", err);
-      setMemberError(
-        err instanceof Error ? err.message : "Failed to save member data",
-      );
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save member data",
-      );
+      const message = err instanceof Error ? err.message : t("memberSaveFailed");
+      setMemberError(message);
+      toast.error(message);
     }
   };
 
@@ -396,7 +396,7 @@ const UserPage = () => {
     // validation (example: limit 5MB)
     const maxSizeMB = 5;
     if (file.size / 1024 / 1024 > maxSizeMB) {
-      toast.error(`Selected file is larger than ${maxSizeMB} MB`);
+      toast.error(t("fileTooLarge", { max: maxSizeMB }));
       // clear input
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
@@ -448,8 +448,8 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        toast.error(result.errorMessage || "Failed to update user session");
-        throw new Error(result.errorMessage || "Failed to update user session");
+        toast.error(result.errorMessage || t("sessionUpdateFailed"));
+        throw new Error(result.errorMessage || t("sessionUpdateFailed"));
       }
       const result = await response.json();
       const updatedUser = result.updatedUser;
@@ -489,9 +489,11 @@ const UserPage = () => {
       });
 
       if (!processedResponse.ok) {
-        throw new Error(
-          `Avatar effect processing failed: ${processedResponse.status}`,
+        console.error(
+          "Avatar effect processing failed:",
+          processedResponse.status,
         );
+        throw new Error(t("avatarUploadFailed"));
       }
 
       const processedBlob: Blob = await processedResponse.blob();
@@ -508,7 +510,7 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || "Failed to upload avatar");
+        throw new Error(result.errorMessage || t("avatarUploadFailed"));
       }
 
       const result = await response.json();
@@ -552,7 +554,9 @@ const UserPage = () => {
       }
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      toast.error(error instanceof Error ? error.message : "Upload failed");
+      toast.error(
+        error instanceof Error ? error.message : t("avatarUploadFailed"),
+      );
     } finally {
       setUploadingAvatar(false);
     }
@@ -574,14 +578,14 @@ const UserPage = () => {
       });
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(`Failed to update username: ${result.errorMessage}`);
+        throw new Error(result.errorMessage || t("usernameUpdateFailed"));
       }
       const result = await response.json();
       console.log("Update username Success: ", result);
     } catch (error) {
       console.error("Error update username: ", error);
       toast.error(
-        error instanceof Error ? error.message : "Error update username",
+        error instanceof Error ? error.message : t("usernameUpdateFailed"),
       );
       throw error;
     }
@@ -602,14 +606,14 @@ const UserPage = () => {
       });
       if (!response.ok) {
         const result = await response.json();
-        throw new Error("Failed to update profile: ", result.errorMessage);
+        throw new Error(result.errorMessage || t("bioUpdateFailed"));
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
       toast.error(
-        error instanceof Error ? error.message : "Error update profile",
+        error instanceof Error ? error.message : t("bioUpdateFailed"),
       );
       throw error;
     }
@@ -633,14 +637,14 @@ const UserPage = () => {
       );
       if (!response.ok) {
         const result = await response.json();
-        throw new Error("Failed to update profile: ", result.errorMessage);
+        throw new Error(result.errorMessage || t("contactEmailUpdateFailed"));
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
       const errMsg =
-        error instanceof Error ? error.message : "Error update contact email";
+        error instanceof Error ? error.message : t("contactEmailUpdateFailed");
       toast.error(errMsg);
       throw error;
     }
@@ -664,25 +668,29 @@ const UserPage = () => {
       );
       if (!response.ok) {
         const result = await response.json();
-        throw new Error("Failed to update profile: ", result.errorMessage);
+        throw new Error(result.errorMessage || t("contactPhoneUpdateFailed"));
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
       const errMsg =
-        error instanceof Error ? error.message : "Error update contact phone";
+        error instanceof Error ? error.message : t("contactPhoneUpdateFailed");
       toast.error(errMsg);
       throw error;
     }
   };
 
-  const handleSaveBio = () => {
+  const handleSaveBio = async () => {
+    const previousBio = bio;
     setBio(tempBio);
     setIsEditingBio(false);
-
-    // Add API call to save bio
-    insertBio(tempBio);
+    try {
+      await insertBio(tempBio);
+    } catch {
+      // insertBio already showed the error; keep the saved bio on screen
+      setBio(previousBio);
+    }
   };
 
   const handleCancelBio = () => {
@@ -710,10 +718,8 @@ const UserPage = () => {
       setContactPhone(formData.phone || "");
       setIsEditingContact(false);
     } catch (error) {
+      // insertContactEmail / insertContactPhone already showed the error
       console.error("Error saving contact info:", error);
-      const errMsg =
-        error instanceof Error ? error.message : "Error saving contact info";
-      toast.error(errMsg);
     }
   };
 
@@ -746,11 +752,9 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error saving username:", error);
       // 如果保存失败，恢复原来的值
+      // insertUsername already showed the error
       setUsername(username || "");
       setTempUsername(username || "");
-      toast.error(
-        error instanceof Error ? error.message : "Error saving username",
-      );
     }
   };
 
@@ -773,7 +777,7 @@ const UserPage = () => {
       });
       if (!res.ok) {
         const r = await res.json();
-        throw new Error(r.errorMessage || "Failed to remove avatar");
+        throw new Error(r.errorMessage || t("avatarRemoveFailed"));
       }
       //* Update user state
       await mutate((data: { user: User | null } | undefined) => {
@@ -783,7 +787,7 @@ const UserPage = () => {
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to remove avatar",
+        err instanceof Error ? err.message : t("avatarRemoveFailed"),
       );
     }
   };
@@ -806,13 +810,13 @@ const UserPage = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
-          toast.error("You are not signed in");
+          toast.error(t("notSignedIn"));
           return;
         }
 
-        const errorMessage = await response.json();
-        console.error("Error signing out:", errorMessage.errorMessage);
-        throw new Error(` ${errorMessage.errorMessage}`);
+        const result = await response.json();
+        console.error("Error signing out:", result.errorMessage);
+        throw new Error(result.errorMessage || t("unexpectedError"));
       }
 
       console.log("Sign out successful");
@@ -822,7 +826,7 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred",
+        error instanceof Error ? error.message : t("unexpectedError"),
       );
     }
   };
@@ -871,7 +875,7 @@ const UserPage = () => {
           >
             <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-megaweave-gold/30 border-t-megaweave-red-light"></div>
             <h1 className="text-2xl font-medium text-megaweave-cream">
-              Loading...
+              {tProfile("loading")}
             </h1>
           </motion.div>
         </div>
@@ -903,7 +907,7 @@ const UserPage = () => {
                 <CommonShareIcon className="h-[85px] w-auto text-megaweave-blue" />
               </div>
               <span className="type-h1 hidden font-bold text-megaweave-forest-dark md:inline">
-                Profile
+                {t("title")}
               </span>
             </div>
 
@@ -914,14 +918,14 @@ const UserPage = () => {
                 className="flex items-center space-x-2 rounded-full px-4 py-2 font-ddin font-bold text-megaweave-forest-dark transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
               >
                 <History className="h-4 w-4" />
-                <span>History</span>
+                <span>{t("history")}</span>
               </button>
               <button
                 type="button"
                 onClick={handleSignOut}
                 className="flex items-center space-x-2 rounded-full px-4 py-2 font-ddin font-bold text-megaweave-forest-dark transition-all duration-200 hover:border-primary-30 hover:bg-primary-30/35"
               >
-                <span>Sign Out</span>
+                <span>{t("signOut")}</span>
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
@@ -942,7 +946,7 @@ const UserPage = () => {
                   type="button"
                   onClick={() => setIsShareQrOpen(true)}
                   className="absolute right-6 top-6 z-10 rounded-full p-1.5 transition-colors hover:bg-primary-15"
-                  aria-label="Share profile QR code"
+                  aria-label={t("shareProfile")}
                 >
                   <Share className="pointer-events-none h-4 w-4 text-megaweave-forest-dark" />
                 </button>
@@ -958,7 +962,16 @@ const UserPage = () => {
                   <div className="relative">
                     {/* 固定尺寸容器：保持原本的大小/比例（max-w-72, h-80） */}
                     <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={t("changeAvatar")}
                       onClick={() => fileInputRef.current?.click()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          fileInputRef.current?.click();
+                        }
+                      }}
                       className="relative mx-auto mb-2 flex h-[222px] max-h-80 w-full max-w-[220px] items-center justify-center overflow-hidden rounded-2xl bg-secondary/50 text-2xl font-bold hover:cursor-pointer"
                     >
                       {/* 如果有 preview，顯示 preview 圖片；否則若 user.avatarUrl 存在則顯示真實頭像，否則顯示字母色塊 */}
@@ -967,7 +980,7 @@ const UserPage = () => {
                         // preview: 使用原生 img 以支援 object URL
                         <Image
                           src={previewSrc}
-                          alt="Avatar preview"
+                          alt={t("avatarPreviewAlt")}
                           width={220}
                           height={222}
                           className="h-full w-full object-cover"
@@ -977,7 +990,7 @@ const UserPage = () => {
                         <div className="absolute inset-0">
                           <Image
                             src={user.avatar_url}
-                            alt={`${username} avatar`}
+                            alt={tProfile("avatarAlt", { username })}
                             fill
                             sizes="(max-width: 1024px) 222px, 220px"
                             className="object-cover"
@@ -1015,7 +1028,7 @@ const UserPage = () => {
                         onClick={handleRemoveAvatar}
                         className="rounded-lg bg-red-600/10 px-3 py-1.5 text-sm text-red-300 transition-all duration-200 hover:bg-red-600/20"
                       >
-                        Remove
+                        {t("removeAvatar")}
                       </button>
                     )}
                     {/* 如果有 preview，顯示 Save / Cancel 按鈕 */}
@@ -1026,14 +1039,14 @@ const UserPage = () => {
                           className="flex items-center rounded-lg px-3 py-1 text-sm font-semibold text-primary"
                         >
                           <Save className="mr-1 h-4 w-4" />
-                          <span>Upload</span>
+                          <span>{t("upload")}</span>
                         </button>
                         <button
                           onClick={handleCancelAvatarPreview}
                           className="flex items-center rounded-lg px-3 py-1 text-sm font-semibold text-primary"
                         >
                           <X className="h-4 w-4" />
-                          <span>Cancel</span>
+                          <span>{t("cancel")}</span>
                         </button>
                       </div>
                     )}
@@ -1067,6 +1080,7 @@ const UserPage = () => {
                         </h2>
                         <button
                           onClick={handleEditUsername}
+                          aria-label={t("editUsername")}
                           className="absolute left-full top-1/2 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity duration-200 hover:bg-gray-600/30 group-hover:opacity-100"
                         >
                           <EditIcon className="h-4 w-4" />
@@ -1089,12 +1103,14 @@ const UserPage = () => {
                         >
                           <button
                             onClick={handleSaveUsername}
+                            aria-label={t("save")}
                             className="rounded p-1 text-green-400 transition-colors duration-200 hover:bg-green-600/30"
                           >
                             <Save className="h-4 w-4" />
                           </button>
                           <button
                             onClick={handleCancelUsername}
+                            aria-label={t("cancel")}
                             className="rounded p-1 text-gray-400 transition-colors duration-200 hover:bg-gray-600/30"
                           >
                             <X className="h-4 w-4" />
@@ -1138,7 +1154,7 @@ const UserPage = () => {
                     <span
                       className={`inline-flex items-center rounded-full border-[.5px] border-megaweave-red-light bg-megaweave-red-dark/40 px-4 py-2 text-sm font-medium text-white`}
                     >
-                      {user.role}
+                      {tProfile("role", { role: user.role })}
                     </span>
                   </div>
 
@@ -1163,13 +1179,13 @@ const UserPage = () => {
                       <div className="flex items-center justify-center space-x-4">
                         <Image
                           src={"/favicon2.ico"}
-                          alt="contributor-badge"
+                          alt={tProfile("contributorBadgeAlt")}
                           width={20}
                           height={20}
                           unoptimized
                         />
                         <p className="text-md font-ddin font-bold tracking-widest text-megaweave-blue-light">
-                          Welcome, dear contributor!
+                          {t("welcomeContributor")}
                         </p>
                       </div>
                     </motion.div>
@@ -1182,7 +1198,7 @@ const UserPage = () => {
                       {String(stats.postCount).padStart(2, "0")}
                     </div>
                     <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
-                      post
+                      {tProfile("statPosts")}
                     </div>
                   </div>
                   <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
@@ -1190,7 +1206,7 @@ const UserPage = () => {
                       {String(stats.weaveCount).padStart(2, "0")}
                     </div>
                     <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
-                      weaved
+                      {tProfile("statWeaved")}
                     </div>
                   </div>
                   <div className="flex flex-col items-center justify-center rounded-[15px] border border-primary-30 bg-white px-[18px] py-[14px]">
@@ -1198,7 +1214,7 @@ const UserPage = () => {
                       {String(stats.points).padStart(2, "0")}
                     </div>
                     <div className="type-button-b2 mt-[2px] font-semibold text-[#222]">
-                      point
+                      {tProfile("statPoints")}
                     </div>
                   </div>
                 </div>
@@ -1218,12 +1234,13 @@ const UserPage = () => {
                   <h3 className="flex items-center space-x-2 text-xl font-semibold">
                     <UserIcon className="h-5 w-5 text-megaweave-forest-dark" />
                     <div className="type-h4 text-megaweave-forest-dark">
-                      About Me
+                      {tProfile("aboutMe")}
                     </div>
                   </h3>
                   {!isEditingBio ? (
                     <button
                       onClick={handleEditBio}
+                      aria-label={t("edit")}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
                       <EditIcon className="h-4 w-4" />
@@ -1235,14 +1252,14 @@ const UserPage = () => {
                         className="flex items-center space-x-1 rounded-lg bg-green-600/20 px-3 py-1.5 text-sm text-green-400 transition-all duration-200 hover:bg-green-600/30"
                       >
                         <Save className="h-3 w-3" />
-                        <span>Save</span>
+                        <span>{t("save")}</span>
                       </button>
                       <button
                         onClick={handleCancelBio}
                         className="flex items-center space-x-1 rounded-lg bg-gray-600/20 px-3 py-1.5 text-sm text-gray-400 transition-all duration-200 hover:bg-gray-600/30"
                       >
                         <X className="h-3 w-3" />
-                        <span>Cancel</span>
+                        <span>{t("cancel")}</span>
                       </button>
                     </div>
                   )}
@@ -1254,7 +1271,7 @@ const UserPage = () => {
                     animate={{ opacity: 1 }}
                     className="text-body-t3 min-h-[140px] whitespace-pre-line break-all leading-relaxed text-primary"
                   >
-                    {bio ? renderTextWithUrls(bio) : "description..."}
+                    {bio ? renderTextWithUrls(bio) : t("bioEmpty")}
                   </motion.p>
                 ) : (
                   <motion.div
@@ -1265,22 +1282,23 @@ const UserPage = () => {
                       value={tempBio}
                       onChange={(e) => setTempBio(e.target.value)}
                       className="type-body-t3 h-32 w-full resize-none rounded-lg border border-gray-600/30 px-4 py-3 transition-all duration-200 focus:border-blue-500/50 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      placeholder="description"
+                      placeholder={t("bioPlaceholder")}
                     />
                   </motion.div>
                 )}
                 <div className="mt-2 flex items-center justify-between">
                   <div className="flex items-center space-x-3"></div>
                   <button className="type-button-b2 flex items-center space-x-2 text-primary-75">
-                    <span>
-                      Joined in{" "}
-                      {user?.joined_at
-                        ? new Date(user.joined_at)
-                            .toISOString()
-                            .slice(0, 7)
-                            .replace("-", ".")
-                        : ""}
-                    </span>
+                    {user?.joined_at && (
+                      <span>
+                        {t("joinedAt", {
+                          date: formatter.dateTime(new Date(user.joined_at), {
+                            year: "numeric",
+                            month: "long",
+                          }),
+                        })}
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>
@@ -1290,12 +1308,13 @@ const UserPage = () => {
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="type-button-b1 flex items-center space-x-2 text-megaweave-forest-dark">
                     <ContactProfileIcon className="h-5 w-5" />
-                    <span>Contact Setting</span>
+                    <span>{t("contactSettings")}</span>
                   </h3>
                   {!isEditingContact ? (
                     <button
                       type="button"
                       onClick={handleEditContact}
+                      aria-label={t("edit")}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
                       <EditIcon className="h-4 w-4" />
@@ -1308,7 +1327,7 @@ const UserPage = () => {
                         className="flex items-center space-x-1 rounded-lg bg-green-600/20 px-3 py-1.5 text-sm text-green-400 transition-all duration-200 hover:bg-green-600/30"
                       >
                         <Save className="h-3 w-3" />
-                        <span>Save</span>
+                        <span>{t("save")}</span>
                       </button>
                       <button
                         type="button"
@@ -1316,7 +1335,7 @@ const UserPage = () => {
                         className="flex items-center space-x-1 rounded-lg bg-gray-600/20 px-3 py-1.5 text-sm text-gray-400 transition-all duration-200 hover:bg-gray-600/30"
                       >
                         <X className="h-3 w-3" />
-                        <span>Cancel</span>
+                        <span>{t("cancel")}</span>
                       </button>
                     </div>
                   )}
@@ -1328,21 +1347,21 @@ const UserPage = () => {
                     className="divide-y divide-primary-30 overflow-hidden rounded-lg lg:flex lg:flex-1 lg:flex-col"
                   >
                     <MemberInfoFieldRow
-                      label="Email"
+                      label={t("email")}
                       name="email"
                       control={contactForm.control}
                       isEditing={isEditingContact}
-                      placeholder="Enter your email"
-                      emptyText="No email provided"
+                      placeholder={t("emailPlaceholder")}
+                      emptyText={t("noEmail")}
                       inputType="email"
                     />
                     <MemberInfoFieldRow
-                      label="Phone"
+                      label={t("phone")}
                       name="phone"
                       control={contactForm.control}
                       isEditing={isEditingContact}
-                      placeholder="Enter your contact phone number"
-                      emptyText="No phone provided"
+                      placeholder={t("phonePlaceholder")}
+                      emptyText={t("noPhone")}
                       inputType="tel"
                     />
                   </form>
@@ -1362,11 +1381,12 @@ const UserPage = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="type-button-b1 flex items-center space-x-2 text-megaweave-forest-dark">
                     <Users className="h-5 w-5" />
-                    <span>Team Member Info.</span>
+                    <span>{t("teamMemberInfo")}</span>
                   </h3>
                   {!isEditingMember ? (
                     <button
                       onClick={handleEditMember}
+                      aria-label={t("edit")}
                       className="flex items-center px-3 py-1.5 transition-all duration-200"
                     >
                       <EditIcon className="h-4 w-4" />
@@ -1379,7 +1399,7 @@ const UserPage = () => {
                         className="flex items-center space-x-1 rounded-lg bg-green-600/20 px-3 py-1.5 text-sm text-green-400 transition-all duration-200 hover:bg-green-600/30"
                       >
                         <Save className="h-3 w-3" />
-                        <span>Save</span>
+                        <span>{t("save")}</span>
                       </button>
                       <button
                         type="button"
@@ -1387,13 +1407,13 @@ const UserPage = () => {
                         className="flex items-center space-x-1 rounded-lg bg-gray-600/20 px-3 py-1.5 text-sm text-gray-400 transition-all duration-200 hover:bg-gray-600/30"
                       >
                         <X className="h-3 w-3" />
-                        <span>Cancel</span>
+                        <span>{t("cancel")}</span>
                       </button>
                     </div>
                   )}
                 </div>
                 <p className="type-body-t5 mb-4 mt-1 text-megaweave-forest-dark">
-                  *megaweaveing Team Only
+                  {t("teamOnly")}
                 </p>
 
                 {memberLoading ? (
@@ -1412,38 +1432,38 @@ const UserPage = () => {
                     <Form {...memberForm}>
                       <form className="divide-y divide-primary-30 overflow-hidden rounded-lg">
                         <MemberInfoFieldRow
-                          label="Title"
+                          label={t("memberTitle")}
                           name="title"
                           control={memberForm.control}
                           isEditing={isEditingMember}
-                          placeholder="Enter your title"
-                          emptyText="No title provided"
+                          placeholder={t("memberTitlePlaceholder")}
+                          emptyText={t("noMemberTitle")}
                         />
                         <MemberInfoFieldRow
-                          label="Location"
+                          label={t("location")}
                           name="location"
                           control={memberForm.control}
                           isEditing={isEditingMember}
-                          placeholder="Enter your location"
-                          emptyText="No location provided"
+                          placeholder={t("locationPlaceholder")}
+                          emptyText={t("noLocation")}
                         />
                         <MemberInfoFieldRow
-                          label="Website"
+                          label={t("website")}
                           name="website"
                           control={memberForm.control}
                           isEditing={isEditingMember}
                           placeholder="https://your-website.com"
-                          emptyText="No website provided"
+                          emptyText={t("noWebsite")}
                           inputType="url"
                           linkify
                         />
                         <MemberInfoFieldRow
-                          label="Email"
+                          label={t("email")}
                           name="email"
                           control={memberForm.control}
                           isEditing={isEditingMember}
-                          placeholder="Enter your email"
-                          emptyText="No email provided"
+                          placeholder={t("emailPlaceholder")}
+                          emptyText={t("noEmail")}
                           inputType="email"
                         />
                       </form>

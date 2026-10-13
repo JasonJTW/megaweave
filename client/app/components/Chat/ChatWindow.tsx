@@ -1,13 +1,13 @@
 import { Link, useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect, useRef } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
 import { useSWRConfig } from "swr";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { format, isToday, isYesterday } from "date-fns";
-import { zhTW } from "date-fns/locale";
+import { isSameDay } from "date-fns";
 import {
   SendIcon,
   ArrowLeft,
@@ -33,6 +33,12 @@ import {
   getDraftSendPayload,
   WeaveDraft,
 } from "@/app/types/weaveDraft";
+import { chatDayLabel } from "@/utils/chatDay";
+import {
+  weavingBanner,
+  weavingRole,
+  type WeavingBanner,
+} from "@/utils/weavingBanner";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -63,6 +69,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isPopup = false,
 }) => {
   const router = useRouter();
+  const t = useTranslations("Chat");
+  const formatter = useFormatter();
+  // Copy for the "Start weaving…" divider; a null role falls through to the ICU `other` branch
+  const weavingBannerText = ({ role, itemTitle }: WeavingBanner) =>
+    itemTitle === null
+      ? t("startWeaving", { role: role ?? "other" })
+      : t("startWeavingItem", { role: role ?? "other", title: itemTitle });
   const searchParams = useSearchParams();
   const highlightWeaveId = searchParams.get("highlightWeaveId");
 
@@ -457,7 +470,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     // Limit to 10 images
     if (selectedFiles.length + files.length > 10) {
-      toast.error("Maximum 10 images allowed");
+      toast.error(t("tooManyImages", { max: 10 }));
       return;
     }
 
@@ -466,7 +479,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     for (const file of files) {
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large (>10MB)`);
+        toast.error(t("imageTooLarge", { name: file.name, maxMb: 10 }));
         continue;
       }
 
@@ -587,7 +600,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           };
         }, false);
         const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to send message");
+        throw new Error(errorData.message || t("sendFailed"));
       }
 
       // If successful, revalidate to get the actual message with real ID and status
@@ -595,9 +608,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       mutate(); // Revalidate all messages for this conversation
     } catch (error) {
       console.error("Error sending message:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to send message.",
-      );
+      toast.error(error instanceof Error ? error.message : t("sendFailed"));
       // Restore the draft if the send failed so the user doesn't
       // lose their weaving context.
       if (draftToSend) setDraft(draftToSend);
@@ -639,7 +650,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="font-bold">{otherUser?.username || "Chat"}</h2>
+            <h2 className="font-bold">
+              {otherUser?.username || t("chatFallback")}
+            </h2>
           </div>
         </div>
       )}
@@ -658,32 +671,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             message. Disappears once system_start_weaving arrives. */}
         {draft &&
           (() => {
-            const { isAll, displayTitle } = getDraftBannerInfo(draft);
-            let optimisticIsGiver = false;
-            if (activePost && currentUser) {
-              const isPostAuthor =
-                activePost.author_public_id === currentUser.public_id;
-              optimisticIsGiver =
-                activePost.type === "share" || activePost.type === "commons"
-                  ? isPostAuthor
-                  : !isPostAuthor;
-            }
+            const { isAll, displayTitle, itemCount } =
+              getDraftBannerInfo(draft);
+            const role = activePost
+              ? weavingRole(
+                  activePost.type,
+                  activePost.author_public_id === currentUser?.public_id,
+                )
+              : null;
+            const title =
+              displayTitle ??
+              (itemCount !== undefined
+                ? t("itemCount", { count: itemCount })
+                : "");
 
-            const optimisticBannerText = activePost
-              ? optimisticIsGiver
-                ? activePost.type === "wish"
-                  ? isAll
-                    ? "Start weaving to offer all items"
-                    : `Start weaving to offer for ${displayTitle}`.trim()
-                  : isAll
-                    ? "Start weaving to give all items"
-                    : `Start weaving to give for ${displayTitle}`.trim()
-                : isAll
-                  ? "Start weaving to request all items"
-                  : `Start weaving to request for ${displayTitle}`.trim()
-              : isAll
-                ? "Start weaving for all items"
-                : `Start weaving for ${displayTitle}`;
+            const optimisticBannerText = weavingBannerText({
+              role,
+              itemTitle: isAll ? null : title,
+            });
             return (
               <div className="my-2 flex w-full min-w-0 items-center justify-center gap-4 py-4">
                 <div className="h-[1px] flex-1 border-t border-dashed border-gray-300" />
@@ -697,7 +702,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
         {isLoading ? (
           <div className="mt-10 text-center text-gray-400">
-            Loading messages...
+            {t("loadingMessages")}
           </div>
         ) : messages.length === 0 ? (
           <div className="mb-10 flex h-full w-full flex-col items-center justify-center gap-2 text-gray-500">
@@ -712,10 +717,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 </AvatarFallback>
               </Avatar>
             </div>
-            <p className="font-semibold text-gray-700">No messages yet</p>
+            <p className="font-semibold text-gray-700">{t("noMessages")}</p>
             <p className="text-sm">
-              Send a message to start the conversation with{" "}
-              {otherUser?.username}
+              {t("noMessagesHint", { username: otherUser?.username ?? "" })}
             </p>
           </div>
         ) : (
@@ -731,10 +735,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               let showDateHeader = false;
               if (olderMsg) {
                 const olderMsgDate = parseDate(olderMsg.created_at);
-                const isSameDay =
-                  format(msgDate, "yyyy-MM-dd") ===
-                  format(olderMsgDate, "yyyy-MM-dd");
-                if (!isSameDay) {
+                if (!isSameDay(msgDate, olderMsgDate)) {
                   // Different day from previous message -> Show Header
                   showDateHeader = true;
                 }
@@ -752,11 +753,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   className="my-4 flex justify-center"
                 >
                   <span className="rounded-full bg-gray-50 px-2 py-1 text-xs uppercase text-gray-500">
-                    {isToday(msgDate)
-                      ? "Today"
-                      : isYesterday(msgDate)
-                        ? "Yesterday"
-                        : format(msgDate, "yyyy-MM-dd", { locale: zhTW })}
+                    {(() => {
+                      const day = chatDayLabel(msgDate, new Date());
+                      return day === "date"
+                        ? formatter.dateTime(msgDate, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : t(day);
+                    })()}
                   </span>
                 </div>
               ) : null;
@@ -798,33 +804,16 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 // Determine role from metadata — no async fetch needed
                 const isPostAuthor =
                   postAuthorPublicId === currentUser?.public_id;
-                const isGiver = postType
-                  ? postType === "share" || postType === "commons"
-                    ? isPostAuthor
-                    : !isPostAuthor
-                  : false;
+                const banner = weavingBanner({
+                  postType,
+                  isPostAuthor,
+                  itemTitle,
+                  itemId: currentItemId,
+                });
+                const isGiver =
+                  banner.role === "give" || banner.role === "offer";
 
-                const isMessageAll =
-                  !itemTitle ||
-                  itemTitle.toLowerCase() === "all" ||
-                  currentItemId === null ||
-                  String(currentItemId).toLowerCase() === "all";
-
-                const bannerText = postType
-                  ? isGiver
-                    ? postType === "wish"
-                      ? isMessageAll
-                        ? "Start weaving to offer all items"
-                        : `Start weaving to offer for ${itemTitle}`.trim()
-                      : isMessageAll
-                        ? "Start weaving to give all items"
-                        : `Start weaving to give for ${itemTitle}`.trim()
-                    : isMessageAll
-                      ? "Start weaving to request all items"
-                      : `Start weaving to request for ${itemTitle}`.trim()
-                  : isMessageAll
-                    ? "Start weaving for all items"
-                    : `Start weaving ${itemTitle ? `for ${itemTitle}` : "!"}`;
+                const bannerText = weavingBannerText(banner);
 
                 const shouldShowBanner = true;
                 const shouldShowCard = !!weaveId;
@@ -903,7 +892,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                             >
                               <Image
                                 src={msg.attachments[0].file_url}
-                                alt="Attachment"
+                                alt={t("attachmentAlt")}
                                 fill
                                 className="object-cover"
                                 sizes="340px"
@@ -937,7 +926,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                                 >
                                   <Image
                                     src={att.file_url}
-                                    alt="Attachment"
+                                    alt={t("attachmentAlt")}
                                     fill
                                     className="object-cover"
                                     sizes="170px"
@@ -981,13 +970,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                         )}
                       >
                         <span>
-                          {format(parseDate(msg.created_at), "HH:mm")}
+                          {formatter.dateTime(msgDate, {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hourCycle: "h23",
+                          })}
                         </span>
                         {isMe && (
                           <span className="ml-1 flex h-3 items-center">
                             {isLastReadMessage ? (
                               <>
-                                <span className="mr-0.5">read</span>
+                                <span className="mr-0.5">{t("read")}</span>
                                 <CheckCheck className="h-3 w-3" />
                               </>
                             ) : // 如果不是最後一則已讀，則根據 is_read 顯示雙勾或單勾
@@ -1013,9 +1006,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             className="flex h-10 items-center justify-center py-4"
           >
             {isFetchingMore && (
-              <span className="text-xs text-gray-400">
-                Loading older messages...
-              </span>
+              <span className="text-xs text-gray-400">{t("loadingOlder")}</span>
             )}
           </div>
         )}
@@ -1030,7 +1021,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               <div key={url} className="group relative h-20 w-20 flex-shrink-0">
                 <Image
                   src={url}
-                  alt="Preview"
+                  alt={t("previewAlt")}
                   fill
                   className="rounded-md border object-cover"
                 />
@@ -1067,7 +1058,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isPopup ? "Hi! I'd like to ..." : "Type a message..."}
+            placeholder={isPopup ? t("popupPlaceholder") : t("placeholder")}
             className={cn(
               "flex-1",
               isPopup && "rounded-full border-none bg-[#F2F2F2]",
@@ -1172,7 +1163,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 {lightboxIndex > 0 && (
                   <Image
                     src={lightboxUrls[lightboxIndex - 1]}
-                    alt="Previous"
+                    alt={t("previousImageAlt")}
                     fill
                     className="pointer-events-none select-none object-contain"
                     sizes="90vw"
@@ -1195,7 +1186,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               >
                 <Image
                   src={lightboxUrls[lightboxIndex]}
-                  alt="Full size"
+                  alt={t("fullSizeImageAlt")}
                   fill
                   className="pointer-events-none select-none object-contain"
                   sizes="90vw"
@@ -1209,7 +1200,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 {lightboxIndex < lightboxUrls.length - 1 && (
                   <Image
                     src={lightboxUrls[lightboxIndex + 1]}
-                    alt="Next"
+                    alt={t("nextImageAlt")}
                     fill
                     className="pointer-events-none select-none object-contain"
                     sizes="90vw"

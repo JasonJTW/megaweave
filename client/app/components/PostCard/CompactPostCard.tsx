@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "@/i18n/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import type { Post } from "@/app/types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { Heart } from "lucide-react";
@@ -31,6 +32,8 @@ export default function CompactPostCard({
   viewedAt,
 }: CompactPostCardProps) {
   const router = useRouter();
+  const t = useTranslations("PostCard");
+  const formatter = useFormatter();
 
   const isExpired = post.expires_at
     ? new Date(post.expires_at) < new Date()
@@ -95,7 +98,7 @@ export default function CompactPostCard({
             aria-hidden="true"
           >
             <span className="font-ddin text-[10px] font-bold tracking-[0.10em] text-white">
-              OVERDUE
+              {t("overdue")}
             </span>
           </div>
         )}
@@ -129,7 +132,7 @@ export default function CompactPostCard({
           <div className="flex items-center gap-2">
             {viewedAt && (
               <span className="text-[10px] text-gray-400">
-                {new Date(viewedAt).toLocaleDateString()}
+                {formatter.dateTime(new Date(viewedAt))}
               </span>
             )}
             {renderTypeIcon()}

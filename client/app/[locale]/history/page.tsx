@@ -5,8 +5,14 @@ import CompactPostCard from "@/app/components/PostCard/CompactPostCard";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
 import { useUser } from "@/app/contexts/UserContext";
 import type { Post } from "@/app/types/schema";
-import { ArrowLeft, Clock, LucideLoader2, LucideRefreshCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  LucideLoader2,
+  LucideRefreshCcw,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -26,6 +32,7 @@ interface HistoryResponse {
 export default function HistoryPage() {
   const { user, loading: userLoading } = useUser();
   const router = useRouter();
+  const t = useTranslations("History");
 
   const [posts, setPosts] = useState<(Post & { viewed_at?: string })[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,12 +45,12 @@ export default function HistoryPage() {
   // Authentication guard
   useEffect(() => {
     if (!userLoading && !user) {
-      toast.error("Please sign in to view your history");
+      toast.error(t("signInToView"));
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
     }
-  }, [userLoading, user, router]);
+  }, [userLoading, user, router, t]);
 
   const fetchHistory = useCallback(
     async (page: number, append: boolean = false) => {
@@ -80,14 +87,14 @@ export default function HistoryPage() {
         setTotalPosts(data.pagination?.totalPosts ?? 0);
       } catch (err) {
         console.error("Error fetching history:", err);
-        toast.error("Failed to load viewing history");
+        toast.error(t("loadFailed"));
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
         setIsRefreshing(false);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -154,18 +161,18 @@ export default function HistoryPage() {
               type="button"
               onClick={() => router.back()}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-megaweave-forest"
-              aria-label="Go back"
+              aria-label={t("back")}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
               <h1 className="text-2xl font-bold text-megaweave-forest-dark sm:text-3xl">
-                Viewing History
+                {t("title")}
               </h1>
               <p className="text-sm text-gray-500">
                 {totalPosts > 0
-                  ? `${totalPosts} posts viewed`
-                  : "Posts you recently browsed"}
+                  ? t("viewedCount", { count: totalPosts })
+                  : t("subtitle")}
               </p>
             </div>
           </div>
@@ -176,12 +183,12 @@ export default function HistoryPage() {
               onClick={handleRefresh}
               disabled={isRefreshing || isLoading}
               className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-megaweave-forest disabled:opacity-50"
-              aria-label="Refresh viewing history"
+              aria-label={t("refreshLabel")}
             >
               <LucideRefreshCcw
                 className={`h-4 w-4 ${isRefreshing ? "animate-spin text-megaweave-forest" : ""}`}
               />
-              <span>Refresh</span>
+              <span>{t("refresh")}</span>
             </button>
           </div>
         </div>
@@ -211,10 +218,10 @@ export default function HistoryPage() {
                   {isLoadingMore ? (
                     <>
                       <LucideLoader2 className="h-4 w-4 animate-spin" />
-                      <span>Loading...</span>
+                      <span>{t("loading")}</span>
                     </>
                   ) : (
-                    <span>Load More</span>
+                    <span>{t("loadMore")}</span>
                   )}
                 </button>
               </div>
@@ -227,18 +234,17 @@ export default function HistoryPage() {
               <Clock className="h-8 w-8" />
             </div>
             <h2 className="mb-2 text-xl font-bold text-gray-900">
-              No viewing history yet
+              {t("emptyTitle")}
             </h2>
             <p className="mb-6 max-w-md text-sm text-gray-500">
-              Explore posts on Megaweave to discover shared items, wishes, and
-              community stories. Your browsing history will appear here.
+              {t("emptyBody")}
             </p>
             <Link
               href="/"
               className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 font-bold text-white shadow-sm transition hover:bg-primary/90"
             >
               <WeavingIcon className="h-4 w-4" />
-              <span>Explore Posts</span>
+              <span>{t("explore")}</span>
             </Link>
           </div>
         )}

@@ -2,6 +2,7 @@
 
 import { useRouter } from "@/i18n/navigation";
 import React from "react";
+import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { useChatPopup } from "@/app/contexts/ChatPopupContext";
@@ -25,11 +26,12 @@ export const ChatPopup = () => {
   } = useChatPopup();
   const { user: currentUser } = useUser();
   const router = useRouter();
+  const t = useTranslations("Chat");
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
   const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
     if (!currentUser) {
-      toast.error("Please log in to request items.");
+      toast.error(t("signInToRequest"));
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
@@ -38,12 +40,12 @@ export const ChatPopup = () => {
     if (!post) return;
 
     if (currentUser.userId === (post.author_user_id ?? post.user_id)) {
-      toast.error("You cannot request your own items.");
+      toast.error(t("cannotRequestOwn"));
       return;
     }
 
     if (selectedItems.length === 0) {
-      toast.error("Please select at least one item.");
+      toast.error(t("selectAtLeastOne"));
       return;
     }
 
@@ -69,13 +71,13 @@ export const ChatPopup = () => {
       globalMutate(`${hostName}/api/messages/conversations`);
       globalMutate(`${hostName}/api/weaves`);
 
-      toast.success("Request sent successfully!");
+      toast.success(t("requestSent"));
     } catch (err: unknown) {
       console.error("Weaving submit error:", err);
       if (err instanceof Error) {
         toast.error(err.message);
       } else {
-        toast.error("An unexpected error occurred.");
+        toast.error(t("unexpectedError"));
       }
     }
   };

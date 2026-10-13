@@ -1,10 +1,13 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { ConversationList } from "@/app/components/Chat/ConversationList";
 import { MessageSquare } from "lucide-react";
 
 export default function MessagesPage() {
+  const t = useTranslations("Chat");
+
   return (
     <div className="container mx-auto h-[calc(100vh-64px)] max-w-6xl p-0 md:p-4">
       <div className="flex h-full overflow-hidden rounded-lg border bg-white shadow-sm">
@@ -18,10 +21,8 @@ export default function MessagesPage() {
           <div className="mb-4 rounded-full bg-white p-4 shadow-sm">
             <MessageSquare className="h-12 w-12 text-blue-500" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800">Your Messages</h3>
-          <p className="mt-2 max-w-sm text-gray-500">
-            Select a conversation from the list to start chatting.
-          </p>
+          <h3 className="text-xl font-bold text-gray-800">{t("emptyTitle")}</h3>
+          <p className="mt-2 max-w-sm text-gray-500">{t("emptyBody")}</p>
         </div>
       </div>
     </div>

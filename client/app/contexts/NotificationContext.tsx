@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect } from "react";
 import useSWR from "swr";
 import { useSocket } from "@/hooks/useSocket";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import { useNavbar } from "./NavBarContext";
 
 import { useUser } from "./UserContext";
@@ -62,6 +63,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // 2. Setup Socket
   const { socket } = useSocket();
+  const t = useTranslations("Notifications");
 
   // 3. Use SWR for Notifications
   const {
@@ -119,7 +121,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Auto-show navbar and toast
       showNavbar();
-      toast.success(newNotif.title || "New Notification");
+      toast.success(newNotif.title || t("newNotification"));
     };
 
     socket.on("new_notification", handleNewNotification);
@@ -127,7 +129,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       socket.off("new_notification", handleNewNotification);
     };
-  }, [socket, showNavbar, mutateNotifications]);
+  }, [socket, showNavbar, mutateNotifications, t]);
 
   // 5. Actions
   const markAsRead = async (id: number) => {
@@ -190,11 +192,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         method: "PUT",
         credentials: "include",
       });
-      toast.success("All marked as read");
+      toast.success(t("markedAllRead"));
       mutateNotifications();
     } catch (error) {
       console.error("Failed to mark all read", error);
-      toast.error("Failed to mark all read");
+      toast.error(t("markAllReadFailed"));
       mutateNotifications();
     }
   };

@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { User as UserIcon, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import QRCode from "react-qr-code";
 
@@ -20,6 +21,7 @@ const ShareQrModal = ({
   profileUrl,
   avatarUrl,
 }: ShareQrModalProps) => {
+  const t = useTranslations("ShareQr");
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -28,7 +30,7 @@ const ShareQrModal = ({
           <Dialog.Close
             type="button"
             className="absolute right-3 top-3 rounded-full p-1 text-megaweave-forest-dark/60 transition-colors hover:bg-primary-15 hover:text-megaweave-forest-dark"
-            aria-label="Close"
+            aria-label={t("close")}
           >
             <X className="h-4 w-4" />
           </Dialog.Close>
@@ -38,7 +40,7 @@ const ShareQrModal = ({
               {avatarUrl ? (
                 <Image
                   src={avatarUrl}
-                  alt={`${username} avatar`}
+                  alt={t("avatarAlt", { username })}
                   width={48}
                   height={48}
                   className="h-full w-full object-cover"
@@ -49,11 +51,11 @@ const ShareQrModal = ({
             </div>
 
             <Dialog.Title className="type-button-b1 font-bold text-megaweave-forest-dark">
-              {username || "User Name"}
+              {username || t("usernameFallback")}
             </Dialog.Title>
 
             <Dialog.Description className="mt-2 whitespace-nowrap text-[12px] leading-tight text-primary-75">
-              Scan QRCode to contact with others.
+              {t("description")}
             </Dialog.Description>
 
             <div className="mt-4 flex w-full items-center justify-center rounded-xl bg-primary-15 p-4">
@@ -67,7 +69,7 @@ const ShareQrModal = ({
                 />
               ) : (
                 <span className="type-body-t5 text-primary-75">
-                  QRcode appears here
+                  {t("placeholder")}
                 </span>
               )}
             </div>

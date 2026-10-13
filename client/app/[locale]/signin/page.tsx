@@ -11,12 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
 import { useSearchParams } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { localizePath } from "@/i18n/routing";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useUser } from "@/app/contexts/UserContext";
 
 function SigninForm() {
@@ -32,9 +32,15 @@ function SigninForm() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo");
   const home = localizePath(useLocale(), "/");
+  const t = useTranslations("Auth");
 
-  //* After successful sign in, redirect to the page
+  //* After successful sign in, redirect to the page.
+  // Both the submit handlers and the `user` effect below call this; navigating
+  // twice cancels the first load midway, so only the first call wins.
+  const navigatingRef = useRef(false);
   const handleSigninSignupSuccess = useCallback(() => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     if (returnTo) {
       // 使用 window.location.href 強制完整頁面跳轉
       // 確保瀏覽器在新請求時帶上已設置的 session Cookie
@@ -66,7 +72,7 @@ function SigninForm() {
     setLoading(true);
 
     if (!credentialResponse.credential) {
-      toast.error("Google sign in failed. Please try again.");
+      toast.error(t("googleFailed"));
       setLoading(false);
       return;
     }
@@ -83,7 +89,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        toast.error(data.errorMessage || "Google sign in failed");
+        toast.error(data.errorMessage || t("googleFailed"));
         return;
       }
 
@@ -92,11 +98,7 @@ function SigninForm() {
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during Google sign in",
-      );
+      toast.error(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -114,7 +116,7 @@ function SigninForm() {
     setLoading(true);
 
     if (!email || !password) {
-      toast.error("All fields are required.");
+      toast.error(t("allFieldsRequired"));
       setLoading(false);
       return;
     }
@@ -131,7 +133,7 @@ function SigninForm() {
       console.log("data:", data);
       // /// handle error
       if (!response.ok) {
-        toast.error(data.errorMessage || "Sign in failed");
+        toast.error(data.errorMessage || t("signInFailed"));
         console.error("Sign in failed", data.errorMessage);
         return;
       }
@@ -140,9 +142,8 @@ function SigninForm() {
       await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred",
-      );
+      console.error("Error during sign in:", error);
+      toast.error(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -167,7 +168,7 @@ function SigninForm() {
 
   const handleFacebookLogin = () => {
     if (!isFBReady || !window.FB) {
-      toast.error("Facebook SDK is not ready. Please try again.");
+      toast.error(t("facebookNotReady"));
       return;
     }
 
@@ -180,7 +181,7 @@ function SigninForm() {
 
           if (!accessToken) {
             console.error("Facebook login failed or no access token received");
-            toast.error("Facebook login failed: No access token received");
+            toast.error(t("facebookNoToken"));
             setLoading(false);
             return;
           }
@@ -188,10 +189,10 @@ function SigninForm() {
           console.log("Facebook login successful:", response.authResponse);
           sendToYourBackend(accessToken);
         } else if (response.status === "not_authorized") {
-          toast.error("Facebook login failed: App not authorized");
+          toast.error(t("facebookNotAuthorized"));
           setLoading(false);
         } else {
-          toast.error("Facebook login was cancelled or failed");
+          toast.error(t("facebookCancelled"));
           setLoading(false);
         }
       },
@@ -214,7 +215,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        toast.error(data.errorMessage || "Facebook sign in failed");
+        toast.error(data.errorMessage || t("facebookFailed"));
         return;
       }
 
@@ -223,11 +224,7 @@ function SigninForm() {
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during Facebook sign in",
-      );
+      toast.error(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -247,7 +244,7 @@ function SigninForm() {
 
     /// Validate input
     if (!username || !email || !password) {
-      toast.error("All fields are required.");
+      toast.error(t("allFieldsRequired"));
       setLoading(false);
       return;
     }
@@ -269,21 +266,16 @@ function SigninForm() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        toast.error(data.errorMessage || "Sign in failed");
-        throw new Error(data.errorMessage || "Sign in failed");
+        toast.error(data.errorMessage || t("signUpFailed"));
+        return;
       }
-      /// Sign in success
-
-      /// Add a 5-second delay to inspect the button text
-      // await new Promise((resolve) => setTimeout(resolve, 300));
-      toast.success(`Welcome to MegaWeave🥳🎉! ${username}`);
+      /// Sign up success
+      toast.success(t("welcomeToast", { username }));
       await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
-      console.log(error);
-      toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred",
-      );
+      console.error("Error during sign up:", error);
+      toast.error(t("unexpectedError"));
     } finally {
       setLoading(false);
     }
@@ -308,7 +300,7 @@ function SigninForm() {
               <div className="relative">
                 <Image
                   src="/icons/weaving.svg"
-                  alt="megaweaving icon"
+                  alt={t("logoAlt")}
                   width={150}
                   height={150}
                   className="object-cover md:h-[130px] md:w-[130px]"
@@ -324,15 +316,15 @@ function SigninForm() {
             {/* title */}
             <div className="flex w-full flex-col items-center text-center">
               <div className="hidden text-[48px] font-bold leading-tight text-megaweave-forest-dark md:block md:text-[36px]">
-                Welcome to megaweaving!
+                {t("welcome")}
               </div>
               <div className="text-[48px] font-bold leading-tight text-megaweave-forest-dark md:hidden">
-                {mode === "register" ? "Register" : "Log in"}
+                {mode === "register" ? t("register") : t("logIn")}
               </div>
               <div className="type-body-t3 mt-2 hidden text-[#888888] md:block">
                 {mode === "register"
-                  ? "Register before start weaving."
-                  : "Log in to continue weaving."}
+                  ? t("registerSubtitle")
+                  : t("logInSubtitle")}
               </div>
             </div>
 
@@ -355,7 +347,7 @@ function SigninForm() {
                 }`}
                 onClick={handleLoginClick}
               >
-                Log in
+                {t("logIn")}
               </button>
               <button
                 className={`type-button-b2 relative z-10 flex h-full flex-1 items-center justify-center transition-colors duration-300 md:type-button-b1 ${
@@ -365,7 +357,7 @@ function SigninForm() {
                 }`}
                 onClick={handleRegisterClick}
               >
-                Register
+                {t("register")}
               </button>
             </div>
 
@@ -398,7 +390,7 @@ function SigninForm() {
                 >
                   <path d={siGoogle.path} />
                 </svg>
-                Log in with Google
+                {t("logInWithGoogle")}
               </Button>
               <div className="hidden">
                 <GoogleLogin
@@ -406,7 +398,7 @@ function SigninForm() {
                   onSuccess={handleGoogleSignin}
                   onError={() => {
                     console.log("Signin with google Failed");
-                    toast.error("Google sign in failed. Please try again.");
+                    toast.error(t("googleFailed"));
                     setLoading(false);
                   }}
                 />
@@ -425,12 +417,14 @@ function SigninForm() {
                 >
                   <path d={siFacebook.path} />
                 </svg>
-                {isFBReady ? "Log in with Facebook" : "Loading Facebook..."}
+                {isFBReady ? t("logInWithFacebook") : t("loadingFacebook")}
               </Button>
             </div>
             <div className="relative">
               <div className="relative flex justify-center font-ddin font-semibold text-megaweave-forest-dark">
-                <span className="select-none bg-transparent px-2">or</span>
+                <span className="select-none bg-transparent px-2">
+                  {t("or")}
+                </span>
               </div>
             </div>
 
@@ -442,7 +436,7 @@ function SigninForm() {
                       htmlFor="email"
                       className="text-secondary-foreground px-1 md:hidden"
                     >
-                      Email
+                      {t("email")}
                     </Label>
                     <Input
                       type="email"
@@ -450,7 +444,7 @@ function SigninForm() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      placeholder="Enter your email"
+                      placeholder={t("emailPlaceholder")}
                       className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                     />
                   </div>
@@ -459,7 +453,7 @@ function SigninForm() {
                       htmlFor="password"
                       className="text-secondary-foreground px-1 md:hidden"
                     >
-                      Password
+                      {t("password")}
                     </Label>
                     <div className="relative">
                       <Input
@@ -468,11 +462,14 @@ function SigninForm() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        placeholder="Enter your password"
+                        placeholder={t("passwordPlaceholder")}
                         className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                       />
                       <button
                         type="button"
+                        aria-label={
+                          showPassword ? t("hidePassword") : t("showPassword")
+                        }
                         onClick={() => {
                           setShowPassword(!showPassword);
                         }}
@@ -498,7 +495,7 @@ function SigninForm() {
                         htmlFor="remember"
                         className="text-primary-400 md:text-gray-500"
                       >
-                        Remember me
+                        {t("rememberMe")}
                       </Label>
                     </div>
                   </div>
@@ -510,7 +507,7 @@ function SigninForm() {
                     className="z-10 w-full bg-primary-75 transition-all duration-200 md:h-12"
                     disabled={!email || !password || loading}
                   >
-                    {loading ? "Logging in..." : "Log in"}
+                    {loading ? t("loggingIn") : t("logIn")}
                   </Button>
                 </div>
               </form>
@@ -527,7 +524,7 @@ function SigninForm() {
                       htmlFor="username"
                       className="text-secondary-foreground px-1 md:hidden"
                     >
-                      UserName
+                      {t("username")}
                     </Label>
                     <Input
                       type="text"
@@ -535,7 +532,7 @@ function SigninForm() {
                       value={username}
                       onChange={(e) => setUserName(e.target.value)}
                       required
-                      placeholder="Enter your username"
+                      placeholder={t("usernamePlaceholder")}
                       className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                     />
                   </div>
@@ -545,7 +542,7 @@ function SigninForm() {
                       htmlFor="email"
                       className="text-secondary-foreground px-1 md:hidden"
                     >
-                      Email
+                      {t("email")}
                     </Label>
                     <Input
                       type="email"
@@ -553,7 +550,7 @@ function SigninForm() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      placeholder="Enter your email"
+                      placeholder={t("emailPlaceholder")}
                       className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                     />
                   </div>
@@ -562,7 +559,7 @@ function SigninForm() {
                       htmlFor="password"
                       className="text-secondary-foreground px-1 md:hidden"
                     >
-                      Password
+                      {t("password")}
                     </Label>
                     <div className="relative">
                       <Input
@@ -571,11 +568,14 @@ function SigninForm() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        placeholder="Enter your password"
+                        placeholder={t("passwordPlaceholder")}
                         className="bg-secondary text-primary md:h-12 md:rounded-full md:border-none md:bg-gray-100"
                       />
                       <button
                         type="button"
+                        aria-label={
+                          showPassword ? t("hidePassword") : t("showPassword")
+                        }
                         onClick={() => {
                           setShowPassword(!showPassword);
                         }}
@@ -601,7 +601,7 @@ function SigninForm() {
                         htmlFor="remember"
                         className="text-primary md:text-gray-500"
                       >
-                        Remember me
+                        {t("rememberMe")}
                       </Label>
                     </div>
                   </div>
@@ -613,7 +613,7 @@ function SigninForm() {
                     className="z-10 w-full bg-primary-75 transition-all duration-200 md:h-12"
                     disabled={!username || !email || !password || loading}
                   >
-                    {loading ? "Registering..." : "Sign up"}
+                    {loading ? t("signingUp") : t("signUp")}
                   </Button>
                 </div>
               </form>
@@ -623,7 +623,7 @@ function SigninForm() {
                 href=""
                 className="items-center font-bold text-primary hover:text-emerald-700 md:text-megaweave-forest-dark"
               >
-                Forget password?
+                {t("forgotPassword")}
               </a>
             </div>
           </div>
@@ -634,8 +634,9 @@ function SigninForm() {
 }
 
 export default function Signin() {
+  const t = useTranslations("Auth");
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>{t("loading")}</div>}>
       <SigninForm />
     </Suspense>
   );

@@ -3,6 +3,7 @@
 import { useRouter } from "@/i18n/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import {
   Truck,
@@ -22,6 +23,7 @@ import toast from "react-hot-toast";
 import { useSocketContext } from "@/app/contexts/SocketContext";
 import * as Dialog from "@radix-ui/react-dialog";
 import SandboxPanel from "@/app/components/Lalamove/SandboxPanel";
+import { deliveryStatusView, type DeliveryStage } from "@/utils/deliveryStatus";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
@@ -85,7 +87,7 @@ const fetcher = async (url: string) => {
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     const err = new Error(
-      errorData.message || errorData.error || "無法載入訂單資料",
+      errorData.message || errorData.error || "",
     ) as Error & { status?: number };
     err.status = res.status;
     throw err;
@@ -94,125 +96,41 @@ const fetcher = async (url: string) => {
   return data.order as OrderDetail;
 };
 
-// 車型名稱字典
-const VEHICLE_NAMES: Record<string, { name: string; icon: string }> = {
-  MOTORCYCLE: { name: "機車", icon: "🛵" },
-  MOTORCYCLE_LARGELALABAG: { name: "機車大保溫袋", icon: "🛵" },
-  MOTORCYCLE_INTERCITY: { name: "跨區機車", icon: "🏍️" },
-  SUV: { name: "廂型貨車（半車）", icon: "🚙" },
-  VAN: { name: "廂型貨車（全車）", icon: "🚐" },
-  TRUCK175: { name: "1.75噸 貨車", icon: "🚚" },
-  TRUCK330: { name: "3.49噸 貨車", icon: "🚛" },
-  TRUCK500: { name: "5噸 貨車", icon: "🚛" },
+// 車型圖示；名稱在翻譯檔（Lalamove.vehicles 與 Delivery.vehicles）
+const VEHICLE_ICONS: Record<string, string> = {
+  MOTORCYCLE: "🛵",
+  MOTORCYCLE_LARGELALABAG: "🛵",
+  MOTORCYCLE_INTERCITY: "🏍️",
+  SUV: "🚙",
+  VAN: "🚐",
+  TRUCK175: "🚚",
+  TRUCK330: "🚛",
+  TRUCK500: "🚛",
 };
 
-// 狀態翻譯與顏色對應
-const STATUS_CONFIG: Record<
-  string,
-  {
-    label: string;
-    desc: string;
-    badgeBg: string;
-    badgeText: string;
-    stepIndex: number;
-  }
-> = {
-  ASSIGNING_DRIVER: {
-    label: "正在媒合司機",
-    desc: "已向附近司機發送訂單，預計 1~3 分鐘內接單",
-    badgeBg: "bg-amber-500/10 border-amber-500/30 text-amber-600",
-    badgeText: "媒合中",
-    stepIndex: 1,
-  },
-  ASSIGNED: {
-    label: "司機已接單，前往取件中",
-    desc: "司機正在前往寄件地點，請準備好物品",
-    badgeBg: "bg-blue-500/10 border-blue-500/30 text-blue-600",
-    badgeText: "前往取件",
-    stepIndex: 2,
-  },
-  ON_GOING: {
-    label: "司機已接單，前往取件中",
-    desc: "司機正在前往寄件地點，請準備好物品",
-    badgeBg: "bg-blue-500/10 border-blue-500/30 text-blue-600",
-    badgeText: "前往取件",
-    stepIndex: 2,
-  },
-  PICKED_UP: {
-    label: "司機已取件，配送運送中",
-    desc: "物品已在路途中，司機正前往送達地點",
-    badgeBg: "bg-indigo-500/10 border-indigo-500/30 text-indigo-600",
-    badgeText: "運送中",
-    stepIndex: 3,
-  },
-  IN_DELIVERY: {
-    label: "司機已取件，配送運送中",
-    desc: "物品已在路途中，司機正前往送達地點",
-    badgeBg: "bg-indigo-500/10 border-indigo-500/30 text-indigo-600",
-    badgeText: "運送中",
-    stepIndex: 3,
-  },
-  COMPLETED: {
-    label: "配送已順利完成",
-    desc: "感謝使用 Lalamove 即時快遞服務！",
-    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
-    badgeText: "已送達",
-    stepIndex: 4,
-  },
-  FULFILLED: {
-    label: "配送已順利完成",
-    desc: "感謝使用 Lalamove 即時快遞服務！",
-    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
-    badgeText: "已送達",
-    stepIndex: 4,
-  },
-  DELIVERED: {
-    label: "配送已順利完成",
-    desc: "感謝使用 Lalamove 即時快遞服務！",
-    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
-    badgeText: "已送達",
-    stepIndex: 4,
-  },
-  FINISHED: {
-    label: "配送已順利完成",
-    desc: "感謝使用 Lalamove 即時快遞服務！",
-    badgeBg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
-    badgeText: "已送達",
-    stepIndex: 4,
-  },
-  CANCELED: {
-    label: "訂單已取消",
-    desc: "此筆配送訂單已被取消",
-    badgeBg: "bg-rose-500/10 border-rose-500/30 text-rose-600",
-    badgeText: "已取消",
-    stepIndex: -1,
-  },
-  CANCELLED: {
-    label: "訂單已取消",
-    desc: "此筆配送訂單已被取消",
-    badgeBg: "bg-rose-500/10 border-rose-500/30 text-rose-600",
-    badgeText: "已取消",
-    stepIndex: -1,
-  },
-  EXPIRED: {
-    label: "訂單已超時失效",
-    desc: "無司機接單，訂單已自動失效",
-    badgeBg: "bg-gray-500/10 border-gray-500/30 text-gray-600",
-    badgeText: "已失效",
-    stepIndex: -1,
-  },
-  REJECTED: {
-    label: "訂單已拒絕",
-    desc: "訂單未能成功媒合",
-    badgeBg: "bg-rose-500/10 border-rose-500/30 text-rose-600",
-    badgeText: "未成功",
-    stepIndex: -1,
-  },
+// 各階段徽章顏色
+const STAGE_BADGE: Record<DeliveryStage, string> = {
+  assigning: "bg-amber-500/10 border-amber-500/30 text-amber-600",
+  toPickup: "bg-blue-500/10 border-blue-500/30 text-blue-600",
+  inTransit: "bg-indigo-500/10 border-indigo-500/30 text-indigo-600",
+  delivered: "bg-emerald-500/10 border-emerald-500/30 text-emerald-600",
+  cancelled: "bg-rose-500/10 border-rose-500/30 text-rose-600",
+  expired: "bg-gray-500/10 border-gray-500/30 text-gray-600",
+  rejected: "bg-rose-500/10 border-rose-500/30 text-rose-600",
 };
+
+const STEPS = [
+  { key: "created", index: 1 },
+  { key: "matching", index: 2 },
+  { key: "inTransit", index: 3 },
+  { key: "delivered", index: 4 },
+] as const;
 
 export default function DeliveryTrackingPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations("Delivery");
+  const tLalamove = useTranslations("Lalamove");
   const orderId = (params?.orderId as string) || "";
   const { socket } = useSocketContext();
 
@@ -248,17 +166,7 @@ export default function DeliveryTrackingPage() {
     {
       refreshInterval: (latestData) => {
         if (!latestData) return 10000;
-        const s = (latestData.status || "").trim().toUpperCase();
-        if (
-          s === "COMPLETED" ||
-          s === "FULFILLED" ||
-          s === "DELIVERED" ||
-          s === "FINISHED" ||
-          s === "CANCELED" ||
-          s === "CANCELLED" ||
-          s === "EXPIRED" ||
-          s === "REJECTED"
-        ) {
+        if (deliveryStatusView(latestData.status).isFinal) {
           return 0; // 結束後停止輪詢
         }
         // 有 Webhook + Socket.IO 即時推播，輪詢僅作為背景備援（10 秒一次），避免轟炸 API
@@ -322,7 +230,7 @@ export default function DeliveryTrackingPage() {
           const origin = stops[0]?.coordinates;
           const dest = stops[stops.length - 1]?.coordinates;
           const targetCoords =
-            currentStatus === "PICKED_UP" || currentStatus === "IN_DELIVERY"
+            deliveryStatusView(currentStatus).stage === "inTransit"
               ? dest
               : origin;
           if (targetCoords) {
@@ -454,7 +362,7 @@ export default function DeliveryTrackingPage() {
       originMarkerRef.current = new window.google.maps.Marker({
         position: { lat: Number(origin.lat), lng: Number(origin.lng) },
         map,
-        title: "取件點",
+        title: t("markerPickup"),
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 9,
@@ -471,7 +379,7 @@ export default function DeliveryTrackingPage() {
       destMarkerRef.current = new window.google.maps.Marker({
         position: { lat: Number(dest.lat), lng: Number(dest.lng) },
         map,
-        title: "送件點",
+        title: t("markerDropoff"),
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 9,
@@ -516,7 +424,9 @@ export default function DeliveryTrackingPage() {
         driverMarkerRef.current = new window.google.maps.Marker({
           position: driverPos,
           map,
-          title: `司機：${order.driver?.name || "Lalamove 司機"}`,
+          title: t("markerDriver", {
+            name: order.driver?.name || t("driverFallback"),
+          }),
           icon: {
             path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
             scale: 6,
@@ -532,7 +442,7 @@ export default function DeliveryTrackingPage() {
 
       // 5b. 司機到下一站目標的虛線（媒合/取件中→取件點，運送中→送達點）
       const targetCoords =
-        normalizedStatus === "PICKED_UP" || normalizedStatus === "IN_DELIVERY"
+        deliveryStatusView(normalizedStatus).stage === "inTransit"
           ? dest
           : origin;
       if (targetCoords) {
@@ -599,7 +509,7 @@ export default function DeliveryTrackingPage() {
       },
     );
     return () => window.google.maps.event.removeListener(listener);
-  }, [order, mapReady, normalizedStatus]);
+  }, [order, mapReady, normalizedStatus, t]);
 
   // 取消訂單處理
   const handleCancelOrder = async () => {
@@ -612,13 +522,13 @@ export default function DeliveryTrackingPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.message || data.error || "取消訂單失敗");
+        throw new Error(data.message || data.error || t("cancelFailed"));
       }
-      toast.success("已成功取消 Lalamove 配送訂單");
+      toast.success(t("cancelled"));
       setIsCancelModalOpen(false);
       mutate();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "取消訂單失敗";
+      const msg = err instanceof Error ? err.message : t("cancelFailed");
       toast.error(msg);
     } finally {
       setIsCancelling(false);
@@ -633,9 +543,9 @@ export default function DeliveryTrackingPage() {
     if (navigator.clipboard && targetUrl) {
       navigator.clipboard.writeText(targetUrl);
       if (order?.shareLink) {
-        toast.success("已複製公開即時追蹤連結！");
+        toast.success(t("copiedPublicLink"));
       } else {
-        toast.success("已複製追蹤連結（需登入訂單帳號檢視）");
+        toast.success(t("copiedLink"));
       }
     }
   };
@@ -646,9 +556,7 @@ export default function DeliveryTrackingPage() {
         <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-3xl bg-orange-50 text-orange-500 shadow-sm">
           <Truck className="h-8 w-8" />
         </div>
-        <p className="mt-4 font-semibold text-gray-700">
-          正在載入配送訂單資訊...
-        </p>
+        <p className="mt-4 font-semibold text-gray-700">{t("loading")}</p>
       </div>
     );
   }
@@ -665,17 +573,18 @@ export default function DeliveryTrackingPage() {
         </div>
         <h2 className="mt-4 text-lg font-bold text-gray-900">
           {isAuthError
-            ? "請先登入帳號"
+            ? t("signInTitle")
             : isForbidden
-              ? "無權限檢視此訂單"
-              : "查無此配送訂單"}
+              ? t("forbiddenTitle")
+              : t("notFoundTitle")}
         </h2>
         <p className="mt-2 text-xs text-gray-500">
           {isAuthError
-            ? "此配送訂單需要登入才能檢視，請先登入買家或賣家帳號。"
+            ? t("signInBody")
             : isForbidden
-              ? "您並非此筆外送訂單的買家、賣家或管理員，無法查看詳細資訊。"
-              : error?.message || "請確認訂單編號是否正確或稍後再試。"}
+              ? t("forbiddenBody")
+              : error?.message ||
+                (status === 404 ? t("notFoundBody") : t("loadFailed"))}
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
           {isAuthError ? (
@@ -684,7 +593,7 @@ export default function DeliveryTrackingPage() {
               onClick={() => router.push("/signin")}
               className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-600"
             >
-              前往登入
+              {t("goSignIn")}
             </button>
           ) : (
             <button
@@ -693,7 +602,7 @@ export default function DeliveryTrackingPage() {
               className="inline-flex items-center gap-2 rounded-2xl bg-orange-500 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-600"
             >
               <ArrowLeft className="h-4 w-4" />
-              返回首頁
+              {t("backHome")}
             </button>
           )}
         </div>
@@ -701,12 +610,22 @@ export default function DeliveryTrackingPage() {
     );
   }
 
-  const currentStatusConfig =
-    STATUS_CONFIG[normalizedStatus] || STATUS_CONFIG.ASSIGNING_DRIVER;
-  const isCancellable =
-    normalizedStatus === "ASSIGNING_DRIVER" ||
-    normalizedStatus === "ON_GOING" ||
-    normalizedStatus === "ASSIGNED";
+  const statusView = deliveryStatusView(order.status);
+  const isCancellable = statusView.isCancellable;
+  const vehicleIcon = (type: string) => VEHICLE_ICONS[type] || "🚛";
+  const vehicleName = (type: string) => {
+    const quoted = `vehicles.${type}.name`;
+    if (tLalamove.has(quoted as Parameters<typeof tLalamove>[0])) {
+      return tLalamove(quoted as Parameters<typeof tLalamove>[0]);
+    }
+    const extra = `vehicles.${type}`;
+    if (t.has(extra as Parameters<typeof t>[0])) {
+      return t(extra as Parameters<typeof t>[0]);
+    }
+    return type;
+  };
+  const price = (amount: string | number | undefined, fallback = 0) =>
+    t("price", { amount: Number(amount) || fallback });
   const stops = order.stops || [];
   const originStop = stops[0];
   const destStop = stops[stops.length - 1];
@@ -721,31 +640,27 @@ export default function DeliveryTrackingPage() {
               type="button"
               onClick={() => router.back()}
               className="flex h-9 w-9 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-95"
+              aria-label={t("back")}
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold text-gray-500">
-                  訂單編號
+                  {t("orderNumber")}
                 </span>
                 <span className="font-mono text-xs font-extrabold text-gray-900">
                   #{order.orderId}
                 </span>
                 {order.serviceType && (
                   <span className="flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-700">
-                    <span>
-                      {VEHICLE_NAMES[order.serviceType]?.icon || "🚛"}
-                    </span>
-                    <span>
-                      {VEHICLE_NAMES[order.serviceType]?.name ||
-                        order.serviceType}
-                    </span>
+                    <span>{vehicleIcon(order.serviceType)}</span>
+                    <span>{vehicleName(order.serviceType)}</span>
                   </span>
                 )}
               </div>
               <h1 className="text-lg font-black text-gray-900 sm:text-xl">
-                Lalamove 即時配送追蹤
+                {t("title")}
               </h1>
             </div>
           </div>
@@ -760,7 +675,7 @@ export default function DeliveryTrackingPage() {
                 className="flex items-center gap-1.5 rounded-2xl border border-orange-200 bg-orange-50 px-3.5 py-2 text-xs font-bold text-orange-700 shadow-sm transition hover:bg-orange-100"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Lalamove 官方追蹤頁</span>
+                <span>{t("officialTracking")}</span>
               </a>
             )}
 
@@ -771,7 +686,7 @@ export default function DeliveryTrackingPage() {
               className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
             >
               <Share2 className="h-3.5 w-3.5 text-gray-500" />
-              <span className="hidden sm:inline">分享追蹤連結</span>
+              <span className="hidden sm:inline">{t("shareLink")}</span>
             </button>
 
             {/* 手動重整 */}
@@ -779,7 +694,7 @@ export default function DeliveryTrackingPage() {
               type="button"
               onClick={() => mutate()}
               className="flex h-9 w-9 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 active:scale-95"
-              title="重新整理"
+              title={t("refresh")}
             >
               <RotateCw className="h-3.5 w-3.5" />
             </button>
@@ -802,17 +717,17 @@ export default function DeliveryTrackingPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${currentStatusConfig.badgeBg}`}
+                    className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${STAGE_BADGE[statusView.stage]}`}
                   >
-                    {currentStatusConfig.badgeText}
+                    {t(`stages.${statusView.stage}.badge`)}
                   </span>
-                  <span className="text-xs text-gray-400">即時同步</span>
+                  <span className="text-xs text-gray-400">{t("liveSync")}</span>
                 </div>
                 <h2 className="mt-1 text-base font-extrabold text-gray-900 sm:text-lg">
-                  {currentStatusConfig.label}
+                  {t(`stages.${statusView.stage}.label`)}
                 </h2>
                 <p className="text-xs text-gray-500">
-                  {currentStatusConfig.desc}
+                  {t(`stages.${statusView.stage}.desc`)}
                 </p>
               </div>
             </div>
@@ -824,13 +739,13 @@ export default function DeliveryTrackingPage() {
                 onClick={() => setIsCancelModalOpen(true)}
                 className="self-start rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-600 transition hover:bg-rose-100 sm:self-center"
               >
-                取消配送訂單
+                {t("cancelOrder")}
               </button>
             )}
           </div>
 
           {/* 流程進度條 (Stepper) */}
-          {currentStatusConfig.stepIndex > 0 && (
+          {statusView.step > 0 && (
             <div className="mt-6 border-t border-gray-100 pt-5">
               <div className="relative grid grid-cols-4 gap-2 text-center text-xs">
                 {/* 橫向進度線條 */}
@@ -838,20 +753,14 @@ export default function DeliveryTrackingPage() {
                   <div
                     className="h-full bg-orange-500 transition-all duration-500"
                     style={{
-                      width: `${((Math.min(currentStatusConfig.stepIndex, 4) - 1) / 3) * 100}%`,
+                      width: `${((Math.min(statusView.step, 4) - 1) / 3) * 100}%`,
                     }}
                   />
                 </div>
 
-                {[
-                  { title: "已建立訂單", index: 1 },
-                  { title: "媒合司機", index: 2 },
-                  { title: "取件運送中", index: 3 },
-                  { title: "順利送達", index: 4 },
-                ].map((step) => {
-                  const isDone = currentStatusConfig.stepIndex >= step.index;
-                  const isCurrent =
-                    currentStatusConfig.stepIndex === step.index;
+                {STEPS.map((step) => {
+                  const isDone = statusView.step >= step.index;
+                  const isCurrent = statusView.step === step.index;
                   return (
                     <div
                       key={step.index}
@@ -875,7 +784,7 @@ export default function DeliveryTrackingPage() {
                           isDone ? "text-gray-900" : "text-gray-400"
                         }`}
                       >
-                        {step.title}
+                        {t(`steps.${step.key}`)}
                       </span>
                     </div>
                   );
@@ -893,22 +802,22 @@ export default function DeliveryTrackingPage() {
               <div className="flex items-center gap-2">
                 <Navigation className="h-4 w-4 text-orange-500" />
                 <span className="text-xs font-bold text-gray-900">
-                  即時路線與司機座標
+                  {t("mapTitle")}
                 </span>
               </div>
               <div className="flex items-center gap-3 text-[11px] text-gray-500">
                 <span className="flex items-center gap-1">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  取件
+                  {t("legendPickup")}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-                  送達
+                  {t("legendDropoff")}
                 </span>
                 {order.driver && (
                   <span className="flex items-center gap-1">
                     <span className="h-2.5 w-2.5 animate-ping rounded-full bg-amber-500" />
-                    司機
+                    {t("legendDriver")}
                   </span>
                 )}
               </div>
@@ -928,17 +837,18 @@ export default function DeliveryTrackingPage() {
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                   <span className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
                     <User className="h-4 w-4 text-orange-500" />
-                    配送司機資訊
+                    {t("driverInfo")}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {order.serviceType && (
                       <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700">
-                        {VEHICLE_NAMES[order.serviceType]?.name ||
-                          order.serviceType}
+                        {vehicleName(order.serviceType)}
                       </span>
                     )}
                     <span className="rounded-lg bg-orange-50 px-2 py-0.5 font-mono text-[11px] font-bold text-orange-700">
-                      車牌：{order.driver.plateNumber || "接單中"}
+                      {t("plate", {
+                        plate: order.driver.plateNumber || t("platePending"),
+                      })}
                     </span>
                   </div>
                 </div>
@@ -946,7 +856,8 @@ export default function DeliveryTrackingPage() {
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100 font-bold text-orange-700">
-                      {order.driver.name.slice(0, 1) || "司"}
+                      {order.driver.name.slice(0, 1) ||
+                        t("driverInitialFallback")}
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-gray-900">
@@ -966,14 +877,14 @@ export default function DeliveryTrackingPage() {
                     className="flex items-center justify-center gap-1.5 rounded-2xl bg-emerald-500 py-2.5 text-xs font-bold text-white shadow-sm shadow-emerald-500/20 transition hover:bg-emerald-600 active:scale-95"
                   >
                     <Phone className="h-3.5 w-3.5" />
-                    撥打電話
+                    {t("call")}
                   </a>
                   <a
                     href={`sms:${order.driver.phone}`}
                     className="flex items-center justify-center gap-1.5 rounded-2xl border border-gray-200 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 transition hover:bg-gray-100 active:scale-95"
                   >
                     <MessageSquare className="h-3.5 w-3.5" />
-                    發送簡訊
+                    {t("sms")}
                   </a>
                 </div>
               </div>
@@ -983,10 +894,10 @@ export default function DeliveryTrackingPage() {
                   <RotateCw className="h-5 w-5 animate-spin" />
                 </div>
                 <h4 className="mt-2 text-xs font-bold text-gray-900">
-                  司機即時媒合中
+                  {t("matchingTitle")}
                 </h4>
                 <p className="mt-1 text-[11px] text-gray-500">
-                  司機接單後，將在此即時顯示司機姓名、電話與車牌資訊。
+                  {t("matchingBody")}
                 </p>
               </div>
             )}
@@ -994,30 +905,33 @@ export default function DeliveryTrackingPage() {
             {/* 停靠點與地址詳情 */}
             <div className="rounded-3xl border border-gray-200/90 bg-white p-4 shadow-sm">
               <h3 className="mb-3 text-xs font-bold text-gray-900">
-                配送路線地址
+                {t("routeTitle")}
               </h3>
 
               <div className="space-y-3">
                 {/* 取件點 */}
                 <div className="flex items-start gap-2.5">
                   <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white">
-                    起
+                    {t("originBadge")}
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-[11px] font-semibold text-gray-400">
-                      取件地址 (寄件)
+                      {t("pickupAddress")}
                     </span>
                     <p className="break-words text-xs font-medium text-gray-800">
-                      {originStop?.address || "寄件地址"}
+                      {originStop?.address || t("pickupFallback")}
                     </p>
                     {originStop?.name && (
                       <p className="mt-0.5 text-[11px] text-gray-500">
-                        聯絡人：{originStop.name} ({originStop.phone})
+                        {t("contact", {
+                          name: originStop.name,
+                          phone: originStop.phone ?? "",
+                        })}
                       </p>
                     )}
                     {originStop?.remarks && (
                       <p className="mt-0.5 rounded-xl bg-gray-50 p-1.5 text-[10px] text-gray-600">
-                        備註：{originStop.remarks}
+                        {t("remarks", { remarks: originStop.remarks })}
                       </p>
                     )}
                   </div>
@@ -1028,23 +942,26 @@ export default function DeliveryTrackingPage() {
                 {/* 送件點 */}
                 <div className="flex items-start gap-2.5">
                   <div className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">
-                    訖
+                    {t("destinationBadge")}
                   </div>
                   <div className="min-w-0 flex-1">
                     <span className="text-[11px] font-semibold text-gray-400">
-                      送達地址 (收件)
+                      {t("dropoffAddress")}
                     </span>
                     <p className="break-words text-xs font-medium text-gray-800">
-                      {destStop?.address || "收件地址"}
+                      {destStop?.address || t("dropoffFallback")}
                     </p>
                     {destStop?.name && (
                       <p className="mt-0.5 text-[11px] text-gray-500">
-                        收件人：{destStop.name} ({destStop.phone})
+                        {t("recipient", {
+                          name: destStop.name,
+                          phone: destStop.phone ?? "",
+                        })}
                       </p>
                     )}
                     {destStop?.remarks && (
                       <p className="mt-0.5 rounded-xl bg-gray-50 p-1.5 text-[10px] text-gray-600">
-                        備註：{destStop.remarks}
+                        {t("remarks", { remarks: destStop.remarks })}
                       </p>
                     )}
                   </div>
@@ -1056,38 +973,37 @@ export default function DeliveryTrackingPage() {
             <div className="rounded-3xl border border-gray-200/90 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
                 <span className="text-xs font-bold text-gray-900">
-                  費用與明細
+                  {t("fareTitle")}
                 </span>
                 <span className="font-ddin text-base font-bold text-orange-600">
-                  NT$ {order.priceBreakdown?.total || 0}
+                  {price(order.priceBreakdown?.total)}
                 </span>
               </div>
 
               <div className="mt-2 space-y-1.5 text-xs text-gray-500">
                 {order.serviceType && (
                   <div className="flex justify-between border-b border-gray-50 pb-1.5">
-                    <span>配送車型</span>
+                    <span>{t("vehicle")}</span>
                     <span className="font-semibold text-gray-800">
-                      {VEHICLE_NAMES[order.serviceType]?.icon || "🚛"}{" "}
-                      {VEHICLE_NAMES[order.serviceType]?.name ||
-                        order.serviceType}
+                      {vehicleIcon(order.serviceType)}{" "}
+                      {vehicleName(order.serviceType)}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span>基本起跳運費</span>
-                  <span>NT$ {order.priceBreakdown?.base || 75}</span>
+                  <span>{t("baseFare")}</span>
+                  <span>{price(order.priceBreakdown?.base, 75)}</span>
                 </div>
                 {Number(order.priceBreakdown?.extraMileage || 0) > 0 && (
                   <div className="flex justify-between">
-                    <span>超里程加價</span>
-                    <span>NT$ {order.priceBreakdown?.extraMileage}</span>
+                    <span>{t("extraMileage")}</span>
+                    <span>{price(order.priceBreakdown?.extraMileage)}</span>
                   </div>
                 )}
                 {Number(order.priceBreakdown?.surcharge || 0) > 0 && (
                   <div className="flex justify-between">
-                    <span>附加費 / 夜間加成</span>
-                    <span>NT$ {order.priceBreakdown?.surcharge}</span>
+                    <span>{t("surcharge")}</span>
+                    <span>{price(order.priceBreakdown?.surcharge)}</span>
                   </div>
                 )}
               </div>
@@ -1110,7 +1026,7 @@ export default function DeliveryTrackingPage() {
                   driver: opt.driverCoords
                     ? {
                         id: prev.driver?.id || "driver_sandbox",
-                        name: prev.driver?.name || "Lalamove 司機",
+                        name: prev.driver?.name || t("driverFallback"),
                         phone: prev.driver?.phone || "0912345678",
                         plateNumber: prev.driver?.plateNumber || "ABC-8888",
                         coordinates: {
@@ -1140,10 +1056,10 @@ export default function DeliveryTrackingPage() {
               <Ban className="h-6 w-6" />
             </div>
             <Dialog.Title className="mt-3 text-center text-base font-bold text-gray-900">
-              確定要取消此筆 Lalamove 訂單？
+              {t("cancelDialogTitle")}
             </Dialog.Title>
             <Dialog.Description className="mt-1 text-center text-xs text-gray-500">
-              取消後系統將立即終止媒合與配送，若司機已前往取件可能需重新發起。
+              {t("cancelDialogBody")}
             </Dialog.Description>
 
             <div className="mt-5 flex items-center justify-center gap-3">
@@ -1153,7 +1069,7 @@ export default function DeliveryTrackingPage() {
                 disabled={isCancelling}
                 className="rounded-2xl border border-gray-200 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
               >
-                暫不取消
+                {t("keepOrder")}
               </button>
               <button
                 type="button"
@@ -1164,10 +1080,10 @@ export default function DeliveryTrackingPage() {
                 {isCancelling ? (
                   <>
                     <RotateCw className="h-3.5 w-3.5 animate-spin" />
-                    正在取消中...
+                    {t("cancelling")}
                   </>
                 ) : (
-                  "確定取消訂單"
+                  t("confirmCancel")
                 )}
               </button>
             </div>

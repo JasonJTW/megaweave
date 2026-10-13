@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { Post } from "@/app/types/schema";
@@ -16,7 +17,7 @@ import {
   toggleDraftItem,
   updateDraftItemQuantity,
   getWeaveSubmitPayload,
-  getDraftSelectedLabel,
+  getDraftSelectedCount,
 } from "@/app/types/weaveDraft";
 import { QuantityStepper } from "@/app/components/ui/QuantityStepper";
 
@@ -32,6 +33,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   post,
   onWeavingSubmit,
 }) => {
+  const t = useTranslations("Chat.postInfo");
   const { draft: contextDraft, setDraft } = useChatPopup();
 
   // If context has draft for this post, use it as single source of truth.
@@ -94,6 +96,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   };
 
   const isSubmitDisabled = draft.mode === "custom" && selectedCount === 0;
+  const selectedLabel = getDraftSelectedCount(draft);
 
   return (
     <div className="flex w-full flex-shrink-0 flex-col border-b border-primary-30 bg-primary-15 font-ddin transition-all">
@@ -110,7 +113,7 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
             />
           ) : (
             <div className="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-md bg-gray-200 text-[9px] text-gray-400">
-              No img
+              {t("noImage")}
             </div>
           )}
 
@@ -119,7 +122,11 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
               {post.title}
             </div>
             <div className="mt-1 flex items-center gap-2 text-[13px] leading-none text-gray-500">
-              <span>{getDraftSelectedLabel(draft)}</span>
+              <span>
+                {selectedLabel === "all"
+                  ? t("selectedAll")
+                  : t("selectedCount", { count: selectedLabel })}
+              </span>
               {hasSubItems && (
                 <button
                   type="button"
@@ -128,11 +135,11 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                 >
                   {isExpanded ? (
                     <>
-                      Hide items <ChevronUp className="h-3 w-3" />
+                      {t("hideItems")} <ChevronUp className="h-3 w-3" />
                     </>
                   ) : (
                     <>
-                      Choose items ({draft.items.length}){" "}
+                      {t("chooseItems", { count: draft.items.length })}{" "}
                       <ChevronDown className="h-3 w-3" />
                     </>
                   )}
@@ -150,8 +157,12 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
               disabled={isSubmitDisabled}
               className="h-[34px] w-auto flex-shrink-0 rounded-full bg-primary px-3.5 text-[13px] font-bold text-white hover:bg-primary/90 disabled:opacity-50"
             >
-              {post.type === "wish" ? "Offer" : "Request"}
-              {draft.mode === "custom" ? ` (${selectedCount})` : ""}
+              {draft.mode === "custom"
+                ? t("submitWithCount", {
+                    type: post.type,
+                    count: selectedCount,
+                  })
+                : t("submit", { type: post.type })}
             </Button>
           </div>
         )}
@@ -211,14 +222,14 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
                         {it.title}
                       </span>
                       <span className="shrink-0 text-[11px] text-primary-75">
-                        (Left: {it.quantityLeft})
+                        {t("quantityLeft", { quantity: it.quantityLeft })}
                       </span>
                     </label>
 
                     {isChecked && (
                       <div className="flex shrink-0 items-center gap-1.5">
                         <span className="text-[11px] font-medium text-gray-500">
-                          Qty:
+                          {t("quantity")}
                         </span>
                         <QuantityStepper
                           value={currentQty}

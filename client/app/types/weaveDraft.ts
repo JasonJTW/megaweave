@@ -95,16 +95,15 @@ export function createInitialDraft(
 export function isAllItemsSelected(items: WeaveDraftItem[]): boolean {
   const availableItems = items.filter((it) => it.quantityLeft > 0);
   if (availableItems.length === 0) return false;
-  return availableItems.every((it) => it.selected && it.quantity === it.quantityLeft);
+  return availableItems.every(
+    (it) => it.selected && it.quantity === it.quantityLeft,
+  );
 }
 
 /**
  * 切換某個 sub-item 的勾選狀態
  */
-export function toggleDraftItem(
-  draft: WeaveDraft,
-  itemId: number,
-): WeaveDraft {
+export function toggleDraftItem(draft: WeaveDraft, itemId: number): WeaveDraft {
   if (draft.mode === "all_post") return draft;
 
   const nextItems = draft.items.map((it) => {
@@ -160,9 +159,7 @@ export function updateDraftItemQuantity(
  * - all_items: 完整映射所有真實 sub-items (已選取且有數量)
  * - custom: 映射使用者自選的真實 sub-items
  */
-export function getWeaveSubmitPayload(
-  draft: WeaveDraft,
-): SelectedWeaveItem[] {
+export function getWeaveSubmitPayload(draft: WeaveDraft): SelectedWeaveItem[] {
   if (draft.mode === "all_post") {
     return [{ itemId: null, quantity: 1, title: draft.postTitle }];
   }
@@ -180,16 +177,14 @@ export function getWeaveSubmitPayload(
 }
 
 /**
- * 取得選取狀態文字
+ * 取得選取數量；整則貼文或全部物品時回傳 "all"
  */
-export function getDraftSelectedLabel(draft: WeaveDraft): string {
+export function getDraftSelectedCount(draft: WeaveDraft): number | "all" {
   if (draft.mode === "all_post" || draft.mode === "all_items") {
-    return "Selected: All";
+    return "all";
   }
 
-  const count = draft.items.filter((it) => it.selected && it.quantity > 0).length;
-  const suffix = count === 1 ? "item" : "items";
-  return `Selected: ${count} ${suffix}`;
+  return draft.items.filter((it) => it.selected && it.quantity > 0).length;
 }
 
 /**
@@ -198,6 +193,8 @@ export function getDraftSelectedLabel(draft: WeaveDraft): string {
 export function getDraftBannerInfo(draft: WeaveDraft | null): {
   isAll: boolean;
   displayTitle?: string;
+  /** 多選時的物品數，由呼叫端依語言組字 */
+  itemCount?: number;
 } {
   if (!draft) return { isAll: true };
 
@@ -211,7 +208,7 @@ export function getDraftBannerInfo(draft: WeaveDraft | null): {
   }
 
   if (selected.length > 1) {
-    return { isAll: false, displayTitle: `${selected.length} items` };
+    return { isAll: false, itemCount: selected.length };
   }
 
   return { isAll: true };

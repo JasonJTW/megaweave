@@ -1,19 +1,26 @@
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures/base";
+import { test as signedInTest } from "./fixtures/auth";
 
 test.describe("locale routing", () => {
   test("/ renders the zh-TW site", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW");
-    await expect(page.getByRole("button", { name: "開啟主選單" })).toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "開啟主選單" }),
+    ).toBeAttached();
     await expect(page.getByRole("link", { name: "隱私權政策" })).toBeAttached();
   });
 
   test("/en renders the English site", async ({ page }) => {
     await page.goto("/en");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.getByRole("button", { name: "Open menu" })).toBeAttached();
-    await expect(page.getByRole("link", { name: "Privacy Policy" })).toBeAttached();
+    await expect(
+      page.getByRole("button", { name: "Open menu" }),
+    ).toBeAttached();
+    await expect(
+      page.getByRole("link", { name: "Privacy Policy" }),
+    ).toBeAttached();
   });
 
   test("guest on /en/messages is sent to the English sign-in with returnTo", async ({
@@ -48,11 +55,17 @@ test.describe("language switcher", () => {
     page,
   }) => {
     await page.goto("/about?ref=e2e#our-team");
-    await page.getByRole("contentinfo").getByRole("link", { name: "English" }).click();
+    await page
+      .getByRole("contentinfo")
+      .getByRole("link", { name: "English" })
+      .click();
     await expect(page).toHaveURL(/\/en\/about\?ref=e2e#our-team$/);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
-    await page.getByRole("contentinfo").getByRole("link", { name: "繁體中文" }).click();
+    await page
+      .getByRole("contentinfo")
+      .getByRole("link", { name: "繁體中文" })
+      .click();
     await expect(page).toHaveURL(/\/about\?ref=e2e#our-team$/);
     await expect(page).toHaveURL((url) => !url.pathname.startsWith("/en"));
     await expect(page.locator("html")).toHaveAttribute("lang", "zh-TW");
@@ -61,7 +74,10 @@ test.describe("language switcher", () => {
   test("menu switcher moves to the English page", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "開啟主選單" }).click();
-    await page.getByRole("dialog").getByRole("link", { name: "English" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("link", { name: "English" })
+      .click();
     await expect(page).toHaveURL((url) => url.pathname === "/en");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
   });
@@ -88,7 +104,9 @@ test.describe("Switch to English prompt", () => {
       extraHTTPHeaders: { "Accept-Language": "en-US,en;q=0.9" },
     });
 
-    test("is offered on zh-TW pages and leads to the English page", async ({ page }) => {
+    test("is offered on zh-TW pages and leads to the English page", async ({
+      page,
+    }) => {
       await page.goto("/about");
       await prompt(page).getByRole("button", { name: "Switch" }).click();
       await expect(page).toHaveURL((url) => url.pathname === "/en/about");
@@ -167,7 +185,14 @@ test.describe("localized metadata", () => {
     const response = await request.get("/sitemap.xml");
     expect(response.ok()).toBeTruthy();
     const xml = await response.text();
-    for (const path of ["", "/en", "/about", "/en/about", "/tinder", "/en/tinder"]) {
+    for (const path of [
+      "",
+      "/en",
+      "/about",
+      "/en/about",
+      "/tinder",
+      "/en/tinder",
+    ]) {
       expect(xml).toContain(`<loc>https://localhost:3100${path}</loc>`);
     }
     expect(xml).toContain('hreflang="x-default"');
@@ -240,4 +265,60 @@ test.describe("onboarding tour", () => {
       page.getByText("a platform for resources sharing"),
     ).toBeVisible();
   });
+});
+
+signedInTest.describe("account pages", () => {
+  signedInTest("/history renders in the page language", async ({ page }) => {
+    await page.goto("/history");
+    await expect(
+      page.getByRole("heading", { name: "瀏覽紀錄", level: 1 }),
+    ).toBeVisible();
+
+    await page.goto("/en/history");
+    await expect(
+      page.getByRole("heading", { name: "Viewing History", level: 1 }),
+    ).toBeVisible();
+  });
+
+  signedInTest(
+    "/notifications renders in the page language",
+    async ({ page }) => {
+      await page.goto("/notifications");
+      await expect(
+        page.getByRole("heading", { name: "通知", level: 1 }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "全部標為已讀" }),
+      ).toBeVisible();
+
+      await page.goto("/en/notifications");
+      await expect(
+        page.getByRole("heading", { name: "Notifications", level: 1 }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Mark all as read" }),
+      ).toBeVisible();
+    },
+  );
+
+  signedInTest(
+    "payment result renders in the page language",
+    async ({ page }) => {
+      // An unknown trade number has no payment record, so the page settles on the unpaid result
+      await page.goto("/delivery/payment-result?MerchantTradeNo=E2E_UNKNOWN");
+      await expect(
+        page.getByRole("heading", { name: "付款未完成" }),
+      ).toBeVisible();
+
+      await page.goto(
+        "/en/delivery/payment-result?MerchantTradeNo=E2E_UNKNOWN",
+      );
+      await expect(
+        page.getByRole("heading", { name: "Payment not completed" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Back to home" }),
+      ).toBeVisible();
+    },
+  );
 });

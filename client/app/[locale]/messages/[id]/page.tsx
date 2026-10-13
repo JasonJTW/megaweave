@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { ConversationList } from "@/app/components/Chat/ConversationList";
 import { ChatWindow } from "@/app/components/Chat/ChatWindow";
@@ -9,6 +10,7 @@ import { useUser } from "@/app/contexts/UserContext";
 
 export default function ConversationPage() {
   const params = useParams();
+  const t = useTranslations("Chat");
   const conversationId = Number(params?.id);
 
   // Fetch conversations to find the "otherUser" details for the header
@@ -51,7 +53,7 @@ export default function ConversationPage() {
             />
           ) : (
             <div className="flex h-full items-center justify-center">
-              Loading...
+              {t("loading")}
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "@/i18n/navigation";
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
@@ -20,6 +21,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
   className,
 }) => {
   const router = useRouter();
+  const t = useTranslations("Chat");
   const [loading, setLoading] = useState(false);
 
   const handleMessageClick = async () => {
@@ -34,7 +36,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
 
       if (!res.ok) {
         if (res.status === 401) {
-          toast.error("Please sign in to message.");
+          toast.error(t("signInToMessage"));
           router.push(
             `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
           );
@@ -47,7 +49,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
       router.push(`/messages/${data.conversationId}`);
     } catch (error) {
       console.error("Message error:", error);
-      toast.error(`Could not message ${recipientName}`);
+      toast.error(t("messageFailed", { username: recipientName }));
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
       className={className}
     >
       <MessageSquare className="mr-2 h-4 w-4" />
-      {loading ? "Loading..." : "Message"}
+      {loading ? t("loading") : t("message")}
     </Button>
   );
 };

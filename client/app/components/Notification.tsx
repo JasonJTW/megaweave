@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   useNotification,
   NotificationItem,
@@ -17,6 +18,8 @@ export default function NotificationList() {
     useNotification();
 
   const router = useRouter();
+  const t = useTranslations("Notifications");
+  const formatter = useFormatter();
 
   const handleNotificationClick = async (notification: NotificationItem) => {
     try {
@@ -37,11 +40,7 @@ export default function NotificationList() {
   };
 
   if (loading)
-    return (
-      <div className="p-8 text-center text-gray-500">
-        Loading notifications...
-      </div>
-    );
+    return <div className="p-8 text-center text-gray-500">{t("loading")}</div>;
 
   return (
     <div className="mx-auto w-full max-w-2xl font-ddin">
@@ -49,13 +48,13 @@ export default function NotificationList() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-megaweave-sand bg-gradient-to-r from-megaweave-cream to-white p-6">
           <h2 className="text-2xl font-bold text-megaweave-forest-dark">
-            Notifications
+            {t("title")}
           </h2>
           <button
             onClick={handleMarkAllRead}
             className="text-megaweave-green text-sm hover:underline"
           >
-            Mark all as read
+            {t("markAllRead")}
           </button>
         </div>
 
@@ -65,7 +64,7 @@ export default function NotificationList() {
             <AnimatePresence mode="popLayout">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center text-gray-400">
-                  <p>No notifications yet</p>
+                  <p>{t("empty")}</p>
                 </div>
               ) : (
                 notifications.map((n) => (
@@ -133,7 +132,7 @@ export default function NotificationList() {
                           {n.title}
                         </h4>
                         <span className="ml-2 whitespace-nowrap text-xs text-gray-400">
-                          {new Date(n.created_at).toLocaleDateString()}
+                          {formatter.dateTime(new Date(n.created_at))}
                         </span>
                       </div>
                       <p

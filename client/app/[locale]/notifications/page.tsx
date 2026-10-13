@@ -2,6 +2,7 @@
 
 import { useRouter } from "@/i18n/navigation";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import NotificationList from "@/app/components/Notification";
 import toast from "react-hot-toast";
 import { useUser } from "@/app/contexts/UserContext";
@@ -9,25 +10,24 @@ import { useUser } from "@/app/contexts/UserContext";
 export default function NotificationsPage() {
   const { user, loading } = useUser();
   const router = useRouter();
+  const t = useTranslations("Notifications");
 
   // Redirect to signin if user is not authenticated after loading
   useEffect(() => {
     if (!loading && !user) {
-      toast.error("Please sign in to view notifications");
+      toast.error(t("signInToView"));
       router.push(
         `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
       );
     }
-  }, [loading, user, router]);
+  }, [loading, user, router, t]);
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-megaweave-cream px-4 pb-12 pt-24">
         <div className="flex animate-pulse flex-col items-center">
           <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-megaweave-forest border-t-transparent"></div>
-          <p className="font-medium text-megaweave-forest">
-            Loading notifications...
-          </p>
+          <p className="font-medium text-megaweave-forest">{t("loading")}</p>
         </div>
       </div>
     );
@@ -44,7 +44,7 @@ export default function NotificationsPage() {
         <div className="mx-auto max-w-7xl">
           <div className="mb-10 text-center">
             <h1 className="type-h4 mb-3 text-megaweave-forest-dark">
-              Notification
+              {t("title")}
             </h1>
           </div>
 

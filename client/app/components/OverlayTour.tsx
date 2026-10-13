@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { X, ArrowLeft, Share2, Heart, MessageSquare } from "lucide-react";
 
 import WeavingIcon from "./icons/WeavingIcon";
@@ -34,6 +35,7 @@ export default function OverlayTour({
   isOpen,
   onClose,
 }: OverlayTourProps) {
+  const t = useTranslations("Onboarding");
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [targetBorderRadius, setTargetBorderRadius] = useState<string>("50px");
@@ -260,7 +262,7 @@ export default function OverlayTour({
         onClick={() => {
           if (!isSwiping.current) handlePrev();
         }}
-        aria-label="Previous tour step"
+        aria-label={t("previousStep")}
       />
       {/* Right click zone — go to next step */}
       <div
@@ -268,7 +270,7 @@ export default function OverlayTour({
         onClick={() => {
           if (!isSwiping.current) handleNext();
         }}
-        aria-label="Next tour step"
+        aria-label={t("nextStep")}
       />
       {/* ====== Mock PostDetail Overlay (Message Step) ====== */}
       <AnimatePresence>
@@ -304,20 +306,19 @@ export default function OverlayTour({
 
               {/* Mock Title */}
               <h1 className="mb-2 mt-4 font-ddin text-2xl font-bold text-gray-900">
-                Post Title
+                {t("mock.postTitle")}
               </h1>
 
               {/* Mock Category */}
               <div className="mb-3 flex gap-2">
                 <span className="rounded-full bg-secondary px-3 py-1 text-sm font-medium">
-                  Category
+                  {t("mock.category")}
                 </span>
               </div>
 
               {/* Mock Description */}
               <p className="mb-4 text-sm leading-relaxed text-gray-600">
-                This is a sample post description showing what the detail page
-                looks like...
+                {t("mock.description")}
               </p>
 
               {/* Mock Avatar Row */}
@@ -327,7 +328,7 @@ export default function OverlayTour({
                 </div>
                 <div className="ml-[18px]">
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Username (owner)
+                    {t("mock.owner")}
                   </h3>
                 </div>
               </div>
@@ -377,7 +378,7 @@ export default function OverlayTour({
           handleClose();
         }}
         className="absolute right-6 top-6 z-[120] text-white transition-colors"
-        aria-label="Close tour"
+        aria-label={t("closeTour")}
       >
         <X size={18} strokeWidth={6} />
       </button>
@@ -543,7 +544,7 @@ export default function OverlayTour({
               e.stopPropagation();
               setCurrentStepIndex(idx);
             }}
-            aria-label={`Go to step ${idx + 1}`}
+            aria-label={t("goToStep", { number: idx + 1 })}
             className={`h-2.5 rounded-full transition-all duration-300 ${
               idx === currentStepIndex ? "w-6 bg-white" : "w-2.5 bg-white/40"
             }`}

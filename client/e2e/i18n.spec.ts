@@ -175,3 +175,69 @@ test.describe("localized metadata", () => {
     expect(xml).not.toContain("/Card");
   });
 });
+
+test.describe("marketing pages", () => {
+  test("/about renders in the page language", async ({ page }) => {
+    await page.goto("/about");
+    await expect(
+      page.getByRole("heading", { name: "我們的夥伴" }),
+    ).toBeVisible();
+
+    await page.goto("/en/about");
+    await expect(
+      page.getByRole("heading", { name: "OUR PARTNER" }),
+    ).toBeVisible();
+  });
+
+  test("/install renders in the page language", async ({ page }) => {
+    await page.goto("/install");
+    await expect(
+      page.getByRole("heading", { name: "加入主畫面？" }),
+    ).toBeVisible();
+
+    await page.goto("/en/install");
+    await expect(
+      page.getByRole("heading", { name: "Add to Home Screen?" }),
+    ).toBeVisible();
+  });
+
+  test("/earthday renders in the page language", async ({ page }) => {
+    await page.goto("/earthday");
+    await expect(
+      page.getByRole("heading", { name: "關於大量交織" }),
+    ).toBeVisible();
+    await expect(page.getByText("都能在社群中互相連結")).toBeVisible();
+
+    await page.goto("/en/earthday");
+    await expect(
+      page.getByRole("heading", { name: "About megaweaving" }),
+    ).toBeVisible();
+    await expect(page.getByText("began as a Facebook group")).toBeVisible();
+  });
+});
+
+test.describe("onboarding tour", () => {
+  // The shared fixture marks the tour as seen; a first-time visitor still gets it
+  const asFirstVisit = (page: Page) =>
+    page.addInitScript(() =>
+      window.localStorage.removeItem("megaweave_tour_seen"),
+    );
+
+  test("greets a first-time visitor in the page language", async ({ page }) => {
+    await asFirstVisit(page);
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "關閉導覽" })).toBeVisible();
+    await expect(page.getByText("促進資源共享與循環的平台")).toBeVisible();
+  });
+
+  test("greets a first-time visitor in English under /en", async ({ page }) => {
+    await asFirstVisit(page);
+    await page.goto("/en");
+    await expect(
+      page.getByRole("button", { name: "Close tour" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("a platform for resources sharing"),
+    ).toBeVisible();
+  });
+});

@@ -57,6 +57,7 @@ import CommonShareIcon from "@/app/components/icons/CommonShareIcon";
 import { useLocation } from "@/app/contexts/LocationContext";
 const PostsApp = () => {
   const t = useTranslations("HomeFeed");
+  const tTour = useTranslations("Onboarding");
   const categoryName = useCategoryName();
   const router = useRouter();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -108,52 +109,42 @@ const PostsApp = () => {
   const TOUR_STEPS: TourStep[] = [
     {
       targetId: undefined,
-      content:
-        'megaweaving is a platform for resources sharing and circulation.\n\nThe concept of "weaving" allows users to exchange resources for free, creating a cycle that maximizes resource efficiency through collective sharing.\n\nBy "weave" user with those who "share" or "wish", we foster sustainability and strengthen community bonds.',
+      content: tTour("welcome"),
       layoutType: "welcome",
     },
     {
       targetId: "tour-wish",
-      content: "Post a request for specific resources\nyou are looking for.",
+      content: tTour("wish"),
       layoutType: "wish",
     },
     {
       targetId: "tour-share",
-      content: "List resources you want to\ngive away to the community.",
+      content: tTour("share"),
       layoutType: "share",
     },
     {
       targetId: "tour-feed",
-      content: "Scroll vertical to browse.",
+      content: tTour("scroll"),
       layoutType: "scroll",
     },
     {
       targetId: undefined,
-      content: (
-        <span>
-          Free resources only.
-          <br />
-          <strong className="text-megaweave-red-dark">
-            No monetary transactions
-          </strong>
-          <br />
-          or trades involved.
-        </span>
-      ),
+      content: tTour.rich("rules", {
+        warning: (chunks) => (
+          <strong className="text-megaweave-red-dark">{chunks}</strong>
+        ),
+      }),
       layoutType: "rules",
     },
     {
       targetId: "tour-message",
-      content: (
-        <span>
-          Click
+      content: tTour.rich("message", {
+        icon: () => (
           <div className="mx-2 inline-block rounded-full bg-white px-2 py-1 align-top">
             <PrivateMessageIcon />
           </div>
-          button to send a private message and request weaving with the owner of
-          the post.
-        </span>
-      ),
+        ),
+      }),
       layoutType: "message",
     },
   ];

@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 //* Team Info Page */
 
 import React, { useState, useRef } from "react";
@@ -60,11 +61,12 @@ const TitleWithBgRender: React.FC<TitleSVGProps> = ({ index }) => {
 
 // 獨立的成員卡片組件
 const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
+  const t = useTranslations("About");
   const [showTooltip, setShowTooltip] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  let title = "Member";
+  let title = t("memberTitleFallback");
   if (member.title != undefined) title = member.title;
 
   const handleMouseEnter = () => {
@@ -133,7 +135,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
           >
             <div className="flex items-center space-x-2">
               <div className="h-2 w-2 rounded-full bg-white"></div>
-              <span>View Detail</span>
+              <span>{t("viewDetail")}</span>
             </div>
           </div>
         )}
@@ -147,6 +149,7 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, router }) => {
 };
 
 const TeamInfoPage = () => {
+  const t = useTranslations("About");
   const router = useRouter();
   const { teamMembers, loading, error } = useTeam();
 
@@ -157,7 +160,7 @@ const TeamInfoPage = () => {
         <div className="flex min-h-screen items-center justify-center bg-primary-75">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-secondary"></div>
-            <p className="text-secondary">Loading team members...</p>
+            <p className="text-secondary">{t("loading")}</p>
           </div>
         </div>
       </>
@@ -171,7 +174,7 @@ const TeamInfoPage = () => {
         <div className="flex min-h-screen items-center justify-center bg-primary-75">
           <div className="text-center">
             <h2 className="mb-4 text-2xl font-bold text-secondary">
-              Error loading team members
+              {t("errorTitle")}
             </h2>
             <p className="mb-4 text-secondary/75">{error}</p>
           </div>
@@ -192,10 +195,10 @@ const TeamInfoPage = () => {
                 MEGAWEAVING
               </h1>
               <h2 className="mt-[20px] text-left font-ddin text-2xl font-medium leading-relaxed text-primary-75 md:mt-[60px] md:text-5xl md:text-dark">
-                Weaving Commons of
+                {t("heroTagline1")}
               </h2>
               <h2 className="mb-4 text-left font-ddin text-2xl font-medium leading-relaxed text-primary-75 md:mt-[60px] md:text-5xl md:text-dark">
-                Shared Resources.
+                {t("heroTagline2")}
               </h2>
             </div>
           </div>
@@ -514,26 +517,26 @@ const TeamInfoPage = () => {
                   <img src="/assets/KeyFrame.svg" />
                 </div>
                 <h3 className="pb-30 relative mb-[27px] pt-20 font-ddin text-2xl font-bold text-[#333333] sm:text-[20px] md:text-[50px]">
-                  大量交織 megaweaving
+                  {t("sections.megaweaving")}
                 </h3>
                 <div className="flex h-full items-center justify-center">
                   <img src="/assets/megaweaving.svg" />
                 </div>
 
                 <h3 className="relative pb-[27px] pt-[60px] font-ddin text-2xl font-bold text-[#333333] sm:text-[20px] md:text-[50px]">
-                  資源 Resources
+                  {t("sections.resources")}
                 </h3>
                 <div className="flex h-full items-center justify-center">
                   <img src="/assets/Resources.svg" />
                 </div>
                 <h3 className="relative mb-[27px] pt-[50px] font-ddin text-2xl font-bold text-[#333333] sm:text-[20px] md:text-[50px]">
-                  橋接 Bridging
+                  {t("sections.bridging")}
                 </h3>
                 <div className="flex h-full items-center justify-center">
                   <img src="/assets/Bridging.svg" />
                 </div>
                 <h3 className="pb-30 relative mb-[26px] pt-[50px] font-ddin text-2xl font-bold text-megaweave-forest sm:text-[20px] md:text-[50px]">
-                  織友 Weaver
+                  {t("sections.weaver")}
                 </h3>
                 <div
                   id="our-team"
@@ -558,7 +561,7 @@ const TeamInfoPage = () => {
                   ))}
                 </div>
                 <h3 className="type-h4 relative mb-4 pt-6 font-ddin font-extrabold text-megaweave-forest-dark sm:type-h1">
-                  OUR PARTNER
+                  {t("ourPartner")}
                 </h3>
                 {partners.map((partner, i) => (
                   <div

@@ -67,7 +67,7 @@ const MegaweaveLanding = () => {
     },
     {
       icon: <Share2 className="h-8 w-8" />,
-      title: "Share Commons",
+      title: "Commons",
       description: "Contribute to the permanent commons for collective access",
     },
     {
@@ -291,7 +291,7 @@ const MegaweaveLanding = () => {
                     Join the Commons
                   </h3>
                   <p className="text-megaweave-sand">
-                    Opt into Share Commons for permanent community access,
+                    Opt into Commons for permanent community access,
                     creating a distributed resource network.
                   </p>
                 </div>

@@ -16,7 +16,7 @@ import { localizePath } from "@/i18n/routing";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useUser } from "@/app/contexts/UserContext";
 
 function SigninForm() {
@@ -34,8 +34,13 @@ function SigninForm() {
   const home = localizePath(useLocale(), "/");
   const t = useTranslations("Auth");
 
-  //* After successful sign in, redirect to the page
+  //* After successful sign in, redirect to the page.
+  // Both the submit handlers and the `user` effect below call this; navigating
+  // twice cancels the first load midway, so only the first call wins.
+  const navigatingRef = useRef(false);
   const handleSigninSignupSuccess = useCallback(() => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     if (returnTo) {
       // 使用 window.location.href 強制完整頁面跳轉
       // 確保瀏覽器在新請求時帶上已設置的 session Cookie

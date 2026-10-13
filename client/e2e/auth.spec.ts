@@ -75,8 +75,13 @@ for (const { locale, prefix, messages, logIn } of LOCALES) {
       guestTest.skip(!hasTestUser, "E2E_USER_EMAIL / E2E_USER_PASSWORD not set");
       const copy = messages.Auth;
 
+      // Typing before hydration is lost to React state; the session check runs once hydrated
+      const hydrated = page.waitForResponse((res) =>
+        res.url().endsWith("/api/currentUser"),
+      );
       await page.goto(`${prefix}/user`);
       await expect(page).toHaveURL((url) => url.pathname === `${prefix}/signin`);
+      await hydrated;
 
       await page.getByPlaceholder(copy.emailPlaceholder).fill(testUser.email);
       await page.getByPlaceholder(copy.passwordPlaceholder).fill(testUser.password);

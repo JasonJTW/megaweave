@@ -561,11 +561,20 @@ router.get(
  */
 router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
   try {
-    const payload = req.body || {};
-    console.log(
-      "[Lalamove Webhook] Received webhook event:",
-      JSON.stringify(payload, null, 2),
-    );
+    // server.ts 對此路由使用 express.raw()，req.body 為原始 Buffer，供驗簽使用
+    if (!Buffer.isBuffer(req.body)) {
+      res.status(400).json({ error: "Invalid webhook body" });
+      return;
+    }
+    const rawBody = req.body.toString("utf8");
+
+    let payload;
+    try {
+      payload = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      res.status(400).json({ error: "Invalid JSON payload" });
+      return;
+    }
 
     const authHeader = req.headers["authorization"] as string | undefined;
     let rawSignature = (payload.signature ||
@@ -588,18 +597,23 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    // Verify signature
+    // Verify signature（先驗簽，再信任 payload 內容）
     const isValid = verifyLalamoveWebhookSignature(
-      JSON.stringify(req.body),
+      rawBody,
       rawSignature,
       rawTimestamp,
     );
 
     if (!isValid) {
-      console.warn(
-        "[Lalamove Webhook] Signature verification failed (continuing in development/sandbox)",
-      );
+      console.warn("[Lalamove Webhook] Signature verification failed");
+      res.status(401).json({ error: "Invalid webhook signature" });
+      return;
     }
+
+    console.log(
+      "[Lalamove Webhook] Received webhook event:",
+      JSON.stringify(payload, null, 2),
+    );
 
     const eventType = payload.eventType;
     const order = payload.data?.order;

@@ -1,0 +1,188 @@
+import crypto from "crypto";
+import { Request, Response, RequestHandler } from "express";
+import lalamoveRouter from "./lalamove";
+import dbPool from "./utils/db";
+import { verifyLalamoveWebhookSignature } from "./services/lalamove";
+
+jest.mock("./utils/db", () => ({
+  query: jest.fn(),
+  execute: jest.fn(),
+}));
+
+jest.mock("./middleware/auth", () => ({
+  requireAuth: (_req: Request, _res: Response, next: () => void) => next(),
+}));
+
+const SECRET = "test-secret";
+const NOW = 1_700_000_000_000;
+
+function sign(rawBody: string, timestamp: string, secret = SECRET): string {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}\r\nPOST\r\n/api/lalamove/webhook\r\n\r\n${rawBody}`)
+    .digest("hex");
+}
+
+describe("verifyLalamoveWebhookSignature", () => {
+  const originalEnv = { ...process.env };
+  const body = JSON.stringify({ eventType: "ORDER_STATUS_CHANGED" });
+  const ts = String(NOW);
+
+  beforeEach(() => {
+    process.env.LALAMOVE_API_SECRET = SECRET;
+    process.env.NODE_ENV = "test";
+    jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.restoreAllMocks();
+  });
+
+  it("accepts a valid signature over the raw body", () => {
+    expect(verifyLalamoveWebhookSignature(body, sign(body, ts), ts, NOW)).toBe(true);
+  });
+
+  it("accepts t=...,v1=... header format", () => {
+    const header = `t=${ts},v1=${sign(body, ts)}`;
+    expect(verifyLalamoveWebhookSignature(body, header, undefined, NOW)).toBe(true);
+  });
+
+  it("rejects a tampered body", () => {
+    expect(
+      verifyLalamoveWebhookSignature(`${body} `, sign(body, ts), ts, NOW),
+    ).toBe(false);
+  });
+
+  it("rejects a signature made with a different secret", () => {
+    expect(
+      verifyLalamoveWebhookSignature(body, sign(body, ts, "other"), ts, NOW),
+    ).toBe(false);
+  });
+
+  it("rejects a missing signature", () => {
+    expect(verifyLalamoveWebhookSignature(body, undefined, ts, NOW)).toBe(false);
+  });
+
+  it("rejects a signature of different length without throwing", () => {
+    expect(verifyLalamoveWebhookSignature(body, "abc", ts, NOW)).toBe(false);
+  });
+
+  it("rejects stale timestamps (replay)", () => {
+    const old = String(NOW - 10 * 60 * 1000);
+    expect(verifyLalamoveWebhookSignature(body, sign(body, old), old, NOW)).toBe(false);
+  });
+
+  it("rejects a non-numeric timestamp", () => {
+    expect(verifyLalamoveWebhookSignature(body, sign(body, "x"), "x", NOW)).toBe(false);
+  });
+
+  it("allows missing secret outside production", () => {
+    delete process.env.LALAMOVE_API_SECRET;
+    process.env.NODE_ENV = "development";
+    expect(verifyLalamoveWebhookSignature(body, undefined, undefined, NOW)).toBe(true);
+  });
+
+  it("rejects missing secret in production", () => {
+    delete process.env.LALAMOVE_API_SECRET;
+    process.env.NODE_ENV = "production";
+    expect(verifyLalamoveWebhookSignature(body, undefined, undefined, NOW)).toBe(false);
+  });
+});
+
+describe("POST /webhook handler", () => {
+  const originalEnv = { ...process.env };
+  const layers = (
+    lalamoveRouter as unknown as {
+      stack: {
+        route?: { path: string; methods: Record<string, boolean>; stack: { handle: RequestHandler }[] };
+      }[];
+    }
+  ).stack;
+  const handler = layers.find((l) => l.route?.path === "/webhook" && l.route.methods.post)!
+    .route!.stack[0].handle;
+
+  function mockRes() {
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      locals: {},
+    };
+    return res as unknown as Response & typeof res;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.LALAMOVE_API_SECRET = SECRET;
+    process.env.NODE_ENV = "test";
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.restoreAllMocks();
+  });
+
+  function makeReq(raw: string, headers: Record<string, string> = {}) {
+    return {
+      body: Buffer.from(raw),
+      headers,
+      app: { get: jest.fn() },
+    } as unknown as Request;
+  }
+
+  it("returns 401 and does not touch DB when signature is invalid", async () => {
+    const raw = JSON.stringify({
+      eventType: "ORDER_STATUS_CHANGED",
+      data: { order: { orderId: "O1", status: "COMPLETED" } },
+    });
+    const res = mockRes();
+    await handler(makeReq(raw, { "x-llm-signature": "bad", "x-llm-timestamp": String(Date.now()) }), res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(dbPool.query).not.toHaveBeenCalled();
+    expect(dbPool.execute).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when signature header is missing", async () => {
+    const res = mockRes();
+    await handler(makeReq("{}"), res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  it("returns 401 in production when secret is not configured", async () => {
+    delete process.env.LALAMOVE_API_SECRET;
+    process.env.NODE_ENV = "production";
+    const res = mockRes();
+    await handler(makeReq("{}"), res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  it("returns 400 when body was not parsed as raw Buffer", async () => {
+    const res = mockRes();
+    const req = { body: { eventType: "X" }, headers: {}, app: { get: jest.fn() } } as unknown as Request;
+    await handler(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("returns 400 for invalid JSON", async () => {
+    const res = mockRes();
+    await handler(makeReq("not-json"), res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("accepts a correctly signed webhook (raw body) and responds 200", async () => {
+    const raw = JSON.stringify({ eventType: "UNKNOWN_EVENT", data: {} });
+    const ts = String(Date.now());
+    const res = mockRes();
+    await handler(
+      makeReq(raw, { "x-llm-signature": sign(raw, ts), "x-llm-timestamp": ts }),
+      res,
+      jest.fn(),
+    );
+    expect(res.status).not.toHaveBeenCalledWith(401);
+    expect(res.status).not.toHaveBeenCalledWith(400);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+});

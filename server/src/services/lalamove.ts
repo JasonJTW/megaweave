@@ -712,16 +712,31 @@ export async function getLalamoveDriverDetail(
   }
 }
 
+/** Webhook timestamp 容許誤差（毫秒），超出視為重放 */
+export const LALAMOVE_WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000;
+
 /**
  * 驗證 Lalamove Webhook 簽名
+ * - rawBody 必須是請求的原始字串（不可用 JSON.stringify 重組）
+ * - 未設定 secret 時：僅非 production 允許略過，production 一律拒絕
+ * - timestamp 需在容許範圍內（防重放）
  */
 export function verifyLalamoveWebhookSignature(
   rawBody: string,
   signatureHeader: string | undefined,
   timestampHeader: string | undefined,
+  now: number = Date.now(),
 ): boolean {
   const secret = process.env.LALAMOVE_API_SECRET || LALAMOVE_API_SECRET;
-  if (!secret) return true; // If no secret configured, pass in dev
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[Lalamove Service] LALAMOVE_API_SECRET is not configured; rejecting webhook",
+      );
+      return false;
+    }
+    return true; // dev/sandbox: 未設定 secret 時略過
+  }
 
   if (!signatureHeader) return false;
 
@@ -737,6 +752,11 @@ export function verifyLalamoveWebhookSignature(
     if (vPart) signature = vPart.replace("v1=", "");
   }
 
+  const tsMs = Number(timestamp);
+  if (!Number.isFinite(tsMs) || Math.abs(now - tsMs) > LALAMOVE_WEBHOOK_TOLERANCE_MS) {
+    return false;
+  }
+
   try {
     const dataToSign = `${timestamp}\r\nPOST\r\n/api/lalamove/webhook\r\n\r\n${rawBody}`;
     const expectedSignature = crypto
@@ -744,10 +764,10 @@ export function verifyLalamoveWebhookSignature(
       .update(dataToSign)
       .digest("hex");
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature),
-    );
+    const sigBuf = Buffer.from(signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+    if (sigBuf.length !== expectedBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expectedBuf);
   } catch (e) {
     console.error(
       "[Lalamove Service] Webhook signature verification error:",

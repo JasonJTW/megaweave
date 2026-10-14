@@ -41,6 +41,8 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS
   : ["https://localhost:3000"];
 const PORT = parseInt(process.env.PORT || "8443");
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
+// Lalamove webhook 需以原始 body 驗簽，必須在 express.json() 之前解析為 Buffer
+app.use("/api/lalamove/webhook", express.raw({ type: "*/*", limit: "1mb" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

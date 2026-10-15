@@ -19,6 +19,10 @@ import {
 import { processUserVectorFlush } from "./jobs/userVectorFlush";
 import { processCalculateHotScore } from "./jobs/hotScore";
 import { processDeliveryReconciliation } from "./jobs/deliveryReconcile";
+import {
+  processDeliveryRefund,
+  DeliveryRefundJobData,
+} from "./jobs/deliveryRefund";
 import { initUserVectorFlushCron, initDeliveryReconcileCron } from "./queues";
 import { WORKER_CONCURRENCY } from "./concurrency";
 
@@ -268,6 +272,32 @@ export async function startWorkers(): Promise<void> {
   // 啟動外送訂單對帳排程 (每 5 分鐘一次)
   await initDeliveryReconcileCron();
 
+  // ─── Delivery Refund Worker (Lalamove 終止外送單後自動退款) ─────────────
+  const deliveryRefundWorker = new Worker<DeliveryRefundJobData>(
+    "delivery-refund",
+    async (job: Job<DeliveryRefundJobData>) => {
+      if (job.name === "refund-delivery") {
+        return await processDeliveryRefund(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["delivery-refund"] },
+  );
+
+  deliveryRefundWorker.on("completed", (job, result) => {
+    const res = result as { refunded?: boolean } | undefined;
+    if (res?.refunded) {
+      console.log(
+        `🎉 [delivery-refund] Job ${formatJobId(job.id)} refunded delivery_order #${job.data.deliveryOrderId}`,
+      );
+    }
+  });
+
+  deliveryRefundWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [delivery-refund] Job ${formatJobId(job?.id)} failed: ${err.message}`,
+    );
+  });
+
   activeWorkers = [
     postImageWorker,
     emailWorker,
@@ -276,6 +306,7 @@ export async function startWorkers(): Promise<void> {
     hotScoreWorker,
     userVectorFlushWorker,
     deliveryReconcileWorker,
+    deliveryRefundWorker,
   ];
 
   console.log("🚀 All workers started");

@@ -27,7 +27,7 @@ export const NotificationSchema = z.object({
 export type Notification = z.infer<typeof NotificationSchema>;
 
 export const createNotification = async (
-  io: Server,
+  io: Server | null,
   data: Omit<Notification, "id" | "is_read" | "created_at">
 ) => {
   try {
@@ -52,9 +52,9 @@ export const createNotification = async (
       created_at: new Date(),
     };
 
-    // 2. 透過 Socket.io 實時推送
+    // 2. 透過 Socket.io 實時推送（獨立 worker process 沒有 io 時只寫 DB，使用者下次載入時看到）
     // 記得你之前設定的 Room 名稱是 `user_${id}`
-    io.to(`user_${data.recipient_id}`).emit(
+    io?.to(`user_${data.recipient_id}`).emit(
       "new_notification",
       newNotification
     );

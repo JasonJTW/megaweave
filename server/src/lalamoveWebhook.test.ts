@@ -1,12 +1,17 @@
 import crypto from "crypto";
 import { Request, Response, RequestHandler } from "express";
-import lalamoveRouter from "./lalamove";
+import lalamoveRouter, { getWebhookEventTime } from "./lalamove";
 import dbPool from "./utils/db";
 import { verifyLalamoveWebhookSignature } from "./services/lalamove";
+import { enqueueDeliveryRefund } from "./queue/queues";
 
 jest.mock("./utils/db", () => ({
   query: jest.fn(),
   execute: jest.fn(),
+}));
+
+jest.mock("./queue/queues", () => ({
+  enqueueDeliveryRefund: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("./middleware/auth", () => ({
@@ -186,11 +191,11 @@ describe("POST /webhook handler", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  function signedStatusReq(status: string) {
+  function signedStatusReq(status: string, updatedAt = "2026-10-15T08:00:00.000Z") {
     const raw = JSON.stringify({
       eventType: "ORDER_STATUS_CHANGED",
       eventId: "E1",
-      data: { order: { orderId: "O1", status } },
+      data: { order: { orderId: "O1", status }, updatedAt },
     });
     const ts = String(Date.now());
     const emit = jest.fn();
@@ -210,10 +215,41 @@ describe("POST /webhook handler", () => {
 
     const [sql, params] = (dbPool.query as jest.Mock).mock.calls[1];
     expect(sql).toContain("AND status IN (?)");
-    expect(params[3]).toEqual(["ASSIGNING_DRIVER", "ON_GOING"]);
+    expect(sql).toContain("status_updated_at IS NULL OR status_updated_at <= ?");
+    expect(params[2]).toEqual(new Date("2026-10-15T08:00:00.000Z"));
+    expect(params[3]).toBeNull(); // failure_reason untouched for non-failure status
+    expect(params[5]).toEqual(["ASSIGNING_DRIVER", "ON_GOING"]);
+    expect(params[6]).toEqual(new Date("2026-10-15T08:00:00.000Z"));
+    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
     expect((dbPool.query as jest.Mock).mock.calls[2][0]).toContain("INSERT INTO delivery_order_events");
     expect(emit).toHaveBeenCalledWith("delivery_update", expect.objectContaining({ status: "PICKED_UP" }));
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("REJECTED: records failure reason and enqueues auto-refund", async () => {
+    (dbPool.query as jest.Mock)
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{}]);
+    const { req } = signedStatusReq("REJECTED");
+    await handler(req, mockRes(), jest.fn());
+
+    const params = (dbPool.query as jest.Mock).mock.calls[1][1];
+    expect(params[0]).toBe("FAILED");
+    expect(params[3]).toBe("LALAMOVE_REJECTED");
+    expect(enqueueDeliveryRefund).toHaveBeenCalledWith({
+      deliveryOrderId: 7,
+      reason: "LALAMOVE_REJECTED",
+    });
+  });
+
+  it("does not enqueue refund when the REJECTED event is rejected by the guard", async () => {
+    (dbPool.query as jest.Mock)
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+    const { req } = signedStatusReq("REJECTED");
+    await handler(req, mockRes(), jest.fn());
+    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
   });
 
   it("ignores an out-of-order status (no event row, no status broadcast)", async () => {
@@ -227,5 +263,31 @@ describe("POST /webhook handler", () => {
     expect(dbPool.query).toHaveBeenCalledTimes(2);
     expect(emit.mock.calls[0][1]).not.toHaveProperty("status");
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+});
+
+describe("getWebhookEventTime", () => {
+  const now = new Date("2026-10-15T00:00:00.000Z");
+
+  it("prefers data.updatedAt (ISO string)", () => {
+    expect(
+      getWebhookEventTime(
+        { timestamp: 1, data: { updatedAt: "2026-10-15T08:00:00.123Z" } },
+        now,
+      ),
+    ).toEqual(new Date("2026-10-15T08:00:00.123Z"));
+  });
+
+  it("falls back to top-level timestamp in seconds or milliseconds", () => {
+    expect(getWebhookEventTime({ timestamp: 1_792_000_000 }, now)).toEqual(
+      new Date(1_792_000_000_000),
+    );
+    expect(getWebhookEventTime({ timestamp: "1792000000123" }, now)).toEqual(
+      new Date(1_792_000_000_123),
+    );
+  });
+
+  it("falls back to receive time when no usable timestamp", () => {
+    expect(getWebhookEventTime({ data: { updatedAt: "garbage" } }, now)).toBe(now);
   });
 });

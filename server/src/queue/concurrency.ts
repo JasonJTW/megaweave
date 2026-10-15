@@ -13,6 +13,8 @@ export const WORKER_CONCURRENCY = {
   // 確保同一時間只有一個 flush job 操作 dirty set，避免多個 worker 同時 SPOP 造成資料競態
   "user-vector-flush": 1,
   "delivery-reconcile": 1,
+  // 退款打金流 API，序列化處理避免同一筆付款併發退款
+  "delivery-refund": 1,
 } as const;
 
 /** 單一 post-image job 內同時處理的圖片數（每篇貼文最多 5 張） */

@@ -57,3 +57,22 @@ export function canTransition(
 export function predecessorsOf(to: DeliveryStatus): DeliveryStatus[] {
   return DELIVERY_STATUSES.filter((from) => TRANSITIONS[from].includes(to));
 }
+
+/** Lalamove 端失敗（REJECTED / FAILED）或無司機接單（EXPIRED）：已付款者需自動退款 */
+export const REFUNDABLE_STATUSES: readonly DeliveryStatus[] = ["FAILED", "EXPIRED"];
+
+export function isRefundableStatus(status: string | null | undefined): boolean {
+  return REFUNDABLE_STATUSES.includes(status as DeliveryStatus);
+}
+
+/** 終止原因，例如 LALAMOVE_REJECTED；非失敗類狀態回傳 null（保留原 failure_reason） */
+export function lalamoveFailureReason(
+  dbStatus: string | null | undefined,
+  rawStatus: string | null | undefined,
+): string | null {
+  if (!isRefundableStatus(dbStatus)) return null;
+  const raw = String(rawStatus ?? dbStatus)
+    .replace(/[\s-]/g, "_")
+    .toUpperCase();
+  return `LALAMOVE_${raw}`;
+}

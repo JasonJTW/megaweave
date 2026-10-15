@@ -10,6 +10,7 @@ import {
 } from "./jobs/postImage";
 import { PostEmbeddingJobData } from "./jobs/postEmbedding";
 import { UserVectorJobData } from "./jobs/userVector";
+import type { DeliveryRefundJobData } from "./jobs/deliveryRefund";
 
 import { EmailTemplateProps } from "../emails/EmailTemplate";
 import { getCacheRedisClient } from "../utils/redis";
@@ -272,6 +273,34 @@ export async function initDeliveryReconcileCron(): Promise<void> {
   console.log("⏱️ Delivery Reconcile Cron Scheduler initialized (runs every 5 mins)");
 }
 
+//* ─── Delivery Refund Queue ──────────────────────────────────────────────────
+
+export const deliveryRefundQueue = new Queue<DeliveryRefundJobData>(
+  "delivery-refund",
+  {
+    connection: bullmqConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 10000 },
+      // 保留紀錄供 jobId 去重：同一外送單在保留期內只會排入一次退款
+      removeOnComplete: { age: 30 * 24 * 60 * 60 },
+      removeOnFail: { age: 30 * 24 * 60 * 60 },
+    },
+  },
+);
+
+/** 外送單被 Lalamove 終止（REJECTED / EXPIRED）後排入自動退款；同一外送單以 jobId 去重 */
+export async function enqueueDeliveryRefund(
+  data: DeliveryRefundJobData,
+): Promise<void> {
+  await deliveryRefundQueue.add("refund-delivery", data, {
+    jobId: `delivery-refund-${data.deliveryOrderId}`,
+  });
+  console.log(
+    `💸 Enqueued refund job for delivery_order #${data.deliveryOrderId} (${data.reason})`,
+  );
+}
+
 /** 關閉本模組建立的所有 Queue 連線；供只作為 producer 的短期程序（例如 benchmark runner）結束時使用 */
 export async function closeQueues(): Promise<void> {
   await Promise.all(
@@ -283,6 +312,7 @@ export async function closeQueues(): Promise<void> {
       userVectorFlushQueue,
       hotScoreQueue,
       deliveryReconcileQueue,
+      deliveryRefundQueue,
     ].map((queue) => queue.close()),
   );
 }

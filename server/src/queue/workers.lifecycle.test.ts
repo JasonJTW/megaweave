@@ -33,11 +33,11 @@ describe("Worker Lifecycle & Graceful Shutdown (Slice 2)", () => {
     await stopWorkers();
   });
 
-  it("should start all 7 workers and track them in getActiveWorkers", async () => {
+  it("should start all 8 workers and track them in getActiveWorkers", async () => {
     await startWorkers();
     const workers = getActiveWorkers() as unknown as MockBullMQWorker[];
 
-    expect(workers.length).toBe(7);
+    expect(workers.length).toBe(8);
     const workerNames = workers.map((w) => w.name);
     expect(workerNames).toContain("post-image");
     expect(workerNames).toContain("email");
@@ -46,12 +46,13 @@ describe("Worker Lifecycle & Graceful Shutdown (Slice 2)", () => {
     expect(workerNames).toContain("hot-score");
     expect(workerNames).toContain("user-vector-flush");
     expect(workerNames).toContain("delivery-reconcile");
+    expect(workerNames).toContain("delivery-refund");
   });
 
   it("should gracefully close all workers on stopWorkers() and empty active workers", async () => {
     await startWorkers();
     const workers = getActiveWorkers() as unknown as MockBullMQWorker[];
-    expect(workers.length).toBe(7);
+    expect(workers.length).toBe(8);
 
     const closeMocks = workers.map((w) => w.close);
 

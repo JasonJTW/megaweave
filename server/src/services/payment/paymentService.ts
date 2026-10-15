@@ -314,8 +314,7 @@ export class PaymentService {
         await this.dbPool.query(
           `UPDATE delivery_orders 
            SET status = 'ASSIGNING_DRIVER', lalamove_order_id = ?, share_link = ?, 
-               driver_name = ?, driver_phone = ?, driver_plate_number = ?, 
-               version = version + 1 
+               driver_name = ?, driver_phone = ?, driver_plate_number = ?
            WHERE id = ? AND status = 'ORDER_PLACING'`,
           [
             lalaResult.orderId || null,
@@ -339,7 +338,7 @@ export class PaymentService {
 
         await this.dbPool.query(
           `UPDATE delivery_orders 
-           SET status = 'FAILED', failure_reason = ?, version = version + 1 
+           SET status = 'FAILED', failure_reason = ? 
            WHERE id = ? AND status = 'ORDER_PLACING'`,
           [reason, deliveryOrder.id]
         );

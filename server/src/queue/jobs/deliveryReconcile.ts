@@ -5,7 +5,11 @@ import { Job } from "bullmq";
 import dbPool from "../../utils/db";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getLalamoveOrderDetail } from "../../services/lalamove";
-import { canTransition } from "../../services/deliveryStatus";
+import {
+  canTransition,
+  lalamoveFailureReason,
+} from "../../services/deliveryStatus";
+import { enqueueDeliveryRefund } from "../queues";
 import { mapLalamoveStatusToDbStatus } from "../../lalamove";
 import { getSocketIO } from "../../utils/socket";
 
@@ -67,8 +71,7 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
       const [expireResult] = await dbPool.query<ResultSetHeader>(
         `UPDATE delivery_orders
          SET status = 'EXPIRED',
-             failure_reason = 'Payment not completed before quotation expiry',
-             version = version + 1
+             failure_reason = 'Payment not completed before quotation expiry'
          WHERE id = ? AND status = 'PAYMENT_PENDING'`,
         [row.delivery_order_id],
       );
@@ -166,16 +169,29 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
         const driverPhone = remoteDriver?.phone || null;
         const driverPlate = remoteDriver?.plateNumber || null;
 
+        const failureReason = isValidTransition
+          ? lalamoveFailureReason(newStatus, remoteRawStatus)
+          : null;
+
         // 更新 DB 狀態與司機資訊（AND status = 掃描時的狀態：期間若被 Webhook 改過則放棄，下輪再對帳）
+        // 不更新 status_updated_at：該欄位只存 Lalamove 事件時間，避免與本機時鐘混用造成誤擋
         const [updateResult] = await dbPool.query<ResultSetHeader>(
           `UPDATE delivery_orders
            SET status = ?,
                driver_name = COALESCE(?, driver_name),
                driver_phone = COALESCE(?, driver_phone),
                driver_plate_number = COALESCE(?, driver_plate_number),
-               version = version + 1
+               failure_reason = COALESCE(?, failure_reason)
            WHERE id = ? AND status = ?`,
-          [newStatus, driverName, driverPhone, driverPlate, row.id, row.status],
+          [
+            newStatus,
+            driverName,
+            driverPhone,
+            driverPlate,
+            failureReason,
+            row.id,
+            row.status,
+          ],
         );
         if (updateResult.affectedRows === 0) {
           await logWarn(
@@ -198,6 +214,13 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
             }),
           ],
         );
+
+        if (failureReason) {
+          await enqueueDeliveryRefund({
+            deliveryOrderId: row.id,
+            reason: failureReason,
+          });
+        }
 
         // 透過 Socket.IO 推播給前端
         if (io) {

@@ -131,7 +131,6 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         service_type: "MOTORCYCLE",
         fee_total: 120,
         updated_at: "2026-09-06T12:00:00Z",
-        version: 1,
         sender_name: "Alice",
         sender_phone: "0912345678",
         recipient_name: "Bob",
@@ -265,7 +264,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
 
       expect(lalamoveService.cancelLalamoveOrder).toHaveBeenCalledWith("LALA_123");
       expect(dbPool.query).toHaveBeenCalledWith(
-        "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ? AND status IN (?)",
+        "UPDATE delivery_orders SET status = 'CANCELLED' WHERE lalamove_order_id = ? AND status IN (?)",
         ["LALA_123", ["PAYMENT_PENDING", "ASSIGNING_DRIVER", "ON_GOING"]],
       );
       expect(res.json).toHaveBeenCalledWith({

@@ -1,4 +1,8 @@
-import { canTransition, predecessorsOf } from "./deliveryStatus";
+import {
+  canTransition,
+  lalamoveFailureReason,
+  predecessorsOf,
+} from "./deliveryStatus";
 
 describe("delivery status state machine", () => {
   it.each([
@@ -39,5 +43,17 @@ describe("delivery status state machine", () => {
       "ON_GOING",
       "PICKED_UP",
     ]);
+  });
+});
+
+describe("lalamoveFailureReason", () => {
+  it("derives reason from the raw Lalamove status for refundable statuses", () => {
+    expect(lalamoveFailureReason("FAILED", "REJECTED")).toBe("LALAMOVE_REJECTED");
+    expect(lalamoveFailureReason("EXPIRED", "expired")).toBe("LALAMOVE_EXPIRED");
+  });
+
+  it("returns null for non-failure statuses", () => {
+    expect(lalamoveFailureReason("COMPLETED", "COMPLETED")).toBeNull();
+    expect(lalamoveFailureReason("CANCELLED", "CANCELED")).toBeNull();
   });
 });

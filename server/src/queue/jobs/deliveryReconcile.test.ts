@@ -1,6 +1,7 @@
 import dbPool from "../../utils/db";
 import { getLalamoveOrderDetail } from "../../services/lalamove";
 import { processDeliveryReconciliation } from "./deliveryReconcile";
+import { enqueueDeliveryRefund } from "../queues";
 
 jest.mock("../../utils/db", () => ({
   __esModule: true,
@@ -13,6 +14,9 @@ jest.mock("../../lalamove", () => ({
   mapLalamoveStatusToDbStatus: (s: string) => s,
 }));
 jest.mock("../../utils/socket", () => ({ getSocketIO: () => null }));
+jest.mock("../queues", () => ({
+  enqueueDeliveryRefund: jest.fn().mockResolvedValue(undefined),
+}));
 
 const query = dbPool.query as jest.Mock;
 
@@ -104,6 +108,23 @@ describe("Phase 2: reconcile in-progress orders", () => {
 
     expect(query.mock.calls[2][1][0]).toBe("ASSIGNING_DRIVER");
     expect(result.reconciledCount).toBe(1);
+    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
   });
 
+  it("remote EXPIRED sets failure reason and enqueues refund", async () => {
+    query
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[staleRow("ASSIGNING_DRIVER")]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{}]);
+    (getLalamoveOrderDetail as jest.Mock).mockResolvedValue({ status: "EXPIRED" });
+
+    await processDeliveryReconciliation();
+
+    expect(query.mock.calls[2][1][4]).toBe("LALAMOVE_EXPIRED");
+    expect(enqueueDeliveryRefund).toHaveBeenCalledWith({
+      deliveryOrderId: 1,
+      reason: "LALAMOVE_EXPIRED",
+    });
+  });
 });

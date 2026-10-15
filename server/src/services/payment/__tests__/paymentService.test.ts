@@ -206,7 +206,6 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
             sender_phone: "+886912345678",
             recipient_name: "Bob",
             recipientPhone: "+886987654321",
-            version: 0,
           },
         ],
       ]);
@@ -289,7 +288,6 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
             id: 201,
             payment_id: 101,
             quotation_id: "QUOTE_12345",
-            version: 0,
           },
         ],
       ]);

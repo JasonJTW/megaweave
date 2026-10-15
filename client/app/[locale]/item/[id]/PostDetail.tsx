@@ -17,7 +17,7 @@ import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, ExternalLink, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { mutate } from "swr";
 import CommentSection from "@/app/components/Comment/CommentSection";
@@ -90,6 +90,11 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // 互動狀態
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  // 按讚狀態：intent = 使用者最新意圖，confirmed = 伺服器確認值
+  const [likeReady, setLikeReady] = useState(false);
+  const likeIntentRef = useRef(false);
+  const likeConfirmedRef = useRef({ liked: false, count: 0 });
+  const likeSendingRef = useRef(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // 編輯狀態
@@ -147,6 +152,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       if (response.ok) {
         setPost(data.post);
         setLikeCount(data.post.likes_count);
+        likeConfirmedRef.current.count = data.post.likes_count;
 
         if (data.post.author_public_id) {
           fetchOwnerSidebar(data.post.author_public_id);
@@ -160,6 +166,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
           );
           if (likeResponse.ok) {
             const likeData = await likeResponse.json();
+            likeIntentRef.current = likeData.liked;
+            likeConfirmedRef.current.liked = likeData.liked;
             setIsLiked(likeData.liked);
           }
         }
@@ -173,6 +181,8 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       toast.error(t("fetchFailed"));
     } finally {
       setLoading(false);
+      // 按讚初始狀態載入完成前不開放點擊，避免以錯誤的基準翻轉
+      setLikeReady(true);
     }
   }, [hostName, postId, user, fetchOwnerSidebar, t]);
 
@@ -264,7 +274,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   // 處理按讚
-  const handleLike = async () => {
+  const handleLike = () => {
     if (!user) {
       toast.error(t("signInToLike"));
       router.push(
@@ -273,24 +283,60 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       return;
     }
 
+    if (!likeReady) return;
+
+    // 樂觀更新，並只記錄最新意圖；連點不會逐次翻轉，最終以最後一次點擊為準
+    const next = !likeIntentRef.current;
+    likeIntentRef.current = next;
+    setIsLiked(next);
+    setLikeCount((prev) => prev + (next ? 1 : -1));
+    if (!likeSendingRef.current) void syncLike();
+  };
+
+  // 持續以「目標狀態」送 PUT，直到伺服器狀態與最新意圖一致（冪等，可安全重送）
+  const syncLike = async () => {
+    const LIKE_TIMEOUT_MS = 10_000;
+    likeSendingRef.current = true;
     try {
-      const response = await fetch(`${hostName}/api/posts/${postId}/like`, {
-        method: "POST",
-        credentials: "include",
-      });
+      while (likeConfirmedRef.current.liked !== likeIntentRef.current) {
+        const liked = likeIntentRef.current;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), LIKE_TIMEOUT_MS);
+        try {
+          const response = await fetch(`${hostName}/api/posts/${postId}/like`, {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ liked }),
+            signal: controller.signal,
+          });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.errorMessage || "Unknown error");
-      }
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.errorMessage || "Unknown error");
+          }
 
-      if (response.ok) {
-        const result = await response.json();
-        setIsLiked(result.liked);
-        setLikeCount((prev) => (result.liked ? prev + 1 : prev - 1));
+          const result = await response.json();
+          likeConfirmedRef.current = {
+            liked: result.liked,
+            count: result.likesCount,
+          };
+        } finally {
+          clearTimeout(timer);
+        }
       }
+      // 意圖已與伺服器一致，以伺服器數值校正顯示
+      setIsLiked(likeConfirmedRef.current.liked);
+      setLikeCount(likeConfirmedRef.current.count);
     } catch (error) {
-      console.error("Error toggling like:", error);
+      console.error("Error syncing like:", error);
+      // 失敗回滾到最後確認的伺服器狀態
+      likeIntentRef.current = likeConfirmedRef.current.liked;
+      setIsLiked(likeConfirmedRef.current.liked);
+      setLikeCount(likeConfirmedRef.current.count);
+      toast.error(t("likeFailed"));
+    } finally {
+      likeSendingRef.current = false;
     }
   };
 
@@ -685,6 +731,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 <Button
                   variant="ghost"
                   onClick={handleLike}
+                  disabled={!likeReady}
                   aria-label={t("like")}
                   aria-pressed={isLiked}
                   className={`inline-flex w-14 items-center space-x-[1px] ${

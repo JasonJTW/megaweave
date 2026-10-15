@@ -2,7 +2,13 @@
 
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import useSWRInfinite from "swr/infinite";
 import { useMotionValue } from "framer-motion";
 import { useUser } from "../../contexts/UserContext";
@@ -55,6 +61,31 @@ export default function TinderFeed({
   const [isMessaging, setIsMessaging] = useState(false);
   // Track liked post IDs client-side so reload doesn't lose the liked state
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
+  // 每篇貼文的 like toggle 排隊執行：快速右滑 / undo 不會讓請求亂序造成狀態翻錯
+  const likeQueueRef = useRef<Map<number, Promise<unknown>>>(new Map());
+
+  // 以宣告式 PUT 設定目標狀態（冪等），排隊確保同一篇貼文請求依序送達
+  const enqueueLikeState = useCallback(
+    (postId: number, publicId: string, liked: boolean) => {
+      const prev = likeQueueRef.current.get(postId) ?? Promise.resolve();
+      const next = prev.catch(() => undefined).then(async () => {
+        const response = await fetch(
+          `${hostName}/api/posts/${publicId}/like`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ liked }),
+          },
+        );
+        if (!response.ok) throw new Error(`Like request failed: ${response.status}`);
+        return response;
+      });
+      likeQueueRef.current.set(postId, next);
+      return next;
+    },
+    [hostName],
+  );
 
   // SWR Infinite fetcher for personal recommendation feed
   // SWR key includes maxDistanceKm so changing radius triggers a full fresh fetch
@@ -157,10 +188,7 @@ export default function TinderFeed({
           toast(t("alreadyLiked"), { icon: "💚", duration: 1500 });
         } else if (user) {
           try {
-            await fetch(`${hostName}/api/posts/${currentPost.public_id}/like`, {
-              method: "POST",
-              credentials: "include",
-            });
+            await enqueueLikeState(currentPost.id, currentPost.public_id, true);
             setLikedIds((prev) => new Set(prev).add(currentPost.id));
             toast.success(t("likeSuccess"), {
               icon: "💚",
@@ -181,8 +209,8 @@ export default function TinderFeed({
       availablePosts,
       t,
       user,
-      hostName,
       likedIds,
+      enqueueLikeState,
       topCardX,
       rawPosts.length,
       history.length,
@@ -223,10 +251,9 @@ export default function TinderFeed({
       !lastItem.post.is_liked &&
       likedIds.has(lastItem.post.id)
     ) {
-      fetch(`${hostName}/api/posts/${lastItem.post.public_id}/like`, {
-        method: "POST",
-        credentials: "include",
-      }).catch((err) => console.error("Error reverting like:", err));
+      enqueueLikeState(lastItem.post.id, lastItem.post.public_id, false).catch(
+        (err) => console.error("Error reverting like:", err),
+      );
       setLikedIds((prev) => {
         const next = new Set(prev);
         next.delete(lastItem.post.id);
@@ -235,7 +262,7 @@ export default function TinderFeed({
     }
 
     toast(t("undone"), { icon: "↩️", duration: 1500 });
-  }, [history, t, user, hostName, likedIds]);
+  }, [history, t, user, likedIds, enqueueLikeState]);
 
   // Navigate to post detail
   const handleDetail = useCallback(

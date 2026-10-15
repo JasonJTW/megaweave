@@ -372,6 +372,7 @@
     "deleteFailed": "貼文刪除失敗",
     "deleteConfirm": "確定要刪除這則貼文嗎？此動作無法復原。",
     "signInToLike": "請先登入才能按讚",
+    "likeFailed": "按讚失敗，請稍後再試",
     "shareFailed": "分享失敗",
     "viewCount": "{count} 次瀏覽",
     "like": "按讚",

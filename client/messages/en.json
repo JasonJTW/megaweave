@@ -372,6 +372,7 @@
     "deleteFailed": "Failed to delete post",
     "deleteConfirm": "Are you sure you want to delete this post? This action cannot be undone.",
     "signInToLike": "Please log in to like",
+    "likeFailed": "Failed to like, please try again",
     "shareFailed": "Failed to share",
     "viewCount": "{count} views",
     "like": "Like",

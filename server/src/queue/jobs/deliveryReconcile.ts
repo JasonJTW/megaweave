@@ -3,8 +3,9 @@
 
 import { Job } from "bullmq";
 import dbPool from "../../utils/db";
-import { RowDataPacket } from "mysql2";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getLalamoveOrderDetail } from "../../services/lalamove";
+import { canTransition } from "../../services/deliveryStatus";
 import { mapLalamoveStatusToDbStatus } from "../../lalamove";
 import { getSocketIO } from "../../utils/socket";
 
@@ -63,7 +64,7 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
   for (const row of expiredRows) {
     try {
       // 將 delivery_orders 標為 EXPIRED（用 AND status = 'PAYMENT_PENDING' 防止 race condition）
-      await dbPool.query(
+      const [expireResult] = await dbPool.query<ResultSetHeader>(
         `UPDATE delivery_orders
          SET status = 'EXPIRED',
              failure_reason = 'Payment not completed before quotation expiry',
@@ -71,6 +72,8 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
          WHERE id = ? AND status = 'PAYMENT_PENDING'`,
         [row.delivery_order_id],
       );
+      // 期間已付款（轉為 ORDER_PLACING）→ 不再過期，也不取消 payment
+      if (expireResult.affectedRows === 0) continue;
 
       // 若對應的 payment 仍在 PENDING，一併取消
       if (row.payment_id) {
@@ -143,27 +146,43 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
       const isStatusChanged = remoteDbStatus && remoteDbStatus !== row.status;
       const isDriverNewlyFound = !row.driver_name && remoteDriver?.name;
 
-      if (isStatusChanged || isDriverNewlyFound) {
+      // 狀態機守衛：遠端狀態不是合法轉移時不覆寫狀態（仍可補司機資訊）
+      const isValidTransition =
+        isStatusChanged && canTransition(row.status, remoteDbStatus);
+      if (isStatusChanged && !isValidTransition) {
+        await logWarn(
+          `Skipped invalid transition for order ${row.lalamove_order_id}: '${row.status}' -> '${remoteDbStatus}'`,
+        );
+      }
+
+      if (isValidTransition || isDriverNewlyFound) {
         await logWarn(
           `Discrepancy detected for order ${row.lalamove_order_id}: local status='${row.status}' vs remote='${remoteDbStatus}'`,
         );
 
-        const newStatus = remoteDbStatus || row.status;
+        const newStatus =
+          isValidTransition && remoteDbStatus ? remoteDbStatus : row.status;
         const driverName = remoteDriver?.name || null;
         const driverPhone = remoteDriver?.phone || null;
         const driverPlate = remoteDriver?.plateNumber || null;
 
-        // 更新 DB 狀態與司機資訊
-        await dbPool.query(
+        // 更新 DB 狀態與司機資訊（AND status = 掃描時的狀態：期間若被 Webhook 改過則放棄，下輪再對帳）
+        const [updateResult] = await dbPool.query<ResultSetHeader>(
           `UPDATE delivery_orders
            SET status = ?,
                driver_name = COALESCE(?, driver_name),
                driver_phone = COALESCE(?, driver_phone),
                driver_plate_number = COALESCE(?, driver_plate_number),
                version = version + 1
-           WHERE id = ?`,
-          [newStatus, driverName, driverPhone, driverPlate, row.id],
+           WHERE id = ? AND status = ?`,
+          [newStatus, driverName, driverPhone, driverPlate, row.id, row.status],
         );
+        if (updateResult.affectedRows === 0) {
+          await logWarn(
+            `Order ${row.lalamove_order_id} changed concurrently (was '${row.status}'), skipping`,
+          );
+          continue;
+        }
 
         // 記錄稽核事件
         await dbPool.query(

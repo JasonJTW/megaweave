@@ -185,4 +185,47 @@ describe("POST /webhook handler", () => {
     expect(res.status).not.toHaveBeenCalledWith(400);
     expect(res.status).toHaveBeenCalledWith(200);
   });
+
+  function signedStatusReq(status: string) {
+    const raw = JSON.stringify({
+      eventType: "ORDER_STATUS_CHANGED",
+      eventId: "E1",
+      data: { order: { orderId: "O1", status } },
+    });
+    const ts = String(Date.now());
+    const emit = jest.fn();
+    const req = makeReq(raw, { "x-llm-signature": sign(raw, ts), "x-llm-timestamp": ts });
+    (req.app.get as jest.Mock).mockReturnValue({ to: jest.fn().mockReturnValue({ emit }) });
+    return { req, emit };
+  }
+
+  it("guards status UPDATE with valid predecessor statuses", async () => {
+    (dbPool.query as jest.Mock)
+      .mockResolvedValueOnce([[{ id: 7 }]]) // SELECT id
+      .mockResolvedValueOnce([{ affectedRows: 1 }]) // guarded UPDATE
+      .mockResolvedValueOnce([{}]); // INSERT event
+    const { req, emit } = signedStatusReq("PICKED_UP");
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    const [sql, params] = (dbPool.query as jest.Mock).mock.calls[1];
+    expect(sql).toContain("AND status IN (?)");
+    expect(params[3]).toEqual(["ASSIGNING_DRIVER", "ON_GOING"]);
+    expect((dbPool.query as jest.Mock).mock.calls[2][0]).toContain("INSERT INTO delivery_order_events");
+    expect(emit).toHaveBeenCalledWith("delivery_update", expect.objectContaining({ status: "PICKED_UP" }));
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("ignores an out-of-order status (no event row, no status broadcast)", async () => {
+    (dbPool.query as jest.Mock)
+      .mockResolvedValueOnce([[{ id: 7 }]]) // SELECT id
+      .mockResolvedValueOnce([{ affectedRows: 0 }]); // guard rejects (e.g. already COMPLETED)
+    const { req, emit } = signedStatusReq("ON_GOING");
+    const res = mockRes();
+    await handler(req, res, jest.fn());
+
+    expect(dbPool.query).toHaveBeenCalledTimes(2);
+    expect(emit.mock.calls[0][1]).not.toHaveProperty("status");
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });

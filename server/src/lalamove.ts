@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import { Server } from "socket.io";
 import dbPool from "./utils/db";
-import { RowDataPacket } from "mysql2/promise";
+import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import {
   requestLalamoveQuotation,
@@ -16,11 +16,18 @@ import {
   CreateOrderParams,
   getLalamoveMarketInfo,
 } from "./services/lalamove";
+import {
+  DeliveryStatus,
+  canTransition,
+  predecessorsOf,
+} from "./services/deliveryStatus";
 
 /**
  * 將 Lalamove 官方狀態字串對應至資料庫 delivery_orders.status ENUM
  */
-export function mapLalamoveStatusToDbStatus(status?: string): string | null {
+export function mapLalamoveStatusToDbStatus(
+  status?: string,
+): DeliveryStatus | null {
   if (!status) return null;
   const upper = String(status).replace(/[\s-]/g, "_").toUpperCase();
   switch (upper) {
@@ -421,15 +428,8 @@ async function handleCancelOrder(
       return;
     }
 
-    // 已送達、司機已取件或已終止狀態不可取消
-    const nonCancellableStatuses = [
-      "PICKED_UP",
-      "COMPLETED",
-      "CANCELLED",
-      "EXPIRED",
-      "FAILED",
-    ];
-    if (nonCancellableStatuses.includes(orderRecord.status)) {
+    // 已送達、司機已取件或已終止狀態不可取消（依狀態機判斷）
+    if (!canTransition(orderRecord.status, "CANCELLED")) {
       res.status(400).json({
         error: `Cannot cancel order with current status: ${orderRecord.status}`,
       });
@@ -441,8 +441,8 @@ async function handleCancelOrder(
     // 更新資料庫 delivery_orders 狀態為 CANCELLED
     await dbPool
       .query(
-        "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ?",
-        [orderId],
+        "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ? AND status IN (?)",
+        [orderId, predecessorsOf("CANCELLED")],
       )
       .catch((e) =>
         console.warn("[Lalamove] Update cancel status to DB error:", e),
@@ -654,6 +654,7 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
         console.log(`[Lalamove Webhook] location:`, JSON.stringify(location));
       }
 
+      let statusApplied = false;
       try {
         const [orderRows] = await dbPool.query<RowDataPacket[]>(
           "SELECT id FROM delivery_orders WHERE lalamove_order_id = ?",
@@ -698,17 +699,23 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
         }
 
         // 2. 如果有訂單狀態變更（例如 ORDER_STATUS_CHANGED 事件），更新狀態
+        //    狀態機守衛：只有合法前置狀態可轉移，亂序 / 重送的事件會被忽略
         if (dbStatus) {
-          await dbPool.query(
+          const [updateResult] = await dbPool.query<ResultSetHeader>(
             `UPDATE delivery_orders 
              SET status = ?,
                  raw_webhook_payload = ?,
                  version = version + 1
-             WHERE lalamove_order_id = ?`,
-            [dbStatus, JSON.stringify(payload), orderId],
+             WHERE lalamove_order_id = ? AND status IN (?)`,
+            [dbStatus, JSON.stringify(payload), orderId, predecessorsOf(dbStatus)],
           );
+          statusApplied = updateResult.affectedRows > 0;
 
-          if (deliveryOrderId) {
+          if (!statusApplied) {
+            console.warn(
+              `[Lalamove Webhook] Ignored ${dbStatus} for order ${orderId}: not a valid transition from current status`,
+            );
+          } else if (deliveryOrderId) {
             const eventId = payload.eventId || null;
             await dbPool.query(
               `INSERT INTO delivery_order_events (delivery_order_id, event_id, event_status, raw_payload)
@@ -731,7 +738,7 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
           updatedAt: new Date().toISOString(),
         };
 
-        if (dbStatus) {
+        if (dbStatus && statusApplied) {
           socketPayload.status = dbStatus;
         }
         if (driver) {
@@ -839,8 +846,8 @@ router.put(
       // 更新資料庫 delivery_orders 狀態為 ON_GOING
       await dbPool
         .query(
-          "UPDATE delivery_orders SET status = 'ON_GOING', version = version + 1 WHERE lalamove_order_id = ?",
-          [orderId],
+          "UPDATE delivery_orders SET status = 'ON_GOING', version = version + 1 WHERE lalamove_order_id = ? AND status IN (?)",
+          [orderId, predecessorsOf("ON_GOING")],
         )
         .catch((e) =>
           console.warn("[Sandbox] Update ON_GOING status to DB error:", e),
@@ -890,8 +897,8 @@ router.put(
       // 更新資料庫 delivery_orders 狀態為 PICKED_UP
       await dbPool
         .query(
-          "UPDATE delivery_orders SET status = 'PICKED_UP', version = version + 1 WHERE lalamove_order_id = ?",
-          [orderId],
+          "UPDATE delivery_orders SET status = 'PICKED_UP', version = version + 1 WHERE lalamove_order_id = ? AND status IN (?)",
+          [orderId, predecessorsOf("PICKED_UP")],
         )
         .catch((e) =>
           console.warn("[Sandbox] Update PICKED_UP status to DB error:", e),
@@ -941,8 +948,8 @@ router.put(
       // 更新資料庫 delivery_orders 狀態為 COMPLETED
       await dbPool
         .query(
-          "UPDATE delivery_orders SET status = 'COMPLETED', version = version + 1 WHERE lalamove_order_id = ?",
-          [orderId],
+          "UPDATE delivery_orders SET status = 'COMPLETED', version = version + 1 WHERE lalamove_order_id = ? AND status IN (?)",
+          [orderId, predecessorsOf("COMPLETED")],
         )
         .catch((e) =>
           console.warn("[Sandbox] Update COMPLETED status to DB error:", e),

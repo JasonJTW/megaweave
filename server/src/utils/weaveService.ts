@@ -3,6 +3,7 @@
 // 對外介面：requestWeave() 和 approveWeave()
 
 import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { Pool, PoolConnection } from "mysql2/promise";
 import { Server } from "socket.io";
 import dbPool from "./db";
 import { createNotification } from "./notificationService";
@@ -92,13 +93,17 @@ async function validatePost(
   return rows[0] as { user_id: number; status: string; type: string };
 }
 
+/**
+ * 軟檢查：庫存是否足夠（無鎖，只做早期回饋；真正保證在 deductInventory）
+ */
 async function validateItems(
   items: Array<{ itemId: number | null; quantity: number }>,
   postId: number,
+  db: Pool | PoolConnection = dbPool,
 ): Promise<void> {
   for (const item of items) {
     if (!item.itemId) continue;
-    const [rows] = await dbPool.execute<RowDataPacket[]>(
+    const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT quantity, title FROM items WHERE id = ? AND post_id = ?`,
       [item.itemId, postId],
     );
@@ -112,6 +117,63 @@ async function validateItems(
         400,
         `Requested quantity (${item.quantity}) exceeds available stock (${rows[0].quantity}) for "${rows[0].title}"`,
       );
+  }
+}
+
+async function getWeaveStockItems(
+  connection: PoolConnection,
+  weaveId: string | number,
+): Promise<Array<{ itemId: number; quantity: number }>> {
+  const [rows] = await connection.execute<RowDataPacket[]>(
+    `SELECT item_id, SUM(quantity) AS quantity
+     FROM weave_items
+     WHERE weave_id = ? AND item_id IS NOT NULL
+     GROUP BY item_id`,
+    [weaveId],
+  );
+  return rows.map((r) => ({
+    itemId: Number(r.item_id),
+    quantity: Number(r.quantity),
+  }));
+}
+
+/**
+ * 硬檢查 + 扣庫存：FOR UPDATE 鎖住 items 列後再比對，避免多筆 Weave 同時完成而扣成負數。
+ * 不足時拋 WeaveError(400)，由呼叫端 rollback（Weave 維持 approved，雙方可再溝通）。
+ */
+async function deductInventory(
+  connection: PoolConnection,
+  weaveId: string | number,
+): Promise<void> {
+  const items = await getWeaveStockItems(connection, weaveId);
+  if (items.length === 0) return;
+
+  const ids = items.map((it) => it.itemId);
+  const [stockRows] = await connection.execute<RowDataPacket[]>(
+    `SELECT id, title, quantity FROM items
+     WHERE id IN (${ids.map(() => "?").join(", ")})
+     ORDER BY id
+     FOR UPDATE`,
+    ids,
+  );
+  const stockById = new Map(stockRows.map((r) => [Number(r.id), r]));
+
+  for (const item of items) {
+    const stock = stockById.get(item.itemId);
+    if (!stock)
+      throw new WeaveError(400, `Item ${item.itemId} is no longer available`);
+    if (Number(stock.quantity) < item.quantity)
+      throw new WeaveError(
+        400,
+        `Insufficient stock for "${stock.title}": requested ${item.quantity}, available ${stock.quantity}`,
+      );
+  }
+
+  for (const item of items) {
+    await connection.execute(
+      `UPDATE items SET quantity = quantity - ? WHERE id = ?`,
+      [item.quantity, item.itemId],
+    );
   }
 }
 
@@ -503,6 +565,11 @@ export async function approveWeave(
       if (newStatus === "approved") {
         if (!isPostAuthor)
           throw new WeaveError(403, "Only post author can approve");
+        await validateItems(
+          await getWeaveStockItems(connection, weaveId),
+          weave.post_id,
+          connection,
+        );
         await connection.execute(
           `UPDATE weaves SET status = 'approved' WHERE id = ?`,
           [weaveId],
@@ -546,22 +613,18 @@ export async function approveWeave(
           Boolean(check[0].receiver_confirmed);
 
         if (bothConfirmed) {
-          // Deduct inventory
-          const [weaveItems] = await connection.execute<RowDataPacket[]>(
-            `SELECT item_id, quantity FROM weave_items WHERE weave_id = ? AND item_id IS NOT NULL`,
-            [weaveId],
-          );
-          for (const item of weaveItems) {
-            await connection.execute(
-              `UPDATE items SET quantity = quantity - ? WHERE id = ?`,
-              [item.quantity, item.item_id],
-            );
-          }
+          await deductInventory(connection, weaveId);
           await connection.execute(
             `UPDATE weaves SET status = 'completed', completed_at = NOW() WHERE id = ?`,
             [weaveId],
           );
         } else {
+          // 單邊確認不扣庫存，先做軟檢查提早告知庫存不足
+          await validateItems(
+            await getWeaveStockItems(connection, weaveId),
+            weave.post_id,
+            connection,
+          );
           // Partial confirm: commit early, broadcast partial state, return
           await connection.commit();
           const recipientId = isGiver ? weave.receiver_id : weave.giver_id;

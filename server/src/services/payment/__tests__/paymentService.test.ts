@@ -211,6 +211,9 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
         ],
       ]);
 
+      // UPDATE delivery_orders → ORDER_PLACING (state guard passes)
+      mockConnection.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
       // Lalamove dispatch success
       mockLalamoveService.createLalamoveOrder.mockResolvedValue({
         orderId: "LALA_ORDER_888",
@@ -291,6 +294,9 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
         ],
       ]);
 
+      // UPDATE delivery_orders → ORDER_PLACING (state guard passes)
+      mockConnection.query.mockResolvedValueOnce([{ affectedRows: 1 }]);
+
       // Lalamove dispatch fails (e.g. quote expired)
       mockLalamoveService.createLalamoveOrder.mockRejectedValue(
         new Error("ERR_QUOTATION_EXPIRED"),
@@ -337,6 +343,45 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
           tradeNo: "ECPAY_TRADE_999",
           amount: 150,
         }),
+      );
+    });
+
+    it("should refund without dispatching if delivery order already left PAYMENT_PENDING (e.g. EXPIRED)", async () => {
+      mockProvider.verifyAndParseCallback.mockResolvedValue({
+        isValid: true,
+        isSuccess: true,
+        merchantTradeNo: "MW1234567890",
+        tradeNo: "ECPAY_TRADE_999",
+        amount: 150,
+        rtnCode: 1,
+        rtnMsg: "Succeeded",
+        simulatedPaid: false,
+        rawPayload: {},
+      });
+
+      mockConnection.query
+        .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE payments → PAID
+        .mockResolvedValueOnce([[{ id: 201, payment_id: 101, quotation_id: "QUOTE_12345" }]]) // SELECT delivery order
+        .mockResolvedValueOnce([{ affectedRows: 0 }]); // UPDATE → ORDER_PLACING rejected by state guard
+
+      mockPool.query
+        .mockResolvedValueOnce([
+          [{ id: 101, merchant_trade_no: "MW1234567890", trade_no: "ECPAY_TRADE_999", amount: 150, status: "PAID" }],
+        ]) // SELECT payments
+        .mockResolvedValueOnce([[{ total_refunded: 0 }]]) // SELECT sum refunds
+        .mockResolvedValueOnce([{ insertId: 1 }]) // INSERT payment_refunds
+        .mockResolvedValueOnce([{ affectedRows: 1 }]); // UPDATE payments → REFUNDED
+
+      mockProvider.refundPayment.mockResolvedValue({ isSuccess: true, rtnCode: 1 });
+
+      const result = await paymentService.handlePaymentCallback({
+        MerchantTradeNo: "MW1234567890",
+      });
+
+      expect(result.status).toBe("PROCESSED");
+      expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
+      expect(mockProvider.refundPayment).toHaveBeenCalledWith(
+        expect.objectContaining({ merchantTradeNo: "MW1234567890", amount: 150 }),
       );
     });
   });

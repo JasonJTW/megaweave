@@ -5,6 +5,7 @@ import {
   PaymentSessionResult,
 } from "./types";
 import { CreateOrderParams } from "../lalamove";
+import { predecessorsOf } from "../deliveryStatus";
 
 export interface CreateCheckoutOrderInput {
   userId: number;
@@ -220,6 +221,7 @@ export class PaymentService {
     const conn = await this.dbPool.getConnection();
     let deliveryOrder: DeliveryOrderRow | null = null;
     let paymentId: number | null = null;
+    let undispatchableReason: string | null = null;
 
     try {
       await conn.beginTransaction();
@@ -259,11 +261,17 @@ export class PaymentService {
         deliveryOrder = orderRows[0];
         paymentId = deliveryOrder.payment_id;
 
-        // 標記外送訂單正在向 Lalamove 派單
-        await conn.query(
-          "UPDATE delivery_orders SET status = 'ORDER_PLACING' WHERE id = ?",
-          [deliveryOrder.id]
+        // 標記外送訂單正在向 Lalamove 派單（狀態機守衛：僅 PAYMENT_PENDING 可轉移）
+        const [placingResult] = await conn.query<ResultSetHeader>(
+          "UPDATE delivery_orders SET status = 'ORDER_PLACING' WHERE id = ? AND status IN (?)",
+          [deliveryOrder.id, predecessorsOf("ORDER_PLACING")]
         );
+
+        // 付款到達前外送單已過期 / 取消 → 不派單，改為自動退款
+        if (placingResult.affectedRows === 0) {
+          undispatchableReason = `Delivery order ${deliveryOrder.id} is no longer awaiting payment`;
+          deliveryOrder = null;
+        }
       }
 
       await conn.commit();
@@ -272,6 +280,15 @@ export class PaymentService {
       throw err;
     } finally {
       conn.release();
+    }
+
+    if (undispatchableReason && paymentId) {
+      try {
+        await this.refund(paymentId, `AUTO_REFUND: ${undispatchableReason}`);
+      } catch (refundErr) {
+        console.error("Auto-refund failed for undispatchable delivery order:", refundErr);
+      }
+      return { status: "PROCESSED", message: "Payment refunded: delivery order no longer payable" };
     }
 
     // 3. 觸發 Lalamove 建立訂單
@@ -299,7 +316,7 @@ export class PaymentService {
            SET status = 'ASSIGNING_DRIVER', lalamove_order_id = ?, share_link = ?, 
                driver_name = ?, driver_phone = ?, driver_plate_number = ?, 
                version = version + 1 
-           WHERE id = ?`,
+           WHERE id = ? AND status = 'ORDER_PLACING'`,
           [
             lalaResult.orderId || null,
             lalaResult.shareLink || null,
@@ -323,7 +340,7 @@ export class PaymentService {
         await this.dbPool.query(
           `UPDATE delivery_orders 
            SET status = 'FAILED', failure_reason = ?, version = version + 1 
-           WHERE id = ?`,
+           WHERE id = ? AND status = 'ORDER_PLACING'`,
           [reason, deliveryOrder.id]
         );
 

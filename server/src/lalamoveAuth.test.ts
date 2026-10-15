@@ -265,8 +265,8 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
 
       expect(lalamoveService.cancelLalamoveOrder).toHaveBeenCalledWith("LALA_123");
       expect(dbPool.query).toHaveBeenCalledWith(
-        "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ?",
-        ["LALA_123"],
+        "UPDATE delivery_orders SET status = 'CANCELLED', version = version + 1 WHERE lalamove_order_id = ? AND status IN (?)",
+        ["LALA_123", ["PAYMENT_PENDING", "ASSIGNING_DRIVER", "ON_GOING"]],
       );
       expect(res.json).toHaveBeenCalledWith({
         success: true,

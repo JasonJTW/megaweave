@@ -299,7 +299,7 @@ CREATE TABLE `delivery_orders` (
   `driver_plate_number` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '司機車牌號碼',
   `failure_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '訂單失敗或取消原因說明',
   `raw_webhook_payload` json DEFAULT NULL COMMENT 'Lalamove Webhook 最新推送之原始 Payload (JSON)',
-  `version` int NOT NULL DEFAULT '0' COMMENT '樂觀鎖版本號 (防止併發更新衝突)',
+  `version` int NOT NULL DEFAULT '0' COMMENT '變更計數器 (每次狀態/司機資訊更新 +1；併發控制由 status 狀態機守衛負責，見 deliveryStatus.ts)',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
   PRIMARY KEY (`id`),

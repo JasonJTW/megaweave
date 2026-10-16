@@ -24,6 +24,9 @@ dotenv.config();
 const router = Router();
 const UPLOAD_IMAGE_LIMIT = process.env.UPLOAD_IMAGE_LIMIT || "5";
 
+/// Post public_id (UUID) validation，避免非 UUID 字串打到 MySQL
+const PublicIdSchema = z.string().uuid();
+
 /// Post validation Schema
 const ItemSchema = z.object({
   title: z.string().min(1, "Item title is required").max(20, "Title too long"),
@@ -438,15 +441,16 @@ router.get(
 //* Get post details api (using public_id)
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const publicId = req.params.id;
-    if (!publicId) {
+    const parsedId = PublicIdSchema.safeParse(req.params.id);
+    if (!parsedId.success) {
       return res.status(400).json({ errorMessage: "Invalid post ID" });
     }
+    const publicId = parsedId.data;
 
     const session = await getUserFromCookie(req);
     const currentUserId = session?.userId;
-    const viewerIp =
-      (req.headers["x-forwarded-for"] as string) || req.ip || "unknown_ip";
+    // 只信任 Express 解析後的 req.ip（trust proxy），client 自帶的 X-Forwarded-For 可偽造
+    const viewerIp = req.ip || "unknown_ip";
 
     const post = await postService.getPostByPublicId(publicId, {
       currentUserId,

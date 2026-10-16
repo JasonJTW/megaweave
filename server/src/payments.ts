@@ -215,17 +215,25 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
   /**
    * POST /api/payments/ecpay/callback
    * 綠界 Server-to-Server 背景 Webhook (ReturnURL)
-   * ⚠️ 綠界硬性規定：無論如何必須在 HTTP 200 回應純文字 "1|OK"，避免綠界無限重試
+   * 只有處理成功（PROCESSED）或已處理過（IGNORED）才回 "1|OK"；
+   * 處理中丟錯（例如 DB 斷線導致交易 rollback）回 500，讓綠界稍後重送（當天最多 4 次）。
+   * 閘門是冪等的，重送多少次都安全。
    */
   router.post("/ecpay/callback", async (req: Request, res: Response): Promise<void> => {
+    const payload = req.body as Record<string, string>;
     try {
-      const payload = req.body as Record<string, string>;
-      await paymentService.handlePaymentCallback(payload);
-    } catch (err) {
-      console.error("Error processing ECPay callback:", err);
-    } finally {
-      // 確保回應 1|OK
+      const result = await paymentService.handlePaymentCallback(payload);
+      console.log(
+        `[ECPay Callback] ${payload.MerchantTradeNo}: ${result.status} - ${result.message}`
+      );
+      if (result.status === "FAILED") {
+        res.status(400).send(`0|${result.message}`);
+        return;
+      }
       res.status(200).send("1|OK");
+    } catch (err) {
+      console.error(`Error processing ECPay callback ${payload?.MerchantTradeNo}:`, err);
+      res.status(500).send("0|Internal Error");
     }
   });
 

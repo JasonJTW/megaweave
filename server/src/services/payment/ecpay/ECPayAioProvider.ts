@@ -9,6 +9,8 @@ import {
 } from "../types";
 import { generateCheckMacValue, verifyCheckMacValue } from "./cmv";
 
+const REFUND_TIMEOUT_MS = 30 * 1000;
+
 export interface ECPayConfig {
   merchantId: string;
   hashKey: string;
@@ -225,6 +227,8 @@ export class ECPayAioProvider implements IPaymentProvider {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      // 綠界卡住時不讓請求無限掛著；逾時視為結果不明，由 refund() 保留 PENDING 並告警
+      signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
     });
 
     const responseText = await response.text();

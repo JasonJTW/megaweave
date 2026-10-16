@@ -6,6 +6,7 @@ import dbPool from "../../utils/db";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getLalamoveOrderDetail } from "../../services/lalamove";
 import {
+  REFUNDABLE_STATUSES,
   canTransition,
   lalamoveFailureReason,
 } from "../../services/deliveryStatus";
@@ -24,11 +25,33 @@ interface StaleDeliveryOrderRow extends RowDataPacket {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * 執行外送訂單狀態對帳，分兩個階段：
+ * 待付款外送單的付款窗口（分鐘）。綠界 AIO 信用卡付款頁有效 10 分鐘且無法調整，
+ * 加上回呼延遲緩衝；窗口內即使報價過期也不關單，付款成功後由 PaymentService 重新報價派單。
+ */
+export const PAYMENT_WINDOW_MINUTES = 30;
+
+/**
+ * ORDER_PLACING 逾時（分鐘）。Lalamove 建單為同步呼叫、建單即進入 ASSIGNING_DRIVER，
+ * 超過此時間仍未寫回 orderId 代表派單 saga 中斷（當機 / T2 回應遺失 / T3 寫入失敗）。
+ * 判定失敗並退款；若 Lalamove 其實已建單，晚到的 ORDER_CREATED webhook 會取消該單（見 deliveryRecovery）。
+ */
+export const ORDER_PLACING_TIMEOUT_MINUTES = 1;
+
+/** 終止後多久仍未退款才補排（給正常流程的退款 job 先跑） */
+const REFUND_SWEEP_GRACE_MINUTES = 10;
+
+/**
+ * 執行外送訂單狀態對帳，分三個階段：
+ *
+ * Phase 0 – ORDER_PLACING 逾時掃描 + 退款保底
+ *   掃描超過 ORDER_PLACING_TIMEOUT_MINUTES 仍在 ORDER_PLACING 的訂單，標記 FAILED 並排入退款、告警。
+ *   再掃描「外送單已終止（FAILED / EXPIRED）但付款仍為 PAID」者補排退款：
+ *   排入佇列失敗（例如 Redis 斷線）時綠界重送會被冪等閘門擋下，沒有這層就沒人會再退款。
  *
  * Phase 1 – PAYMENT_PENDING 逾期掃描
- *   掃描 expires_at < NOW() 的 PAYMENT_PENDING 訂單，標記為 EXPIRED，
+ *   掃描建立超過 PAYMENT_WINDOW_MINUTES 的 PAYMENT_PENDING 訂單（綠界付款頁已關閉），標記為 EXPIRED，
  *   並將對應 payment 若仍是 PENDING 一起取消，記錄 failure_reason。
+ *   不以報價 expires_at 判斷：報價比綠界付款頁先過期，過早關單會讓仍在付款頁的使用者付了錢卻沒單。
  *
  * Phase 2 – 進行中訂單 Lalamove 對帳
  *   掃描超過 3 分鐘未更新的 ASSIGNING_DRIVER / ON_GOING / PICKED_UP 訂單，
@@ -38,6 +61,7 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
   checkedCount: number;
   reconciledCount: number;
   expiredCount: number;
+  stuckPlacingCount: number;
 }> {
   const logPrefix = "[Delivery Reconcile]";
   const log = async (msg: string) => {
@@ -56,12 +80,79 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
 
   await log("🔍 Starting background reconciliation job...");
 
-  // ── Phase 1: 將過期的 PAYMENT_PENDING 訂單標為 EXPIRED ──────────────────────
+  // ── Phase 0: 中斷的派單 saga（ORDER_PLACING 逾時）→ FAILED + 退款 ─────────────
+  const [stuckRows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT id
+     FROM delivery_orders
+     WHERE status = 'ORDER_PLACING'
+       AND updated_at < NOW() - INTERVAL ? MINUTE`,
+    [ORDER_PLACING_TIMEOUT_MINUTES],
+  );
+
+  let stuckPlacingCount = 0;
+  for (const row of stuckRows) {
+    try {
+      // 狀態守衛：期間若 T3 寫回或 webhook 已認領則放棄
+      const [failResult] = await dbPool.query<ResultSetHeader>(
+        `UPDATE delivery_orders
+         SET status = 'FAILED', failure_reason = 'ORDER_PLACING_TIMEOUT'
+         WHERE id = ? AND status = 'ORDER_PLACING'`,
+        [row.id],
+      );
+      if (failResult.affectedRows === 0) continue;
+
+      await dbPool.query(
+        `INSERT INTO delivery_order_events (delivery_order_id, event_status, raw_payload)
+         VALUES (?, 'FAILED', ?)`,
+        [
+          row.id,
+          JSON.stringify({
+            source: "background_reconciliation_worker",
+            reason: "ORDER_PLACING_TIMEOUT",
+          }),
+        ],
+      );
+      await enqueueDeliveryRefund({
+        deliveryOrderId: Number(row.id),
+        reason: "ORDER_PLACING_TIMEOUT",
+      });
+      await logWarn(
+        `[ALERT] delivery_order #${row.id} stuck in ORDER_PLACING; marked FAILED and refund enqueued`,
+      );
+      stuckPlacingCount++;
+    } catch (stuckErr) {
+      await logError(`Failed to recover stuck delivery_order #${row.id}`, stuckErr);
+    }
+  }
+
+  // 退款保底：同一外送單以 jobId 去重，重複排入安全
+  const [unrefundedRows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT d.id
+     FROM delivery_orders d
+     JOIN payments p ON p.id = d.payment_id
+     WHERE d.status IN (?)
+       AND p.status = 'PAID'
+       AND d.updated_at < NOW() - INTERVAL ? MINUTE`,
+    [REFUNDABLE_STATUSES, REFUND_SWEEP_GRACE_MINUTES],
+  );
+  for (const row of unrefundedRows) {
+    try {
+      await enqueueDeliveryRefund({
+        deliveryOrderId: Number(row.id),
+        reason: "REFUND_SWEEP",
+      });
+    } catch (sweepErr) {
+      await logError(`Failed to enqueue refund for delivery_order #${row.id}`, sweepErr);
+    }
+  }
+
+  // ── Phase 1: 將付款窗口已關閉的 PAYMENT_PENDING 訂單標為 EXPIRED ──────────────
   const [expiredRows] = await dbPool.query<RowDataPacket[]>(
     `SELECT d.id AS delivery_order_id, d.payment_id
      FROM delivery_orders d
      WHERE d.status = 'PAYMENT_PENDING'
-       AND d.expires_at < NOW()`,
+       AND d.created_at < NOW() - INTERVAL ? MINUTE`,
+    [PAYMENT_WINDOW_MINUTES],
   );
 
   let expiredCount = 0;
@@ -71,7 +162,7 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
       const [expireResult] = await dbPool.query<ResultSetHeader>(
         `UPDATE delivery_orders
          SET status = 'EXPIRED',
-             failure_reason = 'Payment not completed before quotation expiry'
+             failure_reason = 'Payment not completed within payment window'
          WHERE id = ? AND status = 'PAYMENT_PENDING'`,
         [row.delivery_order_id],
       );
@@ -96,7 +187,7 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
           row.delivery_order_id,
           JSON.stringify({
             source: "background_reconciliation_worker",
-            reason: "Payment not completed before quotation expiry",
+            reason: "Payment not completed within payment window",
             expiredAt: new Date().toISOString(),
           }),
         ],
@@ -129,7 +220,7 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
     if (expiredCount === 0) {
       await log("✅ No stale in-progress orders found.");
     }
-    return { checkedCount: 0, reconciledCount: 0, expiredCount };
+    return { checkedCount: 0, reconciledCount: 0, expiredCount, stuckPlacingCount };
   }
 
   await log(`📦 Found ${rows.length} potentially stale orders to verify.`);
@@ -249,5 +340,5 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
   await log(
     `🎉 Finished. Verified: ${rows.length}, Reconciled: ${reconciledCount}, Expired: ${expiredCount}`,
   );
-  return { checkedCount: rows.length, reconciledCount, expiredCount };
+  return { checkedCount: rows.length, reconciledCount, expiredCount, stuckPlacingCount };
 }

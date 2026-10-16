@@ -12,7 +12,7 @@ import { createPaymentService } from "../../services/payment/defaultPaymentServi
 
 export interface DeliveryRefundJobData {
   deliveryOrderId: number;
-  /** 例如 LALAMOVE_REJECTED / LALAMOVE_EXPIRED */
+  /** 例如 LALAMOVE_REJECTED / LALAMOVE_EXPIRED / LALAMOVE_DISPATCH_FAILED / ORDER_PLACING_TIMEOUT / PAID_AFTER_ORDER_CLOSED */
   reason: string;
 }
 
@@ -63,7 +63,9 @@ export async function processDeliveryRefund(
       content:
         reason === "LALAMOVE_EXPIRED"
           ? "No driver accepted your delivery in time. Your payment has been refunded."
-          : "Your delivery could not be fulfilled by Lalamove. Your payment has been refunded.",
+          : reason === "PAID_AFTER_ORDER_CLOSED"
+            ? "Your payment arrived after the delivery order had expired. Your payment has been refunded."
+            : "Your delivery could not be fulfilled by Lalamove. Your payment has been refunded.",
     });
   } catch (notifyErr) {
     console.error(`[delivery-refund] Notification failed for #${deliveryOrderId}:`, notifyErr);

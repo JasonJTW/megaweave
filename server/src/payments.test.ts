@@ -106,40 +106,65 @@ describe("Payment Routes (Seam 4: HTTP Endpoints & Webhook)", () => {
   });
 
   describe("POST /ecpay/callback", () => {
-    it("should invoke handlePaymentCallback and ALWAYS respond with 200 and text '1|OK'", async () => {
-      mockPaymentService.handlePaymentCallback.mockResolvedValue({
-        status: "PROCESSED",
-        message: "Payment processed",
-      });
+    const req = {
+      body: {
+        MerchantID: "3002607",
+        MerchantTradeNo: "MW12345",
+        RtnCode: "1",
+        CheckMacValue: "MOCK_CMV",
+      },
+    } as unknown as Request;
 
-      const req = {
-        body: {
-          MerchantID: "3002607",
-          MerchantTradeNo: "MW12345",
-          RtnCode: "1",
-          CheckMacValue: "MOCK_CMV",
-        },
-      } as unknown as Request;
-
+    async function invokeCallback(): Promise<Response> {
       const res = {
         status: jest.fn().mockReturnThis(),
         send: jest.fn(),
       } as unknown as Response;
-
-      const next = jest.fn();
-
       const layers = router.stack as unknown as RouterLayer[];
       const layer = layers.find((l) => l.route?.path === "/ecpay/callback");
       const handler = layer?.route?.stack[0]?.handle;
       expect(handler).toBeDefined();
+      if (handler) await handler(req, res, jest.fn());
+      return res;
+    }
 
-      if (handler) {
-        await handler(req, res, next);
-      }
+    beforeEach(() => {
+      jest.spyOn(console, "log").mockImplementation(() => {});
+      jest.spyOn(console, "error").mockImplementation(() => {});
+    });
 
-      expect(mockPaymentService.handlePaymentCallback).toHaveBeenCalledWith(req.body);
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.send).toHaveBeenCalledWith("1|OK");
+    it.each(["PROCESSED", "IGNORED"] as const)(
+      "responds 200 '1|OK' when the callback is %s",
+      async (status) => {
+        mockPaymentService.handlePaymentCallback.mockResolvedValue({ status, message: "ok" });
+
+        const res = await invokeCallback();
+
+        expect(mockPaymentService.handlePaymentCallback).toHaveBeenCalledWith(req.body);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.send).toHaveBeenCalledWith("1|OK");
+      },
+    );
+
+    it("responds 500 (so ECPay retries) when processing throws", async () => {
+      mockPaymentService.handlePaymentCallback.mockRejectedValue(new Error("DB down"));
+
+      const res = await invokeCallback();
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).not.toHaveBeenCalledWith("1|OK");
+    });
+
+    it("does not acknowledge an invalid signature", async () => {
+      mockPaymentService.handlePaymentCallback.mockResolvedValue({
+        status: "FAILED",
+        message: "Invalid payment signature",
+      });
+
+      const res = await invokeCallback();
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.send).not.toHaveBeenCalledWith("1|OK");
     });
   });
 });

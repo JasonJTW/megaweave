@@ -4,6 +4,7 @@ import lalamoveRouter, { getWebhookEventTime } from "./lalamove";
 import dbPool from "./utils/db";
 import { verifyLalamoveWebhookSignature } from "./services/lalamove";
 import { enqueueDeliveryRefund } from "./queue/queues";
+import { adoptLalamoveOrder } from "./services/deliveryRecovery";
 
 jest.mock("./utils/db", () => ({
   query: jest.fn(),
@@ -12,6 +13,10 @@ jest.mock("./utils/db", () => ({
 
 jest.mock("./queue/queues", () => ({
   enqueueDeliveryRefund: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("./services/deliveryRecovery", () => ({
+  adoptLalamoveOrder: jest.fn().mockResolvedValue({ result: "ADOPTED", deliveryOrderId: 7 }),
 }));
 
 jest.mock("./middleware/auth", () => ({
@@ -250,6 +255,45 @@ describe("POST /webhook handler", () => {
     const { req } = signedStatusReq("REJECTED");
     await handler(req, mockRes(), jest.fn());
     expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
+  });
+
+  it("ORDER_CREATED for an unknown orderId adopts it by quotationId, then applies the status", async () => {
+    (dbPool.query as jest.Mock)
+      .mockResolvedValueOnce([[]]) // SELECT by lalamove_order_id → unknown
+      .mockResolvedValueOnce([[{ id: 7 }]]) // re-SELECT after adoption
+      .mockResolvedValueOnce([{ affectedRows: 0 }]); // ASSIGNING_DRIVER already set by adoption
+    const raw = JSON.stringify({
+      eventType: "ORDER_CREATED",
+      eventId: "E2",
+      data: {
+        order: { orderId: "O9", quotationId: "Q9", status: "ASSIGNING_DRIVER", shareLink: "https://s" },
+        updatedAt: "2026-10-15T08:00:00.000Z",
+      },
+    });
+    const ts = String(Date.now());
+    const res = mockRes();
+    await handler(
+      makeReq(raw, { "x-llm-signature": sign(raw, ts), "x-llm-timestamp": ts }),
+      res,
+      jest.fn(),
+    );
+
+    expect(adoptLalamoveOrder).toHaveBeenCalledWith(dbPool, expect.any(Function), {
+      lalamoveOrderId: "O9",
+      quotationId: "Q9",
+      shareLink: "https://s",
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("does not try adoption for a known orderId", async () => {
+    (dbPool.query as jest.Mock)
+      .mockResolvedValueOnce([[{ id: 7 }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }])
+      .mockResolvedValueOnce([{}]);
+    const { req } = signedStatusReq("PICKED_UP");
+    await handler(req, mockRes(), jest.fn());
+    expect(adoptLalamoveOrder).not.toHaveBeenCalled();
   });
 
   it("ignores an out-of-order status (no event row, no status broadcast)", async () => {

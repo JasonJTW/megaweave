@@ -53,6 +53,8 @@ export interface RefundPaymentInput {
   merchantTradeNo: string;
   tradeNo: string;
   amount: number;
+  /** 原交易金額；用來判斷全額 / 部分退款（全額可走放棄授權 N） */
+  paymentAmount?: number;
   reason?: string;
 }
 

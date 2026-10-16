@@ -5,6 +5,12 @@ import {
   OrderPayloadBuilder,
 } from "@lalamove/lalamove-js";
 import crypto from "crypto";
+// SDK 的 Order.create 會把 HTTP 狀態丟掉；直接用底層 client 保留 httpStatus 以分類錯誤
+import BaseHTTPClient from "@lalamove/lalamove-js/dist/http/base";
+import {
+  LalamoveDispatchError,
+  classifyLalamoveHttpStatus,
+} from "./lalamoveErrors";
 
 export interface Coordinates {
   lat: string | number;
@@ -112,6 +118,16 @@ const LALAMOVE_ENV = (process.env.LALAMOVE_ENV || "sandbox").toLowerCase() as
 const LALAMOVE_MARKET = process.env.LALAMOVE_MARKET || "TW";
 
 let clientInstance: InstanceType<typeof ClientModule> | null = null;
+let configInstance: InstanceType<typeof Config> | null = null;
+
+/** 建單逾時：超過視為結果不明（Lalamove 可能已建單），由 ORDER_CREATED webhook 認領 */
+const PLACE_ORDER_TIMEOUT_MS = 30 * 1000;
+
+class RawLalamoveHttpClient extends BaseHTTPClient {
+  post(market: string, path: string, body: unknown): Promise<unknown> {
+    return this.makeCall(market, path, body, "POST");
+  }
+}
 
 function getClient(): InstanceType<typeof ClientModule> {
   const apiKey = process.env.LALAMOVE_API_KEY || LALAMOVE_API_KEY;
@@ -125,10 +141,48 @@ function getClient(): InstanceType<typeof ClientModule> {
   }
 
   if (!clientInstance) {
-    const config = new Config(apiKey, apiSecret, env);
-    clientInstance = new ClientModule(config);
+    configInstance = new Config(apiKey, apiSecret, env);
+    clientInstance = new ClientModule(configInstance);
   }
   return clientInstance;
+}
+
+/**
+ * POST /v3/orders，失敗時拋出 LalamoveDispatchError：
+ * 4xx → REJECTED（確定未建單）；網路錯誤 / 5xx / 逾時 → UNKNOWN（可能已建單）
+ */
+async function placeLalamoveOrder(payload: unknown): Promise<unknown> {
+  getClient();
+  const http = new RawLalamoveHttpClient(configInstance!);
+
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new LalamoveDispatchError(
+            `Lalamove place order timed out after ${PLACE_ORDER_TIMEOUT_MS}ms`,
+            "UNKNOWN",
+          ),
+        ),
+      PLACE_ORDER_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    return await Promise.race([http.post(LALAMOVE_MARKET, "/v3/orders", payload), timeout]);
+  } catch (err: unknown) {
+    if (err instanceof LalamoveDispatchError) throw err;
+    const apiErr = err as { httpStatus?: number; errors?: unknown; message?: string };
+    const detail = apiErr.errors ? JSON.stringify(apiErr.errors) : apiErr.message || "Unknown error";
+    throw new LalamoveDispatchError(
+      `Lalamove place order failed (HTTP ${apiErr.httpStatus ?? "network"}): ${detail}`,
+      classifyLalamoveHttpStatus(apiErr.httpStatus),
+      apiErr.httpStatus,
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface LalamoveMarketInfo {
@@ -471,23 +525,13 @@ export async function createLalamoveOrder(
 
   let rawOrder: unknown;
   try {
-    rawOrder = await client.Order.create(LALAMOVE_MARKET, payload);
+    rawOrder = await placeLalamoveOrder(payload);
     console.log(
       "[Lalamove Service] Order created successfully:",
       JSON.stringify(rawOrder, null, 2),
     );
   } catch (createErr: unknown) {
-    const errObj = createErr as {
-      httpStatus?: number;
-      errors?: unknown;
-      message?: string;
-    };
-    console.error("[Lalamove Service] Detailed Order creation error:", {
-      status: errObj.httpStatus,
-      errors: errObj.errors,
-      message: errObj.message,
-      full: createErr,
-    });
+    console.error("[Lalamove Service] Order creation error:", createErr);
     throw createErr;
   }
 

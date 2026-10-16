@@ -6,8 +6,7 @@ import {
   PostUploadImageJobData,
   PostDeleteImageJobData,
 } from "./jobs/postImage";
-import { processSendEmail } from "./jobs/email";
-import { EmailTemplateProps } from "../emails/EmailTemplate";
+import { processSendEmail, SendEmailJobData } from "./jobs/email";
 import {
   processPostEmbedding,
   PostEmbeddingJobData,
@@ -23,7 +22,12 @@ import {
   processDeliveryRefund,
   DeliveryRefundJobData,
 } from "./jobs/deliveryRefund";
-import { initUserVectorFlushCron, initDeliveryReconcileCron } from "./queues";
+import { processDeliveryDispatchCheck } from "./jobs/deliveryDispatchCheck";
+import {
+  initUserVectorFlushCron,
+  initDeliveryReconcileCron,
+  DeliveryDispatchCheckJobData,
+} from "./queues";
 import { WORKER_CONCURRENCY } from "./concurrency";
 
 
@@ -106,9 +110,9 @@ export async function startWorkers(): Promise<void> {
     );
   });
 
-  const emailWorker = new Worker<EmailTemplateProps>(
+  const emailWorker = new Worker<SendEmailJobData>(
     "email",
-    async (job: Job<EmailTemplateProps>) => {
+    async (job: Job<SendEmailJobData>) => {
       if (job.name === "send-email") {
         await processSendEmail(job);
       }
@@ -298,6 +302,35 @@ export async function startWorkers(): Promise<void> {
     );
   });
 
+  // ─── Delivery Dispatch Check Worker (付款後 60 秒檢查派單 saga 是否完成) ───
+  const deliveryDispatchCheckWorker = new Worker<DeliveryDispatchCheckJobData>(
+    "delivery-dispatch-check",
+    async (job: Job<DeliveryDispatchCheckJobData>) => {
+      if (job.name === "check-dispatch") {
+        return await processDeliveryDispatchCheck(job);
+      }
+    },
+    {
+      connection: bullmqConnection,
+      concurrency: WORKER_CONCURRENCY["delivery-dispatch-check"],
+    },
+  );
+
+  deliveryDispatchCheckWorker.on("completed", (job, result) => {
+    const res = result as { result?: string } | undefined;
+    if (res?.result && res.result !== "NOOP") {
+      console.log(
+        `🚚 [delivery-dispatch-check] delivery_order #${job.data.deliveryOrderId}: ${res.result}`,
+      );
+    }
+  });
+
+  deliveryDispatchCheckWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [delivery-dispatch-check] Job ${formatJobId(job?.id)} failed: ${err.message}`,
+    );
+  });
+
   activeWorkers = [
     postImageWorker,
     emailWorker,
@@ -307,6 +340,7 @@ export async function startWorkers(): Promise<void> {
     userVectorFlushWorker,
     deliveryReconcileWorker,
     deliveryRefundWorker,
+    deliveryDispatchCheckWorker,
   ];
 
   console.log("🚀 All workers started");

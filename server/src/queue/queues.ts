@@ -12,7 +12,7 @@ import { PostEmbeddingJobData } from "./jobs/postEmbedding";
 import { UserVectorJobData } from "./jobs/userVector";
 import type { DeliveryRefundJobData } from "./jobs/deliveryRefund";
 
-import { EmailTemplateProps } from "../emails/EmailTemplate";
+import type { SendEmailJobData } from "./jobs/email";
 import { getCacheRedisClient } from "../utils/redis";
 
 export const postImageQueue = new Queue<
@@ -43,7 +43,7 @@ export async function enqueuePostDeleteImages(
   console.log(`🗑️ Enqueued delete images job for ${data.s3Keys.length} files`);
 }
 
-export const emailQueue = new Queue<EmailTemplateProps>("email", {
+export const emailQueue = new Queue<SendEmailJobData>("email", {
   connection: bullmqConnection,
   defaultJobOptions: {
     attempts: 3,
@@ -62,7 +62,7 @@ export const emailQueue = new Queue<EmailTemplateProps>("email", {
 });
 
 export async function enqueueSendEmail(
-  data: EmailTemplateProps,
+  data: SendEmailJobData,
 ): Promise<void> {
   await emailQueue.add("send-email", data);
   console.log(`📧 Enqueued email job for ${data.toEmail}`);
@@ -323,6 +323,41 @@ export async function enqueueDeliveryRefund(
   );
 }
 
+//* ─── Delivery Dispatch Check Queue ──────────────────────────────────────────
+
+export interface DeliveryDispatchCheckJobData {
+  deliveryOrderId: number;
+}
+
+export const deliveryDispatchCheckQueue = new Queue<DeliveryDispatchCheckJobData>(
+  "delivery-dispatch-check",
+  {
+    connection: bullmqConnection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+      removeOnComplete: { age: 24 * 60 * 60 },
+      removeOnFail: { age: 7 * 24 * 60 * 60 },
+    },
+  },
+);
+
+/**
+ * 排定單筆外送單的派單檢查（ORDER_PLACING 未完成時重新派單或判定失敗）。
+ * stage 區分「付款後首次檢查」與「結果不明等待期滿」；同一外送單同一 stage 以 jobId 去重。
+ */
+export async function enqueueDispatchCheck(
+  deliveryOrderId: number,
+  delayMs: number,
+  stage: "initial" | "final",
+): Promise<void> {
+  await deliveryDispatchCheckQueue.add(
+    "check-dispatch",
+    { deliveryOrderId },
+    { delay: Math.max(0, delayMs), jobId: `dispatch-check-${deliveryOrderId}-${stage}` },
+  );
+}
+
 /** 關閉本模組建立的所有 Queue 連線；供只作為 producer 的短期程序（例如 benchmark runner）結束時使用 */
 export async function closeQueues(): Promise<void> {
   await Promise.all(
@@ -335,6 +370,7 @@ export async function closeQueues(): Promise<void> {
       hotScoreQueue,
       deliveryReconcileQueue,
       deliveryRefundQueue,
+      deliveryDispatchCheckQueue,
     ].map((queue) => queue.close()),
   );
 }

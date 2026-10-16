@@ -182,6 +182,12 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
         isPaid: record.payment_status === "PAID",
         paymentStatus: record.payment_status,
         deliveryStatus: record.delivery_status,
+        outcome: derivePaymentOutcome(
+          record.payment_status,
+          record.delivery_status,
+          record.lalamove_order_id
+        ),
+        amount: Number(record.amount),
         lalamoveOrderId: record.lalamove_order_id || null,
         rtnMsg: record.rtn_msg,
       });
@@ -215,17 +221,25 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
   /**
    * POST /api/payments/ecpay/callback
    * 綠界 Server-to-Server 背景 Webhook (ReturnURL)
-   * ⚠️ 綠界硬性規定：無論如何必須在 HTTP 200 回應純文字 "1|OK"，避免綠界無限重試
+   * 只有處理成功（PROCESSED）或已處理過（IGNORED）才回 "1|OK"；
+   * 處理中丟錯（例如 DB 斷線導致交易 rollback）回 500，讓綠界稍後重送（當天最多 4 次）。
+   * 閘門是冪等的，重送多少次都安全。
    */
   router.post("/ecpay/callback", async (req: Request, res: Response): Promise<void> => {
+    const payload = req.body as Record<string, string>;
     try {
-      const payload = req.body as Record<string, string>;
-      await paymentService.handlePaymentCallback(payload);
-    } catch (err) {
-      console.error("Error processing ECPay callback:", err);
-    } finally {
-      // 確保回應 1|OK
+      const result = await paymentService.handlePaymentCallback(payload);
+      console.log(
+        `[ECPay Callback] ${payload.MerchantTradeNo}: ${result.status} - ${result.message}`
+      );
+      if (result.status === "FAILED") {
+        res.status(400).send(`0|${result.message}`);
+        return;
+      }
       res.status(200).send("1|OK");
+    } catch (err) {
+      console.error(`Error processing ECPay callback ${payload?.MerchantTradeNo}:`, err);
+      res.status(500).send("0|Internal Error");
     }
   });
 
@@ -233,3 +247,28 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
 }
 
 export default createPaymentRouter();
+
+/** 結果頁要呈現給使用者的狀態（由付款 + 外送單狀態推導，前端不自行判斷） */
+export type PaymentOutcome =
+  | "AWAITING_PAYMENT" // 尚未收到綠界付款結果
+  | "PAYMENT_FAILED" // 付款失敗 / 已取消
+  | "PLACING" // 已付款，正在向 Lalamove 叫車（含結果不明的等待期）
+  | "DISPATCHED" // 已建立 Lalamove 訂單
+  | "REFUNDING" // 叫車失敗 / 訂單逾期，退款處理中
+  | "REFUNDED"; // 已退款
+
+export function derivePaymentOutcome(
+  paymentStatus: string,
+  deliveryStatus: string | null,
+  lalamoveOrderId: string | null
+): PaymentOutcome {
+  if (paymentStatus === "REFUNDED" || paymentStatus === "PARTIAL_REFUNDED") return "REFUNDED";
+  if (paymentStatus === "PAID") {
+    // 外送單已終止（含已取消的孤兒 Lalamove 單）優先於 lalamove_order_id 判斷
+    if (deliveryStatus === "FAILED" || deliveryStatus === "EXPIRED") return "REFUNDING";
+    if (lalamoveOrderId) return "DISPATCHED";
+    return "PLACING";
+  }
+  if (paymentStatus === "PENDING") return "AWAITING_PAYMENT";
+  return "PAYMENT_FAILED";
+}

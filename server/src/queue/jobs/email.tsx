@@ -1,5 +1,19 @@
 import { Job } from "bullmq";
 import EmailTemplate, { EmailTemplateProps } from "../../emails/EmailTemplate";
+import DeliveryNoticeEmail, {
+  DeliveryNoticeEmailProps,
+} from "../../emails/DeliveryNoticeEmail";
+
+export type DeliveryNoticeEmailJobData = DeliveryNoticeEmailProps & {
+  template: "delivery-notice";
+};
+
+/** 未帶 template 的舊 job 視為 weave 通知信 */
+export type SendEmailJobData = EmailTemplateProps | DeliveryNoticeEmailJobData;
+
+function isDeliveryNotice(data: SendEmailJobData): data is DeliveryNoticeEmailJobData {
+  return "template" in data && data.template === "delivery-notice";
+}
 import { Resend } from "resend";
 
 let resendClient: Resend | null = null;
@@ -16,7 +30,7 @@ function getResendClient(): Resend {
 }
 
 export async function processSendEmail(
-  job: Job<EmailTemplateProps>,
+  job: Job<SendEmailJobData>,
 ): Promise<void> {
   const props = job.data;
 
@@ -29,7 +43,11 @@ export async function processSendEmail(
     from: "JasonJTW <no-reply@notification.megaweaving.net>",
     to: props.toEmail,
     subject: props.title,
-    react: <EmailTemplate {...props} />,
+    react: isDeliveryNotice(props) ? (
+      <DeliveryNoticeEmail {...props} />
+    ) : (
+      <EmailTemplate {...props} />
+    ),
   });
 
   if (error) {

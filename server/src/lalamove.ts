@@ -8,6 +8,7 @@ import {
   createLalamoveOrder,
   cancelLalamoveOrder,
   getLalamoveDriverDetail,
+  getLalamoveOrderDetail,
   verifyLalamoveWebhookSignature,
   sandboxUpdateDriverLocation,
   sandboxPickup,
@@ -24,6 +25,7 @@ import {
   predecessorsOf,
 } from "./services/deliveryStatus";
 import { enqueueDeliveryRefund } from "./queue/queues";
+import { adoptLalamoveOrder } from "./services/deliveryRecovery";
 
 /**
  * 將 Lalamove 官方狀態字串對應至資料庫 delivery_orders.status ENUM
@@ -677,10 +679,31 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
 
       let statusApplied = false;
       try {
-        const [orderRows] = await dbPool.query<RowDataPacket[]>(
-          "SELECT id FROM delivery_orders WHERE lalamove_order_id = ?",
-          [orderId],
-        );
+        const findByOrderId = () =>
+          dbPool.query<RowDataPacket[]>(
+            "SELECT id FROM delivery_orders WHERE lalamove_order_id = ?",
+            [orderId],
+          );
+        let [orderRows] = await findByOrderId();
+
+        // 不認得的 orderId：派單 saga 中斷（T2 回應遺失 / T3 寫入失敗 / 當機）時 orderId 沒寫入
+        // → 以 quotationId 認領（ORDER_CREATED 直接帶；其他事件向 Lalamove 查詢）
+        if (!orderRows || orderRows.length === 0) {
+          const quotationId: string | undefined =
+            order?.quotationId || (await getLalamoveOrderDetail(orderId))?.quotationId;
+          if (quotationId) {
+            const adoption = await adoptLalamoveOrder(dbPool, cancelLalamoveOrder, {
+              lalamoveOrderId: orderId,
+              quotationId,
+              shareLink: order?.shareLink,
+            });
+            console.log(
+              `[Lalamove Webhook] Unknown order ${orderId} (quotation ${quotationId}): ${adoption.result}`,
+            );
+            [orderRows] = await findByOrderId();
+          }
+        }
+
         const deliveryOrderId =
           orderRows && orderRows.length > 0 ? orderRows[0].id : null;
 

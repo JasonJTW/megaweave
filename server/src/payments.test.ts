@@ -1,4 +1,4 @@
-import { createPaymentRouter } from "./payments";
+import { createPaymentRouter, derivePaymentOutcome } from "./payments";
 import { PaymentService } from "./services/payment/paymentService";
 import express, { Request, Response, NextFunction, RequestHandler } from "express";
 
@@ -106,40 +106,84 @@ describe("Payment Routes (Seam 4: HTTP Endpoints & Webhook)", () => {
   });
 
   describe("POST /ecpay/callback", () => {
-    it("should invoke handlePaymentCallback and ALWAYS respond with 200 and text '1|OK'", async () => {
-      mockPaymentService.handlePaymentCallback.mockResolvedValue({
-        status: "PROCESSED",
-        message: "Payment processed",
-      });
+    const req = {
+      body: {
+        MerchantID: "3002607",
+        MerchantTradeNo: "MW12345",
+        RtnCode: "1",
+        CheckMacValue: "MOCK_CMV",
+      },
+    } as unknown as Request;
 
-      const req = {
-        body: {
-          MerchantID: "3002607",
-          MerchantTradeNo: "MW12345",
-          RtnCode: "1",
-          CheckMacValue: "MOCK_CMV",
-        },
-      } as unknown as Request;
-
+    async function invokeCallback(): Promise<Response> {
       const res = {
         status: jest.fn().mockReturnThis(),
         send: jest.fn(),
       } as unknown as Response;
-
-      const next = jest.fn();
-
       const layers = router.stack as unknown as RouterLayer[];
       const layer = layers.find((l) => l.route?.path === "/ecpay/callback");
       const handler = layer?.route?.stack[0]?.handle;
       expect(handler).toBeDefined();
+      if (handler) await handler(req, res, jest.fn());
+      return res;
+    }
 
-      if (handler) {
-        await handler(req, res, next);
-      }
-
-      expect(mockPaymentService.handlePaymentCallback).toHaveBeenCalledWith(req.body);
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.send).toHaveBeenCalledWith("1|OK");
+    beforeEach(() => {
+      jest.spyOn(console, "log").mockImplementation(() => {});
+      jest.spyOn(console, "error").mockImplementation(() => {});
     });
+
+    it.each(["PROCESSED", "IGNORED"] as const)(
+      "responds 200 '1|OK' when the callback is %s",
+      async (status) => {
+        mockPaymentService.handlePaymentCallback.mockResolvedValue({ status, message: "ok" });
+
+        const res = await invokeCallback();
+
+        expect(mockPaymentService.handlePaymentCallback).toHaveBeenCalledWith(req.body);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.send).toHaveBeenCalledWith("1|OK");
+      },
+    );
+
+    it("responds 500 (so ECPay retries) when processing throws", async () => {
+      mockPaymentService.handlePaymentCallback.mockRejectedValue(new Error("DB down"));
+
+      const res = await invokeCallback();
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.send).not.toHaveBeenCalledWith("1|OK");
+    });
+
+    it("does not acknowledge an invalid signature", async () => {
+      mockPaymentService.handlePaymentCallback.mockResolvedValue({
+        status: "FAILED",
+        message: "Invalid payment signature",
+      });
+
+      const res = await invokeCallback();
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.send).not.toHaveBeenCalledWith("1|OK");
+    });
+  });
+});
+
+describe("derivePaymentOutcome", () => {
+  it.each([
+    ["PENDING", "PAYMENT_PENDING", null, "AWAITING_PAYMENT"],
+    ["FAILED", "PAYMENT_PENDING", null, "PAYMENT_FAILED"],
+    ["CANCELLED", "EXPIRED", null, "PAYMENT_FAILED"],
+    ["PAID", "ORDER_PLACING", null, "PLACING"],
+    ["PAID", "ASSIGNING_DRIVER", "L1", "DISPATCHED"],
+    // T2 failed: still PAID until the refund job completes — must not look like success
+    ["PAID", "FAILED", null, "REFUNDING"],
+    ["PAID", "EXPIRED", null, "REFUNDING"],
+    // orphan Lalamove order linked to a failed delivery order is not a successful dispatch
+    ["PAID", "FAILED", "L1", "REFUNDING"],
+    ["REFUNDED", "FAILED", null, "REFUNDED"],
+    ["PARTIAL_REFUNDED", "FAILED", null, "REFUNDED"],
+  ])("payment=%s delivery=%s lalamove=%s → %s", (payment, delivery, lalamoveId, expected) => {
+    expect(derivePaymentOutcome(payment, delivery, lalamoveId)).toBe(expected);
   });
 });

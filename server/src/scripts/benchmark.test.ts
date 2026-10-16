@@ -7,6 +7,9 @@ import { promisify } from "util";
 const execFileAsync = promisify(execFile);
 const scriptPath = resolve(__dirname, "benchmark.ts");
 
+// 每個案例都會 spawn 一個 ts-node 子程序；CI 全部 suite 並行時冷啟動可超過 jest 預設的 5 秒
+jest.setTimeout(30_000);
+
 function runCli(args: string[], env: Record<string, string> = {}) {
   return execFileAsync(
     process.execPath,

@@ -102,7 +102,7 @@ export function requireRole(...allowedRoles: UserRole[]) {
     // 嚴格比對來自 Redis session 的權威角色
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
-        errorMessage: "Forbidden: Insufficient permissions",
+        errorMessage: `Forbidden: ${allowedRoles.join(" or ")} role required`,
       });
     }
 

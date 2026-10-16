@@ -174,7 +174,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     try {
       // 1. Fetch Post details (Owner & Title)
       const [postRows] = await connection.execute<RowDataPacket[]>(
-        "SELECT user_id, title FROM posts WHERE id = ?",
+        "SELECT user_id, title, public_id FROM posts WHERE id = ?",
         [post_id]
       );
 
@@ -194,7 +194,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
               type: "COMMENT",
               title: "New Comment",
               content: `${commenterName} commented on your post "${post.title}"`,
-              link: `/item/${post_id}#comment-${newComment.id}`,
+              link: `/item/${post.public_id}#comment-${newComment.id}`,
             });
           }
 
@@ -225,7 +225,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
                   type: "COMMENT",
                   title: "New Reply",
                   content: `${commenterName} replied to your comment`,
-                  link: `/item/${post_id}#comment-${newComment.id}`,
+                  link: `/item/${post.public_id}#comment-${newComment.id}`,
                 });
              }
            }

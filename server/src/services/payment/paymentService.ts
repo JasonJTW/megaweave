@@ -696,6 +696,7 @@ export class PaymentService {
         merchantTradeNo: payment.merchant_trade_no,
         tradeNo: payment.trade_no,
         amount: targetRefundAmount,
+        paymentAmount: Number(payment.amount),
         reason,
       });
     } catch (providerErr) {
@@ -707,6 +708,11 @@ export class PaymentService {
     }
 
     const isSuccess = refundResult.isSuccess;
+    if (!isSuccess) {
+      console.error(
+        `[ALERT] Refund ${merchantRefundNo} for payment ${paymentId} rejected by provider: rtnCode=${refundResult.rtnCode} rtnMsg=${refundResult.rtnMsg}`
+      );
+    }
 
     await this.dbPool.query(
       "UPDATE payment_refunds SET status = ?, provider_refund_id = ? WHERE id = ?",

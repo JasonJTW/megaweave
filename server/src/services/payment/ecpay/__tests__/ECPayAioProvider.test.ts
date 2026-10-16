@@ -112,4 +112,59 @@ describe("ECPayAioProvider (Seam 2)", () => {
       expect(result.isSuccess).toBe(false);
     });
   });
+  describe("refundPayment", () => {
+    const input = {
+      merchantTradeNo: "TW20260301001",
+      tradeNo: "2603011234567890",
+      amount: 350,
+      paymentAmount: 350,
+    };
+    const reply = (rtnCode: number, rtnMsg = "") =>
+      ({ text: async () => `RtnCode=${rtnCode}&RtnMsg=${rtnMsg}` }) as Response;
+    const actions = (spy: jest.SpyInstance) =>
+      spy.mock.calls.map(([, init]) => new URLSearchParams(init.body).get("Action"));
+
+    let fetchSpy: jest.SpyInstance;
+    beforeEach(() => {
+      fetchSpy = jest.spyOn(global, "fetch");
+    });
+    afterEach(() => fetchSpy.mockRestore());
+
+    it("full refund of an unclosed (authorized) trade succeeds via N", async () => {
+      fetchSpy.mockResolvedValueOnce(reply(1));
+      await expect(provider.refundPayment(input)).resolves.toMatchObject({ isSuccess: true });
+      expect(actions(fetchSpy)).toEqual(["N"]);
+    });
+
+    it("full refund falls back to R when the trade is already closed", async () => {
+      fetchSpy.mockResolvedValueOnce(reply(0, "not allowed")).mockResolvedValueOnce(reply(1));
+      await expect(provider.refundPayment(input)).resolves.toMatchObject({ isSuccess: true });
+      expect(actions(fetchSpy)).toEqual(["N", "R"]);
+    });
+
+    it("full refund of a to-be-closed trade falls back to E then N", async () => {
+      fetchSpy
+        .mockResolvedValueOnce(reply(0))
+        .mockResolvedValueOnce(reply(0))
+        .mockResolvedValueOnce(reply(1))
+        .mockResolvedValueOnce(reply(1));
+      await expect(provider.refundPayment(input)).resolves.toMatchObject({ isSuccess: true });
+      expect(actions(fetchSpy)).toEqual(["N", "R", "E", "N"]);
+    });
+
+    it("partial refund only uses R", async () => {
+      fetchSpy.mockResolvedValueOnce(reply(0, "nope"));
+      const result = await provider.refundPayment({ ...input, amount: 100 });
+      expect(result.isSuccess).toBe(false);
+      expect(actions(fetchSpy)).toEqual(["R"]);
+    });
+
+    it("surfaces every rejection message when all actions fail", async () => {
+      fetchSpy.mockResolvedValue(reply(10100058, "denied"));
+      const result = await provider.refundPayment(input);
+      expect(result.isSuccess).toBe(false);
+      expect(result.rtnMsg).toContain("denied");
+      expect(actions(fetchSpy)).toEqual(["N", "R", "E"]);
+    });
+  });
 });

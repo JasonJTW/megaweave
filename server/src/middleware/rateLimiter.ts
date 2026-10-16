@@ -20,6 +20,7 @@ import { cacheRedisClient } from "../utils/redis";
  */
 export class ResilientRedisStore implements Store {
   private memoryStore: MemoryStore;
+  private memoryQueue: Promise<void> = Promise.resolve();
   private redisStore: RedisStore | null = null;
   private options?: Options;
   public readonly prefix: string;
@@ -39,22 +40,26 @@ export class ResilientRedisStore implements Store {
   }
 
   private getRedisStore(): RedisStore | null {
+    // Check readiness on every call: while the client is disconnected node-redis
+    // queues commands offline until reconnect (up to ~55s with our
+    // reconnectStrategy), which would stall every request behind the limiter.
+    if (!cacheRedisClient || !cacheRedisClient.isOpen || !cacheRedisClient.isReady) {
+      return null;
+    }
     if (this.redisStore) {
       return this.redisStore;
     }
-    if (cacheRedisClient && cacheRedisClient.isOpen && cacheRedisClient.isReady) {
-      try {
-        this.redisStore = new RedisStore({
-          sendCommand: (...args: string[]) => cacheRedisClient.sendCommand(args),
-          prefix: this.prefix,
-        });
-        if (this.options) {
-          this.redisStore.init(this.options);
-        }
-      } catch (err) {
-        console.warn(`[RateLimit] Failed to instantiate RedisStore for prefix ${this.prefix}:`, err);
-        this.redisStore = null;
+    try {
+      this.redisStore = new RedisStore({
+        sendCommand: (...args: string[]) => cacheRedisClient.sendCommand(args),
+        prefix: this.prefix,
+      });
+      if (this.options) {
+        this.redisStore.init(this.options);
       }
+    } catch (err) {
+      console.warn(`[RateLimit] Failed to instantiate RedisStore for prefix ${this.prefix}:`, err);
+      this.redisStore = null;
     }
     return this.redisStore;
   }
@@ -80,7 +85,25 @@ export class ResilientRedisStore implements Store {
         console.warn(`[RateLimit] Redis increment failed for prefix ${this.prefix}, falling back to memory:`, err);
       }
     }
-    return this.memoryStore.increment(key);
+    return this.incrementMemory(key);
+  }
+
+  /**
+   * MemoryStore.increment returns its internal mutable record, not a copy. If
+   * several increments run back to back, every caller resumes from its await
+   * looking at the same object holding the final count. Run them one at a time
+   * and snapshot before the next starts so each caller sees its own totalHits.
+   */
+  private incrementMemory(key: string): Promise<IncrementResponse> {
+    const result = this.memoryQueue.then(async () => {
+      const { totalHits, resetTime } = await this.memoryStore.increment(key);
+      return { totalHits, resetTime };
+    });
+    this.memoryQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   async decrement(key: string): Promise<void> {

@@ -10,6 +10,7 @@ import {
   ResilientRedisStore,
 } from "./rateLimiter";
 import { Options } from "express-rate-limit";
+import { cacheRedisClient } from "../utils/redis";
 
 describe("Tiered Rate Limiting Middleware (Issue #8)", () => {
   let app: Express;
@@ -209,6 +210,50 @@ describe("Tiered Rate Limiting Middleware (Issue #8)", () => {
       await store.resetKey("client-ip-1");
       const hit3 = await store.increment("client-ip-1");
       expect(hit3.totalHits).toBe(1);
+    });
+
+    it("returns independent snapshots for concurrent memory fallback increments", async () => {
+      const store = new ResilientRedisStore("rl:test:concurrent:");
+      store.init({ windowMs: 60000 } as Options);
+
+      const results = await Promise.all(
+        Array.from({ length: 7 }, () => store.increment("client-ip-2")),
+      );
+
+      expect(results.map((r) => r.totalHits).sort((a, b) => a - b)).toEqual([
+        1, 2, 3, 4, 5, 6, 7,
+      ]);
+    });
+
+    it("skips Redis without sending commands when the client is not ready, even after the store was created", async () => {
+      const store = new ResilientRedisStore("rl:test:notready:");
+      store.init({ windowMs: 60000 } as Options);
+
+      const sendCommand = jest
+        .spyOn(cacheRedisClient, "sendCommand")
+        .mockImplementation((async (args: string[]) =>
+          args[0] === "SCRIPT" ? "sha" : [1, 1000]) as never);
+      const isOpen = jest.spyOn(cacheRedisClient, "isOpen", "get");
+      const isReady = jest.spyOn(cacheRedisClient, "isReady", "get");
+
+      try {
+        // Ready: Redis store is created and used.
+        isOpen.mockReturnValue(true);
+        isReady.mockReturnValue(true);
+        await store.increment("k");
+        expect(sendCommand).toHaveBeenCalled();
+        sendCommand.mockClear();
+
+        // Disconnected: must go straight to memory, no Redis command queued.
+        isReady.mockReturnValue(false);
+        const hit = await store.increment("k");
+        expect(hit.totalHits).toBe(1);
+        expect(sendCommand).not.toHaveBeenCalled();
+      } finally {
+        sendCommand.mockRestore();
+        isOpen.mockRestore();
+        isReady.mockRestore();
+      }
     });
   });
 });

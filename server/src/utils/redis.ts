@@ -10,7 +10,73 @@ const CACHE_REDIS_URL = process.env.REDIS_CACHE_URL!;
 
 const VECTOR_REDIS_URL = process.env.REDIS_VECTOR_URL!;
 
+const MAX_RECONNECT_RETRIES = 10;
+// How long to wait after node-redis gives up before starting a fresh connect().
+const RECOVERY_DELAY_MS = 30000;
+
+// Set by disconnectRedis() so a graceful shutdown doesn't trigger recovery.
+let shuttingDown = false;
+
+interface RecoverableClient {
+  readonly isOpen: boolean;
+  connect(): Promise<unknown>;
+}
+
+/**
+ * Once reconnectStrategy returns an Error, node-redis closes the client for
+ * good (isOpen=false, no "end" event) and never retries again. This schedules
+ * a fresh connect() after a delay; if that attempt also exhausts its retries,
+ * reconnectStrategy gives up again and schedules the next one.
+ */
+export function createRecoveryScheduler(
+  name: string,
+  client: RecoverableClient,
+  delayMs: number = RECOVERY_DELAY_MS,
+  isShuttingDown: () => boolean = () => shuttingDown,
+) {
+  let timer: NodeJS.Timeout | null = null;
+
+  const cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  const schedule = () => {
+    if (timer || isShuttingDown()) {
+      return;
+    }
+    console.warn(`⏳ [${name}] Redis recovery scheduled in ${delayMs}ms`);
+    timer = setTimeout(async () => {
+      timer = null;
+      if (isShuttingDown() || client.isOpen) {
+        return;
+      }
+      try {
+        console.log(`🔄 [${name}] Redis recovery: reconnecting...`);
+        await client.connect();
+      } catch (err) {
+        // reconnectStrategy already scheduled the next attempt on give-up.
+        console.error(
+          `❌ [${name}] Redis recovery attempt failed:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }, delayMs);
+    // Don't keep the process alive just to reconnect.
+    timer.unref();
+  };
+
+  return { schedule, cancel };
+}
+
+const recoverySchedulers: ReturnType<typeof createRecoveryScheduler>[] = [];
+
 function createManagedRedisClient(name: string, url: string) {
+  // Assigned right after createClient(); reconnectStrategy only runs later.
+  let recovery: ReturnType<typeof createRecoveryScheduler> | null = null;
+
   const client = createClient({
     url,
     socket: {
@@ -19,10 +85,14 @@ function createManagedRedisClient(name: string, url: string) {
       keepAliveInitialDelay: 10000,
       connectTimeout: 30000,
       reconnectStrategy: (retries) => {
-        if (retries > 10) {
+        if (retries > MAX_RECONNECT_RETRIES) {
           console.error(
             `❌ [${name}] Redis connection failed after ${retries} retries`,
           );
+          // The client is about to close permanently; let connectRedis()
+          // start over and schedule a fresh connection attempt.
+          connectionPromise = null;
+          recovery?.schedule();
           return new Error(`[${name}] Redis connection failed`);
         }
         const delay = Math.min(retries * 1000, 10000);
@@ -35,6 +105,9 @@ function createManagedRedisClient(name: string, url: string) {
     commandsQueueMaxLength: 100,
     pingInterval: 30000,
   });
+
+  recovery = createRecoveryScheduler(name, client);
+  recoverySchedulers.push(recovery);
 
   client.on("error", (err) => {
     console.error(`❌ [${name}] Redis Client Error:`, err.message);
@@ -77,12 +150,15 @@ export const vectorRedisClient = createManagedRedisClient(
 );
 
 export async function connectRedis(): Promise<void> {
+  shuttingDown = false;
   if (connectionPromise) {
     return connectionPromise;
   }
 
-  const needConnect = (client: AppRedisClient) =>
-    !client.isOpen || !client.isReady;
+  // Only closed clients need connect(). An open but not-ready client is already
+  // reconnecting on its own; calling connect() on it throws "Socket already
+  // opened". Callers that need a ready client check isRedisConnected() after.
+  const needConnect = (client: AppRedisClient) => !client.isOpen;
 
   if (!needConnect(cacheRedisClient) && !needConnect(vectorRedisClient)) {
     return Promise.resolve();
@@ -146,6 +222,8 @@ async function disconnectSingleClient(
 }
 
 export async function disconnectRedis(): Promise<void> {
+  shuttingDown = true;
+  recoverySchedulers.forEach((recovery) => recovery.cancel());
   connectionPromise = null;
   console.log("📍 Disconnecting all Redis clients...");
   await Promise.allSettled([

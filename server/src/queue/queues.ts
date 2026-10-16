@@ -192,6 +192,28 @@ export const hotScoreQueue = new Queue("hot-score", {
 });
 
 /**
+ * feed:trending 遺失時（例如 cache Redis 重啟、不持久化）提早觸發重算，
+ * 不必等下一次 cron（最久 15 分鐘）。
+ * 以 SET NX EX 搶冷卻鎖，避免每個熱門頁請求都排入一個 job。
+ * 不用固定 jobId 去重：removeOnComplete 會保留已完成的 job，同 id 會擋掉下一次重建。
+ */
+const HOT_SCORE_REBUILD_LOCK_KEY = "hot-score:rebuild-lock";
+const HOT_SCORE_REBUILD_LOCK_TTL_SEC = 60;
+
+export async function requestHotScoreRebuild(): Promise<boolean> {
+  const redis = getCacheRedisClient();
+  const acquired = await redis.set(HOT_SCORE_REBUILD_LOCK_KEY, "1", {
+    NX: true,
+    EX: HOT_SCORE_REBUILD_LOCK_TTL_SEC,
+  });
+  if (acquired !== "OK") return false;
+
+  await hotScoreQueue.add("calculate-hot-score", {});
+  console.log("⏱️ HotScore: feed:trending missing, rebuild job enqueued");
+  return true;
+}
+
+/**
  * 啟動 HotScore 定期排程工作（每 15 分鐘執行一次）
  *
  * 啟動時防抖：讀取 hot-score:last-run timestamp，

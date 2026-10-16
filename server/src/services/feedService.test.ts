@@ -7,10 +7,14 @@ import {
 import { getRedisClient, getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import dbPool from "../utils/db";
 import { fetchQueryEmbedding } from "./embeddingService";
+import { requestHotScoreRebuild } from "../queue/queues";
 
 jest.mock("../utils/redis");
 jest.mock("../utils/db");
 jest.mock("./embeddingService");
+jest.mock("../queue/queues", () => ({
+  requestHotScoreRebuild: jest.fn().mockResolvedValue(true),
+}));
 
 interface MockRedisClient {
   sendCommand: jest.Mock;
@@ -176,6 +180,76 @@ describe("FeedService", () => {
         { lat: 25.033, lng: 121.565 },
         null,
       );
+    });
+  });
+
+  describe("getUserVector negative caching", () => {
+    it("caches a not-found result so repeat calls skip Redis and MySQL", async () => {
+      mockRedis.sendCommand.mockResolvedValue(null);
+      (dbPool.execute as jest.Mock).mockResolvedValue([[]]);
+
+      const service = new FeedService();
+      expect(await service.getUserVector(42)).toBeNull();
+      expect(await service.getUserVector(42)).toBeNull();
+
+      expect(mockRedis.sendCommand).toHaveBeenCalledTimes(1);
+      expect(dbPool.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not cache a not-found result when Redis errored", async () => {
+      mockRedis.sendCommand.mockRejectedValue(new Error("redis down"));
+      (dbPool.execute as jest.Mock).mockResolvedValue([[]]);
+      jest.spyOn(console, "warn").mockImplementation(() => {});
+
+      const service = new FeedService();
+      await service.getUserVector(42);
+      await service.getUserVector(42);
+
+      expect(mockRedis.sendCommand).toHaveBeenCalledTimes(2);
+      expect(dbPool.execute).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not cache a not-found result when MySQL errored", async () => {
+      mockRedis.sendCommand.mockResolvedValue(null);
+      (dbPool.execute as jest.Mock).mockRejectedValue(new Error("mysql down"));
+      jest.spyOn(console, "warn").mockImplementation(() => {});
+
+      const service = new FeedService();
+      await service.getUserVector(42);
+      await service.getUserVector(42);
+
+      expect(dbPool.execute).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("getTrendingFeed self-healing", () => {
+    const emptyFeed = {
+      posts: [],
+      pagination: { currentPage: 1, totalPages: 1, totalPosts: 0, postsPerPage: 20 },
+      isPersonalized: false,
+    };
+
+    it("requests a hot score rebuild and falls back to MySQL when feed:trending is missing", async () => {
+      mockRedis.zCard.mockResolvedValue(0);
+      const service = new FeedService();
+      const filteredSpy = jest.spyOn(service, "getFilteredFeed").mockResolvedValue(emptyFeed);
+
+      await service.getTrendingFeed({});
+
+      expect(requestHotScoreRebuild).toHaveBeenCalledTimes(1);
+      expect(filteredSpy).toHaveBeenCalledWith({}, null);
+    });
+
+    it("does not request a rebuild when feed:trending has posts", async () => {
+      mockRedis.zCard.mockResolvedValue(100);
+      mockRedis.zRange.mockResolvedValue([]);
+      const service = new FeedService();
+      jest.spyOn(service, "getFilteredFeed").mockResolvedValue(emptyFeed);
+
+      // page 超出範圍：zRange 為空仍 fallback，但 key 存在不該觸發重建
+      await service.getTrendingFeed({ page: 99 });
+
+      expect(requestHotScoreRebuild).not.toHaveBeenCalled();
     });
   });
 

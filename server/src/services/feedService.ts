@@ -7,6 +7,7 @@ import dbPool from "../utils/db";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { locationService } from "./locationService";
 import { fetchQueryEmbedding } from "./embeddingService";
+import { requestHotScoreRebuild } from "../queue/queues";
 
 export interface FeedParams {
   userId?: number;
@@ -256,10 +257,29 @@ export function getCandidateVectorReadStats(): {
 
 // User Vector 本地記憶體快取（5 分鐘 TTL，避免每次請求都重複花費 300ms+ 連線至遠端 Redis）
 const USER_VECTOR_CACHE_TTL_MS = 5 * 60 * 1000;
+// 查無向量（新用戶尚未互動）的負快取 TTL：防止每次刷 feed 都穿透到 Redis + MySQL；
+// 刻意短於正向 TTL，讓使用者第一次互動後最多 1 分鐘就能拿到個人化 feed
+const USER_VECTOR_NEGATIVE_TTL_MS = 60 * 1000;
+// 每筆 1536 * 4 = 6KB，5000 筆約 30MB；滿了淘汰最早寫入的項目（Map 保留插入順序）
+const USER_VECTOR_CACHE_MAX = 5000;
 const userVectorMemoryCache = new Map<
   number,
-  { buf: Buffer; expiresAt: number }
+  { buf: Buffer | null; expiresAt: number }
 >();
+
+function setUserVectorCache(
+  userId: number,
+  buf: Buffer | null,
+  ttlMs: number,
+): void {
+  // 先刪再寫，讓重新寫入的項目移到尾端
+  userVectorMemoryCache.delete(userId);
+  if (userVectorMemoryCache.size >= USER_VECTOR_CACHE_MAX) {
+    const oldest = userVectorMemoryCache.keys().next().value;
+    if (oldest !== undefined) userVectorMemoryCache.delete(oldest);
+  }
+  userVectorMemoryCache.set(userId, { buf, expiresAt: Date.now() + ttlMs });
+}
 
 export class FeedService {
   /**
@@ -267,6 +287,7 @@ export class FeedService {
    * 0. 優先從本地記憶體快取讀取 (0ms)
    * 1. 次之從 Redis user:{userId}:vector 讀取
    * 2. 若 Redis 沒有，嘗試從 MySQL user_profiles.interest_vector 讀取並轉換
+   * 3. 兩邊都查無時寫入負快取（null），避免新用戶每次刷 feed 都穿透
    */
   async getUserVector(userId: number): Promise<Buffer | null> {
     // const t0 = performance.now();
@@ -279,6 +300,7 @@ export class FeedService {
     }
 
     const redis = getVectorRedisClient();
+    let redisFailed = false;
 
     // 1. Redis 讀取
     try {
@@ -291,13 +313,11 @@ export class FeedService {
         },
       );
       if (raw && Buffer.isBuffer(raw) && raw.length === 1536 * 4) {
-        userVectorMemoryCache.set(userId, {
-          buf: raw,
-          expiresAt: now + USER_VECTOR_CACHE_TTL_MS,
-        });
+        setUserVectorCache(userId, raw, USER_VECTOR_CACHE_TTL_MS);
         return raw;
       }
     } catch (err) {
+      redisFailed = true;
       console.warn(
         `⚠️ Failed to read user vector from Redis (user #${userId}):`,
         err,
@@ -320,15 +340,16 @@ export class FeedService {
           for (let i = 0; i < vec.length; i++) {
             buf.writeFloatLE(vec[i], i * 4);
           }
-          userVectorMemoryCache.set(userId, {
-            buf,
-            expiresAt: now + USER_VECTOR_CACHE_TTL_MS,
-          });
+          setUserVectorCache(userId, buf, USER_VECTOR_CACHE_TTL_MS);
           // console.log(
           //   `🔍 [getUserVector] from MySQL user #${userId} took ${(performance.now() - t0).toFixed(1)}ms`,
           // );
           return buf;
         }
+      }
+      // MySQL 確定查無向量才寫負快取；Redis/MySQL 拋錯時不快取，避免把暫時故障放大成 1 分鐘
+      if (!redisFailed) {
+        setUserVectorCache(userId, null, USER_VECTOR_NEGATIVE_TTL_MS);
       }
     } catch (err) {
       console.warn(
@@ -729,6 +750,12 @@ export class FeedService {
     }
 
     // 3. Fallback: Redis 為空時，降級查 MySQL (無個人化向量)
+    //    totalPosts === 0 代表 feed:trending 遺失（如 cache Redis 重啟），提早觸發重算自癒
+    if (totalPosts === 0) {
+      requestHotScoreRebuild().catch((err) => {
+        console.warn("⚠️ Failed to request hot score rebuild:", err);
+      });
+    }
     return await this.getFilteredFeed(params, null);
   }
 

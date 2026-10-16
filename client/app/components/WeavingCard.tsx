@@ -389,14 +389,16 @@ const WeavingCard = ({
                     return `${action} Qty: ${singleQty}`;
                   })()}
                 </span>
-                <Link
-                  // href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
-                  href={`/item/${activeWeave?.post?.public_id || activeWeave?.post_id}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-xs font-bold text-primary hover:underline"
-                >
-                  View Post Detail →
-                </Link>
+                {activeWeave?.post?.public_id && (
+                  <Link
+                    // href={`/user?highlightWeaveId=${inChatWindow.weaveId}`}
+                    href={`/item/${activeWeave.post.public_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    View Post Detail →
+                  </Link>
+                )}
               </div>
             )}
           </div>

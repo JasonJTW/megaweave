@@ -230,10 +230,15 @@ export class PostService {
 
           if (initialScore > 0) {
             const redis = getCacheRedisClient();
-            await redis.zAdd("feed:trending", {
-              score: initialScore,
-              value: String(postId),
-            });
+            // 只在 feed:trending 已存在時增量加入：若 key 遺失（cache Redis 重啟），
+            // 直接 zAdd 會建出只有這 1 篇的 ZSET，讓熱門頁誤判為有資料而不再 fallback MySQL。
+            // key 遺失時交給 hot score 重算補回（含這篇）。
+            if (await redis.exists("feed:trending")) {
+              await redis.zAdd("feed:trending", {
+                score: initialScore,
+                value: String(postId),
+              });
+            }
             await dbPool.execute(
               "UPDATE posts SET hot_score = ? WHERE id = ?",
               [initialScore, postId],

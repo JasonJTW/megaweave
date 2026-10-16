@@ -129,6 +129,8 @@ export async function processCalculateHotScore(
     if (zsetMembers.length > 0) {
       // 批次寫入 temp ZSET
       await redis.zAdd(tempKey, zsetMembers);
+      // 防止 zAdd 與 rename 之間 process 中斷時 temp key 永久殘留（cache Redis 不淘汰無 TTL 的 key）
+      await redis.expire(tempKey, 60 * 60);
       // 原子置換成正式 feed:trending
       await redis.rename(tempKey, "feed:trending");
       await log(

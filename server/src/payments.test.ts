@@ -1,4 +1,4 @@
-import { createPaymentRouter } from "./payments";
+import { createPaymentRouter, derivePaymentOutcome } from "./payments";
 import { PaymentService } from "./services/payment/paymentService";
 import express, { Request, Response, NextFunction, RequestHandler } from "express";
 
@@ -166,5 +166,24 @@ describe("Payment Routes (Seam 4: HTTP Endpoints & Webhook)", () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.send).not.toHaveBeenCalledWith("1|OK");
     });
+  });
+});
+
+describe("derivePaymentOutcome", () => {
+  it.each([
+    ["PENDING", "PAYMENT_PENDING", null, "AWAITING_PAYMENT"],
+    ["FAILED", "PAYMENT_PENDING", null, "PAYMENT_FAILED"],
+    ["CANCELLED", "EXPIRED", null, "PAYMENT_FAILED"],
+    ["PAID", "ORDER_PLACING", null, "PLACING"],
+    ["PAID", "ASSIGNING_DRIVER", "L1", "DISPATCHED"],
+    // T2 failed: still PAID until the refund job completes — must not look like success
+    ["PAID", "FAILED", null, "REFUNDING"],
+    ["PAID", "EXPIRED", null, "REFUNDING"],
+    // orphan Lalamove order linked to a failed delivery order is not a successful dispatch
+    ["PAID", "FAILED", "L1", "REFUNDING"],
+    ["REFUNDED", "FAILED", null, "REFUNDED"],
+    ["PARTIAL_REFUNDED", "FAILED", null, "REFUNDED"],
+  ])("payment=%s delivery=%s lalamove=%s → %s", (payment, delivery, lalamoveId, expected) => {
+    expect(derivePaymentOutcome(payment, delivery, lalamoveId)).toBe(expected);
   });
 });

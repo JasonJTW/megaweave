@@ -3,8 +3,9 @@ import { getLalamoveOrderDetail } from "../../services/lalamove";
 import {
   processDeliveryReconciliation,
   PAYMENT_WINDOW_MINUTES,
-  ORDER_PLACING_TIMEOUT_MINUTES,
+  UNDISPATCHED_GRACE_MINUTES,
 } from "./deliveryReconcile";
+import type { PaymentService } from "../../services/payment/paymentService";
 import { enqueueDeliveryRefund } from "../queues";
 
 jest.mock("../../utils/db", () => ({
@@ -18,6 +19,9 @@ jest.mock("../../lalamove", () => ({
   mapLalamoveStatusToDbStatus: (s: string) => s,
 }));
 jest.mock("../../utils/socket", () => ({ getSocketIO: () => null }));
+jest.mock("../../services/payment/defaultPaymentService", () => ({
+  createPaymentService: jest.fn(),
+}));
 jest.mock("../queues", () => ({
   enqueueDeliveryRefund: jest.fn().mockResolvedValue(undefined),
 }));
@@ -43,40 +47,42 @@ beforeEach(() => {
   jest.spyOn(console, "error").mockImplementation(() => {});
 });
 
-describe("Phase 0: stuck ORDER_PLACING", () => {
-  it("marks FAILED, records the event and enqueues a refund after the timeout", async () => {
+describe("Phase 0: interrupted dispatch saga (backstop) + refund sweep", () => {
+  const checkPlacingOrder = jest.fn();
+  const service = () => ({ checkPlacingOrder }) as unknown as PaymentService;
+
+  beforeEach(() => checkPlacingOrder.mockReset());
+
+  it("hands never-dispatched and outcome-unknown ORDER_PLACING orders to checkPlacingOrder", async () => {
     query
-      .mockResolvedValueOnce([[{ id: 5 }]]) // stuck scan
-      .mockResolvedValueOnce([{ affectedRows: 1 }]) // guarded FAILED update
-      .mockResolvedValueOnce([{}]) // INSERT event
+      .mockResolvedValueOnce([[{ id: 5 }, { id: 6 }]]) // stuck scan
       .mockResolvedValueOnce([[]]) // refund sweep
       .mockResolvedValueOnce([[]]) // Phase 1
       .mockResolvedValueOnce([[]]); // Phase 2
+    checkPlacingOrder.mockResolvedValueOnce("DISPATCHED").mockResolvedValueOnce("FAILED");
 
-    const result = await processDeliveryReconciliation();
+    const result = await processDeliveryReconciliation(undefined, service);
 
     const [scanSql, scanParams] = query.mock.calls[0];
     expect(scanSql).toContain("status = 'ORDER_PLACING'");
-    expect(scanParams).toEqual([ORDER_PLACING_TIMEOUT_MINUTES]);
-    expect(query.mock.calls[1][0]).toContain("WHERE id = ? AND status = 'ORDER_PLACING'");
-    expect(enqueueDeliveryRefund).toHaveBeenCalledWith({
-      deliveryOrderId: 5,
-      reason: "ORDER_PLACING_TIMEOUT",
-    });
-    expect(result.stuckPlacingCount).toBe(1);
+    expect(scanSql).toContain("dispatch_attempted_at IS NULL");
+    expect(scanParams).toEqual([UNDISPATCHED_GRACE_MINUTES, 5]);
+    expect(checkPlacingOrder).toHaveBeenNthCalledWith(1, 5);
+    expect(checkPlacingOrder).toHaveBeenNthCalledWith(2, 6);
+    expect(result.stuckPlacingCount).toBe(2);
   });
 
-  it("skips when T3 or a webhook adoption moved the order concurrently", async () => {
+  it("keeps going when one order fails to recover", async () => {
     query
-      .mockResolvedValueOnce([[{ id: 5 }]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }])
+      .mockResolvedValueOnce([[{ id: 5 }, { id: 6 }]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]]);
+    checkPlacingOrder.mockRejectedValueOnce(new Error("Lalamove down")).mockResolvedValueOnce("NOOP");
 
-    const result = await processDeliveryReconciliation();
+    const result = await processDeliveryReconciliation(undefined, service);
 
-    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
+    expect(checkPlacingOrder).toHaveBeenCalledTimes(2);
     expect(result.stuckPlacingCount).toBe(0);
   });
 
@@ -87,7 +93,7 @@ describe("Phase 0: stuck ORDER_PLACING", () => {
       .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([[]]);
 
-    await processDeliveryReconciliation();
+    await processDeliveryReconciliation(undefined, service);
 
     const [sweepSql, sweepParams] = query.mock.calls[1];
     expect(sweepSql).toContain("p.status = 'PAID'");

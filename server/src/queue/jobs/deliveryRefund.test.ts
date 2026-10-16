@@ -1,6 +1,6 @@
 import { Job } from "bullmq";
 import dbPool from "../../utils/db";
-import { createNotification } from "../../utils/notificationService";
+import { notifyDeliveryUser } from "../../services/deliveryNotifier";
 import type { PaymentService } from "../../services/payment/paymentService";
 import { processDeliveryRefund, DeliveryRefundJobData } from "./deliveryRefund";
 
@@ -8,9 +8,8 @@ jest.mock("../../utils/db", () => ({
   __esModule: true,
   default: { query: jest.fn() },
 }));
-jest.mock("../../utils/socket", () => ({ getSocketIO: () => null }));
-jest.mock("../../utils/notificationService", () => ({
-  createNotification: jest.fn().mockResolvedValue({}),
+jest.mock("../../services/deliveryNotifier", () => ({
+  notifyDeliveryUser: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock("../../services/payment/defaultPaymentService", () => ({
   createPaymentService: jest.fn(),
@@ -20,10 +19,12 @@ const query = dbPool.query as jest.Mock;
 const refund = jest.fn();
 const service = { refund } as unknown as PaymentService;
 
-function job(reason = "LALAMOVE_REJECTED") {
+function job(reason = "LALAMOVE_REJECTED", attemptsMade = 0) {
   return {
     data: { deliveryOrderId: 7, reason },
     log: jest.fn(),
+    attemptsMade,
+    opts: { attempts: 3 },
   } as unknown as Job<DeliveryRefundJobData>;
 }
 
@@ -42,10 +43,7 @@ describe("processDeliveryRefund", () => {
 
     await expect(processDeliveryRefund(job(), service)).resolves.toEqual({ refunded: true });
     expect(refund).toHaveBeenCalledWith(101, "AUTO_REFUND: LALAMOVE_REJECTED");
-    expect(createNotification).toHaveBeenCalledWith(
-      null,
-      expect.objectContaining({ recipient_id: 42, type: "ORDER_UPDATE" }),
-    );
+    expect(notifyDeliveryUser).toHaveBeenCalledWith(7, "REFUNDED", "LALAMOVE_REJECTED");
   });
 
   it.each([
@@ -64,6 +62,20 @@ describe("processDeliveryRefund", () => {
     await expect(processDeliveryRefund(job("LALAMOVE_EXPIRED"), service)).rejects.toThrow(
       /Refund rejected/,
     );
-    expect(createNotification).not.toHaveBeenCalled();
+    expect(notifyDeliveryUser).not.toHaveBeenCalled();
+  });
+
+  it("alerts and tells the user support will follow up when the last retry fails", async () => {
+    target("FAILED", "PAID");
+    refund.mockRejectedValue(new Error("Refund amount exceeds remaining refundable balance"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(processDeliveryRefund(job("LALAMOVE_DISPATCH_FAILED", 2), service)).rejects.toThrow();
+
+    expect(notifyDeliveryUser).toHaveBeenCalledWith(7, "REFUND_FAILED");
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("[ALERT]"),
+      expect.any(Error),
+    );
   });
 });

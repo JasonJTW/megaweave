@@ -3,7 +3,8 @@
 
 import dbPool from "../../utils/db";
 import { requireEnv } from "../../utils/env";
-import { enqueueDeliveryRefund } from "../../queue/queues";
+import { enqueueDeliveryRefund, enqueueDispatchCheck } from "../../queue/queues";
+import { notifyDeliveryUser } from "../deliveryNotifier";
 import * as lalamoveService from "../lalamove";
 import { ECPayAioProvider } from "./ecpay/ECPayAioProvider";
 import { PaymentService } from "./paymentService";
@@ -24,5 +25,7 @@ export function createPaymentService(): PaymentService {
     }),
     lalamoveService,
     enqueueDeliveryRefund,
+    scheduleDispatchCheck: enqueueDispatchCheck,
+    notifyDeliveryUser,
   });
 }

@@ -8,6 +8,8 @@ import {
 import { CreateOrderParams, GetQuotationParams } from "../lalamove";
 import { predecessorsOf } from "../deliveryStatus";
 import { cancelOrphanLalamoveOrder } from "../deliveryRecovery";
+import { LalamoveDispatchError } from "../lalamoveErrors";
+import type { DeliveryNoticeEvent } from "../deliveryNotifier";
 
 export interface CreateCheckoutOrderInput {
   userId: number;
@@ -55,7 +57,29 @@ export interface PaymentServiceDependencies {
   lalamoveService?: LalamoveServiceDeps;
   /** 排入自動退款佇列（BullMQ 重試）；由 deliveryRefund worker 確認狀態後呼叫 refund() */
   enqueueDeliveryRefund: (data: { deliveryOrderId: number; reason: string }) => Promise<void>;
+  /** 排定單筆外送單的派單檢查（延遲 job），由 worker 呼叫 checkPlacingOrder() */
+  scheduleDispatchCheck: (
+    deliveryOrderId: number,
+    delayMs: number,
+    stage: "initial" | "final"
+  ) => Promise<void>;
+  /** 通知使用者叫車失敗 / 退款結果（站內 + Email），盡力而為 */
+  notifyDeliveryUser: (deliveryOrderId: number, event: DeliveryNoticeEvent) => Promise<void>;
 }
+
+export type DispatchOutcome =
+  | "DISPATCHED" // T2 成功（T3 已寫回或交由 webhook 認領）
+  | "FAILED" // 確定未建單 → FAILED + 退款
+  | "UNKNOWN" // T2 結果不明 → 維持 ORDER_PLACING 等 webhook 認領
+  | "NOT_CLAIMED"; // 已由他方送出 T2，或外送單已離開 ORDER_PLACING
+
+export type PlacingCheckResult = "NOOP" | "WAITING" | "FAILED" | DispatchOutcome;
+
+/** 付款後多久檢查一次派單是否完成（T2 逾時 30 秒，60 秒時必已結束） */
+export const DISPATCH_CHECK_DELAY_MS = 60 * 1000;
+
+/** T2 結果不明時，等 ORDER_CREATED webhook 認領的時間；期滿仍無則判定未建單並退款 */
+export const DISPATCH_OUTCOME_WAIT_MINUTES = 5;
 
 // 報價剩餘有效時間低於此值即視為過期，避免送到 Lalamove 時剛好失效
 const QUOTATION_SAFETY_MARGIN_MS = 30 * 1000;
@@ -87,12 +111,16 @@ export class PaymentService {
   private provider: IPaymentProvider;
   private lalamoveService?: LalamoveServiceDeps;
   private enqueueDeliveryRefund: PaymentServiceDependencies["enqueueDeliveryRefund"];
+  private scheduleDispatchCheck: PaymentServiceDependencies["scheduleDispatchCheck"];
+  private notifyDeliveryUser: PaymentServiceDependencies["notifyDeliveryUser"];
 
   constructor(deps: PaymentServiceDependencies) {
     this.dbPool = deps.dbPool;
     this.provider = deps.provider;
     this.lalamoveService = deps.lalamoveService;
     this.enqueueDeliveryRefund = deps.enqueueDeliveryRefund;
+    this.scheduleDispatchCheck = deps.scheduleDispatchCheck;
+    this.notifyDeliveryUser = deps.notifyDeliveryUser;
   }
 
   /**
@@ -252,7 +280,6 @@ export class PaymentService {
     //      → 外送單已 EXPIRED，下方 ORDER_PLACING 守衛會擋下並自動退款，錢不會被吞掉
     //    已 PAID / REFUNDED 者 affectedRows = 0 → 視為重複通知
     const conn = await this.dbPool.getConnection();
-    let deliveryOrder: DeliveryOrderRow | null = null;
     let deliveryOrderId: number | null = null;
     let undispatchableReason: string | null = null;
 
@@ -282,8 +309,8 @@ export class PaymentService {
       }
 
       // 查詢對應的外送訂單
-      const [orderRows] = await conn.query<DeliveryOrderRow[]>(
-        `SELECT d.*, p.id as payment_id 
+      const [orderRows] = await conn.query<RowDataPacket[]>(
+        `SELECT d.id 
          FROM delivery_orders d 
          JOIN payments p ON d.payment_id = p.id 
          WHERE p.merchant_trade_no = ?`,
@@ -291,19 +318,17 @@ export class PaymentService {
       );
 
       if (orderRows && orderRows.length > 0) {
-        deliveryOrder = orderRows[0];
-        deliveryOrderId = deliveryOrder.id;
+        deliveryOrderId = Number(orderRows[0].id);
 
         // 標記外送訂單正在向 Lalamove 派單（狀態機守衛：僅 PAYMENT_PENDING 可轉移）
         const [placingResult] = await conn.query<ResultSetHeader>(
           "UPDATE delivery_orders SET status = 'ORDER_PLACING' WHERE id = ? AND status IN (?)",
-          [deliveryOrder.id, predecessorsOf("ORDER_PLACING")]
+          [deliveryOrderId, predecessorsOf("ORDER_PLACING")]
         );
 
         // 付款到達前外送單已過期 / 取消（付款窗口已關）→ 不派單，改為自動退款
         if (placingResult.affectedRows === 0) {
-          undispatchableReason = `Delivery order ${deliveryOrder.id} is no longer awaiting payment`;
-          deliveryOrder = null;
+          undispatchableReason = `Delivery order ${deliveryOrderId} is no longer awaiting payment`;
         }
       }
 
@@ -319,53 +344,133 @@ export class PaymentService {
       console.warn(
         `[ALERT] Late payment ${callbackResult.merchantTradeNo} (TradeNo ${callbackResult.tradeNo}): ${undispatchableReason}; auto-refunding`
       );
+      await this.notifyDeliveryUser(deliveryOrderId, "PAID_AFTER_ORDER_CLOSED");
       await this.enqueueDeliveryRefund({ deliveryOrderId, reason: "PAID_AFTER_ORDER_CLOSED" });
       return { status: "PROCESSED", message: "Payment refunded: delivery order no longer payable" };
     }
 
-    // 3. 派單 saga（T1 收款已 commit）：
-    //    T2 Lalamove 建單 = pivot，失敗才補償（FAILED + 退款）
-    //    T3 寫回 DB = retryable，只重試、不補償 —— 車已派出，不可退款
-    if (deliveryOrder && this.lalamoveService) {
-      let lalaResult: LalamoveOrderResult;
-      try {
-        // 付款完成時報價可能已過期（使用者在綠界付款頁停留過久）→ 重新報價
-        const quotationId = this.isQuotationExpired(deliveryOrder.expires_at)
-          ? await this.requoteDeliveryOrder(deliveryOrder)
-          : deliveryOrder.quotation_id;
-
-        const orderParams: CreateOrderParams = {
-          quotationId,
-          sender: {
-            name: deliveryOrder.sender_name,
-            phone: deliveryOrder.sender_phone,
-          },
-          recipients: [
-            {
-              name: deliveryOrder.recipient_name,
-              phone: deliveryOrder.recipient_phone,
-            },
-          ],
-          metadata: { deliveryOrderId: String(deliveryOrder.id) },
-        };
-
-        lalaResult = await this.lalamoveService.createLalamoveOrder(orderParams);
-      } catch (lalaErr: unknown) {
-        // T2 失敗（例如報價過期、重估價超過已付金額）→ 補償
-        const reason = lalaErr instanceof Error ? lalaErr.message : "Lalamove dispatch failed";
-        await this.failDispatch(deliveryOrder.id, reason);
-        return { status: "PROCESSED", message: "Dispatch failed; refund scheduled" };
-      }
-
-      await this.recordDispatch(deliveryOrder.id, lalaResult);
+    if (!deliveryOrderId) {
+      return { status: "PROCESSED", message: "Payment processed (no delivery order)" };
     }
 
-    return { status: "PROCESSED", message: "Payment processed and order dispatched" };
+    // 3. 派單 saga（T1 收款已 commit）。先排定 60 秒後的檢查：本程序若在 T2 前後當機，由 worker 接手
+    try {
+      await this.scheduleDispatchCheck(deliveryOrderId, DISPATCH_CHECK_DELAY_MS, "initial");
+    } catch (scheduleErr) {
+      // 排程失敗時由對帳 cron（Phase 0）兜底
+      console.error(`Failed to schedule dispatch check for delivery order ${deliveryOrderId}:`, scheduleErr);
+    }
+
+    const outcome = await this.dispatchDeliveryOrder(deliveryOrderId);
+    return { status: "PROCESSED", message: `Payment processed; dispatch ${outcome}` };
   }
 
   /**
-   * T2 補償：外送單 ORDER_PLACING → FAILED 並排入退款。
-   * 以狀態守衛搶占，已被他方（對帳逾時、webhook 認領）處理過則不重複補償。
+   * 派單 saga：claim → T2 Lalamove 建單（pivot）→ T3 寫回 DB（retryable）
+   *
+   * claim：送出 T2 前先寫 dispatch_attempted_at（狀態守衛，僅一方能送出）。
+   *        之後若結果不明，代表 Lalamove「可能」已建單 —— 不可重送、不可退款，只能等 webhook 認領。
+   * T2 失敗：Lalamove 明確拒絕（4xx）或重估價失敗 → 確定未建單 → FAILED + 退款
+   *          網路錯誤 / 逾時 / 5xx → UNKNOWN，維持 ORDER_PLACING
+   */
+  async dispatchDeliveryOrder(deliveryOrderId: number): Promise<DispatchOutcome> {
+    if (!this.lalamoveService) {
+      throw new Error("Lalamove service is not configured");
+    }
+
+    const [claimResult] = await this.dbPool.query<ResultSetHeader>(
+      `UPDATE delivery_orders SET dispatch_attempted_at = NOW(3) 
+       WHERE id = ? AND status = 'ORDER_PLACING' AND dispatch_attempted_at IS NULL`,
+      [deliveryOrderId]
+    );
+    if (claimResult.affectedRows === 0) return "NOT_CLAIMED";
+
+    const [orderRows] = await this.dbPool.query<DeliveryOrderRow[]>(
+      "SELECT * FROM delivery_orders WHERE id = ?",
+      [deliveryOrderId]
+    );
+    const deliveryOrder = orderRows[0];
+
+    let lalaResult: LalamoveOrderResult;
+    try {
+      // 付款完成時報價可能已過期（使用者在綠界付款頁停留過久）→ 重新報價（無副作用，失敗即確定未建單）
+      const quotationId = this.isQuotationExpired(deliveryOrder.expires_at)
+        ? await this.requoteDeliveryOrder(deliveryOrder)
+        : deliveryOrder.quotation_id;
+
+      const orderParams: CreateOrderParams = {
+        quotationId,
+        sender: {
+          name: deliveryOrder.sender_name,
+          phone: deliveryOrder.sender_phone,
+        },
+        recipients: [
+          {
+            name: deliveryOrder.recipient_name,
+            phone: deliveryOrder.recipient_phone,
+          },
+        ],
+        metadata: { deliveryOrderId: String(deliveryOrderId) },
+      };
+
+      lalaResult = await this.lalamoveService.createLalamoveOrder(orderParams);
+    } catch (lalaErr: unknown) {
+      const reason = lalaErr instanceof Error ? lalaErr.message : "Lalamove dispatch failed";
+
+      if (lalaErr instanceof LalamoveDispatchError && lalaErr.outcome === "UNKNOWN") {
+        console.warn(
+          `[ALERT] Lalamove dispatch outcome unknown for delivery order ${deliveryOrderId} (${reason}); awaiting ORDER_CREATED webhook for up to ${DISPATCH_OUTCOME_WAIT_MINUTES} min`
+        );
+        return "UNKNOWN";
+      }
+
+      await this.failDispatch(deliveryOrderId, reason);
+      return "FAILED";
+    }
+
+    await this.recordDispatch(deliveryOrderId, lalaResult);
+    return "DISPATCHED";
+  }
+
+  /**
+   * 檢查仍在 ORDER_PLACING 的外送單（延遲 job 與對帳 cron 共用）：
+   * - 從未送出 T2（dispatch_attempted_at 為 NULL）→ 確定沒有 Lalamove 單 → 重新派單
+   * - 已送出且等待期滿仍未被 webhook 認領 → 判定未建單 → FAILED + 退款 + 告警
+   * - 已送出但等待期未滿 → 排定期滿時再檢查
+   */
+  async checkPlacingOrder(deliveryOrderId: number): Promise<PlacingCheckResult> {
+    const [rows] = await this.dbPool.query<RowDataPacket[]>(
+      `SELECT status, dispatch_attempted_at,
+              TIMESTAMPDIFF(MICROSECOND, NOW(3), dispatch_attempted_at + INTERVAL ? MINUTE) DIV 1000 AS wait_remaining_ms
+       FROM delivery_orders WHERE id = ?`,
+      [DISPATCH_OUTCOME_WAIT_MINUTES, deliveryOrderId]
+    );
+    const row = rows[0];
+    if (!row || row.status !== "ORDER_PLACING") return "NOOP";
+
+    if (!row.dispatch_attempted_at) {
+      console.warn(
+        `[Dispatch Check] Delivery order ${deliveryOrderId} was paid but never dispatched; re-dispatching`
+      );
+      return this.dispatchDeliveryOrder(deliveryOrderId);
+    }
+
+    const remainingMs = Number(row.wait_remaining_ms);
+    if (remainingMs > 0) {
+      await this.scheduleDispatchCheck(deliveryOrderId, remainingMs + 1000, "final");
+      return "WAITING";
+    }
+
+    console.warn(
+      `[ALERT] Delivery order ${deliveryOrderId}: no Lalamove order surfaced within ${DISPATCH_OUTCOME_WAIT_MINUTES} min of an unknown dispatch outcome; failing and refunding`
+    );
+    await this.failDispatch(deliveryOrderId, "DISPATCH_OUTCOME_UNKNOWN");
+    return "FAILED";
+  }
+
+  /**
+   * T2 補償：外送單 ORDER_PLACING → FAILED、通知使用者並排入退款。
+   * 以狀態守衛搶占，已被他方（逾時檢查、webhook 認領）處理過則不重複補償。
    */
   private async failDispatch(deliveryOrderId: number, reason: string): Promise<void> {
     const [failResult] = await this.dbPool.query<ResultSetHeader>(
@@ -386,13 +491,14 @@ export class PaymentService {
       console.error(`Failed to record FAILED event for delivery order ${deliveryOrderId}:`, eventErr);
     }
 
+    await this.notifyDeliveryUser(deliveryOrderId, "DISPATCH_FAILED");
     await this.enqueueDeliveryRefund({ deliveryOrderId, reason: "LALAMOVE_DISPATCH_FAILED" });
   }
 
   /**
    * T3：把 Lalamove 建單結果寫回 DB，只重試不補償。
    * - 重試用完仍失敗：保留 ORDER_PLACING，由 ORDER_CREATED webhook 以 quotationId 認領
-   * - 外送單已離開 ORDER_PLACING（對帳判定逾時並退款）：取消這張 Lalamove 單，與退款一致
+   * - 外送單已離開 ORDER_PLACING（逾時檢查已判定失敗並退款）：取消這張 Lalamove 單，與退款一致
    */
   private async recordDispatch(deliveryOrderId: number, lalaResult: LalamoveOrderResult): Promise<void> {
     const lalamoveOrderId = lalaResult.orderId || null;

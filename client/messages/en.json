@@ -895,13 +895,21 @@
     "tradeNo": "Transaction No.: {tradeNo}",
     "paidTitle": "Payment successful!",
     "paidMatched": "A Lalamove driver has been matched. Taking you to live tracking...",
-    "paidPending": "We've received your payment and are arranging your delivery.",
     "goTracking": "Go to live tracking",
     "viewOrders": "View my orders",
     "unpaidTitle": "Payment not completed",
     "unpaidBody": "The payment was not completed or was cancelled. You have not been charged.",
     "retry": "Back to try again",
     "home": "Back to home",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "placingTitle": "Payment received — booking your driver...",
+    "placingBody": "We're creating your Lalamove delivery. This usually takes a few seconds.",
+    "stillConfirmingTitle": "Still confirming",
+    "stillConfirmingBody": "We're still confirming your delivery booking. If it fails, your payment will be refunded in full, and we'll let you know by in-app notification and email.",
+    "awaitingPaymentBody": "We haven't received the payment result from ECPay yet. If you completed the payment, we'll let you know by in-app notification and email. If the payment failed, you have not been charged.",
+    "dispatchFailedTitle": "Delivery booking failed",
+    "dispatchFailedBody": "We're sorry, we couldn't book a Lalamove driver. Your payment of NT${amount} will be refunded in full to your card, and we'll let you know by in-app notification and email once it's done.",
+    "refundedTitle": "Fully refunded",
+    "refundedBody": "Your payment of NT${amount} has been refunded to your card. The exact posting date depends on your card issuer."
   }
 }

@@ -895,13 +895,21 @@
     "tradeNo": "交易序號：{tradeNo}",
     "paidTitle": "付款成功！",
     "paidMatched": "已成功為您媒合 Lalamove 司機，正在跳轉至即時追蹤頁⋯",
-    "paidPending": "我們已收到您的款項，外送訂單正在安排中。",
     "goTracking": "前往外送即時追蹤",
     "viewOrders": "查看我的訂單列表",
     "unpaidTitle": "付款未完成",
     "unpaidBody": "付款尚未完成或已被取消，您尚未被扣款。",
     "retry": "返回重新下單",
     "home": "回首頁",
-    "loading": "載入中⋯"
+    "loading": "載入中⋯",
+    "placingTitle": "已收到款項，正在為您叫車⋯",
+    "placingBody": "正在向 Lalamove 建立外送訂單，請稍候，通常只需幾秒鐘",
+    "stillConfirmingTitle": "結果確認中",
+    "stillConfirmingBody": "叫車結果仍在確認中。若叫車失敗，已支付的款項將全額退回，結果會以站內通知與 Email 告知您。",
+    "awaitingPaymentBody": "尚未收到綠界的付款結果。若您已完成付款，結果會以站內通知與 Email 告知您；若付款失敗，您不會被扣款。",
+    "dispatchFailedTitle": "叫車失敗",
+    "dispatchFailedBody": "很抱歉，未能成功向 Lalamove 叫車。已支付的 NT${amount} 將全額退回原信用卡，完成後會以站內通知與 Email 告知您。",
+    "refundedTitle": "已全額退款",
+    "refundedBody": "已支付的 NT${amount} 已退回原信用卡，實際入帳時間依發卡銀行而定。"
   }
 }

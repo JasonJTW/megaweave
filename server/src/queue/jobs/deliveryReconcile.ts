@@ -13,6 +13,11 @@ import {
 import { enqueueDeliveryRefund } from "../queues";
 import { mapLalamoveStatusToDbStatus } from "../../lalamove";
 import { getSocketIO } from "../../utils/socket";
+import {
+  DISPATCH_OUTCOME_WAIT_MINUTES,
+  type PaymentService,
+} from "../../services/payment/paymentService";
+import { createPaymentService } from "../../services/payment/defaultPaymentService";
 
 interface StaleDeliveryOrderRow extends RowDataPacket {
   id: number;
@@ -24,6 +29,12 @@ interface StaleDeliveryOrderRow extends RowDataPacket {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let defaultPaymentService: PaymentService | null = null;
+function getPaymentService(): PaymentService {
+  defaultPaymentService ??= createPaymentService();
+  return defaultPaymentService;
+}
+
 /**
  * 待付款外送單的付款窗口（分鐘）。綠界 AIO 信用卡付款頁有效 10 分鐘且無法調整，
  * 加上回呼延遲緩衝；窗口內即使報價過期也不關單，付款成功後由 PaymentService 重新報價派單。
@@ -31,11 +42,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const PAYMENT_WINDOW_MINUTES = 30;
 
 /**
- * ORDER_PLACING 逾時（分鐘）。Lalamove 建單為同步呼叫、建單即進入 ASSIGNING_DRIVER，
- * 超過此時間仍未寫回 orderId 代表派單 saga 中斷（當機 / T2 回應遺失 / T3 寫入失敗）。
- * 判定失敗並退款；若 Lalamove 其實已建單，晚到的 ORDER_CREATED webhook 會取消該單（見 deliveryRecovery）。
+ * 付款後從未送出 T2（dispatch_attempted_at 為 NULL）多久，由 cron 補做派單。
+ * 正常由付款後 60 秒的單筆檢查 job 處理；此值只在該 job 未能排入時兜底。
  */
-export const ORDER_PLACING_TIMEOUT_MINUTES = 1;
+export const UNDISPATCHED_GRACE_MINUTES = 2;
 
 /** 終止後多久仍未退款才補排（給正常流程的退款 job 先跑） */
 const REFUND_SWEEP_GRACE_MINUTES = 10;
@@ -43,8 +53,9 @@ const REFUND_SWEEP_GRACE_MINUTES = 10;
 /**
  * 執行外送訂單狀態對帳，分三個階段：
  *
- * Phase 0 – ORDER_PLACING 逾時掃描 + 退款保底
- *   掃描超過 ORDER_PLACING_TIMEOUT_MINUTES 仍在 ORDER_PLACING 的訂單，標記 FAILED 並排入退款、告警。
+ * Phase 0 – 中斷的派單 saga（單筆檢查 job 的兜底）+ 退款保底
+ *   ORDER_PLACING 且「從未送出 T2 超過 UNDISPATCHED_GRACE_MINUTES」或「T2 結果不明超過等待期」者，
+ *   交給 PaymentService.checkPlacingOrder：前者重新派單，後者判定未建單 → FAILED + 退款。
  *   再掃描「外送單已終止（FAILED / EXPIRED）但付款仍為 PAID」者補排退款：
  *   排入佇列失敗（例如 Redis 斷線）時綠界重送會被冪等閘門擋下，沒有這層就沒人會再退款。
  *
@@ -57,7 +68,10 @@ const REFUND_SWEEP_GRACE_MINUTES = 10;
  *   掃描超過 3 分鐘未更新的 ASSIGNING_DRIVER / ON_GOING / PICKED_UP 訂單，
  *   主動查詢 Lalamove API，若發現狀態不一致則自動補正 DB 並發送 Socket.IO 即時推播。
  */
-export async function processDeliveryReconciliation(job?: Job): Promise<{
+export async function processDeliveryReconciliation(
+  job?: Job,
+  paymentService: () => PaymentService = getPaymentService,
+): Promise<{
   checkedCount: number;
   reconciledCount: number;
   expiredCount: number;
@@ -80,46 +94,22 @@ export async function processDeliveryReconciliation(job?: Job): Promise<{
 
   await log("🔍 Starting background reconciliation job...");
 
-  // ── Phase 0: 中斷的派單 saga（ORDER_PLACING 逾時）→ FAILED + 退款 ─────────────
+  // ── Phase 0: 中斷的派單 saga（單筆檢查 job 未排入 / 未執行時兜底）────────────
   const [stuckRows] = await dbPool.query<RowDataPacket[]>(
     `SELECT id
      FROM delivery_orders
      WHERE status = 'ORDER_PLACING'
-       AND updated_at < NOW() - INTERVAL ? MINUTE`,
-    [ORDER_PLACING_TIMEOUT_MINUTES],
+       AND ((dispatch_attempted_at IS NULL AND updated_at < NOW() - INTERVAL ? MINUTE)
+            OR dispatch_attempted_at < NOW(3) - INTERVAL ? MINUTE)`,
+    [UNDISPATCHED_GRACE_MINUTES, DISPATCH_OUTCOME_WAIT_MINUTES],
   );
 
   let stuckPlacingCount = 0;
   for (const row of stuckRows) {
     try {
-      // 狀態守衛：期間若 T3 寫回或 webhook 已認領則放棄
-      const [failResult] = await dbPool.query<ResultSetHeader>(
-        `UPDATE delivery_orders
-         SET status = 'FAILED', failure_reason = 'ORDER_PLACING_TIMEOUT'
-         WHERE id = ? AND status = 'ORDER_PLACING'`,
-        [row.id],
-      );
-      if (failResult.affectedRows === 0) continue;
-
-      await dbPool.query(
-        `INSERT INTO delivery_order_events (delivery_order_id, event_status, raw_payload)
-         VALUES (?, 'FAILED', ?)`,
-        [
-          row.id,
-          JSON.stringify({
-            source: "background_reconciliation_worker",
-            reason: "ORDER_PLACING_TIMEOUT",
-          }),
-        ],
-      );
-      await enqueueDeliveryRefund({
-        deliveryOrderId: Number(row.id),
-        reason: "ORDER_PLACING_TIMEOUT",
-      });
-      await logWarn(
-        `[ALERT] delivery_order #${row.id} stuck in ORDER_PLACING; marked FAILED and refund enqueued`,
-      );
-      stuckPlacingCount++;
+      const result = await paymentService().checkPlacingOrder(Number(row.id));
+      await logWarn(`delivery_order #${row.id} stuck in ORDER_PLACING → ${result}`);
+      if (result !== "NOOP") stuckPlacingCount++;
     } catch (stuckErr) {
       await logError(`Failed to recover stuck delivery_order #${row.id}`, stuckErr);
     }

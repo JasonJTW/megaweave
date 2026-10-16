@@ -1,4 +1,9 @@
-import { PaymentService, CreateCheckoutOrderInput } from "../paymentService";
+import {
+  PaymentService,
+  CreateCheckoutOrderInput,
+  DISPATCH_CHECK_DELAY_MS,
+} from "../paymentService";
+import { LalamoveDispatchError } from "../../lalamoveErrors";
 import { IPaymentProvider, ParsedCallbackResult } from "../types";
 import { Pool } from "mysql2/promise";
 
@@ -25,6 +30,8 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
     cancelLalamoveOrder: jest.Mock;
   };
   let mockEnqueueRefund: jest.Mock;
+  let mockScheduleCheck: jest.Mock;
+  let mockNotify: jest.Mock;
   let paymentService: PaymentService;
 
   beforeEach(() => {
@@ -61,12 +68,16 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       cancelLalamoveOrder: jest.fn().mockResolvedValue({ success: true }),
     };
     mockEnqueueRefund = jest.fn().mockResolvedValue(undefined);
+    mockScheduleCheck = jest.fn().mockResolvedValue(undefined);
+    mockNotify = jest.fn().mockResolvedValue(undefined);
 
     paymentService = new PaymentService({
       dbPool: mockPool as unknown as Pool,
       provider: mockProvider,
       lalamoveService: mockLalamoveService,
       enqueueDeliveryRefund: mockEnqueueRefund,
+      scheduleDispatchCheck: mockScheduleCheck,
+      notifyDeliveryUser: mockNotify,
     });
 
     jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -184,7 +195,64 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
     });
   });
 
-  describe("handlePaymentCallback (Idempotency & Dispatch saga)", () => {
+  /**
+   * 依 SQL 片段回應 mockPool.query：同一片段可排多個結果（依序取用，最後一個重複使用）；
+   * 結果為 Error 時拋出。未設定的 SQL 直接失敗，避免測試默默走錯路徑。
+   */
+  const routes: { match: string; results: unknown[] }[] = [];
+  const onSql = (match: string, ...results: unknown[]) => routes.push({ match, results });
+  const sqlCalls = (match: string) =>
+    mockPool.query.mock.calls.filter((c) => (c[0] as string).includes(match));
+
+  const SQL = {
+    claim: "SET dispatch_attempted_at = NOW(3)",
+    loadOrder: "SELECT * FROM delivery_orders WHERE id = ?",
+    recordDispatch: "SET status = 'ASSIGNING_DRIVER'",
+    event: "INSERT INTO delivery_order_events",
+    fail: "SET status = 'FAILED'",
+    conflictRead: "SELECT status, lalamove_order_id FROM delivery_orders",
+    linkOrphan: "AND lalamove_order_id IS NULL",
+    locations: "FROM locations",
+    requote: "SET quotation_id = ?",
+    checkRead: "TIMESTAMPDIFF",
+  };
+
+  const order = (overrides: Record<string, unknown> = {}) => ({
+    id: 201,
+    payment_id: 101,
+    quotation_id: "QUOTE_12345",
+    expires_at: new Date(Date.now() + 5 * 60 * 1000),
+    fee_total: "150.00",
+    service_type: "MOTORCYCLE",
+    pickup_location_id: 1,
+    pickup_address_snapshot: "Taipei Main Station",
+    dropoff_location_id: 2,
+    dropoff_address_snapshot: "Taipei 101",
+    sender_name: "Alice",
+    sender_phone: "+886912345678",
+    recipient_name: "Bob",
+    recipient_phone: "+886987654321",
+    ...overrides,
+  });
+
+  /** claim 成功 + 載入外送單（dispatchDeliveryOrder 的前兩步） */
+  const claimable = (row = order()) => {
+    onSql(SQL.claim, [{ affectedRows: 1 }]);
+    onSql(SQL.loadOrder, [[row]]);
+  };
+
+  beforeEach(() => {
+    routes.length = 0;
+    mockPool.query.mockImplementation(async (sql: string) => {
+      const route = routes.find((r) => sql.includes(r.match));
+      if (!route) throw new Error(`Unexpected SQL in test: ${sql}`);
+      const result = route.results.length > 1 ? route.results.shift() : route.results[0];
+      if (result instanceof Error) throw result;
+      return result;
+    });
+  });
+
+  describe("handlePaymentCallback (T1 gate)", () => {
     const successCallback: ParsedCallbackResult = {
       isValid: true,
       isSuccess: true,
@@ -199,33 +267,14 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       rawPayload: { TradeNo: "ECPAY_TRADE_999" },
     };
 
-    const order = (overrides: Record<string, unknown> = {}) => ({
-      id: 201,
-      payment_id: 101,
-      quotation_id: "QUOTE_12345",
-      expires_at: new Date(Date.now() + 5 * 60 * 1000),
-      fee_total: "150.00",
-      service_type: "MOTORCYCLE",
-      pickup_location_id: 1,
-      pickup_address_snapshot: "Taipei Main Station",
-      dropoff_location_id: 2,
-      dropoff_address_snapshot: "Taipei 101",
-      sender_name: "Alice",
-      sender_phone: "+886912345678",
-      recipient_name: "Bob",
-      recipient_phone: "+886987654321",
-      ...overrides,
-    });
-
     /** T1：閘門 PAID → 查外送單 → ORDER_PLACING（placingAffected=0 代表外送單已關閉） */
-    const mockT1 = (row = order(), placingAffected = 1) => {
+    const mockT1 = (placingAffected = 1) => {
       mockConnection.query
         .mockResolvedValueOnce([{ affectedRows: 1 }])
-        .mockResolvedValueOnce([[row]])
+        .mockResolvedValueOnce([[{ id: 201 }]])
         .mockResolvedValueOnce([{ affectedRows: placingAffected }]);
     };
 
-    const sqls = () => mockPool.query.mock.calls.map((c) => c[0] as string);
     const callback = () =>
       paymentService.handlePaymentCallback({ MerchantTradeNo: "MW1234567890" });
 
@@ -233,27 +282,36 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       mockProvider.verifyAndParseCallback.mockResolvedValue(successCallback);
     });
 
-    it("dispatches to Lalamove with deliveryOrderId metadata and records ASSIGNING_DRIVER", async () => {
+    it("schedules the 60s dispatch check, then dispatches with deliveryOrderId metadata", async () => {
       mockT1();
-      mockLalamoveService.createLalamoveOrder.mockResolvedValue({
-        orderId: "LALA_ORDER_888",
-        shareLink: "https://lalamove.com/track/888",
-      });
-      mockPool.query
-        .mockResolvedValueOnce([{ affectedRows: 1 }]) // T3 UPDATE → ASSIGNING_DRIVER
-        .mockResolvedValueOnce([{ insertId: 1 }]); // INSERT event
+      claimable();
+      onSql(SQL.recordDispatch, [{ affectedRows: 1 }]);
+      onSql(SQL.event, [{ insertId: 1 }]);
+      mockLalamoveService.createLalamoveOrder.mockResolvedValue({ orderId: "LALA_888" });
 
       const result = await callback();
 
-      expect(result.status).toBe("PROCESSED");
+      expect(result).toEqual({ status: "PROCESSED", message: "Payment processed; dispatch DISPATCHED" });
+      expect(mockScheduleCheck).toHaveBeenCalledWith(201, DISPATCH_CHECK_DELAY_MS, "initial");
       expect(mockLalamoveService.createLalamoveOrder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          quotationId: "QUOTE_12345",
-          metadata: { deliveryOrderId: "201" },
-        }),
+        expect.objectContaining({ quotationId: "QUOTE_12345", metadata: { deliveryOrderId: "201" } }),
       );
-      expect(mockPool.query.mock.calls[0][1][0]).toBe("LALA_ORDER_888");
+      expect(sqlCalls(SQL.recordDispatch)[0][1][0]).toBe("LALA_888");
       expect(mockEnqueueRefund).not.toHaveBeenCalled();
+      expect(mockNotify).not.toHaveBeenCalled();
+    });
+
+    it("still dispatches when scheduling the check fails (cron is the backstop)", async () => {
+      mockT1();
+      claimable();
+      onSql(SQL.recordDispatch, [{ affectedRows: 1 }]);
+      onSql(SQL.event, [{ insertId: 1 }]);
+      mockScheduleCheck.mockRejectedValue(new Error("Redis down"));
+      mockLalamoveService.createLalamoveOrder.mockResolvedValue({ orderId: "LALA_888" });
+
+      await callback();
+
+      expect(mockLalamoveService.createLalamoveOrder).toHaveBeenCalled();
     });
 
     it("ignores a duplicate callback when the gate matches no row", async () => {
@@ -262,6 +320,7 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       const result = await callback();
 
       expect(result.status).toBe("IGNORED");
+      expect(mockScheduleCheck).not.toHaveBeenCalled();
       expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
     });
 
@@ -275,32 +334,46 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       );
     });
 
-    it("enqueues a refund without dispatching when the delivery order already closed (late payment)", async () => {
-      mockT1(order(), 0);
+    it("notifies and refunds without dispatching when the delivery order already closed", async () => {
+      mockT1(0);
 
       const result = await callback();
 
       expect(result.status).toBe("PROCESSED");
       expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
+      expect(mockScheduleCheck).not.toHaveBeenCalled();
+      expect(mockNotify).toHaveBeenCalledWith(201, "PAID_AFTER_ORDER_CLOSED");
       expect(mockEnqueueRefund).toHaveBeenCalledWith({
         deliveryOrderId: 201,
         reason: "PAID_AFTER_ORDER_CLOSED",
       });
     });
+  });
 
-    describe("T2 (pivot) failure → compensate", () => {
-      it("marks FAILED and enqueues a refund when Lalamove order creation fails", async () => {
-        mockT1();
-        mockLalamoveService.createLalamoveOrder.mockRejectedValue(new Error("ERR_QUOTATION_EXPIRED"));
-        mockPool.query
-          .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE → FAILED
-          .mockResolvedValueOnce([{ insertId: 1 }]); // INSERT event
+  describe("dispatchDeliveryOrder (claim → T2 → T3)", () => {
+    const dispatch = () => paymentService.dispatchDeliveryOrder(201);
 
-        const result = await callback();
+    it("does nothing when another dispatcher already claimed it (dispatch_attempted_at set)", async () => {
+      onSql(SQL.claim, [{ affectedRows: 0 }]);
 
-        expect(result.status).toBe("PROCESSED");
-        expect(sqls()[0]).toContain("status = 'FAILED'");
-        expect(mockPool.query.mock.calls[0][1]).toEqual(["ERR_QUOTATION_EXPIRED", 201]);
+      await expect(dispatch()).resolves.toBe("NOT_CLAIMED");
+      expect(sqlCalls(SQL.claim)[0][0]).toContain("dispatch_attempted_at IS NULL");
+      expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
+    });
+
+    describe("T2 failure", () => {
+      it("Lalamove definitely rejected (4xx) → FAILED, notify, enqueue refund", async () => {
+        claimable();
+        onSql(SQL.fail, [{ affectedRows: 1 }]);
+        onSql(SQL.event, [{ insertId: 1 }]);
+        mockLalamoveService.createLalamoveOrder.mockRejectedValue(
+          new LalamoveDispatchError("ERR_INVALID_QUOTATION_ID", "REJECTED", 422),
+        );
+
+        await expect(dispatch()).resolves.toBe("FAILED");
+
+        expect(sqlCalls(SQL.fail)[0][1]).toEqual(["ERR_INVALID_QUOTATION_ID", 201]);
+        expect(mockNotify).toHaveBeenCalledWith(201, "DISPATCH_FAILED");
         expect(mockEnqueueRefund).toHaveBeenCalledWith({
           deliveryOrderId: 201,
           reason: "LALAMOVE_DISPATCH_FAILED",
@@ -308,14 +381,30 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
         expect(mockProvider.refundPayment).not.toHaveBeenCalled();
       });
 
-      it("does not compensate twice when the order already left ORDER_PLACING", async () => {
-        mockT1();
-        mockLalamoveService.createLalamoveOrder.mockRejectedValue(new Error("timeout"));
-        mockPool.query.mockResolvedValueOnce([{ affectedRows: 0 }]); // reconcile already FAILED it
+      it("outcome unknown (timeout / network / 5xx) → keep ORDER_PLACING, no refund, no notice", async () => {
+        claimable();
+        mockLalamoveService.createLalamoveOrder.mockRejectedValue(
+          new LalamoveDispatchError("timed out", "UNKNOWN"),
+        );
 
-        await callback();
+        await expect(dispatch()).resolves.toBe("UNKNOWN");
+
+        expect(sqlCalls(SQL.fail)).toHaveLength(0);
+        expect(mockEnqueueRefund).not.toHaveBeenCalled();
+        expect(mockNotify).not.toHaveBeenCalled();
+      });
+
+      it("does not compensate twice when the order already left ORDER_PLACING", async () => {
+        claimable();
+        onSql(SQL.fail, [{ affectedRows: 0 }]);
+        mockLalamoveService.createLalamoveOrder.mockRejectedValue(
+          new LalamoveDispatchError("rejected", "REJECTED", 400),
+        );
+
+        await dispatch();
 
         expect(mockEnqueueRefund).not.toHaveBeenCalled();
+        expect(mockNotify).not.toHaveBeenCalled();
       });
     });
 
@@ -333,58 +422,54 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       });
 
       it("retries a transient DB error and records the dispatch", async () => {
-        mockT1();
-        mockPool.query
-          .mockRejectedValueOnce(new Error("ECONNRESET"))
-          .mockResolvedValueOnce([{ affectedRows: 1 }])
-          .mockResolvedValueOnce([{ insertId: 1 }]);
+        claimable();
+        onSql(SQL.recordDispatch, new Error("ECONNRESET"), [{ affectedRows: 1 }]);
+        onSql(SQL.event, [{ insertId: 1 }]);
 
-        await callback();
+        await expect(dispatch()).resolves.toBe("DISPATCHED");
 
-        expect(sqls().filter((q) => q.includes("ASSIGNING_DRIVER")).length).toBeGreaterThanOrEqual(2);
-        expect(sqls().some((q) => q.includes("status = 'FAILED'"))).toBe(false);
+        expect(sqlCalls(SQL.recordDispatch)).toHaveLength(2);
         expect(mockEnqueueRefund).not.toHaveBeenCalled();
       });
 
       it("leaves ORDER_PLACING for webhook adoption when every retry fails (car already dispatched)", async () => {
-        mockT1();
-        mockPool.query.mockRejectedValue(new Error("DB down"));
+        claimable();
+        onSql(SQL.recordDispatch, new Error("DB down"));
 
-        const result = await callback();
+        await expect(dispatch()).resolves.toBe("DISPATCHED");
 
-        expect(result.status).toBe("PROCESSED");
-        expect(sqls().some((q) => q.includes("status = 'FAILED'"))).toBe(false);
+        expect(sqlCalls(SQL.recordDispatch)).toHaveLength(4);
+        expect(sqlCalls(SQL.fail)).toHaveLength(0);
         expect(mockEnqueueRefund).not.toHaveBeenCalled();
         expect(mockLalamoveService.cancelLalamoveOrder).not.toHaveBeenCalled();
       });
 
       it("does nothing when a webhook already adopted the same Lalamove order", async () => {
-        mockT1();
-        mockPool.query
-          .mockResolvedValueOnce([{ affectedRows: 0 }]) // T3 guard miss
-          .mockResolvedValueOnce([[{ status: "ASSIGNING_DRIVER", lalamove_order_id: "LALA_1" }]]);
+        claimable();
+        onSql(SQL.recordDispatch, [{ affectedRows: 0 }]);
+        onSql(SQL.conflictRead, [[{ status: "ASSIGNING_DRIVER", lalamove_order_id: "LALA_1" }]]);
 
-        await callback();
+        await dispatch();
 
         expect(mockLalamoveService.cancelLalamoveOrder).not.toHaveBeenCalled();
       });
 
-      it("cancels the Lalamove order when reconcile already failed + refunded the delivery order", async () => {
-        mockT1();
-        mockPool.query
-          .mockResolvedValueOnce([{ affectedRows: 0 }]) // T3 guard miss
-          .mockResolvedValueOnce([[{ status: "FAILED", lalamove_order_id: null }]])
-          .mockResolvedValueOnce([{ affectedRows: 1 }]); // link orphan orderId
+      it("cancels the Lalamove order when the delivery order was already failed and refunded", async () => {
+        claimable();
+        onSql(SQL.recordDispatch, [{ affectedRows: 0 }]);
+        onSql(SQL.conflictRead, [[{ status: "FAILED", lalamove_order_id: null }]]);
+        onSql(SQL.linkOrphan, [{ affectedRows: 1 }]);
 
-        await callback();
+        await dispatch();
 
         expect(mockLalamoveService.cancelLalamoveOrder).toHaveBeenCalledWith("LALA_1");
         expect(mockEnqueueRefund).not.toHaveBeenCalled();
       });
     });
 
-    describe("expired quotation at payment time → re-quote", () => {
-      const expired = () => order({ quotation_id: "OLD_QUOTE", expires_at: new Date(Date.now() - 60 * 1000) });
+    describe("expired quotation → re-quote", () => {
+      const expired = () =>
+        order({ quotation_id: "OLD_QUOTE", expires_at: new Date(Date.now() - 60 * 1000) });
       const locationRows = [
         { id: 1, lat: "25.0478", lng: "121.5170" },
         { id: 2, lat: "25.0339", lng: "121.5644" },
@@ -395,19 +480,17 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
         priceBreakdown: { total },
       });
 
-      it("dispatches with the new quotation when the new fee <= paid", async () => {
-        mockT1(expired());
-        mockPool.query
-          .mockResolvedValueOnce([locationRows])
-          .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE quotation_id (before T2)
-          .mockResolvedValueOnce([{ affectedRows: 1 }]) // T3
-          .mockResolvedValueOnce([{ insertId: 1 }]);
+      it("dispatches with the new quotation (saved before T2) when the new fee <= paid", async () => {
+        claimable(expired());
+        onSql(SQL.locations, [locationRows]);
+        onSql(SQL.requote, [{ affectedRows: 1 }]);
+        onSql(SQL.recordDispatch, [{ affectedRows: 1 }]);
+        onSql(SQL.event, [{ insertId: 1 }]);
         mockLalamoveService.requestLalamoveQuotation.mockResolvedValue(quote("140"));
         mockLalamoveService.createLalamoveOrder.mockResolvedValue({ orderId: "LALA_1" });
 
-        const result = await callback();
+        await expect(dispatch()).resolves.toBe("DISPATCHED");
 
-        expect(result.status).toBe("PROCESSED");
         expect(mockLalamoveService.requestLalamoveQuotation).toHaveBeenCalledWith(
           expect.objectContaining({
             serviceType: "MOTORCYCLE",
@@ -417,30 +500,81 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
             ],
           }),
         );
-        expect(mockPool.query.mock.calls[1][1]).toEqual(["NEW_QUOTE", expect.any(Date), 201]);
+        expect(sqlCalls(SQL.requote)[0][1]).toEqual(["NEW_QUOTE", expect.any(Date), 201]);
         expect(mockLalamoveService.createLalamoveOrder).toHaveBeenCalledWith(
           expect.objectContaining({ quotationId: "NEW_QUOTE" }),
         );
         expect(mockEnqueueRefund).not.toHaveBeenCalled();
       });
 
-      it("marks FAILED and enqueues a refund when the re-quoted fee exceeds the paid amount", async () => {
-        mockT1(expired());
-        mockPool.query
-          .mockResolvedValueOnce([locationRows])
-          .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE → FAILED
-          .mockResolvedValueOnce([{ insertId: 1 }]);
+      it("fails and refunds (no Lalamove order) when the re-quoted fee exceeds the paid amount", async () => {
+        claimable(expired());
+        onSql(SQL.locations, [locationRows]);
+        onSql(SQL.fail, [{ affectedRows: 1 }]);
+        onSql(SQL.event, [{ insertId: 1 }]);
         mockLalamoveService.requestLalamoveQuotation.mockResolvedValue(quote("180"));
 
-        await callback();
+        await expect(dispatch()).resolves.toBe("FAILED");
 
         expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
-        expect(mockPool.query.mock.calls[1][1][0]).toMatch(/exceeds paid amount/);
+        expect(sqlCalls(SQL.fail)[0][1][0]).toMatch(/exceeds paid amount/);
         expect(mockEnqueueRefund).toHaveBeenCalledWith({
           deliveryOrderId: 201,
           reason: "LALAMOVE_DISPATCH_FAILED",
         });
       });
+    });
+  });
+
+  describe("checkPlacingOrder (60s check job / reconcile backstop)", () => {
+    const check = () => paymentService.checkPlacingOrder(201);
+    const placing = (dispatchAttemptedAt: Date | null, waitRemainingMs: number | null) =>
+      onSql(SQL.checkRead, [
+        [{ status: "ORDER_PLACING", dispatch_attempted_at: dispatchAttemptedAt, wait_remaining_ms: waitRemainingMs }],
+      ]);
+
+    it("is a no-op once the order left ORDER_PLACING", async () => {
+      onSql(SQL.checkRead, [[{ status: "ASSIGNING_DRIVER", dispatch_attempted_at: new Date() }]]);
+
+      await expect(check()).resolves.toBe("NOOP");
+      expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
+    });
+
+    it("re-dispatches when T2 was never sent (crash between T1 commit and T2)", async () => {
+      placing(null, null);
+      claimable();
+      onSql(SQL.recordDispatch, [{ affectedRows: 1 }]);
+      onSql(SQL.event, [{ insertId: 1 }]);
+      mockLalamoveService.createLalamoveOrder.mockResolvedValue({ orderId: "LALA_1" });
+
+      await expect(check()).resolves.toBe("DISPATCHED");
+      expect(mockLalamoveService.createLalamoveOrder).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for webhook adoption while the 5-minute window is open", async () => {
+      placing(new Date(), 120_000);
+
+      await expect(check()).resolves.toBe("WAITING");
+
+      expect(mockScheduleCheck).toHaveBeenCalledWith(201, 121_000, "final");
+      expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
+      expect(mockEnqueueRefund).not.toHaveBeenCalled();
+    });
+
+    it("fails, notifies and refunds once the window closes without a Lalamove order", async () => {
+      placing(new Date(Date.now() - 6 * 60 * 1000), -60_000);
+      onSql(SQL.fail, [{ affectedRows: 1 }]);
+      onSql(SQL.event, [{ insertId: 1 }]);
+
+      await expect(check()).resolves.toBe("FAILED");
+
+      expect(sqlCalls(SQL.fail)[0][1]).toEqual(["DISPATCH_OUTCOME_UNKNOWN", 201]);
+      expect(mockNotify).toHaveBeenCalledWith(201, "DISPATCH_FAILED");
+      expect(mockEnqueueRefund).toHaveBeenCalledWith({
+        deliveryOrderId: 201,
+        reason: "LALAMOVE_DISPATCH_FAILED",
+      });
+      expect(mockLalamoveService.createLalamoveOrder).not.toHaveBeenCalled();
     });
   });
 

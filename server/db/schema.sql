@@ -300,6 +300,7 @@ CREATE TABLE `delivery_orders` (
   `failure_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '訂單失敗或取消原因說明',
   `raw_webhook_payload` json DEFAULT NULL COMMENT 'Lalamove Webhook 最新推送之原始 Payload (JSON)',
   `status_updated_at` datetime(3) DEFAULT NULL COMMENT '最後套用之 Lalamove 狀態事件時間 (webhook data.updatedAt)；用於丟棄亂序 / 重送的舊事件',
+  `dispatch_attempted_at` datetime(3) DEFAULT NULL COMMENT '送出 Lalamove 建單請求的時間；NULL 代表從未送出（可安全重新派單），非 NULL 代表結果可能不明（只能等 webhook 認領）',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP COMMENT '建立時間',
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間',
   PRIMARY KEY (`id`),

@@ -4,8 +4,7 @@
 import { Job } from "bullmq";
 import { RowDataPacket } from "mysql2";
 import dbPool from "../../utils/db";
-import { getSocketIO } from "../../utils/socket";
-import { createNotification } from "../../utils/notificationService";
+import { notifyDeliveryUser } from "../../services/deliveryNotifier";
 import { isRefundableStatus } from "../../services/deliveryStatus";
 import type { PaymentService } from "../../services/payment/paymentService";
 import { createPaymentService } from "../../services/payment/defaultPaymentService";
@@ -52,24 +51,22 @@ export async function processDeliveryRefund(
     return { refunded: false };
   }
 
-  const ok = await service.refund(target.payment_id, `AUTO_REFUND: ${reason}`);
-  if (!ok) throw new Error(`Refund rejected by provider for payment #${target.payment_id}`);
-
   try {
-    await createNotification(getSocketIO(), {
-      recipient_id: target.user_id,
-      type: "ORDER_UPDATE",
-      title: "Delivery Refunded",
-      content:
-        reason === "LALAMOVE_EXPIRED"
-          ? "No driver accepted your delivery in time. Your payment has been refunded."
-          : reason === "PAID_AFTER_ORDER_CLOSED"
-            ? "Your payment arrived after the delivery order had expired. Your payment has been refunded."
-            : "Your delivery could not be fulfilled by Lalamove. Your payment has been refunded.",
-    });
-  } catch (notifyErr) {
-    console.error(`[delivery-refund] Notification failed for #${deliveryOrderId}:`, notifyErr);
+    const ok = await service.refund(target.payment_id, `AUTO_REFUND: ${reason}`);
+    if (!ok) throw new Error(`Refund rejected by provider for payment #${target.payment_id}`);
+  } catch (refundErr) {
+    // 最後一次重試仍失敗 → 告警 + 通知使用者由客服處理（refund() 對結果不明者保留 PENDING，不會自動重刷）
+    const isFinalAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
+    if (isFinalAttempt) {
+      console.error(
+        `[ALERT] Auto-refund for delivery_order #${deliveryOrderId} (payment #${target.payment_id}) failed after all retries; manual action required`,
+        refundErr,
+      );
+      await notifyDeliveryUser(deliveryOrderId, "REFUND_FAILED");
+    }
+    throw refundErr;
   }
 
+  await notifyDeliveryUser(deliveryOrderId, "REFUNDED", reason);
   return { refunded: true };
 }

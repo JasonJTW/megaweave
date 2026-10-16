@@ -143,7 +143,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
       // Must be rejected with 403 Forbidden based on authoritative Redis role
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
-        errorMessage: "Forbidden: Insufficient permissions",
+        errorMessage: "Forbidden: admin role required",
       });
       expect(next).not.toHaveBeenCalled();
     });
@@ -241,7 +241,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
       await roleMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
-        errorMessage: "Forbidden: Insufficient permissions",
+        errorMessage: "Forbidden: admin role required",
       });
       expect(next).not.toHaveBeenCalled();
     });

@@ -1,8 +1,12 @@
 import { Router, Request, Response } from "express";
 import { EmailTemplateProps } from "./emails/EmailTemplate";
 import { enqueueSendEmail } from "./queue/queues";
+import { requireRole } from "./middleware/auth";
 
 const router = Router();
+
+// 手動測試用：僅限 admin，避免被當成任意寄信入口
+router.use(requireRole("admin"));
 
 router.post("/", async (req: Request, res: Response) => {
   // const props: EmailTemplateProps = {

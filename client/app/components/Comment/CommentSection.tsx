@@ -17,6 +17,7 @@ import {
   getComments,
   getCommentCounts,
 } from "@/services/commentService";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 interface CommentSectionProps {
   post: Post;
@@ -40,9 +41,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   }) => {
     if (!user) {
       toast.error(t("signInToMessage"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
 

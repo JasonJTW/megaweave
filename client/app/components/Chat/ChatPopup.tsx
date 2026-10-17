@@ -12,6 +12,7 @@ import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
 import { createWeave } from "@/services/weaveService";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 export const ChatPopup = () => {
   const { mutate: globalMutate } = useSWRConfig();
@@ -32,9 +33,7 @@ export const ChatPopup = () => {
   const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
     if (!currentUser) {
       toast.error(t("signInToRequest"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
     if (!post) return;

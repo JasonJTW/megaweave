@@ -8,6 +8,7 @@ import { createComment } from "@/services/commentService";
 import User from "../../types/user";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 interface CommentInputProps {
   postId: number;
   itemId?: "all" | number; // "all" = All 留言, 數字 = 特定 item
@@ -85,9 +86,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
     if (!user) {
       toast(t("signInToComment"));
       setTimeout(() => {
-        router.push(
-          `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-        );
+        router.push(signinUrlForCurrentPage());
       }, 1000);
     }
   };

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 interface SwipeHistoryItem {
   post: Post;
@@ -277,9 +278,7 @@ export default function TinderFeed({
     async (post: Post) => {
       if (!user) {
         toast.error(t("signInToMessage"));
-        router.push(
-          `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-        );
+        router.push(signinUrlForCurrentPage());
         return;
       }
 

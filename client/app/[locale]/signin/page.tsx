@@ -13,6 +13,7 @@ import { siFacebook, siGoogle } from "simple-icons";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { localizePath } from "@/i18n/routing";
+import { getSafeReturnTo } from "@/lib/returnTo";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import Image from "next/image";
 import toast from "react-hot-toast";
@@ -41,13 +42,10 @@ function SigninForm() {
   const handleSigninSignupSuccess = useCallback(() => {
     if (navigatingRef.current) return;
     navigatingRef.current = true;
-    if (returnTo) {
-      // 使用 window.location.href 強制完整頁面跳轉
-      // 確保瀏覽器在新請求時帶上已設置的 session Cookie
-      window.location.href = decodeURIComponent(returnTo);
-    } else {
-      window.location.href = home;
-    }
+    // 使用 window.location.href 強制完整頁面跳轉
+    // 確保瀏覽器在新請求時帶上已設置的 session Cookie
+    // returnTo 來自 URL，必須限制為站內路徑，避免 javascript: XSS 與 open redirect
+    window.location.href = getSafeReturnTo(returnTo, home);
   }, [returnTo, home]);
 
   //* Dismiss overlay → always return home

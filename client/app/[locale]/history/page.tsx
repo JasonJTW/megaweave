@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -46,9 +47,7 @@ export default function HistoryPage() {
   useEffect(() => {
     if (!userLoading && !user) {
       toast.error(t("signInToView"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
     }
   }, [userLoading, user, router, t]);
 

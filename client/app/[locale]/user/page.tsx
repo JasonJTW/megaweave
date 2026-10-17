@@ -47,6 +47,7 @@ import {
 } from "@/app/teamMembers";
 import { UserStats } from "@/app/types/schema";
 import User from "@/app/types/user";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
@@ -839,9 +840,7 @@ const UserPage = () => {
       // Only redirect if not already redirecting to avoid loops
       if (!redirecting) {
         setRedirecting(true);
-        router.push(
-          `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-        );
+        router.push(signinUrlForCurrentPage());
       }
       return;
     }

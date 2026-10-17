@@ -38,6 +38,7 @@ import {
   GOOGLE_AUTOCOMPLETE_FIELDS,
   ParsedGooglePlace,
 } from "@/utils/locationUtils";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -166,9 +167,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const handleWeaveThisClick = async () => {
     if (!user) {
       toast.error(t("quotation.signInToMessage"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
 

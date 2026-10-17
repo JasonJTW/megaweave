@@ -34,6 +34,7 @@ import { useUser } from "@/app/contexts/UserContext";
 import { Post } from "@/app/types/schema";
 // 地點工具函式
 import { formatLocationText } from "@/utils/locationUtils";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 interface OwnerProfile {
   username: string;
@@ -277,9 +278,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const handleLike = () => {
     if (!user) {
       toast.error(t("signInToLike"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
 

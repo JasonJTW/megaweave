@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 interface MessageButtonProps {
   recipientPublicId: string;
@@ -37,9 +38,7 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
       if (!res.ok) {
         if (res.status === 401) {
           toast.error(t("signInToMessage"));
-          router.push(
-            `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-          );
+          router.push(signinUrlForCurrentPage());
           return;
         }
         throw new Error("Failed to start conversation");

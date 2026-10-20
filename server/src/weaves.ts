@@ -5,6 +5,7 @@ import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { requestWeave, approveWeave, WeaveError } from "./utils/weaveService";
+import { ConnectionAcquireTimeoutError } from "./utils/acquireConnection";
 import { WeaveStatus } from "./utils/weaveService";
 import { buildWeavesFilter, WeavesListQuerySchema } from "./utils/weaveQuery";
 import { enqueueUserVectorUpdate } from "./queue/queues";
@@ -334,6 +335,12 @@ router.patch(
     } catch (err) {
       if (err instanceof WeaveError)
         return res.status(err.httpStatus).json({ errorMessage: err.message });
+      if (err instanceof ConnectionAcquireTimeoutError) {
+        console.error("approveWeave: DB pool exhausted:", err);
+        return res
+          .status(503)
+          .json({ errorMessage: "Server busy, please try again" });
+      }
       console.error("Error in approveWeave:", err);
       return res.status(500).json({ errorMessage: "Server error" });
     }

@@ -12,7 +12,7 @@ import {
 } from "../../services/deliveryStatus";
 import { enqueueDeliveryRefund } from "../queues";
 import { mapLalamoveStatusToDbStatus } from "../../lalamove";
-import { getSocketIO } from "../../utils/socket";
+import { getSocketBroadcaster } from "../../utils/socket";
 import {
   DISPATCH_OUTCOME_WAIT_MINUTES,
   type PaymentService,
@@ -215,7 +215,7 @@ export async function processDeliveryReconciliation(
 
   await log(`📦 Found ${rows.length} potentially stale orders to verify.`);
   let reconciledCount = 0;
-  const io = getSocketIO();
+  const io = getSocketBroadcaster();
 
   for (const row of rows) {
     try {

@@ -4,7 +4,7 @@
 
 import { RowDataPacket } from "mysql2/promise";
 import dbPool from "../utils/db";
-import { getSocketIO } from "../utils/socket";
+import { getSocketBroadcaster } from "../utils/socket";
 import { createNotification } from "../utils/notificationService";
 import { enqueueSendEmail } from "../queue/queues";
 
@@ -126,7 +126,7 @@ export async function notifyDeliveryUser(
     const link = `/delivery/payment-result?MerchantTradeNo=${encodeURIComponent(target.merchant_trade_no)}`;
 
     try {
-      await createNotification(getSocketIO(), {
+      await createNotification(getSocketBroadcaster(), {
         recipient_id: target.user_id,
         type: "ORDER_UPDATE",
         title: copy.title,

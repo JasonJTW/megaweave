@@ -1,4 +1,5 @@
-import { connectRedis, disconnectRedis } from "./utils/redis";
+import { connectRedis, disconnectRedis, getCacheRedisClient } from "./utils/redis";
+import { initSocketEmitter } from "./utils/socket";
 import { closeDatabase } from "./utils/db";
 import { startWorkers, stopWorkers } from "./queue/workers";
 import { initHotScoreCron } from "./queue/queues";
@@ -10,6 +11,7 @@ export interface WorkerServiceDependencies {
   startWorkers?: () => Promise<void>;
   stopWorkers?: () => Promise<void>;
   initHotScoreCron?: () => Promise<void>;
+  initSocketEmitter?: () => void;
   exitProcess?: (code: number) => void;
 }
 
@@ -27,6 +29,8 @@ export async function runWorkerService(
   const doStartWorkers = deps.startWorkers ?? startWorkers;
   const doStopWorkers = deps.stopWorkers ?? stopWorkers;
   const doInitHotScoreCron = deps.initHotScoreCron ?? initHotScoreCron;
+  const doInitSocketEmitter =
+    deps.initSocketEmitter ?? (() => initSocketEmitter(getCacheRedisClient()));
   const doExitProcess = deps.exitProcess ?? ((code: number) => process.exit(code));
 
   let shuttingDown = false;
@@ -63,6 +67,8 @@ export async function runWorkerService(
   try {
     console.log("👷 Starting standalone BullMQ Worker service...");
     await doConnectRedis();
+    // worker 沒有 Socket.IO server，推播改走 redis emitter → API 的 redis adapter
+    doInitSocketEmitter();
     await doStartWorkers();
     await doInitHotScoreCron();
     state.isRunning = true;

@@ -4,7 +4,7 @@ import { enqueueSendEmail } from "../queue/queues";
 import { getDeliveryNoticeCopy, notifyDeliveryUser } from "./deliveryNotifier";
 
 jest.mock("../utils/db", () => ({ __esModule: true, default: { query: jest.fn() } }));
-jest.mock("../utils/socket", () => ({ getSocketIO: () => null }));
+jest.mock("../utils/socket", () => ({ getSocketBroadcaster: () => null }));
 jest.mock("../utils/notificationService", () => ({
   createNotification: jest.fn().mockResolvedValue({}),
 }));

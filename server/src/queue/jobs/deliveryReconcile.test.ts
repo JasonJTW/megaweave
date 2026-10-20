@@ -18,7 +18,7 @@ jest.mock("../../services/lalamove", () => ({
 jest.mock("../../lalamove", () => ({
   mapLalamoveStatusToDbStatus: (s: string) => s,
 }));
-jest.mock("../../utils/socket", () => ({ getSocketIO: () => null }));
+jest.mock("../../utils/socket", () => ({ getSocketBroadcaster: () => null }));
 jest.mock("../../services/payment/defaultPaymentService", () => ({
   createPaymentService: jest.fn(),
 }));

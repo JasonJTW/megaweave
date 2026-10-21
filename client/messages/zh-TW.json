@@ -704,6 +704,7 @@
     "skills": "技能與專長"
   },
   "Chat": {
+    "close": "關閉聊天",
     "title": "訊息",
     "emptyTitle": "你的訊息",
     "emptyBody": "從列表選一個對話開始聊天。",

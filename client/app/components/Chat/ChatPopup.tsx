@@ -116,6 +116,7 @@ export const ChatPopup = () => {
               </h2>
               <button
                 onClick={closeChat}
+                aria-label={t("close")}
                 className="rounded-full p-2 transition-colors hover:bg-gray-100"
               >
                 <X className="h-6 w-6 text-megaweave-forest-dark" />

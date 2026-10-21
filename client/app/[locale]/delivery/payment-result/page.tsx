@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Undo2,
 } from "lucide-react";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 /** 由後端依付款 + 外送單狀態推導（server/src/payments.ts derivePaymentOutcome） */
 type PaymentOutcome =
@@ -50,6 +51,7 @@ const PENDING_OUTCOMES: PaymentOutcome[] = ["AWAITING_PAYMENT", "PLACING"];
 function PaymentResultContent() {
   const router = useRouter();
   const t = useTranslations("PaymentResult");
+  const apiErrorMessage = useApiErrorMessage();
   const searchParams = useSearchParams();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
@@ -92,7 +94,7 @@ function PaymentResultContent() {
 
       const data: PaymentStatusResponse = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || t("statusFetchFailed"));
+        throw new Error(res.ok ? t("statusFetchFailed") : apiErrorMessage(data));
       }
 
       setStatusData(data);
@@ -129,7 +131,7 @@ function PaymentResultContent() {
       setErrorMessage(msg);
       setLoading(false);
     }
-  }, [merchantTradeNo, hostName, router, t]);
+  }, [merchantTradeNo, hostName, router, t, apiErrorMessage]);
 
   useEffect(() => {
     if (merchantTradeNo) {

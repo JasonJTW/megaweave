@@ -65,6 +65,7 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 import { useNotification } from "../contexts/NotificationContext";
 import WeavingIcon from "./icons/WeavingIcon";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 // cleaned up
 const Navbar = () => {
@@ -73,6 +74,7 @@ const Navbar = () => {
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("Navbar");
+  const apiErrorMessage = useApiErrorMessage();
   const { unreadCount } = useNotification(); // Notifications
 
   // Listen for new messages globally
@@ -101,8 +103,9 @@ const Navbar = () => {
           return;
         }
 
-        const errorMessage = await response.json();
-        throw new Error(errorMessage.errorMessage);
+        throw new Error(
+          apiErrorMessage(await response.json().catch(() => null)),
+        );
       }
 
       await mutate({ user: null }, false);

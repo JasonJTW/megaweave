@@ -48,6 +48,7 @@ import {
 import { UserStats } from "@/app/types/schema";
 import User from "@/app/types/user";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
@@ -164,6 +165,7 @@ const UserPage = () => {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("UserSettings");
+  const apiErrorMessage = useApiErrorMessage();
   const tProfile = useTranslations("Profile");
   const formatter = useFormatter();
   const { refetchTeamMembers } = useTeam();
@@ -284,7 +286,7 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || t("memberFetchFailed"));
+        throw new Error(apiErrorMessage(result));
       }
 
       const result = await response.json();
@@ -325,7 +327,7 @@ const UserPage = () => {
 
     if (!response.ok) {
       const result = await response.json();
-      throw new Error(result.errorMessage || t("memberSaveFailed"));
+      throw new Error(apiErrorMessage(result));
     }
 
     setMemberError(null);
@@ -449,8 +451,8 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        toast.error(result.errorMessage || t("sessionUpdateFailed"));
-        throw new Error(result.errorMessage || t("sessionUpdateFailed"));
+        toast.error(apiErrorMessage(result));
+        throw new Error(apiErrorMessage(result));
       }
       const result = await response.json();
       const updatedUser = result.updatedUser;
@@ -511,7 +513,7 @@ const UserPage = () => {
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || t("avatarUploadFailed"));
+        throw new Error(apiErrorMessage(result));
       }
 
       const result = await response.json();
@@ -579,7 +581,7 @@ const UserPage = () => {
       });
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || t("usernameUpdateFailed"));
+        throw new Error(apiErrorMessage(result));
       }
       const result = await response.json();
       console.log("Update username Success: ", result);
@@ -607,7 +609,7 @@ const UserPage = () => {
       });
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || t("bioUpdateFailed"));
+        throw new Error(apiErrorMessage(result));
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
@@ -638,7 +640,7 @@ const UserPage = () => {
       );
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || t("contactEmailUpdateFailed"));
+        throw new Error(apiErrorMessage(result));
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
@@ -669,7 +671,7 @@ const UserPage = () => {
       );
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.errorMessage || t("contactPhoneUpdateFailed"));
+        throw new Error(apiErrorMessage(result));
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
@@ -778,7 +780,7 @@ const UserPage = () => {
       });
       if (!res.ok) {
         const r = await res.json();
-        throw new Error(r.errorMessage || t("avatarRemoveFailed"));
+        throw new Error(apiErrorMessage(r));
       }
       //* Update user state
       await mutate((data: { user: User | null } | undefined) => {
@@ -817,7 +819,7 @@ const UserPage = () => {
 
         const result = await response.json();
         console.error("Error signing out:", result.errorMessage);
-        throw new Error(result.errorMessage || t("unexpectedError"));
+        throw new Error(apiErrorMessage(result));
       }
 
       console.log("Sign out successful");

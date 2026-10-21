@@ -49,6 +49,7 @@ import {
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 import { User } from "@/app/types/schema";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 // Helper to parse date safely as UTC if needed
 const parseDate = (dateString: string) => {
@@ -76,6 +77,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const router = useRouter();
   const t = useTranslations("Chat");
+  const apiErrorMessage = useApiErrorMessage();
   const formatter = useFormatter();
   // Copy for the "Start weaving…" divider; a null role falls through to the ICU `other` branch
   const weavingBannerText = ({ role, itemTitle }: WeavingBanner) =>
@@ -612,8 +614,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             messages: currentData.messages.filter((msg) => msg.id !== tempId),
           };
         }, false);
-        const errorData = await res.json();
-        throw new Error(errorData.message || t("sendFailed"));
+        throw new Error(apiErrorMessage(await res.json().catch(() => null)));
       }
 
       // If successful, revalidate to get the actual message with real ID and status

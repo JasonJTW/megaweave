@@ -26,6 +26,8 @@ import { Post, PostsResponse, PostLocationField } from "@/app/types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
+import { ApiError } from "@/lib/apiError";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { parseGooglePlace } from "@/utils/locationUtils";
 import OverlayTour, { TourStep } from "@/app/components/OverlayTour";
 
@@ -57,6 +59,7 @@ import CommonShareIcon from "@/app/components/icons/CommonShareIcon";
 import { useLocation } from "@/app/contexts/LocationContext";
 const PostsApp = () => {
   const t = useTranslations("HomeFeed");
+  const apiErrorMessage = useApiErrorMessage();
   const tTour = useTranslations("Onboarding");
   const categoryName = useCategoryName();
   const router = useRouter();
@@ -555,13 +558,16 @@ const PostsApp = () => {
         toast.success(t("postCreated"));
         mutate(); // 重新獲取貼文列表
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.errorMessage || t("postFailed"));
+        toast.error(apiErrorMessage(await response.json().catch(() => null)));
       }
     } catch (error: unknown) {
       console.error("Create post error:", error);
       const message =
-        error instanceof Error ? error.message : t("networkError");
+        error instanceof ApiError
+          ? apiErrorMessage(error)
+          : error instanceof Error
+            ? error.message
+            : t("networkError");
       toast.error(message);
     } finally {
       setIsCreating(false);

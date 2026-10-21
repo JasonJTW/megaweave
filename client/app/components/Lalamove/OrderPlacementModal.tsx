@@ -37,6 +37,7 @@ import {
   buildDriverRemarks,
   LALAMOVE_LANGUAGE,
 } from "@/utils/lalamove";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
 const VEHICLE_ICONS: Record<VehicleType, "bike" | "car" | "van" | "truck"> = {
@@ -162,6 +163,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 }) => {
   const router = useRouter();
   const t = useTranslations("Lalamove");
+  const apiErrorMessage = useApiErrorMessage();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
   const [currentQuotation, setCurrentQuotation] =
@@ -443,7 +445,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         data.quotations.length === 0
       ) {
         throw new Error(
-          data.message || data.error || t("order.recalculateFailed"),
+          res.ok ? t("order.recalculateFailed") : apiErrorMessage(data),
         );
       }
 
@@ -651,7 +653,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.message || data.error || t("order.checkoutFailed"),
+          response.ok ? t("order.checkoutFailed") : apiErrorMessage(data),
         );
       }
 

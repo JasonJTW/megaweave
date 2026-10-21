@@ -19,6 +19,7 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import { useCallback, useRef } from "react";
 import { useUser } from "@/app/contexts/UserContext";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 function SigninForm() {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -34,6 +35,7 @@ function SigninForm() {
   const returnTo = searchParams.get("returnTo");
   const home = localizePath(useLocale(), "/");
   const t = useTranslations("Auth");
+  const apiErrorMessage = useApiErrorMessage();
 
   //* After successful sign in, redirect to the page.
   // Both the submit handlers and the `user` effect below call this; navigating
@@ -87,7 +89,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        toast.error(data.errorMessage || t("googleFailed"));
+        toast.error(apiErrorMessage(data));
         return;
       }
 
@@ -131,7 +133,7 @@ function SigninForm() {
       console.log("data:", data);
       // /// handle error
       if (!response.ok) {
-        toast.error(data.errorMessage || t("signInFailed"));
+        toast.error(apiErrorMessage(data));
         console.error("Sign in failed", data.errorMessage);
         return;
       }
@@ -213,7 +215,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        toast.error(data.errorMessage || t("facebookFailed"));
+        toast.error(apiErrorMessage(data));
         return;
       }
 
@@ -264,7 +266,7 @@ function SigninForm() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        toast.error(data.errorMessage || t("signUpFailed"));
+        toast.error(apiErrorMessage(data));
         return;
       }
       /// Sign up success

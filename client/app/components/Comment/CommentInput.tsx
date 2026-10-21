@@ -9,6 +9,8 @@ import User from "../../types/user";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { ApiError } from "@/lib/apiError";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 interface CommentInputProps {
   postId: number;
   itemId?: "all" | number; // "all" = All 留言, 數字 = 特定 item
@@ -35,6 +37,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
 }) => {
   const router = useRouter();
   const t = useTranslations("Comments");
+  const apiErrorMessage = useApiErrorMessage();
   const formatter = useFormatter();
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,13 +65,9 @@ const CommentInput: React.FC<CommentInputProps> = ({
       setContent("");
       onSuccess?.();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || t("submitFailed"));
-      } else if (typeof err === "string") {
-        setError(err);
-      } else {
-        setError(t("submitFailed"));
-      }
+      setError(
+        err instanceof ApiError ? apiErrorMessage(err) : t("submitFailed"),
+      );
     } finally {
       setIsSubmitting(false);
     }

@@ -15,10 +15,12 @@ import { Eye, EyeClosed } from "lucide-react";
 import { siFacebook, siGoogle } from "simple-icons";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import toast from "react-hot-toast";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 export default function Signup() {
   const router = useRouter();
   const t = useTranslations("Auth");
+  const apiErrorMessage = useApiErrorMessage();
   const [username, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +44,7 @@ export default function Signup() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        setSignupError(data.errorMessage || t("facebookFailed"));
+        setSignupError(apiErrorMessage(data));
         return;
       }
 
@@ -85,7 +87,7 @@ export default function Signup() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        setSignupError(data.errorMessage || t("googleFailed"));
+        setSignupError(apiErrorMessage(data));
         return;
       }
 
@@ -139,7 +141,7 @@ export default function Signup() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        setSignupError(data.errorMessage || t("signUpFailed"));
+        setSignupError(apiErrorMessage(data));
         return;
       }
       /// Sign up success

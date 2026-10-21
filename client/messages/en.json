@@ -912,5 +912,79 @@
     "dispatchFailedBody": "We're sorry, we couldn't book a Lalamove driver. Your payment of NT${amount} will be refunded in full to your card, and we'll let you know by in-app notification and email once it's done.",
     "refundedTitle": "Fully refunded",
     "refundedBody": "Your payment of NT${amount} has been refunded to your card. The exact posting date depends on your card issuer."
+  },
+  "WeaveCard": {
+    "status": {
+      "newRequest": "New Request",
+      "requestSent": "Request Sent",
+      "weaving": "Weaving",
+      "weaved": "Weaved",
+      "declined": "Declined",
+      "withdrawn": "Withdrawn",
+      "cancelled": "Cancelled"
+    },
+    "hint": {
+      "requested": {
+        "decideOnRequest": "Approve or decline this request?",
+        "awaitingAuthor": "Waiting for the post author's approval..."
+      },
+      "approved": {
+        "confirmHandover": "Handed over the item? Click the checkmark to confirm.",
+        "confirmReceipt": "Received the item? Click the checkmark to confirm.",
+        "waitingForReceiver": "Handover confirmed. Waiting for {name} to confirm receipt...",
+        "waitingForGiver": "Receipt confirmed. Waiting for {name} to confirm handover...",
+        "receiverConfirmedPleaseConfirmHandover": "{name} confirmed receipt. Please confirm handover!",
+        "giverConfirmedPleaseConfirmReceipt": "{name} confirmed handover. Please confirm receipt!"
+      }
+    },
+    "role": {
+      "giver": "Giver",
+      "receiver": "Receiver"
+    },
+    "chatHeading": "{viewer, select, author {Weaving Request Received} other {Weaving Request Sent}}",
+    "noImage": "No image",
+    "fallbackTitle": "Weave Request",
+    "allItems": "All items",
+    "item": "Item",
+    "chatSummary": {
+      "all": "{direction, select, give {Offer all items} other {Request all items}}",
+      "multiple": "{direction, select, give {Offer} other {Request}}: {types} items ({total} total)",
+      "single": "{direction, select, give {Offer} other {Request}} Qty: {quantity}"
+    },
+    "viewPost": "View Post Detail →",
+    "actions": {
+      "approve": "Approve request",
+      "decline": "Decline request",
+      "withdraw": "Withdraw request",
+      "confirm": "Complete weave",
+      "confirmed": "You have confirmed",
+      "cancel": "Cancel weave"
+    },
+    "prompts": {
+      "decline": "Are you sure you want to decline this request?",
+      "confirmReceipt": "Have you physically received the item? This action cannot be undone once both parties confirm.",
+      "confirmHandover": "Have you handed over or shipped the item? The weave will complete once the receiver also confirms.",
+      "cancel": "Are you sure you want to cancel this weave?",
+      "withdraw": "Are you sure you want to withdraw this request?"
+    },
+    "toast": {
+      "onlyAuthorCanApprove": "Only the post author can approve this request",
+      "notAwaitingApproval": "This weave request is no longer awaiting approval",
+      "approved": "Request approved! The weave is now in progress.",
+      "approveFailed": "Failed to approve request",
+      "onlyAuthorCanDecline": "Only the post author can decline this request",
+      "declined": "Request declined.",
+      "declineFailed": "Failed to decline request",
+      "cannotConfirm": "You cannot confirm this weave right now",
+      "completed": "Weaved!",
+      "confirmedWaiting": "Your confirmation was received. Waiting for the other party.",
+      "confirmFailed": "Failed to confirm",
+      "cannotCancel": "You cannot cancel this weave right now",
+      "cancelled": "Weave cancelled.",
+      "cancelFailed": "Failed to cancel weave",
+      "cannotWithdraw": "You cannot withdraw this request right now",
+      "withdrawn": "Request withdrawn.",
+      "withdrawFailed": "Failed to withdraw request"
+    }
   }
 }

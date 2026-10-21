@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { ApiError } from "@/lib/apiError";
 dotenv.config();
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
@@ -82,8 +83,10 @@ export async function getTeamMembers() {
       },
     });
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.errorMessage || "Failed to fetch team members");
+      throw new ApiError(
+        await response.json().catch(() => null),
+        response.status,
+      );
     }
     const data = await response.json();
     return (data as TeamMember[]).map(normalizeTeamMember);

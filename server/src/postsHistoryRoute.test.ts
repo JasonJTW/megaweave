@@ -15,6 +15,7 @@ import request from "supertest";
 import postsRouter from "./posts";
 import { postService } from "./services/postService";
 import * as sessionModule from "./session";
+import { errorMiddleware } from "./utils/errorHandler";
 
 jest.mock("./utils/db", () => ({
   query: jest.fn(),
@@ -60,6 +61,7 @@ const EMPTY_HISTORY = {
 function makeApp() {
   const app = express();
   app.use("/api/posts", postsRouter);
+  app.use(errorMiddleware);
   return app;
 }
 

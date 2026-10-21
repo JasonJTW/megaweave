@@ -4,6 +4,7 @@ import request from "supertest";
 import dbPool from "./utils/db";
 import { createUserSession } from "./session";
 import { generateSalt, hashPassword } from "./passwordHasher";
+import { errorMiddleware } from "./utils/errorHandler";
 
 jest.mock("./utils/db", () => ({
   __esModule: true,
@@ -12,6 +13,15 @@ jest.mock("./utils/db", () => ({
 
 jest.mock("./session", () => ({
   createUserSession: jest.fn().mockResolvedValue(undefined),
+}));
+
+//* Google 驗證會連網抓憑證；這裡讓每個 credential 都驗證失敗
+jest.mock("google-auth-library", () => ({
+  OAuth2Client: jest.fn().mockImplementation(() => ({
+    verifyIdToken: jest
+      .fn()
+      .mockRejectedValue(new Error("Wrong number of segments in token")),
+  })),
 }));
 
 jest.mock("./middleware/rateLimiter", () => ({
@@ -70,6 +80,7 @@ describe("POST /signin (native)", () => {
     app = express();
     app.use(express.json());
     app.use("/signin", signinRouter);
+    app.use(errorMiddleware);
 
     salt = generateSalt();
     hashed = await hashPassword(PASSWORD, salt);
@@ -97,7 +108,10 @@ describe("POST /signin (native)", () => {
     const res = await signin();
 
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ errorMessage: "Invalid email or password" });
+    expect(res.body).toEqual({
+      code: "INVALID_CREDENTIALS",
+      errorMessage: "Invalid email or password",
+    });
     expect(createUserSession).not.toHaveBeenCalled();
   });
 
@@ -112,7 +126,10 @@ describe("POST /signin (native)", () => {
       const res = await signin();
 
       expect(res.status).toBe(401);
-      expect(res.body).toEqual({ errorMessage: "Invalid email or password" });
+      expect(res.body).toEqual({
+        code: "INVALID_CREDENTIALS",
+        errorMessage: "Invalid email or password",
+      });
       expect(createUserSession).not.toHaveBeenCalled();
     },
   );
@@ -123,7 +140,32 @@ describe("POST /signin (native)", () => {
     const res = await signin();
 
     expect(res.status).toBe(400);
-    expect(res.body.errorMessage).toContain("google");
+    expect(res.body.code).toBe("USE_SOCIAL_SIGNIN");
+    expect(res.body.params).toEqual({ providers: "Google" });
+    expect(createUserSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /signin/google", () => {
+  let app: express.Express;
+
+  beforeAll(async () => {
+    process.env.GOOGLE_CLIENT_ID =
+      process.env.GOOGLE_CLIENT_ID ?? "test-client-id";
+    const { default: signinRouter } = await import("./signin");
+    app = express();
+    app.use(express.json());
+    app.use("/signin", signinRouter);
+    app.use(errorMiddleware);
+  });
+
+  it("returns 401 INVALID_SOCIAL_TOKEN for a credential Google rejects", async () => {
+    const res = await request(app)
+      .post("/signin/google")
+      .send({ credential: "not-a-jwt" });
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("INVALID_SOCIAL_TOKEN");
     expect(createUserSession).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,7 @@
 // src/services/weaveService.ts
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 import { Post } from "../app/types/schema";
+import { ApiError } from "@/lib/apiError";
 interface WeaveItemParam {
   itemId: number | null;
   quantity: number;
@@ -87,8 +88,8 @@ export const createWeave = async ({
     const data = await response.json();
 
     if (!response.ok) {
-      // 捕捉後端回傳的錯誤訊息 (例如: "Cannot weave your own post" 或 "Insufficient stock")
-      throw new Error(data.errorMessage || "Failed to send weave request");
+      // 後端錯誤碼（例如 WEAVE_OWN_POST、INSUFFICIENT_STOCK）交給 UI 翻譯
+      throw new ApiError(data);
     }
 
     return data;

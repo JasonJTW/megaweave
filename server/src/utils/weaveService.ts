@@ -12,16 +12,24 @@ import { messageService } from "./messageService";
 import { updateUserStats } from "./updateUserStats";
 import { enqueueSendEmail } from "../queue/queues";
 import { EmailTemplateProps, WeaveItem } from "../emails/EmailTemplate";
+import { ErrorCode } from "./errorCodes";
+import { HttpError } from "./httpError";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
-export class WeaveError extends Error {
+export class WeaveError extends HttpError {
   constructor(
-    public readonly httpStatus: number,
+    statusCode: number,
+    code: ErrorCode,
     message: string,
+    params?: Record<string, string | number>,
   ) {
-    super(message);
+    super(statusCode, code, message, params);
     this.name = "WeaveError";
+  }
+
+  get httpStatus() {
+    return this.statusCode;
   }
 }
 
@@ -86,11 +94,12 @@ async function validatePost(
     `SELECT user_id, status, type FROM posts WHERE id = ?`,
     [postId],
   );
-  if (rows.length === 0) throw new WeaveError(404, "Post not found");
+  if (rows.length === 0)
+    throw new WeaveError(404, "POST_NOT_FOUND", "Post not found");
   if (rows[0].user_id === initiatorId)
-    throw new WeaveError(400, "Cannot weave your own post");
+    throw new WeaveError(400, "WEAVE_OWN_POST", "Cannot weave your own post");
   if (rows[0].status !== "active")
-    throw new WeaveError(400, "This post is no longer active");
+    throw new WeaveError(400, "POST_INACTIVE", "This post is no longer active");
   return rows[0] as { user_id: number; status: string; type: string };
 }
 
@@ -111,12 +120,15 @@ async function validateItems(
     if (rows.length === 0)
       throw new WeaveError(
         404,
+        "ITEM_UNAVAILABLE",
         `Item ${item.itemId} does not exist in this post`,
       );
     if (rows[0].quantity < item.quantity)
       throw new WeaveError(
         400,
+        "INSUFFICIENT_STOCK",
         `Requested quantity (${item.quantity}) exceeds available stock (${rows[0].quantity}) for "${rows[0].title}"`,
+        { title: rows[0].title, available: Number(rows[0].quantity) },
       );
   }
 }
@@ -162,11 +174,17 @@ async function deductInventory(
   for (const item of items) {
     const stock = stockById.get(item.itemId);
     if (!stock)
-      throw new WeaveError(400, `Item ${item.itemId} is no longer available`);
+      throw new WeaveError(
+        400,
+        "ITEM_UNAVAILABLE",
+        `Item ${item.itemId} is no longer available`,
+      );
     if (Number(stock.quantity) < item.quantity)
       throw new WeaveError(
         400,
+        "INSUFFICIENT_STOCK",
         `Insufficient stock for "${stock.title}": requested ${item.quantity}, available ${stock.quantity}`,
+        { title: stock.title, available: Number(stock.quantity) },
       );
   }
 
@@ -549,15 +567,17 @@ export async function approveWeave(
        WHERE w.id = ? FOR UPDATE`,
       [weaveId],
     );
-    if (weaves.length === 0) throw new WeaveError(404, "Not found");
+    if (weaves.length === 0)
+      throw new WeaveError(404, "WEAVE_NOT_FOUND", "Not found");
 
     weave = weaves[0];
     if (weave.status !== "requested" && weave.status !== "approved")
-      throw new WeaveError(400, "Already closed");
+      throw new WeaveError(400, "WEAVE_CLOSED", "Already closed");
 
     const isGiver = weave.giver_id === userId;
     const isReceiver = weave.receiver_id === userId;
-    if (!isGiver && !isReceiver) throw new WeaveError(403, "Unauthorized");
+    if (!isGiver && !isReceiver)
+      throw new WeaveError(403, "FORBIDDEN", "Unauthorized");
     // Requested stage is judged by Post Author / Initiator (not Giver / Receiver).
     // The Initiator is the party who is not the Post Author.
     const isPostAuthor = weave.post_author_id === userId;
@@ -567,7 +587,11 @@ export async function approveWeave(
     if (weave.status === "requested") {
       if (newStatus === "approved") {
         if (!isPostAuthor)
-          throw new WeaveError(403, "Only post author can approve");
+          throw new WeaveError(
+            403,
+            "FORBIDDEN",
+            "Only post author can approve",
+          );
         await validateItems(
           await getWeaveStockItems(connection, weaveId),
           weave.post_id,
@@ -579,20 +603,28 @@ export async function approveWeave(
         );
       } else if (newStatus === "declined") {
         if (!isPostAuthor)
-          throw new WeaveError(403, "Only post author can decline");
+          throw new WeaveError(
+            403,
+            "FORBIDDEN",
+            "Only post author can decline",
+          );
         await connection.execute(
           `UPDATE weaves SET status = 'declined' WHERE id = ?`,
           [weaveId],
         );
       } else if (newStatus === "withdrawn") {
         if (!isInitiator)
-          throw new WeaveError(403, "Only initiator can withdraw");
+          throw new WeaveError(403, "FORBIDDEN", "Only initiator can withdraw");
         await connection.execute(
           `UPDATE weaves SET status = 'withdrawn' WHERE id = ?`,
           [weaveId],
         );
       } else {
-        throw new WeaveError(400, "Invalid status transition");
+        throw new WeaveError(
+          400,
+          "INVALID_STATUS_TRANSITION",
+          "Invalid status transition",
+        );
       }
     } else if (weave.status === "approved") {
       if (newStatus === "cancelled") {
@@ -631,7 +663,11 @@ export async function approveWeave(
           isPartialConfirm = true;
         }
       } else {
-        throw new WeaveError(400, "Invalid status transition");
+        throw new WeaveError(
+          400,
+          "INVALID_STATUS_TRANSITION",
+          "Invalid status transition",
+        );
       }
     }
 

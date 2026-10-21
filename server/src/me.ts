@@ -14,45 +14,48 @@ const router = Router();
 
 // ─── GET /api/me ──────────────────────────────────────────────────────────────
 
-router.get("/", requireAuth, async (req: Request, res: Response) => {
-  const userId = req.user!.userId;
-  const userRole = req.user!.role;
+router.get(
+  "/",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user!.userId;
+    const userRole = req.user!.role;
 
-  try {
-    // Run all independent queries in parallel
-    const [profileRows, statsRows, postsRows, weaveRows, memberRows] =
-      await Promise.all([
-        // 1. user_profiles — bio, custom_name, contact_email, contact_phone
-        dbPool.execute<RowDataPacket[]>(
-          `SELECT bio, custom_name, contact_email, contact_phone
+    try {
+      // Run all independent queries in parallel
+      const [profileRows, statsRows, postsRows, weaveRows, memberRows] =
+        await Promise.all([
+          // 1. user_profiles — bio, custom_name, contact_email, contact_phone
+          dbPool.execute<RowDataPacket[]>(
+            `SELECT bio, custom_name, contact_email, contact_phone
          FROM user_profiles
          WHERE user_id = ?`,
-          [userId],
-        ),
+            [userId],
+          ),
 
-        // 2. user_stats
-        dbPool.execute<RowDataPacket[]>(
-          `SELECT post_count, weave_count, points, give_success_rate,
+          // 2. user_stats
+          dbPool.execute<RowDataPacket[]>(
+            `SELECT post_count, weave_count, points, give_success_rate,
                 total_likes, total_views, last_calculated_at
          FROM user_stats
          WHERE user_id = ?`,
-          [userId],
-        ),
+            [userId],
+          ),
 
-        // 3. user's posts (with images)
-        dbPool.execute<RowDataPacket[]>(
-          `SELECT p.*, GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) AS s3_keys
+          // 3. user's posts (with images)
+          dbPool.execute<RowDataPacket[]>(
+            `SELECT p.*, GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) AS s3_keys
          FROM posts p
          LEFT JOIN images i ON p.id = i.post_id
          WHERE p.user_id = ? AND p.deleted_at IS NULL
          GROUP BY p.id
          ORDER BY p.created_at DESC`,
-          [userId],
-        ),
+            [userId],
+          ),
 
-        // 4. weaves (giver or receiver)
-        dbPool.execute<WeaveOutput[]>(
-          `SELECT
+          // 4. weaves (giver or receiver)
+          dbPool.execute<WeaveOutput[]>(
+            `SELECT
             w.*,
             p.id AS post_id_original,
             p.user_id AS post_user_id,
@@ -95,55 +98,55 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
          WHERE (w.giver_id = ? OR w.receiver_id = ?)
          GROUP BY w.id
          ORDER BY w.created_at DESC`,
-          [userId, userId],
-        ),
+            [userId, userId],
+          ),
 
-        // 5. member profile — only queried for contributor/admin, returns [] otherwise
-        userRole === "contributor" || userRole === "admin"
-          ? dbPool.query<RowDataPacket[]>(
-              `SELECT * FROM members WHERE user_id = ?`,
-              [userId],
-            )
-          : Promise.resolve([[]] as unknown as [RowDataPacket[], unknown]),
-      ]);
+          // 5. member profile — only queried for contributor/admin, returns [] otherwise
+          userRole === "contributor" || userRole === "admin"
+            ? dbPool.query<RowDataPacket[]>(
+                `SELECT * FROM members WHERE user_id = ?`,
+                [userId],
+              )
+            : Promise.resolve([[]] as unknown as [RowDataPacket[], unknown]),
+        ]);
 
-    const profile = (profileRows[0] as RowDataPacket[])[0] ?? {};
-    const stats = (statsRows[0] as RowDataPacket[])[0] ?? null;
-    const posts = postsRows[0] as RowDataPacket[];
-    const weaves = await processWeaveRows(weaveRows[0] as WeaveOutput[]);
-    const member = (memberRows[0] as RowDataPacket[])[0] ?? null;
+      const profile = (profileRows[0] as RowDataPacket[])[0] ?? {};
+      const stats = (statsRows[0] as RowDataPacket[])[0] ?? null;
+      const posts = postsRows[0] as RowDataPacket[];
+      const weaves = await processWeaveRows(weaveRows[0] as WeaveOutput[]);
+      const member = (memberRows[0] as RowDataPacket[])[0] ?? null;
 
-    return res.status(200).json({
-      profile: {
-        bio: profile.bio ?? "",
-        custom_name:
-          (profile.custom_name && profile.custom_name.trim()) ||
-          req.user!.username,
-        contact_email: profile.contact_email ?? null,
-        contact_phone: profile.contact_phone ?? null,
-      },
-      stats: {
-        postCount: stats?.post_count ?? 0,
-        weaveCount: stats?.weave_count ?? 0,
-        points: stats?.points != null ? Number(stats.points) : 0,
-        giveSuccessRate:
-          stats?.give_success_rate != null
-            ? Number(stats.give_success_rate)
-            : 0,
-        totalLikes: stats?.total_likes ?? 0,
-        totalViews: stats?.total_views ?? 0,
-        lastCalculatedAt: stats?.last_calculated_at ?? null,
-      },
-      posts,
-      weaves,
-      // null when user is not contributor/admin
-      member: member ?? null,
-    });
-  } catch (error) {
-    console.error("Error fetching /api/me:", error);
-    return res.status(500).json({ errorMessage: "Failed to fetch user data" });
-  }
-});
+      return res.status(200).json({
+        profile: {
+          bio: profile.bio ?? "",
+          custom_name:
+            (profile.custom_name && profile.custom_name.trim()) ||
+            req.user!.username,
+          contact_email: profile.contact_email ?? null,
+          contact_phone: profile.contact_phone ?? null,
+        },
+        stats: {
+          postCount: stats?.post_count ?? 0,
+          weaveCount: stats?.weave_count ?? 0,
+          points: stats?.points != null ? Number(stats.points) : 0,
+          giveSuccessRate:
+            stats?.give_success_rate != null
+              ? Number(stats.give_success_rate)
+              : 0,
+          totalLikes: stats?.total_likes ?? 0,
+          totalViews: stats?.total_views ?? 0,
+          lastCalculatedAt: stats?.last_calculated_at ?? null,
+        },
+        posts,
+        weaves,
+        // null when user is not contributor/admin
+        member: member ?? null,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 // ─── PUT /api/me/locale ───────────────────────────────────────────────────────
 // Called only by the client's language switcher, so visiting /en never changes it.

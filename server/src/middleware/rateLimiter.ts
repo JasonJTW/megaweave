@@ -9,6 +9,7 @@ import rateLimit, {
 import { RedisStore } from "rate-limit-redis";
 import { Request, Response, NextFunction } from "express";
 import { cacheRedisClient } from "../utils/redis";
+import { ErrorCode } from "../utils/errorCodes";
 
 /**
  * Resilient Redis Store for express-rate-limit.
@@ -182,6 +183,7 @@ export function createRateLimiter(options: RateLimiterOptions): RateLimitRequest
     store,
     statusCode: options.statusCode || 429,
     message: {
+      code: "RATE_LIMITED" satisfies ErrorCode,
       errorMessage: options.errorMessage,
     },
     handler: (_req: Request, res: Response, _next: NextFunction, opts) => {

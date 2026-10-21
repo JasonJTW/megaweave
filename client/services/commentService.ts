@@ -1,4 +1,5 @@
 // services/commentService.ts
+import { ApiError } from "@/lib/apiError";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -69,8 +70,7 @@ export async function createComment(
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message || "Failed to create comment");
+    throw new ApiError(await res.json().catch(() => null), res.status);
   }
 
   return res.json();
@@ -98,8 +98,7 @@ export async function getComments(
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message || "Failed to fetch comments");
+    throw new ApiError(await res.json().catch(() => null), res.status);
   }
 
   return res.json();
@@ -117,8 +116,7 @@ export async function getCommentCounts(
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message || "Failed to fetch comment counts");
+    throw new ApiError(await res.json().catch(() => null), res.status);
   }
 
   return res.json();

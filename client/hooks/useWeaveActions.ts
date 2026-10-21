@@ -3,6 +3,8 @@ import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import type { Weave } from "@/services/weaveService";
 import { useSocket } from "@/hooks/useSocket";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 import {
   getWeaveViewModel,
   type WeaveAction,
@@ -12,11 +14,7 @@ import {
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-async function patchWeaveStatus(
-  weaveId: number,
-  status: Weave["status"],
-  fallbackError: string,
-) {
+async function patchWeaveStatus(weaveId: number, status: Weave["status"]) {
   const response = await fetch(`${hostName}/api/weaves/${weaveId}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -24,7 +22,7 @@ async function patchWeaveStatus(
     body: JSON.stringify({ status }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.errorMessage || fallbackError);
+  if (!response.ok) throw new ApiError(data);
   return data;
 }
 
@@ -64,6 +62,7 @@ export function useWeaveActions({
   onWeaveStatusChange,
 }: UseWeaveActionsOptions): WeaveActions {
   const t = useTranslations("WeaveCard");
+  const apiErrorMessage = useApiErrorMessage();
   const { socket } = useSocket();
   const [isProcessing, setIsProcessing] = useState(false);
   const [localStatus, setLocalStatus] = useState(weave?.status);
@@ -143,15 +142,13 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "approved", t("toast.approveFailed"));
+      await patchWeaveStatus(weave.id, "approved");
 
       setLocalStatus("approved");
       toast.success(t("toast.approved"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("toast.approveFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.approveFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -168,15 +165,13 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "declined", t("toast.declineFailed"));
+      await patchWeaveStatus(weave.id, "declined");
 
       setLocalStatus("declined");
       toast.success(t("toast.declined"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("toast.declineFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.declineFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -197,11 +192,7 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      const data = await patchWeaveStatus(
-        weave.id,
-        "completed",
-        t("toast.confirmFailed"),
-      );
+      const data = await patchWeaveStatus(weave.id, "completed");
 
       if (data.newStatus === "completed") {
         setLocalStatus("completed");
@@ -215,9 +206,7 @@ export function useWeaveActions({
       }
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("toast.confirmFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.confirmFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -234,15 +223,13 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "cancelled", t("toast.cancelFailed"));
+      await patchWeaveStatus(weave.id, "cancelled");
 
       setLocalStatus("cancelled");
       toast.success(t("toast.cancelled"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("toast.cancelFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.cancelFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -259,15 +246,13 @@ export function useWeaveActions({
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "withdrawn", t("toast.withdrawFailed"));
+      await patchWeaveStatus(weave.id, "withdrawn");
 
       setLocalStatus("withdrawn");
       toast.success(t("toast.withdrawn"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t("toast.withdrawFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.withdrawFailed")));
     } finally {
       setIsProcessing(false);
     }

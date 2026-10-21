@@ -9,6 +9,7 @@ import { CreateOrderParams, GetQuotationParams } from "../lalamove";
 import { predecessorsOf } from "../deliveryStatus";
 import { cancelOrphanLalamoveOrder } from "../deliveryRecovery";
 import { LalamoveDispatchError } from "../lalamoveErrors";
+import { HttpError } from "../../utils/httpError";
 import type { DeliveryNoticeEvent } from "../deliveryNotifier";
 
 export interface CreateCheckoutOrderInput {
@@ -141,7 +142,11 @@ export class PaymentService {
   ): Promise<PaymentSessionResult> {
     // 1. 檢查報價是否過期
     if (new Date() >= new Date(input.expiresAt)) {
-      throw new Error("Lalamove quotation has expired. Please request a new quote.");
+      throw new HttpError(
+        400,
+        "QUOTATION_EXPIRED",
+        "Lalamove quotation has expired. Please request a new quote.",
+      );
     }
 
     // 2. 查詢地點資料庫取得下單當下之地址文字快照
@@ -150,7 +155,11 @@ export class PaymentService {
       [input.pickupLocationId]
     );
     if (!pickupRows || pickupRows.length === 0) {
-      throw new Error(`Pickup location not found for ID: ${input.pickupLocationId}`);
+      throw new HttpError(
+        400,
+        "INVALID_REQUEST",
+        `Pickup location not found for ID: ${input.pickupLocationId}`,
+      );
     }
     const pickupAddressSnapshot = pickupRows[0].full_address;
 
@@ -159,7 +168,11 @@ export class PaymentService {
       [input.dropoffLocationId]
     );
     if (!dropoffRows || dropoffRows.length === 0) {
-      throw new Error(`Dropoff location not found for ID: ${input.dropoffLocationId}`);
+      throw new HttpError(
+        400,
+        "INVALID_REQUEST",
+        `Dropoff location not found for ID: ${input.dropoffLocationId}`,
+      );
     }
     const dropoffAddressSnapshot = dropoffRows[0].full_address;
 
@@ -178,7 +191,11 @@ export class PaymentService {
         [input.postId, input.userId, input.userId]
       );
       if (!pendingWeaveRows || pendingWeaveRows.length === 0) {
-        throw new Error("A pending weave for this post is required to book Lalamove delivery.");
+        throw new HttpError(
+          400,
+          "WEAVE_REQUIRED_FOR_DELIVERY",
+          "A pending weave for this post is required to book Lalamove delivery.",
+        );
       }
 
       // 插入 payments 表

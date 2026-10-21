@@ -19,6 +19,7 @@ import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
 import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
 import { createWeave } from "@/services/weaveService";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
@@ -35,6 +36,7 @@ export const ChatPopup = () => {
   const { user: currentUser } = useUser();
   const router = useRouter();
   const t = useTranslations("Chat");
+  const apiErrorMessage = useApiErrorMessage();
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
   const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
@@ -80,11 +82,7 @@ export const ChatPopup = () => {
       toast.success(t("requestSent"));
     } catch (err: unknown) {
       console.error("Weaving submit error:", err);
-      if (err instanceof Error) {
-        toast.error(err.message);
-      } else {
-        toast.error(t("unexpectedError"));
-      }
+      toast.error(apiErrorMessage(err, t("unexpectedError")));
     }
   };
 

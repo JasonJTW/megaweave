@@ -1,4 +1,5 @@
 // services/imageUploadService.ts
+import { ApiError } from "@/lib/apiError";
 
 export interface UploadableImage {
   blob: Blob | File;
@@ -40,9 +41,9 @@ export async function uploadImagesToS3Staging(
   });
 
   if (!presignedRes.ok) {
-    const errorData = await presignedRes.json().catch(() => ({}));
-    throw new Error(
-      errorData.errorMessage || "Failed to obtain upload permissions",
+    throw new ApiError(
+      await presignedRes.json().catch(() => null),
+      presignedRes.status,
     );
   }
 

@@ -1,0 +1,55 @@
+//* API 錯誤碼的單一來源：server 回應帶 `code`，client 依 code 查 Errors namespace 的翻譯
+//* 新增 code 時 client 兩個語言的翻譯檔都要補上（client 的 messages 測試會檢查）
+//* 這個檔案不可 import 任何東西，client 測試會直接讀它
+export const ERROR_CODES = [
+  //* 通用
+  "INTERNAL_ERROR",
+  "SERVICE_UNAVAILABLE",
+  "VALIDATION_FAILED",
+  "INVALID_REQUEST",
+  "DUPLICATE_ENTRY",
+  "UNAUTHENTICATED",
+  "FORBIDDEN",
+  "RATE_LIMITED",
+
+  //* 帳號
+  "INVALID_CREDENTIALS",
+  "ACCOUNT_EXISTS",
+  "INVALID_SOCIAL_TOKEN",
+  "USE_SOCIAL_SIGNIN",
+
+  //* 找不到資源
+  "POST_NOT_FOUND",
+  "USER_NOT_FOUND",
+  "COMMENT_NOT_FOUND",
+  "WEAVE_NOT_FOUND",
+  "CATEGORY_NOT_FOUND",
+  "CONDITION_NOT_FOUND",
+
+  //* Weave
+  "WEAVE_OWN_POST",
+  "POST_INACTIVE",
+  "ITEM_UNAVAILABLE",
+  "INSUFFICIENT_STOCK",
+  "WEAVE_CLOSED",
+  "INVALID_STATUS_TRANSITION",
+
+  //* 配送
+  "DELIVERY_ORDER_NOT_FOUND",
+  "ORDER_NOT_CANCELLABLE",
+  "DELIVERY_PROVIDER_ERROR",
+  "QUOTATION_EXPIRED",
+  "WEAVE_REQUIRED_FOR_DELIVERY",
+  "PAYMENT_NOT_FOUND",
+
+  //* 表單內容
+  "COMMENT_EMPTY",
+  "REPLY_DEPTH_EXCEEDED",
+  "MESSAGE_EMPTY",
+  "IMAGE_REQUIRED",
+  "MEMBER_NAME_REQUIRED",
+  "INVALID_CATEGORY",
+  "SEARCH_QUERY_TOO_LONG",
+] as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[number];

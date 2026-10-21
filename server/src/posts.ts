@@ -18,6 +18,7 @@ import { FEED_STRATEGY_HEADER, resolveFeedStrategy } from "./benchmark/feedStrat
 import type { PostType } from "./types/post";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { defaultImageStorage } from "./storage/ImageStorage";
+import { HttpError } from "./utils/httpError";
 
 dotenv.config();
 
@@ -177,16 +178,15 @@ router.post(
       });
     } catch (error: unknown) {
       if (error instanceof Error && error.message === "INVALID_CATEGORY") {
-        return res.status(400).json({ errorMessage: "Invalid category" });
+        return next(new HttpError(400, "INVALID_CATEGORY", "Invalid category"));
       }
-      console.error("⚠️ Create post error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
 
 // Get all posts api
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -212,14 +212,13 @@ router.get("/", async (req: Request, res: Response) => {
 
     res.status(200).json(result);
   } catch (error) {
-    console.error("Get posts error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
 // 🌟 統一推薦 Feed API (Unified Hybrid Feed)
 // GET /api/posts/feed?page=1&limit=20&type=share&category_id=1&lat=25.033&lng=121.565
-router.get("/feed", async (req: Request, res: Response) => {
+router.get("/feed", async (req: Request, res: Response, next: NextFunction) => {
   const t0 = performance.now();
   try {
     const tSessionStart = performance.now();
@@ -275,10 +274,9 @@ router.get("/feed", async (req: Request, res: Response) => {
     res.status(200).json(result);
   } catch (error) {
     if (error instanceof Error && error.message === "SEARCH_QUERY_TOO_LONG") {
-      return res.status(400).json({ errorMessage: "Search query must be 300 characters or fewer" });
+      return next(new HttpError(400, "SEARCH_QUERY_TOO_LONG", "Search query must be 300 characters or fewer"));
     }
-    console.error("Get feed error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
@@ -299,7 +297,7 @@ router.put(
     const userId = req.user!.userId;
 
     if (!publicId) {
-      return res.status(400).json({ errorMessage: "Invalid post ID" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid post ID"));
     }
 
     let incoming: EditPostSchemaType;
@@ -367,19 +365,16 @@ router.put(
     } catch (error: unknown) {
       if (error instanceof Error) {
         if (error.message === "POST_NOT_FOUND") {
-          return res.status(404).json({ errorMessage: "Post not found" });
+          return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
         }
         if (error.message === "FORBIDDEN") {
-          return res.status(403).json({
-            errorMessage: "Forbidden: You are not the owner of this post",
-          });
+          return next(new HttpError(403, "FORBIDDEN", "Forbidden: You are not the owner of this post"));
         }
         if (error.message === "INVALID_CATEGORY") {
-          return res.status(400).json({ errorMessage: "Invalid category" });
+          return next(new HttpError(400, "INVALID_CATEGORY", "Invalid category"));
         }
       }
-      console.error("⚠️ Edit post error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
@@ -388,14 +383,14 @@ router.put(
 router.delete(
   "/:id",
   requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const publicId = req.params.id;
       const userId = req.user!.userId;
       const userRole = req.user!.role;
 
       if (!publicId) {
-        return res.status(400).json({ errorMessage: "Invalid post ID" });
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid post ID"));
       }
 
       await postService.deletePost(publicId, userId, userRole);
@@ -404,16 +399,13 @@ router.delete(
     } catch (error) {
       if (error instanceof Error) {
         if (error.message === "POST_NOT_FOUND") {
-          return res.status(404).json({ errorMessage: "Post not found" });
+          return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
         }
         if (error.message === "FORBIDDEN") {
-          return res.status(403).json({
-            errorMessage: "Forbidden: You are not the owner of this post",
-          });
+          return next(new HttpError(403, "FORBIDDEN", "Forbidden: You are not the owner of this post"));
         }
       }
-      console.error("Delete post error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
@@ -423,7 +415,7 @@ router.delete(
 router.get(
   "/history",
   requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
       const page = parseInt(req.query.page as string) || 1;
@@ -432,18 +424,17 @@ router.get(
       const result = await postService.getViewedPosts(userId, page, limit);
       res.status(200).json(result);
     } catch (error) {
-      console.error("Get viewed posts history error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
 
 //* Get post details api (using public_id)
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsedId = PublicIdSchema.safeParse(req.params.id);
     if (!parsedId.success) {
-      return res.status(400).json({ errorMessage: "Invalid post ID" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid post ID"));
     }
     const publicId = parsedId.data;
 
@@ -458,7 +449,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     });
 
     if (!post) {
-      return res.status(404).json({ errorMessage: "Post not found" });
+      return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
     }
 
     // 🧠 登入使用者看非自己的貼文 → 觸發興趣向量更新（fire-and-forget）
@@ -474,8 +465,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
     res.status(200).json({ post });
   } catch (error) {
-    console.error("Get post error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
@@ -485,14 +475,14 @@ router.post(
   "/:id/embedding",
   requireAuth,
   requireRole("admin"),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const idOrPublicId = req.params.id;
       let postId = parseInt(idOrPublicId);
       if (isNaN(postId)) {
         const resolved = await postService.getPostIdByPublicId(idOrPublicId);
         if (!resolved) {
-          return res.status(404).json({ errorMessage: "Post not found" });
+          return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
         }
         postId = resolved;
       }
@@ -506,12 +496,9 @@ router.post(
       });
     } catch (error: unknown) {
       if (error instanceof Error && error.message === "POST_NOT_FOUND") {
-        return res.status(404).json({ errorMessage: "Post not found" });
+        return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
       }
-      console.error("Manual generate embedding error:", error);
-      return res
-        .status(500)
-        .json({ errorMessage: "Internal server error", error });
+      return next(error);
     }
   },
 );

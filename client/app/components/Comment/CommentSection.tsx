@@ -19,6 +19,7 @@ import {
   getCommentCounts,
 } from "@/services/commentService";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 interface CommentSectionProps {
   post: Post;
@@ -30,6 +31,7 @@ type ItemKey = "all" | number;
 const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const router = useRouter();
   const t = useTranslations("Comments");
+  const apiErrorMessage = useApiErrorMessage();
   const [activeItemKey, setActiveItemKey] = useState<ItemKey | null>(null);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -102,16 +104,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         const res = await getComments(post.id, itemKey);
         setComments(res.comments);
       } catch (err: unknown) {
-        if (err instanceof Error) {
-          toast.error(err.message);
-        } else {
-          toast.error(t("fetchFailed"));
-        }
+        toast.error(apiErrorMessage(err, t("fetchFailed")));
       } finally {
         setIsLoading(false);
       }
     },
-    [post.id, t],
+    [post.id, t, apiErrorMessage],
   );
 
   // 初始載入留言數量

@@ -48,6 +48,8 @@ import {
 import { UserStats } from "@/app/types/schema";
 import User from "@/app/types/user";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
@@ -164,6 +166,7 @@ const UserPage = () => {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("UserSettings");
+  const apiErrorMessage = useApiErrorMessage();
   const tProfile = useTranslations("Profile");
   const formatter = useFormatter();
   const { refetchTeamMembers } = useTeam();
@@ -283,13 +286,13 @@ const UserPage = () => {
       );
 
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.errorMessage || t("memberFetchFailed"));
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
 
       const result = await response.json();
       if (!result[0]) {
-        throw new Error(t("memberNotFound"));
+        setMemberError(t("memberNotFound"));
+        return;
       }
       const memberData = normalizeTeamMember(result[0]);
       setMember(memberData);
@@ -298,7 +301,7 @@ const UserPage = () => {
     } catch (err) {
       console.error("Error fetching member data:", err);
       setMemberError(
-        err instanceof Error ? err.message : t("memberFetchFailed"),
+        apiErrorMessage(err, t("memberFetchFailed")),
       );
     } finally {
       if (!options?.silent) setMemberLoading(false);
@@ -324,8 +327,7 @@ const UserPage = () => {
     });
 
     if (!response.ok) {
-      const result = await response.json();
-      throw new Error(result.errorMessage || t("memberSaveFailed"));
+      throw new ApiError(await response.json().catch(() => null), response.status);
     }
 
     setMemberError(null);
@@ -368,7 +370,7 @@ const UserPage = () => {
       }
     } catch (err) {
       console.error("Error saving member data:", err);
-      const message = err instanceof Error ? err.message : t("memberSaveFailed");
+      const message = apiErrorMessage(err, t("memberSaveFailed"));
       setMemberError(message);
       toast.error(message);
     }
@@ -448,9 +450,13 @@ const UserPage = () => {
       });
 
       if (!response.ok) {
-        const result = await response.json();
-        toast.error(result.errorMessage || t("sessionUpdateFailed"));
-        throw new Error(result.errorMessage || t("sessionUpdateFailed"));
+        toast.error(
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("sessionUpdateFailed"),
+          ),
+        );
+        return;
       }
       const result = await response.json();
       const updatedUser = result.updatedUser;
@@ -510,8 +516,7 @@ const UserPage = () => {
       });
 
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.errorMessage || t("avatarUploadFailed"));
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
 
       const result = await response.json();
@@ -556,7 +561,7 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error uploading avatar:", error);
       toast.error(
-        error instanceof Error ? error.message : t("avatarUploadFailed"),
+        apiErrorMessage(error, t("avatarUploadFailed")),
       );
     } finally {
       setUploadingAvatar(false);
@@ -578,15 +583,14 @@ const UserPage = () => {
         }),
       });
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.errorMessage || t("usernameUpdateFailed"));
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
       const result = await response.json();
       console.log("Update username Success: ", result);
     } catch (error) {
       console.error("Error update username: ", error);
       toast.error(
-        error instanceof Error ? error.message : t("usernameUpdateFailed"),
+        apiErrorMessage(error, t("usernameUpdateFailed")),
       );
       throw error;
     }
@@ -606,15 +610,14 @@ const UserPage = () => {
         }),
       });
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.errorMessage || t("bioUpdateFailed"));
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
       toast.error(
-        error instanceof Error ? error.message : t("bioUpdateFailed"),
+        apiErrorMessage(error, t("bioUpdateFailed")),
       );
       throw error;
     }
@@ -637,15 +640,14 @@ const UserPage = () => {
         },
       );
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.errorMessage || t("contactEmailUpdateFailed"));
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
       const errMsg =
-        error instanceof Error ? error.message : t("contactEmailUpdateFailed");
+        apiErrorMessage(error, t("contactEmailUpdateFailed"));
       toast.error(errMsg);
       throw error;
     }
@@ -668,15 +670,14 @@ const UserPage = () => {
         },
       );
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.errorMessage || t("contactPhoneUpdateFailed"));
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
       const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
       const errMsg =
-        error instanceof Error ? error.message : t("contactPhoneUpdateFailed");
+        apiErrorMessage(error, t("contactPhoneUpdateFailed"));
       toast.error(errMsg);
       throw error;
     }
@@ -777,8 +778,7 @@ const UserPage = () => {
         credentials: "include",
       });
       if (!res.ok) {
-        const r = await res.json();
-        throw new Error(r.errorMessage || t("avatarRemoveFailed"));
+        throw new ApiError(await res.json().catch(() => null), res.status);
       }
       //* Update user state
       await mutate((data: { user: User | null } | undefined) => {
@@ -788,7 +788,7 @@ const UserPage = () => {
     } catch (err) {
       console.error(err);
       toast.error(
-        err instanceof Error ? err.message : t("avatarRemoveFailed"),
+        apiErrorMessage(err, t("avatarRemoveFailed")),
       );
     }
   };
@@ -815,9 +815,10 @@ const UserPage = () => {
           return;
         }
 
-        const result = await response.json();
-        console.error("Error signing out:", result.errorMessage);
-        throw new Error(result.errorMessage || t("unexpectedError"));
+        throw new ApiError(
+          await response.json().catch(() => null),
+          response.status,
+        );
       }
 
       console.log("Sign out successful");
@@ -827,7 +828,7 @@ const UserPage = () => {
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error(
-        error instanceof Error ? error.message : t("unexpectedError"),
+        apiErrorMessage(error, t("unexpectedError")),
       );
     }
   };

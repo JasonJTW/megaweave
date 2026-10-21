@@ -1,4 +1,4 @@
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import { requireAuth } from "./middleware/auth";
 import { messageService } from "./utils/messageService";
 import { Server } from "socket.io";
@@ -7,6 +7,7 @@ import { defaultImageStorage } from "./storage/ImageStorage";
 import { randomUUID } from "crypto";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
+import { HttpError } from "./utils/httpError";
 
 const router = Router();
 
@@ -14,7 +15,7 @@ const router = Router();
 router.get(
   "/conversations",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user!.userId;
     // console.log(`[GET /conversations] Fetching for userId: ${userId}`);
     try {
@@ -27,8 +28,7 @@ router.get(
       // );
       return res.json({ conversations: dtos });
     } catch (error) {
-      console.error("Get conversations error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
@@ -37,7 +37,7 @@ router.get(
 router.get(
   "/conversations/:id",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user!.userId;
     const conversationId = parseInt(req.params.id);
     const beforeId = req.query.before_id
@@ -52,9 +52,13 @@ router.get(
         userId,
       );
       if (!isMember) {
-        return res
-          .status(403)
-          .json({ errorMessage: "Not authorized to view this conversation" });
+        return next(
+          new HttpError(
+            403,
+            "FORBIDDEN",
+            "Not authorized to view this conversation",
+          ),
+        );
       }
 
       const messages = await messageService.getMessages(
@@ -75,8 +79,7 @@ router.get(
         hasMore: messages.length === limit,
       });
     } catch (error) {
-      console.error("Get message history error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
@@ -86,7 +89,7 @@ router.post(
   "/",
   requireAuth,
   memoryUpload.array("images", 10),
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const senderId = req.user!.userId;
     const senderPublicId = req.user!.public_id;
     const { recipient_public_id, content, item_id, item_title, post_id } =
@@ -97,9 +100,13 @@ router.post(
       (!content &&
         (!req.files || (req.files as Express.Multer.File[]).length === 0))
     ) {
-      return res
-        .status(400)
-        .json({ errorMessage: "Recipient and content or image are required" });
+      return next(
+        new HttpError(
+          400,
+          "MESSAGE_EMPTY",
+          "Recipient and content or image are required",
+        ),
+      );
     }
 
     try {
@@ -107,7 +114,9 @@ router.post(
       const recipientId =
         await messageService.getUserIdByPublicId(recipient_public_id);
       if (!recipientId) {
-        return res.status(404).json({ errorMessage: "Recipient not found" });
+        return next(
+          new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
+        );
       }
 
       // 0. Process Attachments if any
@@ -210,46 +219,50 @@ router.post(
 
       res.status(201).json({ message: messageDTO, conversationId });
     } catch (error) {
-      console.error("Send message error:", error);
-      return res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );
 
 // POST /api/messages/start - Get or create conversation (no DB message written here)
-router.post("/start", requireAuth, async (req: Request, res: Response) => {
-  const senderId = req.user!.userId;
-  const { recipient_public_id } = req.body;
+router.post(
+  "/start",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    const senderId = req.user!.userId;
+    const { recipient_public_id } = req.body;
 
-  if (!recipient_public_id) {
-    return res
-      .status(400)
-      .json({ errorMessage: "Recipient Public ID required" });
-  }
-
-  try {
-    const recipientId =
-      await messageService.getUserIdByPublicId(recipient_public_id);
-    if (!recipientId) {
-      return res.status(404).json({ errorMessage: "Recipient not found" });
+    if (!recipient_public_id) {
+      return next(
+        new HttpError(400, "INVALID_REQUEST", "Recipient Public ID required"),
+      );
     }
-    const conversationId = await messageService.getConversationId(
-      senderId,
-      recipientId,
-    );
 
-    return res.json({ conversationId });
-  } catch (error) {
-    console.error("Start conversation error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
-  }
-});
+    try {
+      const recipientId =
+        await messageService.getUserIdByPublicId(recipient_public_id);
+      if (!recipientId) {
+        return next(
+          new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
+        );
+      }
+      const conversationId = await messageService.getConversationId(
+        senderId,
+        recipientId,
+      );
+
+      return res.json({ conversationId });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 // PATCH /api/messages/conversations/:id/read - Mark as read
 router.patch(
   "/conversations/:id/read",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user!.userId;
     const conversationId = parseInt(req.params.id);
 
@@ -259,7 +272,7 @@ router.patch(
         userId,
       );
       if (!isMember) {
-        return res.status(403).json({ errorMessage: "Not authorized" });
+        return next(new HttpError(403, "FORBIDDEN", "Not authorized"));
       }
 
       await messageService.markConversationRead(conversationId, userId);
@@ -293,8 +306,7 @@ router.patch(
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Mark read error:", error);
-      res.status(500).json({ errorMessage: "Internal server error" });
+      return next(error);
     }
   },
 );

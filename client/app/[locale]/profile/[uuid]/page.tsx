@@ -15,6 +15,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 // import type { Weave } from "@/services/weaveService";
 import { usePost } from "@/app/contexts/PostContext";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 // 定義公開 Profile 的資料型別
 interface PublicProfile {
@@ -29,16 +30,14 @@ interface PublicProfile {
   contact_phone?: string | null;
 }
 
-// The server's message when it sent one, else which translated message to show
-type ProfileError = {
-  serverMessage?: string;
-  fallback: "notFound" | "loadFailed";
-};
+// Already translated: the API error's code, or the load failure fallback
+type ProfileError = { message: string };
 
 const PublicProfilePage = () => {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations("Profile");
+  const apiErrorMessage = useApiErrorMessage();
   const uuid = params.uuid as string;
   const { conditions } = usePost();
   const defaultStats: UserStats = {
@@ -82,10 +81,11 @@ const PublicProfilePage = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
         setError({
-          serverMessage: errorData.errorMessage,
-          fallback: "notFound",
+          message: apiErrorMessage(
+            await response.json().catch(() => null),
+            t("loadFailed"),
+          ),
         });
         return;
       }
@@ -101,7 +101,7 @@ const PublicProfilePage = () => {
       setError(null);
     } catch (error) {
       console.error("Error fetching profile:", error);
-      setError({ fallback: "loadFailed" });
+      setError({ message: t("loadFailed") });
     }
     // 注意：這裡不設定 setLoading(false)，交給 init 統一處理
   };
@@ -186,7 +186,7 @@ const PublicProfilePage = () => {
         <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
           <Alert className="max-w-md border-red-500/30 bg-red-950/50">
             <AlertDescription className="text-red-300">
-              {error.serverMessage || t(error.fallback)}
+              {error.message}
             </AlertDescription>
           </Alert>
         </div>

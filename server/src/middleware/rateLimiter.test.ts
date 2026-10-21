@@ -85,7 +85,10 @@ describe("Tiered Rate Limiting Middleware (Issue #8)", () => {
       expect(retryAfter).toBeGreaterThan(0);
 
       const body = (await res3.json()) as { errorMessage: string };
-      expect(body).toEqual({ errorMessage: "Too many attempts from this IP" });
+      expect(body).toEqual({
+        code: "RATE_LIMITED",
+        errorMessage: "Too many attempts from this IP",
+      });
     });
 
     it("bypasses rate limiting when RATE_LIMIT_DISABLED=true", async () => {

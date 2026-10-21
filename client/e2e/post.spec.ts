@@ -80,7 +80,17 @@ for (const { locale, home, messages, heading } of LOCALES) {
         .click();
 
       await expect(page.getByText(messages.HomeFeed.postCreated)).toBeVisible();
-      await page.getByText(title).click();
+      // The feed is ranked, not chronological, so with other specs' posts in
+      // the shared database the new one can land past the first page.
+      // Scroll to let infinite scroll load more until it shows up.
+      const card = page.getByText(title);
+      await expect(async () => {
+        await page.evaluate(() =>
+          window.scrollTo(0, document.body.scrollHeight),
+        );
+        await expect(card).toBeAttached({ timeout: 1_000 });
+      }).toPass({ timeout: 20_000 });
+      await card.click();
       // The dev server compiles the post page on first visit
       await expect(page).toHaveURL(/\/item\/[\w-]+$/, { timeout: 20_000 });
       await expect(page.getByText(title).first()).toBeVisible();

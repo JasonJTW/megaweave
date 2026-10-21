@@ -19,7 +19,6 @@ import {
   getCommentCounts,
 } from "@/services/commentService";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
-import { ApiError } from "@/lib/apiError";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 interface CommentSectionProps {
@@ -105,9 +104,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         const res = await getComments(post.id, itemKey);
         setComments(res.comments);
       } catch (err: unknown) {
-        toast.error(
-          err instanceof ApiError ? apiErrorMessage(err) : t("fetchFailed"),
-        );
+        toast.error(apiErrorMessage(err, t("fetchFailed")));
       } finally {
         setIsLoading(false);
       }

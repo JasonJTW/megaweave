@@ -444,9 +444,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         !data.quotations ||
         data.quotations.length === 0
       ) {
-        throw new Error(
-          res.ok ? t("order.recalculateFailed") : apiErrorMessage(data),
-        );
+        throw new Error(apiErrorMessage(data, t("order.recalculateFailed")));
       }
 
       const quotesMapNew: Record<string, QuotationItem> = {};
@@ -652,9 +650,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(
-          response.ok ? t("order.checkoutFailed") : apiErrorMessage(data),
-        );
+        throw new Error(apiErrorMessage(data, t("order.checkoutFailed")));
       }
 
       // 儲存 MerchantTradeNo 與當前貼文網址到 sessionStorage，供付款後查詢與返回

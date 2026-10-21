@@ -20,11 +20,16 @@ export class ApiError extends Error {
   }
 }
 
-export function translateApiError(t: ErrorsTranslator, body: unknown): string {
-  if (body instanceof ApiError) body = body.body;
+//* 有 code：翻譯（未知 code 顯示通用訊息）
+//* 沒有 code（網路錯誤、非 JSON 回應、res.ok 但 success: false…）：用 fallback，沒給就顯示通用訊息
+export function translateApiError(
+  t: ErrorsTranslator,
+  error: unknown,
+  fallback?: string,
+): string {
+  const body = error instanceof ApiError ? error.body : error;
   const { code, params } = (body ?? {}) as { code?: unknown; params?: unknown };
-  if (typeof code === "string" && t.has(code as ErrorKey)) {
-    return t(code as ErrorKey, params as Record<string, string | number>);
-  }
-  return t("UNKNOWN");
+  if (typeof code !== "string") return fallback ?? t("UNKNOWN");
+  if (!t.has(code as ErrorKey)) return t("UNKNOWN");
+  return t(code as ErrorKey, params as Record<string, string | number>);
 }

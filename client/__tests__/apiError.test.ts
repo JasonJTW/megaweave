@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createTranslator } from "next-intl";
 import zhTW from "../messages/zh-TW.json";
 import en from "../messages/en.json";
-import { translateApiError } from "../lib/apiError";
+import { ApiError, translateApiError } from "../lib/apiError";
 
 const tZh = createTranslator({
   locale: "zh-TW",
@@ -54,5 +54,37 @@ describe("translateApiError", () => {
     for (const body of [{ errorMessage: "legacy" }, null, "oops", undefined]) {
       assert.equal(translateApiError(tZh, body), "發生錯誤，請稍後再試。");
     }
+  });
+
+  it("uses the caller's fallback when the error carries no code", () => {
+    for (const error of [
+      new Error("Failed to fetch"),
+      null,
+      { success: false },
+    ]) {
+      assert.equal(
+        translateApiError(tZh, error, "留言送出失敗"),
+        "留言送出失敗",
+      );
+    }
+  });
+
+  it("still translates an ApiError's code when a fallback is given", () => {
+    const error = new ApiError(
+      { code: "COMMENT_EMPTY", errorMessage: "x" },
+      400,
+    );
+
+    assert.equal(
+      translateApiError(tEn, error, "fallback"),
+      "Comments can't be empty.",
+    );
+  });
+
+  it("prefers the generic message over the fallback for an unknown code", () => {
+    assert.equal(
+      translateApiError(tEn, { code: "SOMETHING_NEW" }, "fallback"),
+      "Something went wrong. Please try again.",
+    );
   });
 });

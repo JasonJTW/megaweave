@@ -614,7 +614,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             messages: currentData.messages.filter((msg) => msg.id !== tempId),
           };
         }, false);
-        throw new Error(apiErrorMessage(await res.json().catch(() => null)));
+        throw new Error(
+          apiErrorMessage(await res.json().catch(() => null), t("sendFailed")),
+        );
       }
 
       // If successful, revalidate to get the actual message with real ID and status

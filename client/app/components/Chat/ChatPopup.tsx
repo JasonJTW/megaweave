@@ -19,7 +19,6 @@ import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
 import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
 import { createWeave } from "@/services/weaveService";
-import { ApiError } from "@/lib/apiError";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
@@ -83,9 +82,7 @@ export const ChatPopup = () => {
       toast.success(t("requestSent"));
     } catch (err: unknown) {
       console.error("Weaving submit error:", err);
-      toast.error(
-        err instanceof ApiError ? apiErrorMessage(err) : t("unexpectedError"),
-      );
+      toast.error(apiErrorMessage(err, t("unexpectedError")));
     }
   };
 

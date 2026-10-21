@@ -148,11 +148,7 @@ export function useWeaveActions({
       toast.success(t("toast.approved"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : t("toast.approveFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.approveFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -175,11 +171,7 @@ export function useWeaveActions({
       toast.success(t("toast.declined"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : t("toast.declineFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.declineFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -214,11 +206,7 @@ export function useWeaveActions({
       }
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : t("toast.confirmFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.confirmFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -241,11 +229,7 @@ export function useWeaveActions({
       toast.success(t("toast.cancelled"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : t("toast.cancelFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.cancelFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -268,11 +252,7 @@ export function useWeaveActions({
       toast.success(t("toast.withdrawn"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : t("toast.withdrawFailed"),
-      );
+      toast.error(apiErrorMessage(error, t("toast.withdrawFailed")));
     } finally {
       setIsProcessing(false);
     }

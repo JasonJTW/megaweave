@@ -9,7 +9,6 @@ import User from "../../types/user";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
-import { ApiError } from "@/lib/apiError";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 interface CommentInputProps {
   postId: number;
@@ -65,9 +64,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
       setContent("");
       onSuccess?.();
     } catch (err: unknown) {
-      setError(
-        err instanceof ApiError ? apiErrorMessage(err) : t("submitFailed"),
-      );
+      setError(apiErrorMessage(err, t("submitFailed")));
     } finally {
       setIsSubmitting(false);
     }

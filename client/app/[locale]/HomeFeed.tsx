@@ -26,7 +26,6 @@ import { Post, PostsResponse, PostLocationField } from "@/app/types/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
-import { ApiError } from "@/lib/apiError";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { parseGooglePlace } from "@/utils/locationUtils";
 import OverlayTour, { TourStep } from "@/app/components/OverlayTour";
@@ -562,12 +561,10 @@ const PostsApp = () => {
       }
     } catch (error: unknown) {
       console.error("Create post error:", error);
-      const message =
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : error instanceof Error
-            ? error.message
-            : t("networkError");
+      const message = apiErrorMessage(
+        error,
+        error instanceof Error ? error.message : t("networkError"),
+      );
       toast.error(message);
     } finally {
       setIsCreating(false);

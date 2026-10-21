@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
-import { ApiError } from "@/lib/apiError";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, ExternalLink, Heart, Share2, Trash2 } from "lucide-react";
@@ -264,16 +263,19 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         fetchPost(); // Refresh page data without changing URL layout
         mutate(() => true, undefined, { revalidate: true }); // Revalidate all SWR caches (including main page feed)
       } else {
-        toast.error(apiErrorMessage(await response.json().catch(() => null)));
+        toast.error(
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("updateFailed"),
+          ),
+        );
       }
     } catch (error: unknown) {
       console.error("Error updating post:", error);
-      const message =
-        error instanceof ApiError
-          ? apiErrorMessage(error)
-          : error instanceof Error
-            ? error.message
-            : t("updateFailed");
+      const message = apiErrorMessage(
+        error,
+        error instanceof Error ? error.message : t("updateFailed"),
+      );
       toast.error(message);
     } finally {
       setIsUpdating(false);
@@ -366,7 +368,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         );
         router.push("/");
       } else {
-        toast.error(apiErrorMessage(await response.json().catch(() => null)));
+        toast.error(
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("deleteFailed"),
+          ),
+        );
       }
     } catch (error) {
       console.error("Error deleting post:", error);

@@ -322,9 +322,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         console.log("[Lalamove Client] Received quotation data:", data);
 
         if (!response.ok || !data.success) {
-          throw new Error(
-            response.ok ? t("quotation.quoteFailed") : apiErrorMessage(data),
-          );
+          throw new Error(apiErrorMessage(data, t("quotation.quoteFailed")));
         }
 
         const quotesMap: Record<string, QuotationItem> = {};

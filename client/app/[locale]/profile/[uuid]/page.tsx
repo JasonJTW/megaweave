@@ -82,7 +82,10 @@ const PublicProfilePage = () => {
 
       if (!response.ok) {
         setError({
-          message: apiErrorMessage(await response.json().catch(() => null)),
+          message: apiErrorMessage(
+            await response.json().catch(() => null),
+            t("loadFailed"),
+          ),
         });
         return;
       }

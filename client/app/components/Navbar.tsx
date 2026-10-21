@@ -104,7 +104,10 @@ const Navbar = () => {
         }
 
         throw new Error(
-          apiErrorMessage(await response.json().catch(() => null)),
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("unexpectedError"),
+          ),
         );
       }
 

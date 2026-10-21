@@ -520,7 +520,7 @@ export default function DeliveryTrackingPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(res.ok ? t("cancelFailed") : apiErrorMessage(data));
+        throw new Error(apiErrorMessage(data, t("cancelFailed")));
       }
       toast.success(t("cancelled"));
       setIsCancelModalOpen(false);
@@ -583,9 +583,7 @@ export default function DeliveryTrackingPage() {
               ? t("forbiddenBody")
               : status === 404
                 ? t("notFoundBody")
-                : error instanceof ApiError
-                  ? apiErrorMessage(error)
-                  : t("loadFailed")}
+                : apiErrorMessage(error, t("loadFailed"))}
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
           {isAuthError ? (

@@ -94,7 +94,7 @@ function PaymentResultContent() {
 
       const data: PaymentStatusResponse = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(res.ok ? t("statusFetchFailed") : apiErrorMessage(data));
+        throw new Error(apiErrorMessage(data, t("statusFetchFailed")));
       }
 
       setStatusData(data);

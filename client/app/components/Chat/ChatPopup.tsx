@@ -5,7 +5,16 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import {
+  closeChat as closeChatAction,
+  draftSet,
+  selectConversationId,
+  selectDraft,
+  selectIsOpen,
+  selectOtherUser,
+  selectPost,
+} from "@/app/store/chatPopupSlice";
 import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
 import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
@@ -16,15 +25,13 @@ import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 export const ChatPopup = () => {
   const { mutate: globalMutate } = useSWRConfig();
-  const {
-    isOpen,
-    conversationId,
-    otherUser,
-    post,
-    draft,
-    setDraft,
-    closeChat,
-  } = useChatPopup();
+  const dispatch = useAppDispatch();
+  const isOpen = useAppSelector(selectIsOpen);
+  const conversationId = useAppSelector(selectConversationId);
+  const otherUser = useAppSelector(selectOtherUser);
+  const post = useAppSelector(selectPost);
+  const draft = useAppSelector(selectDraft);
+  const closeChat = () => dispatch(closeChatAction());
   const { user: currentUser } = useUser();
   const router = useRouter();
   const t = useTranslations("Chat");
@@ -59,7 +66,7 @@ export const ChatPopup = () => {
       void newWeave;
 
       // draft is the single source of truth — clearing it collapses the PostInfoCard
-      setDraft(null);
+      dispatch(draftSet(null));
 
       const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
       if (conversationId) {
@@ -109,6 +116,7 @@ export const ChatPopup = () => {
               </h2>
               <button
                 onClick={closeChat}
+                aria-label={t("close")}
                 className="rounded-full p-2 transition-colors hover:bg-gray-100"
               >
                 <X className="h-6 w-6 text-megaweave-forest-dark" />

@@ -6,7 +6,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { Post } from "@/app/types/schema";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import { draftSet, selectDraft } from "@/app/store/chatPopupSlice";
 import User from "@/app/types/user";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -34,7 +35,9 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   onWeavingSubmit,
 }) => {
   const t = useTranslations("Chat.postInfo");
-  const { draft: contextDraft, setDraft } = useChatPopup();
+  const dispatch = useAppDispatch();
+  const contextDraft = useAppSelector(selectDraft);
+  const setDraft = (next: WeaveDraft | null) => dispatch(draftSet(next));
 
   // If context has draft for this post, use it as single source of truth.
   // Otherwise fallback to local state (e.g. if rendered outside provider).

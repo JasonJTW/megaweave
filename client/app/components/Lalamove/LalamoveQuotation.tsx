@@ -20,7 +20,8 @@ import toast from "react-hot-toast";
 import OrderPlacementModal from "./OrderPlacementModal";
 import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch } from "@/app/store/hooks";
+import { openChat } from "@/app/store/chatPopupSlice";
 import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
 import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
@@ -146,7 +147,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const { user } = useUser();
-  const { openChat } = useChatPopup();
+  const dispatch = useAppDispatch();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   // Weaves query to check if there is a approved weave for this post
@@ -188,15 +189,17 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
       const data = await res.json();
 
-      openChat(
-        data.conversationId,
-        {
-          public_id: post.author_public_id,
-          username: post.username,
-          avatar_url: post.avatar_url,
-        },
-        post,
-        { id: "all", title: "All" },
+      dispatch(
+        openChat({
+          conversationId: data.conversationId,
+          otherUser: {
+            public_id: post.author_public_id,
+            username: post.username,
+            avatar_url: post.avatar_url,
+          },
+          post,
+          item: { id: "all", title: "All" },
+        }),
       );
     } catch (error) {
       console.error("Message error:", error);

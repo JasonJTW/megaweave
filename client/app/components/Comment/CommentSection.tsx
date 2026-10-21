@@ -11,7 +11,8 @@ import CommentCard from "./CommentCard";
 import CommentInput from "./CommentInput";
 import CommentItem from "./CommentItem";
 import toast from "react-hot-toast";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch } from "@/app/store/hooks";
+import { openChat } from "@/app/store/chatPopupSlice";
 import {
   Comment,
   getComments,
@@ -33,7 +34,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const { openChat } = useChatPopup();
+  const dispatch = useAppDispatch();
 
   const handleWeavingMessage = async (item: {
     key: ItemKey;
@@ -65,15 +66,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       const data = await res.json();
       console.log("data: ", data);
 
-      openChat(
-        data.conversationId,
-        {
-          public_id: post.author_public_id,
-          username: post.username,
-          avatar_url: post.avatar_url,
-        },
-        post,
-        { id: item.key, title: item.title },
+      dispatch(
+        openChat({
+          conversationId: data.conversationId,
+          otherUser: {
+            public_id: post.author_public_id,
+            username: post.username,
+            avatar_url: post.avatar_url,
+          },
+          post,
+          item: { id: item.key, title: item.title },
+        }),
       );
     } catch (error) {
       console.error("Message error:", error);

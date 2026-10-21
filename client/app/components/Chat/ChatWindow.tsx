@@ -1,5 +1,5 @@
 import { Link, useRouter } from "@/i18n/navigation";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
@@ -26,7 +26,13 @@ import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { safeCompressImage } from "@/utils/imageProcessor";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import {
+  draftSet,
+  selectConversationId,
+  selectDraft,
+  selectPost,
+} from "@/app/store/chatPopupSlice";
 import WeavingCard from "@/app/components/WeavingCard";
 import {
   getDraftBannerInfo,
@@ -141,7 +147,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   // Read draft (weaving intent) from global context.
-  const { draft, setDraft, post, conversationId: popupConvId } = useChatPopup();
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectDraft);
+  const post = useAppSelector(selectPost);
+  const popupConvId = useAppSelector(selectConversationId);
+  const setDraft = useCallback(
+    (next: WeaveDraft | null) => dispatch(draftSet(next)),
+    [dispatch],
+  );
   // ponytail: activePost only used for optimistic banner, same conv check
   const activePost = popupConvId === conversationId ? post : null;
 

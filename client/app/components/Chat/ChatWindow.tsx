@@ -50,6 +50,7 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 import { User } from "@/app/types/schema";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 // Helper to parse date safely as UTC if needed
 const parseDate = (dateString: string) => {
@@ -614,9 +615,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             messages: currentData.messages.filter((msg) => msg.id !== tempId),
           };
         }, false);
-        throw new Error(
-          apiErrorMessage(await res.json().catch(() => null), t("sendFailed")),
-        );
+        throw new ApiError(await res.json().catch(() => null), res.status);
       }
 
       // If successful, revalidate to get the actual message with real ID and status
@@ -624,7 +623,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       mutate(); // Revalidate all messages for this conversation
     } catch (error) {
       console.error("Error sending message:", error);
-      toast.error(error instanceof Error ? error.message : t("sendFailed"));
+      toast.error(apiErrorMessage(error, t("sendFailed")));
       // Restore the draft if the send failed so the user doesn't
       // lose their weaving context.
       if (draftToSend) setDraft(draftToSend);

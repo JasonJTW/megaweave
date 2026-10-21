@@ -41,6 +41,7 @@ import {
 } from "@/utils/locationUtils";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -322,7 +323,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         console.log("[Lalamove Client] Received quotation data:", data);
 
         if (!response.ok || !data.success) {
-          throw new Error(apiErrorMessage(data, t("quotation.quoteFailed")));
+          throw new ApiError(data);
         }
 
         const quotesMap: Record<string, QuotationItem> = {};
@@ -367,7 +368,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       } catch (err: unknown) {
         console.error("Fetch quotation error:", err);
         const message =
-          err instanceof Error ? err.message : t("quotation.quoteFailed");
+          apiErrorMessage(err, t("quotation.quoteFailed"));
         setErrorMsg(message);
         toast.error(message);
       } finally {

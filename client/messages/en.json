@@ -245,7 +245,6 @@
       "recipientNameRequired": "Recipient name is required",
       "recipientPhoneRequired": "Recipient phone is required",
       "sessionExpired": "Session expired. Please sign in again.",
-      "checkoutFailed": "Failed to create the checkout order",
       "redirectingToPayment": "Redirecting to secure payment...",
       "paymentFormMissing": "No valid payment form received, please retry",
       "orderFailed": "Failed to place the order, please try again later"
@@ -663,6 +662,7 @@
     "bioUpdateFailed": "Failed to update bio",
     "contactEmailUpdateFailed": "Failed to update contact email",
     "contactPhoneUpdateFailed": "Failed to update contact phone",
+    "sessionUpdateFailed": "Failed to update user session",
     "notSignedIn": "You are not signed in",
     "unexpectedError": "An unexpected error occurred"
   },
@@ -884,7 +884,6 @@
     "loadFailed": "Couldn't load the order right now. Please try again later."
   },
   "PaymentResult": {
-    "statusFetchFailed": "Could not get the order status",
     "checkFailed": "Status check failed",
     "checkingTitle": "Confirming payment and finding a driver...",
     "checkingBody": "Please wait while we sync your order with ECPay and Lalamove.",

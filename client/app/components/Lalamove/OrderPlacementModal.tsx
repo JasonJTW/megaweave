@@ -38,6 +38,7 @@ import {
   LALAMOVE_LANGUAGE,
 } from "@/utils/lalamove";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
 const VEHICLE_ICONS: Record<VehicleType, "bike" | "car" | "van" | "truck"> = {
@@ -444,7 +445,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         !data.quotations ||
         data.quotations.length === 0
       ) {
-        throw new Error(apiErrorMessage(data, t("order.recalculateFailed")));
+        throw new ApiError(data);
       }
 
       const quotesMapNew: Record<string, QuotationItem> = {};
@@ -486,7 +487,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       toast.success(t("order.allQuotesUpdated"));
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : t("order.recalculateFailed");
+        apiErrorMessage(err, t("order.recalculateFailed"));
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
@@ -650,7 +651,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(apiErrorMessage(data, t("order.checkoutFailed")));
+        throw new ApiError(data);
       }
 
       // 儲存 MerchantTradeNo 與當前貼文網址到 sessionStorage，供付款後查詢與返回
@@ -678,10 +679,11 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         }
       }
 
-      throw new Error(t("order.paymentFormMissing"));
+      setErrorMessage(t("order.paymentFormMissing"));
+      toast.error(t("order.paymentFormMissing"));
     } catch (err: unknown) {
       console.error("Checkout failed:", err);
-      const msg = err instanceof Error ? err.message : t("order.orderFailed");
+      const msg = apiErrorMessage(err, t("order.orderFailed"));
       setErrorMessage(msg);
       toast.error(msg);
     } finally {

@@ -245,7 +245,6 @@
       "recipientNameRequired": "請填寫收件人姓名",
       "recipientPhoneRequired": "請填寫收件人手機電話",
       "sessionExpired": "登入已逾期，請重新登入",
-      "checkoutFailed": "建立結帳訂單失敗",
       "redirectingToPayment": "正在跳轉至綠界安全結帳頁面...",
       "paymentFormMissing": "未收到有效的付款表單，請重試",
       "orderFailed": "下單失敗，請稍後再試"
@@ -663,6 +662,7 @@
     "bioUpdateFailed": "無法更新自我介紹",
     "contactEmailUpdateFailed": "無法更新聯絡信箱",
     "contactPhoneUpdateFailed": "無法更新聯絡電話",
+    "sessionUpdateFailed": "無法更新登入狀態",
     "notSignedIn": "您尚未登入",
     "unexpectedError": "發生未預期的錯誤"
   },
@@ -884,7 +884,6 @@
     "loadFailed": "目前無法載入訂單資料，請稍後再試。"
   },
   "PaymentResult": {
-    "statusFetchFailed": "無法取得訂單狀態",
     "checkFailed": "查詢失敗",
     "checkingTitle": "正在確認付款與媒合司機⋯",
     "checkingBody": "請稍候，後端正與綠界及 Lalamove 即時同步您的訂單狀態",

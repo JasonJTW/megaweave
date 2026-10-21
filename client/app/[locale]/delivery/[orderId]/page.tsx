@@ -520,13 +520,13 @@ export default function DeliveryTrackingPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(apiErrorMessage(data, t("cancelFailed")));
+        throw new ApiError(data);
       }
       toast.success(t("cancelled"));
       setIsCancelModalOpen(false);
       mutate();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t("cancelFailed");
+      const msg = apiErrorMessage(err, t("cancelFailed"));
       toast.error(msg);
     } finally {
       setIsCancelling(false);

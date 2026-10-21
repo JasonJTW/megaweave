@@ -66,6 +66,7 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 import { useNotification } from "../contexts/NotificationContext";
 import WeavingIcon from "./icons/WeavingIcon";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 // cleaned up
 const Navbar = () => {
@@ -103,12 +104,7 @@ const Navbar = () => {
           return;
         }
 
-        throw new Error(
-          apiErrorMessage(
-            await response.json().catch(() => null),
-            t("unexpectedError"),
-          ),
-        );
+        throw new ApiError(await response.json().catch(() => null), response.status);
       }
 
       await mutate({ user: null }, false);
@@ -117,7 +113,7 @@ const Navbar = () => {
     } catch (error) {
       console.error("Error signing out:", error);
       toast.error(
-        error instanceof Error ? error.message : t("unexpectedError"),
+        apiErrorMessage(error, t("unexpectedError")),
       );
     }
   };

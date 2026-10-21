@@ -14,7 +14,7 @@ const router = Router();
 
 // ─── GET /api/me ──────────────────────────────────────────────────────────────
 
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const userId = req.user!.userId;
   const userRole = req.user!.role;
 
@@ -140,8 +140,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       member: member ?? null,
     });
   } catch (error) {
-    console.error("Error fetching /api/me:", error);
-    return res.status(500).json({ errorMessage: "Failed to fetch user data" });
+    return next(error);
   }
 });
 

@@ -1,4 +1,4 @@
-import { Router, Request, Response, RequestHandler } from "express";
+import { Router, Request, Response, RequestHandler, NextFunction } from "express";
 import { z } from "zod";
 import { PaymentService } from "./services/payment/paymentService";
 import { createPaymentService } from "./services/payment/defaultPaymentService";
@@ -7,6 +7,7 @@ import dbPool from "./utils/db";
 import { RowDataPacket } from "mysql2/promise";
 
 import { locationService } from "./services/locationService";
+import { HttpError } from "./utils/httpError";
 
 // 地點可以用已存在的 ID（後端 locations 表），或在結帳時即時傳入地址物件（後端自動建立）
 const LocationByIdSchema = z.object({ locationId: z.number().int().positive() });
@@ -86,19 +87,17 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
    * POST /api/payments/checkout
    * 建立結帳訂單並回傳綠界自動跳轉 Form
    */
-  router.post("/checkout", auth, async (req: Request, res: Response): Promise<void> => {
+  router.post("/checkout", auth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = CheckoutSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: "Validation failed", details: parsed.error.format() });
-        return;
+        return next(parsed.error);
       }
 
       const authReq = req as unknown as AuthenticatedRequest;
       const userId = authReq.user?.userId;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        return next(new HttpError(401, "UNAUTHENTICATED", "Unauthorized"));
       }
 
       // 解析取件/送達地點 → 取得 locationId（必要時自動建立）
@@ -130,8 +129,7 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
         session,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "結帳建立失敗";
-      res.status(400).json({ success: false, error: message });
+      return next(err);
     }
   });
 
@@ -139,19 +137,17 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
    * GET /api/payments/status/:merchantTradeNo
    * 查詢資料庫真實付款與外送派單狀態（防止前端竄改，並取得 lalamoveOrderId）
    */
-  router.get("/status/:merchantTradeNo", auth, async (req: Request, res: Response): Promise<void> => {
+  router.get("/status/:merchantTradeNo", auth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
       const userId = authReq.user?.userId;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        return next(new HttpError(401, "UNAUTHENTICATED", "Unauthorized"));
       }
 
       const merchantTradeNo = req.params.merchantTradeNo;
       if (!merchantTradeNo) {
-        res.status(400).json({ error: "merchantTradeNo is required" });
-        return;
+        return next(new HttpError(400, "INVALID_REQUEST", "merchantTradeNo is required"));
       }
 
       const [rows] = await dbPool.query<RowDataPacket[]>(
@@ -172,8 +168,7 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
       );
 
       if (!rows || rows.length === 0) {
-        res.status(404).json({ error: "Payment record not found" });
-        return;
+        return next(new HttpError(404, "PAYMENT_NOT_FOUND", "Payment record not found"));
       }
 
       const record = rows[0];
@@ -192,8 +187,7 @@ export function createPaymentRouter(options?: PaymentRouterOptions): Router {
         rtnMsg: record.rtn_msg,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "查詢失敗";
-      res.status(500).json({ success: false, error: message });
+      return next(err);
     }
   });
 

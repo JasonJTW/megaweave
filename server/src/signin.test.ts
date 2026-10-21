@@ -4,6 +4,7 @@ import request from "supertest";
 import dbPool from "./utils/db";
 import { createUserSession } from "./session";
 import { generateSalt, hashPassword } from "./passwordHasher";
+import { errorMiddleware } from "./utils/errorHandler";
 
 jest.mock("./utils/db", () => ({
   __esModule: true,
@@ -70,6 +71,7 @@ describe("POST /signin (native)", () => {
     app = express();
     app.use(express.json());
     app.use("/signin", signinRouter);
+    app.use(errorMiddleware);
 
     salt = generateSalt();
     hashed = await hashPassword(PASSWORD, salt);
@@ -97,7 +99,10 @@ describe("POST /signin (native)", () => {
     const res = await signin();
 
     expect(res.status).toBe(401);
-    expect(res.body).toEqual({ errorMessage: "Invalid email or password" });
+    expect(res.body).toEqual({
+        code: "INVALID_CREDENTIALS",
+        errorMessage: "Invalid email or password",
+      });
     expect(createUserSession).not.toHaveBeenCalled();
   });
 
@@ -112,7 +117,10 @@ describe("POST /signin (native)", () => {
       const res = await signin();
 
       expect(res.status).toBe(401);
-      expect(res.body).toEqual({ errorMessage: "Invalid email or password" });
+      expect(res.body).toEqual({
+        code: "INVALID_CREDENTIALS",
+        errorMessage: "Invalid email or password",
+      });
       expect(createUserSession).not.toHaveBeenCalled();
     },
   );
@@ -123,7 +131,8 @@ describe("POST /signin (native)", () => {
     const res = await signin();
 
     expect(res.status).toBe(400);
-    expect(res.body.errorMessage).toContain("google");
+    expect(res.body.code).toBe("USE_SOCIAL_SIGNIN");
+    expect(res.body.params).toEqual({ providers: "Google" });
     expect(createUserSession).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { RowDataPacket } from "mysql2";
@@ -6,7 +6,7 @@ import { RowDataPacket } from "mysql2";
 const router = Router();
 
 // GET / - Get user's notifications
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const userId = req.user!.userId;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 20;
@@ -39,13 +39,12 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       unreadCount: countResult[0].unread_count,
     });
   } catch (error) {
-    console.error("Get notifications error:", error);
-    res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
 // PATCH /:id/read - Mark single notification as read
-router.patch("/:id/read", requireAuth, async (req: Request, res: Response) => {
+router.patch("/:id/read", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const userId = req.user!.userId;
   const notificationId = req.params.id;
 
@@ -59,13 +58,12 @@ router.patch("/:id/read", requireAuth, async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error("Mark read error:", error);
-    res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
 // PUT /read-all - Mark all as read
-router.put("/read-all", requireAuth, async (req: Request, res: Response) => {
+router.put("/read-all", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const userId = req.user!.userId;
 
   try {
@@ -78,8 +76,7 @@ router.put("/read-all", requireAuth, async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error("Mark all read error:", error);
-    res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 

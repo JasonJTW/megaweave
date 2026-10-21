@@ -1,19 +1,18 @@
 // server/src/stats.ts
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { updateUserStats } from "./utils/updateUserStats";
+import { HttpError } from "./utils/httpError";
 
 const router = Router();
 
 // GET /api/user/stats - 獲取當前用戶統計
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user?.userId) {
-      return res.status(401).json({
-        errorMessage: "User ID not found, Please signin first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
     }
 
     const userId = req.user.userId;
@@ -105,15 +104,12 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       posts: posts || [],
     });
   } catch (error) {
-    console.error("Error fetching user stats:", error);
-    return res.status(500).json({
-      errorMessage: "Failed to fetch user stats",
-    });
+    return next(error);
   }
 });
 
 // GET /api/user/stats/public/:uuid - 獲取公開統計（for 公開頁面）
-router.get("/public/:uuid", async (req: Request, res: Response) => {
+router.get("/public/:uuid", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { uuid } = req.params;
 
@@ -121,9 +117,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(uuid)) {
-      return res.status(400).json({
-        errorMessage: "Invalid user ID format",
-      });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid user ID format"));
     }
 
     // 先查找用戶的 internal ID
@@ -131,9 +125,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     const [userRows] = await dbPool.execute<RowDataPacket[]>(userQuery, [uuid]);
 
     if (userRows.length === 0) {
-      return res.status(404).json({
-        errorMessage: "User not found",
-      });
+      return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
     }
 
     const userId = userRows[0].id;
@@ -224,20 +216,15 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
       posts: posts || [],
     });
   } catch (error) {
-    console.error("Error fetching public stats:", error);
-    return res.status(500).json({
-      errorMessage: "Failed to fetch user stats",
-    });
+    return next(error);
   }
 });
 
 // POST /api/user/stats/refresh - 手動重新計算統計（需要登入）
-router.post("/refresh", requireAuth, async (req: Request, res: Response) => {
+router.post("/refresh", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user?.userId) {
-      return res.status(401).json({
-        errorMessage: "User ID not found, Please signin first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
     }
 
     const userId = req.user.userId;
@@ -246,10 +233,9 @@ router.post("/refresh", requireAuth, async (req: Request, res: Response) => {
     const result = await updateUserStats(userId.toString());
 
     if (!result.success) {
-      return res.status(500).json({
-        errorMessage: "Failed to refresh user stats",
-        error: result.error,
-      });
+      return next(
+        new Error(`Failed to refresh user stats: ${String(result.error)}`),
+      );
     }
 
     return res.status(200).json({
@@ -257,15 +243,12 @@ router.post("/refresh", requireAuth, async (req: Request, res: Response) => {
       stats: result.stats,
     });
   } catch (error) {
-    console.error("Error refreshing user stats:", error);
-    return res.status(500).json({
-      errorMessage: "Failed to refresh user stats",
-    });
+    return next(error);
   }
 });
 
 // GET /api/user/stats/leaderboard - 獲取排行榜
-router.get("/leaderboard", async (req: Request, res: Response) => {
+router.get("/leaderboard", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { type = "points", limit = "10" } = req.query;
     const limitNum = Math.min(parseInt(limit as string) || 10, 100);
@@ -330,10 +313,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
       leaderboard,
     });
   } catch (error) {
-    console.error("Error fetching leaderboard:", error);
-    return res.status(500).json({
-      errorMessage: "Failed to fetch leaderboard",
-    });
+    return next(error);
   }
 });
 

@@ -1,4 +1,4 @@
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import { requireAuth, requireRole } from "./middleware/auth";
 import dbPool from "./utils/db";
 import { getRedisClient } from "./utils/redis";
@@ -12,7 +12,7 @@ router.use(requireAuth, requireRole("admin"));
  * GET /api/admin/metrics
  * 系統與資料庫全域狀態監控指標 (Privileged Metrics API)
  */
-router.get("/metrics", async (_req: Request, res: Response) => {
+router.get("/metrics", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const memUsage = process.memoryUsage();
 
@@ -45,8 +45,7 @@ router.get("/metrics", async (_req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Admin metrics error:", error);
-    return res.status(500).json({ errorMessage: "Failed to collect metrics" });
+    return next(error);
   }
 });
 
@@ -54,7 +53,7 @@ router.get("/metrics", async (_req: Request, res: Response) => {
  * POST /api/admin/cleanup
  * 系統定時與手動資源清理作業 (Privileged Cleanup API)
  */
-router.post("/cleanup", async (_req: Request, res: Response) => {
+router.post("/cleanup", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     // 範例清理作業：清理軟刪除殘留或快取日誌
     return res.status(200).json({
@@ -62,8 +61,7 @@ router.post("/cleanup", async (_req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Admin cleanup error:", error);
-    return res.status(500).json({ errorMessage: "Failed to execute cleanup" });
+    return next(error);
   }
 });
 

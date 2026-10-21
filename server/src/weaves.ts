@@ -1,14 +1,15 @@
 // server/src/weaves.ts
 
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
-import { requestWeave, approveWeave, WeaveError } from "./utils/weaveService";
+import { requestWeave, approveWeave } from "./utils/weaveService";
 import { ConnectionAcquireTimeoutError } from "./utils/acquireConnection";
 import { WeaveStatus } from "./utils/weaveService";
 import { buildWeavesFilter, WeavesListQuerySchema } from "./utils/weaveQuery";
 import { enqueueUserVectorUpdate } from "./queue/queues";
+import { HttpError } from "./utils/httpError";
 const router = Router();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -208,11 +209,11 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // POST / - 建立 Weave 請求
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const { postId, itemId, quantity = 1, notes } = req.body;
 
   if (!postId)
-    return res.status(400).json({ errorMessage: "Post ID is required" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Post ID is required"));
 
   // Normalise items: support array format and legacy single-item format
   interface IncomingItem {
@@ -259,20 +260,17 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       notificationSent: result.notificationSent,
     });
   } catch (err) {
-    if (err instanceof WeaveError)
-      return res.status(err.httpStatus).json({ errorMessage: err.message });
-    console.error("Error creating weave:", err);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(err);
   }
 });
 
 // GET / - 獲取我的交易列表
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
     const parsed = WeavesListQuerySchema.safeParse(req.query);
     if (!parsed.success)
-      return res.status(400).json({ errorMessage: "Invalid query parameters" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid query parameters"));
 
     const { whereClause, params } = buildWeavesFilter({
       userId,
@@ -284,14 +282,12 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const weaves = await processWeaveRows(weaveRows);
     return res.status(200).json({ weaves });
   } catch (error) {
-    console.error("Error retrieving weaves:", error);
-    if (error instanceof Error) console.error(error.stack);
-    return res.status(500).json({ errorMessage: "Failed to retrieve weaves" });
+    return next(error);
   }
 });
 
 // GET /:id - 獲取單筆交易紀錄
-router.get("/:id", requireAuth, async (req: Request, res: Response) => {
+router.get("/:id", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.userId;
     const weaveId = req.params.id;
@@ -302,12 +298,11 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       userId,
     ]);
     if (weaveRows.length === 0)
-      return res.status(404).json({ errorMessage: "Weave not found" });
+      return next(new HttpError(404, "WEAVE_NOT_FOUND", "Weave not found"));
     const processed = await processWeaveRows(weaveRows);
     return res.status(200).json({ weave: processed[0] });
   } catch (error) {
-    console.error("Error retrieving single weave:", error);
-    return res.status(500).json({ errorMessage: "Failed to retrieve weave" });
+    return next(error);
   }
 });
 
@@ -315,7 +310,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 router.patch(
   "/:id/status",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await approveWeave(
         {
@@ -333,22 +328,23 @@ router.patch(
         fullyCompleted: result.fullyCompleted,
       });
     } catch (err) {
-      if (err instanceof WeaveError)
-        return res.status(err.httpStatus).json({ errorMessage: err.message });
       if (err instanceof ConnectionAcquireTimeoutError) {
         console.error("approveWeave: DB pool exhausted:", err);
-        return res
-          .status(503)
-          .json({ errorMessage: "Server busy, please try again" });
+        return next(
+          new HttpError(
+            503,
+            "SERVICE_UNAVAILABLE",
+            "Server busy, please try again",
+          ),
+        );
       }
-      console.error("Error in approveWeave:", err);
-      return res.status(500).json({ errorMessage: "Server error" });
+      return next(err);
     }
   },
 );
 
 // GET /public/:uuid - 公開交易紀錄
-router.get("/public/:uuid", async (req: Request, res: Response) => {
+router.get("/public/:uuid", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { uuid } = req.params;
     const [userRows] = await dbPool.execute<RowDataPacket[]>(
@@ -356,7 +352,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
       [uuid],
     );
     if (userRows.length === 0)
-      return res.status(404).json({ errorMessage: "User not found" });
+      return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
 
     const userId = userRows[0].id as number;
     const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) GROUP BY w.id ORDER BY w.created_at DESC`;
@@ -366,8 +362,8 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     ]);
     const processed = await processWeaveRows(weaveRows);
     return res.status(200).json({ weaves: processed });
-  } catch {
-    res.status(500).json({ errorMessage: "Failed" });
+  } catch (error) {
+    return next(error);
   }
 });
 

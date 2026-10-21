@@ -12,6 +12,7 @@ import dotenv from "dotenv";
 import { userRoles } from "./schema";
 import { randomUUID } from "crypto";
 import { authRateLimiter } from "./middleware/rateLimiter";
+import { HttpError } from "./utils/httpError";
 dotenv.config();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const router = Router();
@@ -226,7 +227,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 
   if (!validationResult) {
-    return res.status(400).json({ errorMessage: "Invalid input" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid input"));
   }
 
   try {
@@ -240,9 +241,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const [rows] = await dbPool.execute<RowDataPacket[]>(query, [user.email]);
 
     if (rows.length === 0) {
-      return res
-        .status(401)
-        .json({ errorMessage: "Invalid email or password" });
+      return next(new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
     }
 
     const foundUser = rows[0];
@@ -253,23 +252,32 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       foundUser.password && foundUser.salt,
     );
     if (!userProviders.includes("native") && !hasPasswordCredentials) {
-      // 取得用戶支持的登入方式
-      const availableProviders = userProviders.filter((p) => p !== "native");
-      const providerText =
+      // 取得用戶支持的登入方式（品牌名不翻譯，直接帶進 client 的翻譯字串）
+      const providerNames: Record<string, string> = {
+        google: "Google",
+        facebook: "Facebook",
+      };
+      const availableProviders = userProviders
+        .filter((p) => p !== "native")
+        .map((p) => providerNames[p] ?? p);
+      const providers =
         availableProviders.length > 0
-          ? availableProviders.join(" or ")
-          : "social login";
+          ? availableProviders.join(" / ")
+          : "Google / Facebook";
 
-      return res.status(400).json({
-        errorMessage: `This email is registered with ${providerText}. Please use ${providerText} to sign in.`,
-      });
+      return next(
+        new HttpError(
+          400,
+          "USE_SOCIAL_SIGNIN",
+          `This email is registered with ${providers}. Please use ${providers} to sign in.`,
+          { providers },
+        ),
+      );
     }
 
     // providers 有 native 但缺密碼資料（資料不一致），視為登入失敗
     if (!hasPasswordCredentials) {
-      return res
-        .status(401)
-        .json({ errorMessage: "Invalid email or password" });
+      return next(new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
     }
 
     // 4. 驗證密碼
@@ -280,9 +288,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     );
 
     if (!isCorrectPassword) {
-      return res
-        .status(401)
-        .json({ errorMessage: "Invalid email or password" });
+      return next(new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
     }
 
     // 5. 創建 session
@@ -303,8 +309,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     await createUserSession(validUser, req, res);
     res.status(200).json({ message: "Signin successful" });
   } catch (error) {
-    console.error("Database error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
@@ -327,24 +332,24 @@ async function verifyGoogleCredential(credential: string) {
   }
 }
 
-router.post("/google", async (req: Request, res: Response) => {
+router.post("/google", async (req: Request, res: Response, next: NextFunction) => {
   console.log("API signin with Google called");
   const { credential } = req.body;
 
   if (!credential) {
-    return res.status(400).json({ errorMessage: "Credential is required" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Credential is required"));
   }
 
   try {
     const googleUser = await verifyGoogleCredential(credential);
 
     if (!googleUser || !googleUser.email) {
-      return res.status(400).json({ errorMessage: "Invalid Google user" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid Google user"));
     }
 
     // 檢查必要的 Google 用戶資料
     if (!googleUser.sub) {
-      return res.status(400).json({ errorMessage: "Invalid Google user ID" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid Google user ID"));
     }
 
     // 使用統一函數處理用戶
@@ -368,8 +373,7 @@ router.post("/google", async (req: Request, res: Response) => {
     await createUserSession(googleUserSession, req, res);
     return res.status(200).json({ message: "Google sign in successful" });
   } catch (error) {
-    console.error("Google sign in error: ", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
@@ -412,12 +416,12 @@ async function verifyFacebookToken(
   }
 }
 
-router.post("/facebook", async (req: Request, res: Response) => {
+router.post("/facebook", async (req: Request, res: Response, next: NextFunction) => {
   console.log("API signin with Facebook called");
   const { accessToken } = req.body;
 
   if (!accessToken) {
-    return res.status(400).json({ errorMessage: "Access token is required" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Access token is required"));
   }
 
   try {
@@ -425,14 +429,12 @@ router.post("/facebook", async (req: Request, res: Response) => {
     console.log("facebookUser:", facebookUser);
 
     if (!facebookUser || !facebookUser.email) {
-      return res.status(401).json({
-        errorMessage: "Invalid Facebook token or email not provided",
-      });
+      return next(new HttpError(401, "INVALID_SOCIAL_TOKEN", "Invalid Facebook token or email not provided"));
     }
 
     // 檢查必要的 Facebook 用戶資料
     if (!facebookUser.id) {
-      return res.status(400).json({ errorMessage: "Invalid Facebook user ID" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid Facebook user ID"));
     }
 
     // 使用統一函數處理用戶
@@ -456,8 +458,7 @@ router.post("/facebook", async (req: Request, res: Response) => {
     await createUserSession(facebookUserSession, req, res);
     return res.status(200).json({ message: "Facebook sign in successful" });
   } catch (error) {
-    console.error("Facebook sign in error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 

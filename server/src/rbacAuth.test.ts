@@ -8,6 +8,7 @@ import adminRouter from "./admin";
 import dbPool from "./utils/db";
 import { postService } from "./services/postService";
 import * as sessionModule from "./session";
+import { nextThroughErrorMiddleware } from "./testUtils/nextThroughErrorMiddleware";
 
 // Mock external dependencies
 jest.mock("./utils/db", () => ({
@@ -83,12 +84,12 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       } as unknown as Response;
-      const next = jest.fn();
+      const next = nextThroughErrorMiddleware(res);
 
       await requireAuth(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ errorMessage: "Please login first" });
-      expect(next).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({ code: "UNAUTHENTICATED", errorMessage: "Please login first" });
+      expect(next).not.toHaveBeenCalledWith();
     });
 
     it("requireAuth rejects invalid/corrupted session with 401", async () => {
@@ -102,14 +103,15 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       } as unknown as Response;
-      const next = jest.fn();
+      const next = nextThroughErrorMiddleware(res);
 
       await requireAuth(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
+        code: "UNAUTHENTICATED",
         errorMessage: "Invalid session data. Please login again.",
       });
-      expect(next).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith();
     });
 
     it("requireRole prevents cookie-role tampering: client sends user-role=admin cookie but Redis has role=user", async () => {
@@ -135,7 +137,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       } as unknown as Response;
-      const next = jest.fn();
+      const next = nextThroughErrorMiddleware(res);
 
       const adminGuard = requireRole("admin");
       await adminGuard(req, res, next);
@@ -143,9 +145,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
       // Must be rejected with 403 Forbidden based on authoritative Redis role
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: admin role required",
       });
-      expect(next).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith();
     });
 
     it("requireRole allows request when authoritative session has matching role", async () => {
@@ -164,7 +167,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       } as unknown as Response;
-      const next = jest.fn();
+      const next = nextThroughErrorMiddleware(res);
 
       const adminGuard = requireRole("admin");
       await adminGuard(req, res, next);
@@ -190,7 +193,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await handler(req, res, jest.fn());
+      await handler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -213,7 +216,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await handler(req, res, jest.fn());
+      await handler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -236,14 +239,15 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
       } as unknown as Response;
-      const next = jest.fn();
+      const next = nextThroughErrorMiddleware(res);
 
       await roleMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: admin role required",
       });
-      expect(next).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith();
     });
   });
 
@@ -267,10 +271,11 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
+          code: "FORBIDDEN",
           errorMessage: "Forbidden: You cannot post comments on behalf of another user",
         }),
       );
@@ -297,10 +302,11 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
+          code: "FORBIDDEN",
           errorMessage: "Forbidden: You are not the owner of this comment",
         }),
       );
@@ -325,7 +331,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -354,7 +360,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
@@ -377,10 +383,11 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
+          code: "FORBIDDEN",
           errorMessage: "Forbidden: You are not the owner of this comment",
         }),
       );
@@ -404,7 +411,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -432,7 +439,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await commentHandler(req, res, jest.fn());
+      await commentHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(200);
     });
   });
@@ -456,9 +463,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await putHandler(req, res, jest.fn());
+      await putHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: You are not the owner of this post",
       });
     });
@@ -479,9 +487,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await deleteHandler(req, res, jest.fn());
+      await deleteHandler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: You are not the owner of this post",
       });
     });
@@ -502,7 +511,7 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await deleteHandler(req, res, jest.fn());
+      await deleteHandler(req, res, nextThroughErrorMiddleware(res));
       expect(postService.deletePost).toHaveBeenCalledWith("p-uuid-123", 1, "admin");
       expect(res.status).toHaveBeenCalledWith(200);
     });
@@ -526,9 +535,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await handler(req, res, jest.fn());
+      await handler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: You cannot modify another user's profile",
       });
     });
@@ -550,9 +560,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await handler(req, res, jest.fn());
+      await handler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: You cannot modify another user's profile",
       });
     });
@@ -577,9 +588,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await handler(req, res, jest.fn());
+      await handler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: Cannot change user role",
       });
     });
@@ -602,9 +614,10 @@ describe("RBAC and Resource Ownership Verification Test Suite", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await handler(req, res, jest.fn());
+      await handler(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
+        code: "FORBIDDEN",
         errorMessage: "Forbidden: Cannot change user ID",
       });
     });

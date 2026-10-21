@@ -1,12 +1,13 @@
 import { RowDataPacket } from "mysql2";
 import { memoryUpload, updateAvatar } from "./upload";
 import { defaultImageStorage } from "./storage/ImageStorage";
-import { Response, Router } from "express";
+import { Response, Router, NextFunction } from "express";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import { randomUUID } from "crypto";
 import dotenv from "dotenv";
 import dbPool from "./utils/db";
 import { updateUserSession } from "./session";
+import { HttpError } from "./utils/httpError";
 dotenv.config();
 
 const S3_BUCKET_AVATAR_FOLDER =
@@ -17,14 +18,12 @@ router.post(
   "/",
   requireAuth,
   memoryUpload.single("avatar"),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     let connection;
     try {
       // * start transaction
       if (!req.file) {
-        return res
-          .status(400)
-          .json({ errorMessage: "Please upload an image file." });
+        return next(new HttpError(400, "IMAGE_REQUIRED", "Please upload an image file."));
       }
 
       const userId = req.user!.userId;
@@ -67,10 +66,6 @@ router.post(
         avatarKey: result.avatarKey,
       });
     } catch (error) {
-      console.error("Error uploading avatar:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-      }
       if (connection) {
         try {
           await connection.rollback();
@@ -78,9 +73,7 @@ router.post(
           console.error("Error rolling back transaction:", rollbackError);
         }
       }
-      return res
-        .status(500)
-        .json({ errorMessage: "Failed to upload avatar. " });
+      return next(error);
     } finally {
       if (connection) {
         connection.release();
@@ -92,7 +85,7 @@ router.post(
 router.delete(
   "/",
   requireAuth,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     let connection;
     try {
       const userId = req.user!.userId;
@@ -135,10 +128,6 @@ router.delete(
         message: "Avatar removed successfully.",
       });
     } catch (error) {
-      console.error("Error removing avatar:", error);
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-      }
       if (connection) {
         try {
           await connection.rollback();
@@ -146,7 +135,7 @@ router.delete(
           console.error("Error rolling back transaction:", rollbackError);
         }
       }
-      return res.status(500).json({ errorMessage: "Failed to remove avatar." });
+      return next(error);
     } finally {
       if (connection) {
         connection.release();

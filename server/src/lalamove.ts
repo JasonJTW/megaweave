@@ -1,4 +1,4 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { Server } from "socket.io";
 import dbPool from "./utils/db";
 import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
@@ -26,6 +26,7 @@ import {
 } from "./services/deliveryStatus";
 import { enqueueDeliveryRefund } from "./queue/queues";
 import { adoptLalamoveOrder } from "./services/deliveryRecovery";
+import { HttpError } from "./utils/httpError";
 
 /**
  * 將 Lalamove 官方狀態字串對應至資料庫 delivery_orders.status ENUM
@@ -93,6 +94,17 @@ export function getWebhookEventTime(
 
 const router = express.Router();
 
+//* Lalamove API 呼叫失敗：細節進 log，回 502 給 client 顯示通用的物流錯誤
+function deliveryProviderError(context: string, error: unknown) {
+  if (error instanceof HttpError) return error;
+  console.error(`Lalamove ${context} error:`, error);
+  return new HttpError(
+    502,
+    "DELIVERY_PROVIDER_ERROR",
+    `Failed to ${context}`,
+  );
+}
+
 export const ALL_SUPPORTED_SERVICE_TYPES = [
   "MOTORCYCLE",
   "MOTORCYCLE_INTERCITY",
@@ -110,7 +122,7 @@ export const ALL_SUPPORTED_SERVICE_TYPES = [
  */
 router.get(
   "/service-types",
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const market = await getLalamoveMarketInfo(req.query.refresh === "true");
       const requestedCity = req.query.city as string | undefined;
@@ -131,10 +143,7 @@ router.get(
         allSupportedTypes: ALL_SUPPORTED_SERVICE_TYPES,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "取得車型資料失敗";
-      res
-        .status(500)
-        .json({ error: "Failed to retrieve market info", message });
+      return next(deliveryProviderError("retrieve market info", err));
     }
   },
 );
@@ -145,25 +154,18 @@ router.get(
  */
 router.post(
   "/quotation",
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { serviceType, serviceTypes, stops, language, scheduleAt } =
         req.body;
 
       if (!stops || !Array.isArray(stops) || stops.length < 2) {
-        res.status(400).json({
-          error:
-            "Stops are required and must have at least 2 locations (pickup and drop-off)",
-        });
-        return;
+        return next(new HttpError(400, "INVALID_REQUEST", "Stops are required and must have at least 2 locations (pickup and drop-off)"));
       }
 
       const [origin, destination] = stops;
       if (!origin?.address || !destination?.address) {
-        res.status(400).json({
-          error: "Both pickup and drop-off must provide an address",
-        });
-        return;
+        return next(new HttpError(400, "INVALID_REQUEST", "Both pickup and drop-off must provide an address"));
       }
 
       // Determine target service types
@@ -194,13 +196,7 @@ router.post(
         primary: quotations[0],
       });
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Internal server error";
-      console.error("Lalamove quotation route error:", error);
-      res.status(500).json({
-        error: "Failed to get Lalamove quotation",
-        message,
-      });
+      return next(deliveryProviderError("get quotation", error));
     }
   },
 );
@@ -212,7 +208,7 @@ router.post(
 router.post(
   "/orders",
   requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const {
       quotationId,
@@ -225,26 +221,20 @@ router.post(
     } = req.body;
 
     if (!quotationId) {
-      res.status(400).json({ error: "quotationId is required" });
-      return;
+      return next(new HttpError(400, "INVALID_REQUEST", "quotationId is required"));
     }
 
     if (!sender?.name || !sender?.phone) {
-      res.status(400).json({ error: "Sender name and phone are required" });
-      return;
+      return next(new HttpError(400, "INVALID_REQUEST", "Sender name and phone are required"));
     }
 
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      res.status(400).json({ error: "At least one recipient is required" });
-      return;
+      return next(new HttpError(400, "INVALID_REQUEST", "At least one recipient is required"));
     }
 
     for (const r of recipients) {
       if (!r.name || !r.phone) {
-        res
-          .status(400)
-          .json({ error: "Each recipient must have name and phone" });
-        return;
+        return next(new HttpError(400, "INVALID_REQUEST", "Each recipient must have name and phone"));
       }
     }
 
@@ -275,21 +265,12 @@ router.post(
     });
   } catch (error: unknown) {
     const errObj = error as {
-      httpStatus?: number;
       errors?: Array<{ id?: string; message?: string; detail?: string }>;
-      message?: string;
     };
-    const detailMsg =
-      errObj.errors && errObj.errors.length > 0
-        ? `${errObj.errors[0].id || ""}: ${errObj.errors[0].message || ""}`
-        : errObj.message || "Failed to create order";
-
-    console.error("Lalamove create order error:", error);
-    res.status(500).json({
-      error: "Failed to create Lalamove order",
-      message: detailMsg,
-      details: errObj.errors,
-    });
+    if (errObj.errors?.length) {
+      console.error("Lalamove create order details:", errObj.errors);
+    }
+    return next(deliveryProviderError("create order", error));
   }
 });
 
@@ -300,21 +281,19 @@ router.post(
 router.get(
   "/orders/:orderId",
   requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authReq = req as AuthenticatedRequest;
       const userId = authReq.user?.userId;
       const userRole = authReq.user?.role;
 
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        return next(new HttpError(401, "UNAUTHENTICATED", "Unauthorized"));
       }
 
       const { orderId } = req.params;
       if (!orderId) {
-        res.status(400).json({ error: "orderId is required" });
-        return;
+        return next(new HttpError(400, "INVALID_REQUEST", "orderId is required"));
       }
 
       // ─── 檢查本地 DB 關聯與權限（限買方 d.user_id、賣方 p.user_id 或管理員）───
@@ -338,8 +317,7 @@ router.get(
       );
 
       if (!dbRows || dbRows.length === 0) {
-        res.status(404).json({ error: "Delivery order not found" });
-        return;
+        return next(new HttpError(404, "DELIVERY_ORDER_NOT_FOUND", "Delivery order not found"));
       }
 
       const row = dbRows[0];
@@ -348,10 +326,7 @@ router.get(
       const isAdmin = userRole === "admin";
 
       if (!isOwner && !isSeller && !isAdmin) {
-        res.status(403).json({
-          error: "Forbidden: You do not have permission to view this order",
-        });
-        return;
+        return next(new HttpError(403, "FORBIDDEN", "Forbidden: You do not have permission to view this order"));
       }
 
       // 從 DB 組裝回前端需要的 OrderDetail 格式
@@ -399,13 +374,7 @@ router.get(
 
       res.json({ success: true, order: orderFromDb });
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to get order details";
-      console.error(`Lalamove get order ${req.params.orderId} error:`, error);
-      res.status(500).json({
-        error: "Failed to get Lalamove order details",
-        message,
-      });
+      return next(error);
     }
   },
 );
@@ -416,20 +385,19 @@ router.get(
 async function handleCancelOrder(
   req: Request,
   res: Response,
+  next: NextFunction,
 ): Promise<void> {
   try {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user?.userId;
     const userRole = authReq.user?.role;
     if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
+      return next(new HttpError(401, "UNAUTHENTICATED", "Unauthorized"));
     }
 
     const { orderId } = req.params;
     if (!orderId) {
-      res.status(400).json({ error: "orderId is required" });
-      return;
+      return next(new HttpError(400, "INVALID_REQUEST", "orderId is required"));
     }
 
     // 檢查訂單歸屬與目前狀態
@@ -439,24 +407,23 @@ async function handleCancelOrder(
     );
 
     if (!orderRows || orderRows.length === 0) {
-      res.status(404).json({ error: "Delivery order not found" });
-      return;
+      return next(new HttpError(404, "DELIVERY_ORDER_NOT_FOUND", "Delivery order not found"));
     }
 
     const orderRecord = orderRows[0];
     if (orderRecord.user_id !== userId && userRole !== "admin") {
-      res
-        .status(403)
-        .json({ error: "Forbidden: You cannot cancel this order" });
-      return;
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You cannot cancel this order"));
     }
 
     // 已送達、司機已取件或已終止狀態不可取消（依狀態機判斷）
     if (!canTransition(orderRecord.status, "CANCELLED")) {
-      res.status(400).json({
-        error: `Cannot cancel order with current status: ${orderRecord.status}`,
-      });
-      return;
+      return next(
+        new HttpError(
+          400,
+          "ORDER_NOT_CANCELLABLE",
+          `Cannot cancel order with current status: ${orderRecord.status}`,
+        ),
+      );
     }
 
     const cancelResult = await cancelLalamoveOrder(orderId);
@@ -484,13 +451,7 @@ async function handleCancelOrder(
       result: cancelResult,
     });
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Failed to cancel order";
-    console.error(`Lalamove cancel order ${req.params.orderId} error:`, error);
-    res.status(500).json({
-      error: "Failed to cancel Lalamove order",
-      message,
-    });
+    return next(deliveryProviderError(`cancel order ${req.params.orderId}`, error));
   }
 }
 
@@ -513,24 +474,20 @@ router.post("/orders/:orderId/cancel", requireAuth, handleCancelOrder);
 router.get(
   "/orders/:orderId/driver",
   requireAuth,
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authReq = req as AuthenticatedRequest;
       const userId = authReq.user?.userId;
       const userRole = authReq.user?.role;
       if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
+        return next(new HttpError(401, "UNAUTHENTICATED", "Unauthorized"));
       }
 
       const { orderId } = req.params;
       const driverId = req.query.driverId as string;
 
       if (!orderId || !driverId) {
-        res
-          .status(400)
-          .json({ error: "orderId and driverId query param are required" });
-        return;
+        return next(new HttpError(400, "INVALID_REQUEST", "orderId and driverId query param are required"));
       }
 
       // 驗證是否有權限查看此訂單（買方、賣方或管理員）
@@ -544,8 +501,7 @@ router.get(
       );
 
       if (!orderRows || orderRows.length === 0) {
-        res.status(404).json({ error: "Delivery order not found" });
-        return;
+        return next(new HttpError(404, "DELIVERY_ORDER_NOT_FOUND", "Delivery order not found"));
       }
 
       const orderRecord = orderRows[0];
@@ -554,10 +510,7 @@ router.get(
         orderRecord.seller_user_id !== userId &&
         userRole !== "admin"
       ) {
-        res
-          .status(403)
-          .json({ error: "Forbidden: You do not have permission to view this order" });
-        return;
+        return next(new HttpError(403, "FORBIDDEN", "Forbidden: You do not have permission to view this order"));
       }
 
       const realLalamoveOrderId = orderRecord.lalamove_order_id || orderId;
@@ -567,13 +520,7 @@ router.get(
         driver,
       });
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to get driver";
-      console.error("Lalamove get driver error:", error);
-      res.status(500).json({
-        error: "Failed to get driver details",
-        message,
-      });
+      return next(deliveryProviderError("get driver details", error));
     }
   },
 );

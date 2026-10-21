@@ -1,12 +1,13 @@
 //* categories.ts
-import { Request, Response, Router } from "express";
+import { Request, Response, Router, NextFunction } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
+import { HttpError } from "./utils/httpError";
 
 const router = Router();
 
 // 獲取所有分類
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const categoriesQuery = `
       SELECT 
@@ -28,18 +29,17 @@ router.get("/", async (_req: Request, res: Response) => {
       categories,
     });
   } catch (error) {
-    console.error("Get categories error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
 // 獲取單個分類詳情
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const categoryId = parseInt(req.params.id);
 
     if (isNaN(categoryId)) {
-      return res.status(400).json({ errorMessage: "Invalid category ID" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid category ID"));
     }
 
     const categoryQuery = `
@@ -59,7 +59,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     ]);
 
     if (categories.length === 0) {
-      return res.status(404).json({ errorMessage: "Category not found" });
+      return next(new HttpError(404, "CATEGORY_NOT_FOUND", "Category not found"));
     }
 
     res.status(200).json({
@@ -67,8 +67,7 @@ router.get("/:id", async (req: Request, res: Response) => {
       category: categories[0],
     });
   } catch (error) {
-    console.error("Get category error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { EmailTemplateProps } from "./emails/EmailTemplate";
 import { enqueueSendEmail } from "./queue/queues";
 import { requireRole } from "./middleware/auth";
@@ -8,7 +8,7 @@ const router = Router();
 // 手動測試用：僅限 admin，避免被當成任意寄信入口
 router.use(requireRole("admin"));
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   // const props: EmailTemplateProps = {
   //   username: "Jason",
   //   title: "Your order has been confirmed ✓",
@@ -31,10 +31,7 @@ router.post("/", async (req: Request, res: Response) => {
       message: "Email job enqueued successfully",
     });
   } catch (error) {
-    console.error("Failed to enqueue email job: ", error);
-    return res
-      .status(500)
-      .json({ errorMessage: "Failed to enqueue email job." });
+    return next(error);
   }
 });
 

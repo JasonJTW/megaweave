@@ -1,4 +1,4 @@
-import { Request, Response, Router } from "express";
+import { Request, Response, Router, NextFunction } from "express";
 import type { PoolConnection } from "mysql2/promise";
 import { z } from "zod";
 import dbPool from "./utils/db";
@@ -6,6 +6,7 @@ import { requireAuth } from "./middleware/auth";
 import { RowDataPacket } from "mysql2";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
+import { HttpError } from "./utils/httpError";
 
 const router = Router({ mergeParams: true });
 
@@ -118,16 +119,16 @@ const afterLike = (
 };
 
 //* check user's like status
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const publicId = req.params.publicId || req.params.postId || req.params.id;
   const userId = req.user?.userId;
 
   if (!publicId) {
-    return res.status(400).json({ errorMessage: "Invalid post ID" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid post ID"));
   }
 
   if (!userId)
-    return res.status(401).json({ errorMessage: "Please signin first" });
+    return next(new HttpError(401, "UNAUTHENTICATED", "Please signin first"));
 
   try {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
@@ -139,38 +140,43 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const liked = rows.length > 0;
     return res.status(200).json({ liked: liked });
   } catch (error) {
-    console.log("Error getting user liked status: ", error);
-    return res.status(400).json({ errorMessage: "Server Error" });
+    return next(error);
   }
 });
 
 //* declarative: set like state to body.liked (idempotent, safe to retry)
-router.put("/", requireAuth, async (req: Request, res: Response) => {
+router.put("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const publicId = req.params.publicId || req.params.postId || req.params.id;
   const userId = req.user?.userId;
   const username = req.user?.username;
 
   if (!publicId) {
-    return res.status(400).json({ errorMessage: "Invalid post ID" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid post ID"));
   }
 
   if (!userId) {
-    return res.status(401).json({ errorMessage: "Please signin first" });
+    return next(new HttpError(401, "UNAUTHENTICATED", "Please signin first"));
   }
 
   const parsed = likeBodySchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ errorMessage: "Invalid like payload" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid like payload"));
   }
 
-  const connection = await dbPool.getConnection();
+  let connection: PoolConnection;
+  try {
+    connection = await dbPool.getConnection();
+  } catch (error) {
+    return next(error);
+  }
+
   try {
     await connection.beginTransaction();
     const outcome = await applyLike(connection, publicId, userId, parsed.data.liked);
 
     if (!outcome) {
       await connection.rollback();
-      return res.status(404).json({ errorMessage: "Post not found" });
+      return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
     }
 
     await connection.commit();
@@ -179,35 +185,40 @@ router.put("/", requireAuth, async (req: Request, res: Response) => {
     return res.json({ liked: outcome.liked, likesCount: outcome.likesCount });
   } catch (error) {
     await connection.rollback();
-    console.error("Error setting like state: ", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   } finally {
     connection.release();
   }
 });
 
 //* legacy toggle (kept for old clients; prefer PUT)
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const publicId = req.params.publicId || req.params.postId || req.params.id;
   const userId = req.user?.userId;
   const username = req.user?.username;
 
   if (!publicId) {
-    return res.status(400).json({ errorMessage: "Invalid post ID" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid post ID"));
   }
 
   if (!userId) {
-    return res.status(401).json({ errorMessage: "Please signin first" });
+    return next(new HttpError(401, "UNAUTHENTICATED", "Please signin first"));
   }
 
-  const connection = await dbPool.getConnection();
+  let connection: PoolConnection;
+  try {
+    connection = await dbPool.getConnection();
+  } catch (error) {
+    return next(error);
+  }
+
   try {
     await connection.beginTransaction();
     const outcome = await applyLike(connection, publicId, userId);
 
     if (!outcome) {
       await connection.rollback();
-      return res.status(404).json({ errorMessage: "Post not found" });
+      return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
     }
 
     await connection.commit();
@@ -216,8 +227,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     return res.json({ liked: outcome.liked });
   } catch (error) {
     await connection.rollback();
-    console.error("Error liking/unliking post: ", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   } finally {
     connection.release();
   }

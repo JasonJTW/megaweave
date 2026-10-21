@@ -1,7 +1,8 @@
 //* conditions.ts
-import { Request, Response, Router } from "express";
+import { Request, Response, Router, NextFunction } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
+import { HttpError } from "./utils/httpError";
 
 const router = Router();
 
@@ -19,7 +20,7 @@ const CONDITION_COLUMNS = `
 `;
 
 // 獲取所有狀況等級
-router.get("/", async (_req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const [conditions] = await dbPool.query<RowDataPacket[]>(
       `SELECT ${CONDITION_COLUMNS}
@@ -33,18 +34,17 @@ router.get("/", async (_req: Request, res: Response) => {
       conditions,
     });
   } catch (error) {
-    console.error("Get conditions error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 
 // 獲取單個狀況等級詳情
-router.get("/:level", async (req: Request, res: Response) => {
+router.get("/:level", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const level = parseInt(req.params.level);
 
     if (isNaN(level) || level < 1 || level > 5) {
-      return res.status(400).json({ errorMessage: "Invalid condition level" });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid condition level"));
     }
 
     const [conditions] = await dbPool.query<RowDataPacket[]>(
@@ -55,7 +55,7 @@ router.get("/:level", async (req: Request, res: Response) => {
     );
 
     if (conditions.length === 0) {
-      return res.status(404).json({ errorMessage: "Condition not found" });
+      return next(new HttpError(404, "CONDITION_NOT_FOUND", "Condition not found"));
     }
 
     res.status(200).json({
@@ -63,8 +63,7 @@ router.get("/:level", async (req: Request, res: Response) => {
       condition: conditions[0],
     });
   } catch (error) {
-    console.error("Get condition error:", error);
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(error);
   }
 });
 

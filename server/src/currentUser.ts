@@ -1,5 +1,5 @@
 // currentUser.ts
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import {
   updateUserSession,
   RedisConnectionError,
@@ -10,16 +10,31 @@ import _ from "lodash";
 import Router from "express";
 import dbPool from "./utils/db";
 import { RowDataPacket } from "mysql2";
+import { HttpError } from "./utils/httpError";
 
 const router = Router();
 
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+//* session 相關錯誤轉成可預期的 HttpError，其餘交給 errorMiddleware 當 500
+function toSessionHttpError(error: unknown) {
+  if (error instanceof RedisConnectionError) {
+    console.error("Session store unavailable:", error);
+    return new HttpError(
+      503,
+      "SERVICE_UNAVAILABLE",
+      "Service temporarily unavailable. Please try again later.",
+    );
+  }
+  if (error instanceof UpdateSessionError) {
+    return new HttpError(401, "UNAUTHENTICATED", error.message);
+  }
+  return error;
+}
+
+router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   console.log("Received Request for /api/currentUser");
   try {
     if (!req.user) {
-      return res.status(401).json({
-        errorMessage: "Please login first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
 
     // Ensure req.user.username is in sync with user_profiles.custom_name
@@ -42,26 +57,14 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     console.log("Current user:", req.user);
     return res.status(200).json({ user: req.user });
   } catch (error) {
-    console.error("Get current user error:", error);
-
-    // ✅ 處理 Redis 連線錯誤
-    if (error instanceof RedisConnectionError) {
-      return res.status(503).json({
-        errorMessage:
-          "Service temporarily unavailable. Please try again later.",
-      });
-    }
-
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(toSessionHttpError(error));
   }
 });
 
-router.post("/update", requireAuth, async (req: Request, res: Response) => {
+router.post("/update", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        errorMessage: "Please login first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
 
     const updates = req.body.updates;
@@ -71,52 +74,33 @@ router.post("/update", requireAuth, async (req: Request, res: Response) => {
     // 安全防護：禁止一般使用者任意竄改自身權限角色或使用者 ID（防範 Privilege Escalation）
     if (updates) {
       if (updates.role && updates.role !== req.user.role) {
-        return res.status(403).json({
-          errorMessage: "Forbidden: Cannot change user role",
-        });
+        return next(new HttpError(403, "FORBIDDEN", "Forbidden: Cannot change user role"));
       }
       if (updates.userId && Number(updates.userId) !== req.user.userId) {
-        return res.status(403).json({
-          errorMessage: "Forbidden: Cannot change user ID",
-        });
+        return next(new HttpError(403, "FORBIDDEN", "Forbidden: Cannot change user ID"));
       }
     }
 
     if (!updates || _.isEqual(updates, req.user)) {
-      return res.status(400).json({
-        errorMessage:
+      return next(
+        new HttpError(
+          400,
+          "INVALID_REQUEST",
           "No updates provided or updates are identical to current user data",
-      });
+        ),
+      );
     }
 
     const updatedUserSession = await updateUserSession(req, updates);
     console.log("User after update:", updatedUserSession);
 
     if (!updatedUserSession) {
-      return res
-        .status(500)
-        .json({ errorMessage: "Failed to update user session" });
+      return next(new Error("Failed to update user session"));
     }
 
     return res.status(200).json({ updatedUser: updatedUserSession });
   } catch (error) {
-    console.error("Update current user error:", error);
-
-    // ✅ 處理特定錯誤
-    if (error instanceof RedisConnectionError) {
-      return res.status(503).json({
-        errorMessage:
-          "Service temporarily unavailable. Please try again later.",
-      });
-    }
-
-    if (error instanceof UpdateSessionError) {
-      return res.status(400).json({
-        errorMessage: error.message,
-      });
-    }
-
-    return res.status(500).json({ errorMessage: "Internal server error" });
+    return next(toSessionHttpError(error));
   }
 });
 

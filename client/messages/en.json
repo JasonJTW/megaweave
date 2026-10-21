@@ -308,7 +308,7 @@
     "cityFilter": "District: {value}",
     "locationFilter": "Location: {value}",
     "postCreated": "Post created successfully!",
-    "networkError": "Network error, please try again later.",
+    "postFailed": "Failed to create post",
     "bannerTitle": "Let's start weaving!"
   },
   "Feed": {

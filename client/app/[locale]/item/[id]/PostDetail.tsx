@@ -272,11 +272,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       }
     } catch (error: unknown) {
       console.error("Error updating post:", error);
-      const message = apiErrorMessage(
-        error,
-        error instanceof Error ? error.message : t("updateFailed"),
-      );
-      toast.error(message);
+      toast.error(apiErrorMessage(error, t("updateFailed")));
     } finally {
       setIsUpdating(false);
     }

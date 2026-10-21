@@ -308,7 +308,7 @@
     "cityFilter": "鄉鎮市區：{value}",
     "locationFilter": "地點：{value}",
     "postCreated": "貼文已發布！",
-    "networkError": "網路錯誤，請稍後再試",
+    "postFailed": "貼文發布失敗",
     "bannerTitle": "開始大量交織！"
   },
   "Feed": {

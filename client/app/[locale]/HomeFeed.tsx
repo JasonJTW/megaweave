@@ -557,15 +557,16 @@ const PostsApp = () => {
         toast.success(t("postCreated"));
         mutate(); // 重新獲取貼文列表
       } else {
-        toast.error(apiErrorMessage(await response.json().catch(() => null)));
+        toast.error(
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("postFailed"),
+          ),
+        );
       }
     } catch (error: unknown) {
       console.error("Create post error:", error);
-      const message = apiErrorMessage(
-        error,
-        error instanceof Error ? error.message : t("networkError"),
-      );
-      toast.error(message);
+      toast.error(apiErrorMessage(error, t("postFailed")));
     } finally {
       setIsCreating(false);
     }

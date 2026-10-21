@@ -912,5 +912,79 @@
     "dispatchFailedBody": "很抱歉，未能成功向 Lalamove 叫車。已支付的 NT${amount} 將全額退回原信用卡，完成後會以站內通知與 Email 告知您。",
     "refundedTitle": "已全額退款",
     "refundedBody": "已支付的 NT${amount} 已退回原信用卡，實際入帳時間依發卡銀行而定。"
+  },
+  "WeaveCard": {
+    "status": {
+      "newRequest": "新請求",
+      "requestSent": "已送出請求",
+      "weaving": "交織中",
+      "weaved": "交織成功",
+      "declined": "已婉拒",
+      "withdrawn": "已撤回",
+      "cancelled": "已取消"
+    },
+    "hint": {
+      "requested": {
+        "decideOnRequest": "要同意還是婉拒這個請求？",
+        "awaitingAuthor": "等待發文者同意⋯"
+      },
+      "approved": {
+        "confirmHandover": "已交出物品？點勾勾確認。",
+        "confirmReceipt": "已收到物品？點勾勾確認。",
+        "waitingForReceiver": "已確認交出，等待 {name} 確認收到⋯",
+        "waitingForGiver": "已確認收到，等待 {name} 確認交出⋯",
+        "receiverConfirmedPleaseConfirmHandover": "{name} 已確認收到，請確認交出！",
+        "giverConfirmedPleaseConfirmReceipt": "{name} 已確認交出，請確認收到！"
+      }
+    },
+    "role": {
+      "giver": "提供者",
+      "receiver": "接收者"
+    },
+    "chatHeading": "{viewer, select, author {收到交織請求} other {已送出交織請求}}",
+    "noImage": "沒有圖片",
+    "fallbackTitle": "交織請求",
+    "allItems": "全部物品",
+    "item": "物品",
+    "chatSummary": {
+      "all": "{direction, select, give {提供全部物品} other {請求全部物品}}",
+      "multiple": "{direction, select, give {提供} other {請求}}：{types} 項物品（共 {total} 件）",
+      "single": "{direction, select, give {提供} other {請求}}數量：{quantity}"
+    },
+    "viewPost": "查看貼文 →",
+    "actions": {
+      "approve": "同意請求",
+      "decline": "婉拒請求",
+      "withdraw": "撤回請求",
+      "confirm": "確認完成交織",
+      "confirmed": "你已確認",
+      "cancel": "取消交織"
+    },
+    "prompts": {
+      "decline": "確定要婉拒這個請求嗎？",
+      "confirmReceipt": "你已經實際收到物品了嗎？雙方都確認後就無法復原。",
+      "confirmHandover": "你已經交出或寄出物品了嗎？接收者也確認後，這次交織就會完成。",
+      "cancel": "確定要取消這次交織嗎？",
+      "withdraw": "確定要撤回這個請求嗎？"
+    },
+    "toast": {
+      "onlyAuthorCanApprove": "只有發文者可以同意這個請求",
+      "notAwaitingApproval": "這個交織請求已不在等待同意的狀態",
+      "approved": "已同意請求！交織進行中。",
+      "approveFailed": "同意請求失敗",
+      "onlyAuthorCanDecline": "只有發文者可以婉拒這個請求",
+      "declined": "已婉拒請求。",
+      "declineFailed": "婉拒請求失敗",
+      "cannotConfirm": "目前無法確認這次交織",
+      "completed": "交織成功！",
+      "confirmedWaiting": "已收到你的確認，等待對方確認。",
+      "confirmFailed": "確認失敗",
+      "cannotCancel": "目前無法取消這次交織",
+      "cancelled": "已取消交織。",
+      "cancelFailed": "取消交織失敗",
+      "cannotWithdraw": "目前無法撤回這個請求",
+      "withdrawn": "已撤回請求。",
+      "withdrawFailed": "撤回請求失敗"
+    }
   }
 }

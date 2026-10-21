@@ -3,6 +3,7 @@
 import { Link } from "@/i18n/navigation";
 import type { Weave } from "@/services/weaveService";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { User as UserIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
@@ -14,11 +15,7 @@ import { useWeaveActions } from "@/hooks/useWeaveActions";
 import { useSocket } from "@/hooks/useSocket";
 import LalamoveQuotation from "./Lalamove/LalamoveQuotation";
 import { shouldShowLalamoveQuotation } from "@/utils/weaveGuard";
-import {
-  getWeaveStatusKey,
-  type WeaveHintKey,
-  type WeaveStatusKey,
-} from "@/utils/weaveViewModel";
+import { getWeaveStatusKey, type WeaveStatusKey } from "@/utils/weaveViewModel";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -61,33 +58,6 @@ function getDisplayUsername(
   return post.username;
 }
 
-const STATUS_LABELS: Record<WeaveStatusKey, string> = {
-  newRequest: "New Request",
-  requestSent: "Request Sent",
-  weaving: "Weaving",
-  weaved: "Weaved",
-  declined: "Declined",
-  withdrawn: "Withdrawn",
-  cancelled: "Cancelled",
-};
-
-const HINT_TEXTS: Record<WeaveHintKey, (otherName: string) => string> = {
-  "requested.decideOnRequest": () => "Approve or decline this request?",
-  "requested.awaitingAuthor": () => "Waiting for the post author's approval...",
-  "approved.confirmHandover": () =>
-    "Handed over the item? Click the checkmark to confirm.",
-  "approved.confirmReceipt": () =>
-    "Received the item? Click the checkmark to confirm.",
-  "approved.waitingForReceiver": (name) =>
-    `Handover confirmed. Waiting for ${name} to confirm receipt...`,
-  "approved.waitingForGiver": (name) =>
-    `Received confirmed. Waiting for ${name} to confirm handover...`,
-  "approved.receiverConfirmedPleaseConfirmHandover": (name) =>
-    `${name} confirmed receipt. Please confirm handover!`,
-  "approved.giverConfirmedPleaseConfirmReceipt": (name) =>
-    `${name} confirmed handover. Please confirm receipt!`,
-};
-
 const statusStyles: Record<WeaveStatusKey, { badge: string; icon: string }> = {
   newRequest: {
     badge: "bg-[#FEF3C7] text-[#92400E]",
@@ -113,6 +83,7 @@ const WeavingCard = ({
   onWeaveStatusChange,
   inChatWindow,
 }: WeavesCardProps) => {
+  const t = useTranslations("WeaveCard");
   const { socket } = useSocket();
   const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(
     undefined,
@@ -200,9 +171,9 @@ const WeavingCard = ({
       : undefined;
 
   const username = isInChatWindow
-    ? inChatWindow.isPostAuthor
-      ? "Weaving Request Received"
-      : "Weaving Request Sent"
+    ? t("chatHeading", {
+        viewer: inChatWindow.isPostAuthor ? "author" : "initiator",
+      })
     : post
       ? getDisplayUsername(post, activeWeave, currentUserId)
       : "";
@@ -219,13 +190,13 @@ const WeavingCard = ({
       currentStatus,
       isInChatWindow ? inChatWindow.isPostAuthor : false,
     );
-  const statusLabel = statusKey ? STATUS_LABELS[statusKey] : null;
+  const statusLabel = statusKey ? t(`status.${statusKey}`) : null;
 
   const cardTitle = isInChatWindow
     ? activeWeave?.post_title ||
       (inChatWindow.itemTitle && inChatWindow.itemTitle.toLowerCase() !== "all"
         ? inChatWindow.itemTitle
-        : post?.title || "Weave Request")
+        : post?.title || t("fallbackTitle"))
     : post
       ? post.title
       : "";
@@ -239,7 +210,7 @@ const WeavingCard = ({
     activeWeave?.items && activeWeave.items.length > 0
       ? activeWeave.items.map((it, idx) => ({
           id: it.id || idx,
-          title: it.title || (it.item_id === null ? "All items" : "Item"),
+          title: it.title || (it.item_id === null ? t("allItems") : t("item")),
           quantity: it.quantity,
         }))
       : post?.items || [];
@@ -254,18 +225,18 @@ const WeavingCard = ({
         ? {
             name: activeWeave.receiver_name,
             avatar: activeWeave.receiver_avatar,
-            role: "Receiver",
+            role: t("role.receiver"),
           }
         : {
             name: activeWeave.giver_name,
             avatar: activeWeave.giver_avatar,
-            role: "Giver",
+            role: t("role.giver"),
           }
       : isInChatWindow
         ? {
-            name: inChatWindow.isGiver ? "Receiver" : "Giver",
+            name: t(inChatWindow.isGiver ? "role.receiver" : "role.giver"),
             avatar: "",
-            role: inChatWindow.isGiver ? "Receiver" : "Giver",
+            role: t(inChatWindow.isGiver ? "role.receiver" : "role.giver"),
           }
         : null;
 
@@ -298,7 +269,7 @@ const WeavingCard = ({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-xs text-primary-75">
-                No image
+                {t("noImage")}
               </div>
             )}
           </div>
@@ -374,19 +345,26 @@ const WeavingCard = ({
                       (weaveItems.length > 0 &&
                         weaveItems.every((it) => it.item_id === null));
 
-                    const action = inChatWindow.isGiver ? "Offer" : "Request";
+                    const direction = inChatWindow.isGiver ? "give" : "receive";
 
                     if (isAll) {
-                      return `${action} all items`;
+                      return t("chatSummary.all", { direction });
                     }
 
                     if (totalTypes > 1) {
-                      return `${action}: ${totalTypes} items (${totalQuantity} total)`;
+                      return t("chatSummary.multiple", {
+                        direction,
+                        types: totalTypes,
+                        total: totalQuantity,
+                      });
                     }
 
                     const singleQty =
                       totalQuantity > 0 ? totalQuantity : inChatWindow.quantity;
-                    return `${action} Qty: ${singleQty}`;
+                    return t("chatSummary.single", {
+                      direction,
+                      quantity: singleQty,
+                    });
                   })()}
                 </span>
                 {activeWeave?.post?.public_id && (
@@ -396,7 +374,7 @@ const WeavingCard = ({
                     onClick={(e) => e.stopPropagation()}
                     className="text-xs font-bold text-primary hover:underline"
                   >
-                    View Post Detail →
+                    {t("viewPost")}
                   </Link>
                 )}
               </div>
@@ -446,7 +424,7 @@ const WeavingCard = ({
                           : "font-medium text-orange-500"
                   }`}
                 >
-                  {HINT_TEXTS[hintKey](displayUser.name)}
+                  {t(`hint.${hintKey}`, { name: displayUser.name })}
                 </span>
               )}
             </div>
@@ -460,7 +438,8 @@ const WeavingCard = ({
                     onClick={handleApproveWeave}
                     disabled={isProcessing}
                     className={`transition-all hover:text-green-600 ${isProcessing ? "opacity-50" : ""}`}
-                    title="Approve request"
+                    title={t("actions.approve")}
+                    aria-label={t("actions.approve")}
                   >
                     <AcceptIcon className="h-auto w-[18px]" />
                   </button>
@@ -470,7 +449,8 @@ const WeavingCard = ({
                     onClick={handleRejectWeave}
                     disabled={isProcessing}
                     className={`transition-all hover:text-red-600 ${isProcessing ? "opacity-50" : ""}`}
-                    title="Decline request"
+                    title={t("actions.decline")}
+                    aria-label={t("actions.decline")}
                   >
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
@@ -480,7 +460,8 @@ const WeavingCard = ({
                     onClick={handleWithdrawWeave}
                     disabled={isProcessing}
                     className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
-                    title="Withdraw request"
+                    title={t("actions.withdraw")}
+                    aria-label={t("actions.withdraw")}
                   >
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>
@@ -488,8 +469,8 @@ const WeavingCard = ({
                 {currentStatus === "approved" && hasIConfirmed && (
                   <span
                     className="text-green-500"
-                    title="You have confirmed"
-                    aria-label="You have confirmed"
+                    title={t("actions.confirmed")}
+                    aria-label={t("actions.confirmed")}
                   >
                     <AcceptIcon className="h-auto w-[18px] stroke-[3px]" />
                   </span>
@@ -499,9 +480,12 @@ const WeavingCard = ({
                     onClick={handleCompleteWeave}
                     disabled={isProcessing}
                     className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
-                    title={
-                      hasIConfirmed ? "You have confirmed" : "Complete weave"
-                    }
+                    title={t(
+                      hasIConfirmed ? "actions.confirmed" : "actions.confirm",
+                    )}
+                    aria-label={t(
+                      hasIConfirmed ? "actions.confirmed" : "actions.confirm",
+                    )}
                   >
                     <AcceptIcon
                       className={`h-auto w-[18px] ${hasIConfirmed ? "stroke-[3px]" : ""}`}
@@ -513,7 +497,8 @@ const WeavingCard = ({
                     onClick={handleCancelWeave}
                     disabled={isProcessing}
                     className={`transition-opacity ${isProcessing ? "opacity-50" : "hover:opacity-70"}`}
-                    title="Cancel weave"
+                    title={t("actions.cancel")}
+                    aria-label={t("actions.cancel")}
                   >
                     <CancelIcon className="h-auto w-[18px]" />
                   </button>

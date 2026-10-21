@@ -241,7 +241,10 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
       comment: newComment,
     });
   } catch (err) {
-    await connection.rollback();
+    //* rollback 失敗也要把原本的錯誤交給 errorMiddleware
+    await connection
+      .rollback()
+      .catch((e) => console.error("Rollback failed:", e));
     return next(err);
   } finally {
     connection.release();

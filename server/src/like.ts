@@ -184,7 +184,10 @@ router.put("/", requireAuth, async (req: Request, res: Response, next: NextFunct
 
     return res.json({ liked: outcome.liked, likesCount: outcome.likesCount });
   } catch (error) {
-    await connection.rollback();
+    //* rollback 失敗也要把原本的錯誤交給 errorMiddleware
+    await connection
+      .rollback()
+      .catch((e) => console.error("Rollback failed:", e));
     return next(error);
   } finally {
     connection.release();
@@ -226,7 +229,10 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
 
     return res.json({ liked: outcome.liked });
   } catch (error) {
-    await connection.rollback();
+    //* rollback 失敗也要把原本的錯誤交給 errorMiddleware
+    await connection
+      .rollback()
+      .catch((e) => console.error("Rollback failed:", e));
     return next(error);
   } finally {
     connection.release();

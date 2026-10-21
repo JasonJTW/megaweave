@@ -68,7 +68,12 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   const public_id = randomUUID();
   console.log("Generated public_id: ", public_id);
   const salt = generateSalt();
-  const hashedPassword = await hashPassword(user.password, salt);
+  let hashedPassword: string;
+  try {
+    hashedPassword = await hashPassword(user.password, salt);
+  } catch (error) {
+    return next(error);
+  }
   user.password = hashedPassword;
   user.salt = salt;
   user.public_id = public_id;

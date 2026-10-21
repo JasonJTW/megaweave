@@ -1012,7 +1012,7 @@
     "ORDER_NOT_CANCELLABLE": "這筆配送訂單目前無法取消。",
     "DELIVERY_PROVIDER_ERROR": "配送服務暫時無法使用，請稍後再試。",
     "QUOTATION_EXPIRED": "報價已過期，請重新試算。",
-    "WEAVE_REQUIRED_FOR_DELIVERY": "這則貼文要先有進行中的交織才能叫車配送。",
+    "WEAVE_REQUIRED_FOR_DELIVERY": "這則貼文要先有已同意的交織，才能叫車配送。",
     "PAYMENT_NOT_FOUND": "找不到這筆付款紀錄。",
     "COMMENT_EMPTY": "留言內容不能是空的。",
     "REPLY_DEPTH_EXCEEDED": "回覆層數已達上限。",

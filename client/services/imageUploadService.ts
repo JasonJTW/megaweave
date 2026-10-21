@@ -41,7 +41,10 @@ export async function uploadImagesToS3Staging(
   });
 
   if (!presignedRes.ok) {
-    throw new ApiError(await presignedRes.json().catch(() => ({})));
+    throw new ApiError(
+      await presignedRes.json().catch(() => null),
+      presignedRes.status,
+    );
   }
 
   const { urls }: PresignedUrlResponse = await presignedRes.json();

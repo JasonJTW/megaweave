@@ -249,10 +249,10 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     // 3. 檢查用戶是否支持 native 登入
     const userProviders: string[] = parseProviders(foundUser.providers);
     // 檢查是否支持 native 登入
-    if (
-      !userProviders.includes("native") &&
-      (!foundUser.password || !foundUser.salt)
-    ) {
+    const hasPasswordCredentials = Boolean(
+      foundUser.password && foundUser.salt,
+    );
+    if (!userProviders.includes("native") && !hasPasswordCredentials) {
       // 取得用戶支持的登入方式
       const availableProviders = userProviders.filter((p) => p !== "native");
       const providerText =
@@ -263,6 +263,13 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       return res.status(400).json({
         errorMessage: `This email is registered with ${providerText}. Please use ${providerText} to sign in.`,
       });
+    }
+
+    // providers 有 native 但缺密碼資料（資料不一致），視為登入失敗
+    if (!hasPasswordCredentials) {
+      return res
+        .status(401)
+        .json({ errorMessage: "Invalid email or password" });
     }
 
     // 4. 驗證密碼

@@ -59,7 +59,9 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
     ]);
 
     if (categories.length === 0) {
-      return next(new HttpError(404, "CATEGORY_NOT_FOUND", "Category not found"));
+      return next(
+        new HttpError(404, "CATEGORY_NOT_FOUND", "Category not found"),
+      );
     }
 
     res.status(200).json({

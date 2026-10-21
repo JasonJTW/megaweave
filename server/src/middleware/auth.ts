@@ -34,7 +34,13 @@ export async function requireAuth(
 
     // 驗證用戶數據的完整性
     if (!user.userId || !user.email) {
-      return next(new HttpError(401, "UNAUTHENTICATED", "Invalid session data. Please login again."));
+      return next(
+        new HttpError(
+          401,
+          "UNAUTHENTICATED",
+          "Invalid session data. Please login again.",
+        ),
+      );
     }
 
     // 將用戶信息附加到 request 對象

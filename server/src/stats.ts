@@ -9,16 +9,25 @@ import { HttpError } from "./utils/httpError";
 const router = Router();
 
 // GET /api/user/stats - 獲取當前用戶統計
-router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user?.userId) {
-      return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
-    }
+router.get(
+  "/",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user?.userId) {
+        return next(
+          new HttpError(
+            401,
+            "UNAUTHENTICATED",
+            "User ID not found, Please signin first",
+          ),
+        );
+      }
 
-    const userId = req.user.userId;
+      const userId = req.user.userId;
 
-    // 從 user_stats 表獲取統計資料
-    const statsQuery = `
+      // 從 user_stats 表獲取統計資料
+      const statsQuery = `
       SELECT 
         post_count,
         item_count,
@@ -39,13 +48,13 @@ router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunct
       WHERE user_id = ?
     `;
 
-    const [statsRows] = await dbPool.execute<RowDataPacket[]>(statsQuery, [
-      userId,
-    ]);
+      const [statsRows] = await dbPool.execute<RowDataPacket[]>(statsQuery, [
+        userId,
+      ]);
 
-    // 獲取使用者的所有貼文，並 JOIN 圖片資訊
-    // **修正: 參考 posts.ts，使用 GROUP_CONCAT 獲取 URL 字串，避免 JSON 解析錯誤**
-    const postsQuery = `
+      // 獲取使用者的所有貼文，並 JOIN 圖片資訊
+      // **修正: 參考 posts.ts，使用 GROUP_CONCAT 獲取 URL 字串，避免 JSON 解析錯誤**
+      const postsQuery = `
       SELECT 
         p.*, 
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
@@ -56,82 +65,91 @@ router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunct
       ORDER BY p.created_at DESC
     `;
 
-    const [posts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [userId]);
+      const [posts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [
+        userId,
+      ]);
 
-    // **修正: 移除原有的 postsWithImages 映射和 JSON.parse 邏輯**
-    // 直接使用 posts 變數，它包含 s3_keys 欄位。
+      // **修正: 移除原有的 postsWithImages 映射和 JSON.parse 邏輯**
+      // 直接使用 posts 變數，它包含 s3_keys 欄位。
 
-    // 如果沒有統計記錄，返回初始值
-    if (statsRows.length === 0) {
+      // 如果沒有統計記錄，返回初始值
+      if (statsRows.length === 0) {
+        return res.status(200).json({
+          postCount: 0,
+          itemCount: 0,
+          totalItemQuantity: 0,
+          postsWithItems: 0,
+          weaveCount: 0,
+          weaveAsGiver: 0,
+          weaveAsReceiver: 0,
+          totalQuantityGiven: 0,
+          totalQuantityReceived: 0,
+          totalLikes: 0,
+          totalComments: 0,
+          totalViews: 0,
+          points: 0,
+          giveSuccessRate: 0,
+          lastCalculatedAt: null,
+          posts: posts || [],
+        });
+      }
+
+      const stats = statsRows[0];
+
       return res.status(200).json({
-        postCount: 0,
-        itemCount: 0,
-        totalItemQuantity: 0,
-        postsWithItems: 0,
-        weaveCount: 0,
-        weaveAsGiver: 0,
-        weaveAsReceiver: 0,
-        totalQuantityGiven: 0,
-        totalQuantityReceived: 0,
-        totalLikes: 0,
-        totalComments: 0,
-        totalViews: 0,
-        points: 0,
-        giveSuccessRate: 0,
-        lastCalculatedAt: null,
+        postCount: stats.post_count || 0,
+        itemCount: stats.item_count || 0,
+        totalItemQuantity: stats.total_item_quantity || 0,
+        postsWithItems: stats.posts_with_items || 0,
+        weaveCount: stats.weave_count || 0,
+        weaveAsGiver: stats.weave_as_giver || 0,
+        weaveAsReceiver: stats.weave_as_receiver || 0,
+        totalQuantityGiven: stats.total_quantity_given || 0,
+        totalQuantityReceived: stats.total_quantity_received || 0,
+        totalLikes: stats.total_likes || 0,
+        totalComments: stats.total_comments || 0,
+        totalViews: stats.total_views || 0,
+        points: Number(stats.points) || 0,
+        giveSuccessRate: Number(stats.give_success_rate) || 0,
+        lastCalculatedAt: stats.last_calculated_at,
         posts: posts || [],
       });
+    } catch (error) {
+      return next(error);
     }
-
-    const stats = statsRows[0];
-
-    return res.status(200).json({
-      postCount: stats.post_count || 0,
-      itemCount: stats.item_count || 0,
-      totalItemQuantity: stats.total_item_quantity || 0,
-      postsWithItems: stats.posts_with_items || 0,
-      weaveCount: stats.weave_count || 0,
-      weaveAsGiver: stats.weave_as_giver || 0,
-      weaveAsReceiver: stats.weave_as_receiver || 0,
-      totalQuantityGiven: stats.total_quantity_given || 0,
-      totalQuantityReceived: stats.total_quantity_received || 0,
-      totalLikes: stats.total_likes || 0,
-      totalComments: stats.total_comments || 0,
-      totalViews: stats.total_views || 0,
-      points: Number(stats.points) || 0,
-      giveSuccessRate: Number(stats.give_success_rate) || 0,
-      lastCalculatedAt: stats.last_calculated_at,
-      posts: posts || [],
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+  },
+);
 
 // GET /api/user/stats/public/:uuid - 獲取公開統計（for 公開頁面）
-router.get("/public/:uuid", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { uuid } = req.params;
+router.get(
+  "/public/:uuid",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { uuid } = req.params;
 
-    // 驗證 UUID 格式
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(uuid)) {
-      return next(new HttpError(400, "INVALID_REQUEST", "Invalid user ID format"));
-    }
+      // 驗證 UUID 格式
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(uuid)) {
+        return next(
+          new HttpError(400, "INVALID_REQUEST", "Invalid user ID format"),
+        );
+      }
 
-    // 先查找用戶的 internal ID
-    const userQuery = `SELECT id FROM users WHERE public_id = ?`;
-    const [userRows] = await dbPool.execute<RowDataPacket[]>(userQuery, [uuid]);
+      // 先查找用戶的 internal ID
+      const userQuery = `SELECT id FROM users WHERE public_id = ?`;
+      const [userRows] = await dbPool.execute<RowDataPacket[]>(userQuery, [
+        uuid,
+      ]);
 
-    if (userRows.length === 0) {
-      return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
-    }
+      if (userRows.length === 0) {
+        return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
+      }
 
-    const userId = userRows[0].id;
+      const userId = userRows[0].id;
 
-    // 查詢統計數據
-    const statsQuery = `
+      // 查詢統計數據
+      const statsQuery = `
       SELECT 
         post_count,
         item_count,
@@ -152,13 +170,13 @@ router.get("/public/:uuid", async (req: Request, res: Response, next: NextFuncti
       WHERE user_id = ?
     `;
 
-    const [statsRows] = await dbPool.execute<RowDataPacket[]>(statsQuery, [
-      userId,
-    ]);
+      const [statsRows] = await dbPool.execute<RowDataPacket[]>(statsQuery, [
+        userId,
+      ]);
 
-    // 獲取使用者的所有貼文，並 JOIN 圖片資訊
-    // **修正: 參考 posts.ts，使用 GROUP_CONCAT 獲取 URL 字串，避免 JSON 解析錯誤**
-    const postsQuery = `
+      // 獲取使用者的所有貼文，並 JOIN 圖片資訊
+      // **修正: 參考 posts.ts，使用 GROUP_CONCAT 獲取 URL 字串，避免 JSON 解析錯誤**
+      const postsQuery = `
       SELECT 
         p.*, 
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
@@ -169,109 +187,124 @@ router.get("/public/:uuid", async (req: Request, res: Response, next: NextFuncti
       ORDER BY p.created_at DESC
     `;
 
-    const [posts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [userId]);
+      const [posts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [
+        userId,
+      ]);
 
-    // **修正: 移除原有的 postsWithImages 映射和 JSON.parse 邏輯**
-    // 直接使用 posts 變數。
+      // **修正: 移除原有的 postsWithImages 映射和 JSON.parse 邏輯**
+      // 直接使用 posts 變數。
 
-    if (statsRows.length === 0) {
+      if (statsRows.length === 0) {
+        return res.status(200).json({
+          postCount: 0,
+          itemCount: 0,
+          totalItemQuantity: 0,
+          postsWithItems: 0,
+          weaveCount: 0,
+          weaveAsGiver: 0,
+          weaveAsReceiver: 0,
+          totalQuantityGiven: 0,
+          totalQuantityReceived: 0,
+          totalLikes: 0,
+          totalComments: 0,
+          totalViews: 0,
+          points: 0,
+          giveSuccessRate: 0,
+          lastCalculatedAt: null,
+          posts: posts || [],
+        });
+      }
+
+      const stats = statsRows[0];
+
       return res.status(200).json({
-        postCount: 0,
-        itemCount: 0,
-        totalItemQuantity: 0,
-        postsWithItems: 0,
-        weaveCount: 0,
-        weaveAsGiver: 0,
-        weaveAsReceiver: 0,
-        totalQuantityGiven: 0,
-        totalQuantityReceived: 0,
-        totalLikes: 0,
-        totalComments: 0,
-        totalViews: 0,
-        points: 0,
-        giveSuccessRate: 0,
-        lastCalculatedAt: null,
+        postCount: stats.post_count || 0,
+        itemCount: stats.item_count || 0,
+        totalItemQuantity: stats.total_item_quantity || 0,
+        postsWithItems: stats.posts_with_items || 0,
+        weaveCount: stats.weave_count || 0,
+        weaveAsGiver: stats.weave_as_giver || 0,
+        weaveAsReceiver: stats.weave_as_receiver || 0,
+        totalQuantityGiven: stats.total_quantity_given || 0,
+        totalQuantityReceived: stats.total_quantity_received || 0,
+        totalLikes: stats.total_likes || 0,
+        totalComments: stats.total_comments || 0,
+        totalViews: stats.total_views || 0,
+        points: Number(stats.points) || 0,
+        giveSuccessRate: Number(stats.give_success_rate) || 0,
+        lastCalculatedAt: stats.last_calculated_at,
         posts: posts || [],
       });
+    } catch (error) {
+      return next(error);
     }
-
-    const stats = statsRows[0];
-
-    return res.status(200).json({
-      postCount: stats.post_count || 0,
-      itemCount: stats.item_count || 0,
-      totalItemQuantity: stats.total_item_quantity || 0,
-      postsWithItems: stats.posts_with_items || 0,
-      weaveCount: stats.weave_count || 0,
-      weaveAsGiver: stats.weave_as_giver || 0,
-      weaveAsReceiver: stats.weave_as_receiver || 0,
-      totalQuantityGiven: stats.total_quantity_given || 0,
-      totalQuantityReceived: stats.total_quantity_received || 0,
-      totalLikes: stats.total_likes || 0,
-      totalComments: stats.total_comments || 0,
-      totalViews: stats.total_views || 0,
-      points: Number(stats.points) || 0,
-      giveSuccessRate: Number(stats.give_success_rate) || 0,
-      lastCalculatedAt: stats.last_calculated_at,
-      posts: posts || [],
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+  },
+);
 
 // POST /api/user/stats/refresh - 手動重新計算統計（需要登入）
-router.post("/refresh", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user?.userId) {
-      return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
+router.post(
+  "/refresh",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user?.userId) {
+        return next(
+          new HttpError(
+            401,
+            "UNAUTHENTICATED",
+            "User ID not found, Please signin first",
+          ),
+        );
+      }
+
+      const userId = req.user.userId;
+
+      // 呼叫 updateUserStats 重新計算
+      const result = await updateUserStats(userId.toString());
+
+      if (!result.success) {
+        return next(
+          new Error(`Failed to refresh user stats: ${String(result.error)}`),
+        );
+      }
+
+      return res.status(200).json({
+        message: "Stats refreshed successfully",
+        stats: result.stats,
+      });
+    } catch (error) {
+      return next(error);
     }
-
-    const userId = req.user.userId;
-
-    // 呼叫 updateUserStats 重新計算
-    const result = await updateUserStats(userId.toString());
-
-    if (!result.success) {
-      return next(
-        new Error(`Failed to refresh user stats: ${String(result.error)}`),
-      );
-    }
-
-    return res.status(200).json({
-      message: "Stats refreshed successfully",
-      stats: result.stats,
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+  },
+);
 
 // GET /api/user/stats/leaderboard - 獲取排行榜
-router.get("/leaderboard", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { type = "points", limit = "10" } = req.query;
-    const limitNum = Math.min(parseInt(limit as string) || 10, 100);
+router.get(
+  "/leaderboard",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { type = "points", limit = "10" } = req.query;
+      const limitNum = Math.min(parseInt(limit as string) || 10, 100);
 
-    // 決定排序欄位
-    let orderBy = "points";
-    switch (type) {
-      case "givers":
-        orderBy = "total_quantity_given";
-        break;
-      case "weaves":
-        orderBy = "weave_count";
-        break;
-      case "posts":
-        orderBy = "post_count";
-        break;
-      case "points":
-      default:
-        orderBy = "points";
-        break;
-    }
+      // 決定排序欄位
+      let orderBy = "points";
+      switch (type) {
+        case "givers":
+          orderBy = "total_quantity_given";
+          break;
+        case "weaves":
+          orderBy = "weave_count";
+          break;
+        case "posts":
+          orderBy = "post_count";
+          break;
+        case "points":
+        default:
+          orderBy = "points";
+          break;
+      }
 
-    const query = `
+      const query = `
       SELECT 
         u.id,
         COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,
@@ -292,29 +325,30 @@ router.get("/leaderboard", async (req: Request, res: Response, next: NextFunctio
       LIMIT ?
     `;
 
-    const [rows] = await dbPool.query(query, [limitNum]);
+      const [rows] = await dbPool.query(query, [limitNum]);
 
-    const leaderboard = (rows as RowDataPacket[]).map((row, index) => ({
-      rank: index + 1,
-      userId: row.public_id,
-      username: row.username,
-      avatarUrl: row.avatar_url,
-      postCount: row.post_count || 0,
-      weaveCount: row.weave_count || 0,
-      weaveAsGiver: row.weave_as_giver || 0,
-      totalQuantityGiven: row.total_quantity_given || 0,
-      totalQuantityReceived: row.total_quantity_received || 0,
-      points: parseFloat(row.points) || 0,
-      giveSuccessRate: parseFloat(row.give_success_rate) || 0,
-    }));
+      const leaderboard = (rows as RowDataPacket[]).map((row, index) => ({
+        rank: index + 1,
+        userId: row.public_id,
+        username: row.username,
+        avatarUrl: row.avatar_url,
+        postCount: row.post_count || 0,
+        weaveCount: row.weave_count || 0,
+        weaveAsGiver: row.weave_as_giver || 0,
+        totalQuantityGiven: row.total_quantity_given || 0,
+        totalQuantityReceived: row.total_quantity_received || 0,
+        points: parseFloat(row.points) || 0,
+        giveSuccessRate: parseFloat(row.give_success_rate) || 0,
+      }));
 
-    return res.status(200).json({
-      type,
-      leaderboard,
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+      return res.status(200).json({
+        type,
+        leaderboard,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
 
 export default router;

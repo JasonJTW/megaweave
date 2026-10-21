@@ -94,7 +94,8 @@ async function validatePost(
     `SELECT user_id, status, type FROM posts WHERE id = ?`,
     [postId],
   );
-  if (rows.length === 0) throw new WeaveError(404, "POST_NOT_FOUND", "Post not found");
+  if (rows.length === 0)
+    throw new WeaveError(404, "POST_NOT_FOUND", "Post not found");
   if (rows[0].user_id === initiatorId)
     throw new WeaveError(400, "WEAVE_OWN_POST", "Cannot weave your own post");
   if (rows[0].status !== "active")
@@ -566,7 +567,8 @@ export async function approveWeave(
        WHERE w.id = ? FOR UPDATE`,
       [weaveId],
     );
-    if (weaves.length === 0) throw new WeaveError(404, "WEAVE_NOT_FOUND", "Not found");
+    if (weaves.length === 0)
+      throw new WeaveError(404, "WEAVE_NOT_FOUND", "Not found");
 
     weave = weaves[0];
     if (weave.status !== "requested" && weave.status !== "approved")
@@ -574,7 +576,8 @@ export async function approveWeave(
 
     const isGiver = weave.giver_id === userId;
     const isReceiver = weave.receiver_id === userId;
-    if (!isGiver && !isReceiver) throw new WeaveError(403, "FORBIDDEN", "Unauthorized");
+    if (!isGiver && !isReceiver)
+      throw new WeaveError(403, "FORBIDDEN", "Unauthorized");
     // Requested stage is judged by Post Author / Initiator (not Giver / Receiver).
     // The Initiator is the party who is not the Post Author.
     const isPostAuthor = weave.post_author_id === userId;
@@ -584,7 +587,11 @@ export async function approveWeave(
     if (weave.status === "requested") {
       if (newStatus === "approved") {
         if (!isPostAuthor)
-          throw new WeaveError(403, "FORBIDDEN", "Only post author can approve");
+          throw new WeaveError(
+            403,
+            "FORBIDDEN",
+            "Only post author can approve",
+          );
         await validateItems(
           await getWeaveStockItems(connection, weaveId),
           weave.post_id,
@@ -596,7 +603,11 @@ export async function approveWeave(
         );
       } else if (newStatus === "declined") {
         if (!isPostAuthor)
-          throw new WeaveError(403, "FORBIDDEN", "Only post author can decline");
+          throw new WeaveError(
+            403,
+            "FORBIDDEN",
+            "Only post author can decline",
+          );
         await connection.execute(
           `UPDATE weaves SET status = 'declined' WHERE id = ?`,
           [weaveId],

@@ -100,9 +100,9 @@ describe("POST /signin (native)", () => {
 
     expect(res.status).toBe(401);
     expect(res.body).toEqual({
-        code: "INVALID_CREDENTIALS",
-        errorMessage: "Invalid email or password",
-      });
+      code: "INVALID_CREDENTIALS",
+      errorMessage: "Invalid email or password",
+    });
     expect(createUserSession).not.toHaveBeenCalled();
   });
 

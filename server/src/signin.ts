@@ -241,7 +241,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     const [rows] = await dbPool.execute<RowDataPacket[]>(query, [user.email]);
 
     if (rows.length === 0) {
-      return next(new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
+      return next(
+        new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"),
+      );
     }
 
     const foundUser = rows[0];
@@ -277,7 +279,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 
     // providers 有 native 但缺密碼資料（資料不一致），視為登入失敗
     if (!hasPasswordCredentials) {
-      return next(new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
+      return next(
+        new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"),
+      );
     }
 
     // 4. 驗證密碼
@@ -288,7 +292,9 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     );
 
     if (!isCorrectPassword) {
-      return next(new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"));
+      return next(
+        new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password"),
+      );
     }
 
     // 5. 創建 session
@@ -332,50 +338,59 @@ async function verifyGoogleCredential(credential: string) {
   }
 }
 
-router.post("/google", async (req: Request, res: Response, next: NextFunction) => {
-  console.log("API signin with Google called");
-  const { credential } = req.body;
+router.post(
+  "/google",
+  async (req: Request, res: Response, next: NextFunction) => {
+    console.log("API signin with Google called");
+    const { credential } = req.body;
 
-  if (!credential) {
-    return next(new HttpError(400, "INVALID_REQUEST", "Credential is required"));
-  }
-
-  try {
-    const googleUser = await verifyGoogleCredential(credential);
-
-    if (!googleUser || !googleUser.email) {
-      return next(new HttpError(400, "INVALID_REQUEST", "Invalid Google user"));
+    if (!credential) {
+      return next(
+        new HttpError(400, "INVALID_REQUEST", "Credential is required"),
+      );
     }
 
-    // 檢查必要的 Google 用戶資料
-    if (!googleUser.sub) {
-      return next(new HttpError(400, "INVALID_REQUEST", "Invalid Google user ID"));
+    try {
+      const googleUser = await verifyGoogleCredential(credential);
+
+      if (!googleUser || !googleUser.email) {
+        return next(
+          new HttpError(400, "INVALID_REQUEST", "Invalid Google user"),
+        );
+      }
+
+      // 檢查必要的 Google 用戶資料
+      if (!googleUser.sub) {
+        return next(
+          new HttpError(400, "INVALID_REQUEST", "Invalid Google user ID"),
+        );
+      }
+
+      // 使用統一函數處理用戶
+      const user = await findOrCreateUser(googleUser.email, "google", {
+        username: googleUser.name,
+        googleId: googleUser.sub,
+      });
+
+      const googleUserSession: UserSession = {
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        userId: user.id,
+        provider: "google",
+        avatar_url: user.avatar_url ?? null,
+        avatar_key: user.avatar_key ?? null,
+        public_id: user.public_id,
+        joined_at: user.created_at,
+      };
+
+      await createUserSession(googleUserSession, req, res);
+      return res.status(200).json({ message: "Google sign in successful" });
+    } catch (error) {
+      return next(error);
     }
-
-    // 使用統一函數處理用戶
-    const user = await findOrCreateUser(googleUser.email, "google", {
-      username: googleUser.name,
-      googleId: googleUser.sub,
-    });
-
-    const googleUserSession: UserSession = {
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      userId: user.id,
-      provider: "google",
-      avatar_url: user.avatar_url ?? null,
-      avatar_key: user.avatar_key ?? null,
-      public_id: user.public_id,
-      joined_at: user.created_at,
-    };
-
-    await createUserSession(googleUserSession, req, res);
-    return res.status(200).json({ message: "Google sign in successful" });
-  } catch (error) {
-    return next(error);
-  }
-});
+  },
+);
 
 // Facebook sign in
 interface FacebookUser {
@@ -416,50 +431,63 @@ async function verifyFacebookToken(
   }
 }
 
-router.post("/facebook", async (req: Request, res: Response, next: NextFunction) => {
-  console.log("API signin with Facebook called");
-  const { accessToken } = req.body;
+router.post(
+  "/facebook",
+  async (req: Request, res: Response, next: NextFunction) => {
+    console.log("API signin with Facebook called");
+    const { accessToken } = req.body;
 
-  if (!accessToken) {
-    return next(new HttpError(400, "INVALID_REQUEST", "Access token is required"));
-  }
-
-  try {
-    const facebookUser = await verifyFacebookToken(accessToken);
-    console.log("facebookUser:", facebookUser);
-
-    if (!facebookUser || !facebookUser.email) {
-      return next(new HttpError(401, "INVALID_SOCIAL_TOKEN", "Invalid Facebook token or email not provided"));
+    if (!accessToken) {
+      return next(
+        new HttpError(400, "INVALID_REQUEST", "Access token is required"),
+      );
     }
 
-    // 檢查必要的 Facebook 用戶資料
-    if (!facebookUser.id) {
-      return next(new HttpError(400, "INVALID_REQUEST", "Invalid Facebook user ID"));
+    try {
+      const facebookUser = await verifyFacebookToken(accessToken);
+      console.log("facebookUser:", facebookUser);
+
+      if (!facebookUser || !facebookUser.email) {
+        return next(
+          new HttpError(
+            401,
+            "INVALID_SOCIAL_TOKEN",
+            "Invalid Facebook token or email not provided",
+          ),
+        );
+      }
+
+      // 檢查必要的 Facebook 用戶資料
+      if (!facebookUser.id) {
+        return next(
+          new HttpError(400, "INVALID_REQUEST", "Invalid Facebook user ID"),
+        );
+      }
+
+      // 使用統一函數處理用戶
+      const user = await findOrCreateUser(facebookUser.email, "facebook", {
+        username: facebookUser.name,
+        facebookId: facebookUser.id,
+      });
+
+      const facebookUserSession: UserSession = {
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        userId: Number(user.id),
+        provider: "facebook",
+        avatar_url: user.avatar_url || null,
+        avatar_key: user.avatar_key || null,
+        public_id: user.public_id,
+        joined_at: user.created_at,
+      };
+
+      await createUserSession(facebookUserSession, req, res);
+      return res.status(200).json({ message: "Facebook sign in successful" });
+    } catch (error) {
+      return next(error);
     }
-
-    // 使用統一函數處理用戶
-    const user = await findOrCreateUser(facebookUser.email, "facebook", {
-      username: facebookUser.name,
-      facebookId: facebookUser.id,
-    });
-
-    const facebookUserSession: UserSession = {
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      userId: Number(user.id),
-      provider: "facebook",
-      avatar_url: user.avatar_url || null,
-      avatar_key: user.avatar_key || null,
-      public_id: user.public_id,
-      joined_at: user.created_at,
-    };
-
-    await createUserSession(facebookUserSession, req, res);
-    return res.status(200).json({ message: "Facebook sign in successful" });
-  } catch (error) {
-    return next(error);
-  }
-});
+  },
+);
 
 export default router;

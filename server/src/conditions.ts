@@ -39,32 +39,39 @@ router.get("/", async (_req: Request, res: Response, next: NextFunction) => {
 });
 
 // 獲取單個狀況等級詳情
-router.get("/:level", async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const level = parseInt(req.params.level);
+router.get(
+  "/:level",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const level = parseInt(req.params.level);
 
-    if (isNaN(level) || level < 1 || level > 5) {
-      return next(new HttpError(400, "INVALID_REQUEST", "Invalid condition level"));
-    }
+      if (isNaN(level) || level < 1 || level > 5) {
+        return next(
+          new HttpError(400, "INVALID_REQUEST", "Invalid condition level"),
+        );
+      }
 
-    const [conditions] = await dbPool.query<RowDataPacket[]>(
-      `SELECT ${CONDITION_COLUMNS}
+      const [conditions] = await dbPool.query<RowDataPacket[]>(
+        `SELECT ${CONDITION_COLUMNS}
        FROM conditions
        WHERE level = ? AND status = 'active'`,
-      [level],
-    );
+        [level],
+      );
 
-    if (conditions.length === 0) {
-      return next(new HttpError(404, "CONDITION_NOT_FOUND", "Condition not found"));
+      if (conditions.length === 0) {
+        return next(
+          new HttpError(404, "CONDITION_NOT_FOUND", "Condition not found"),
+        );
+      }
+
+      res.status(200).json({
+        message: "Condition retrieved successfully",
+        condition: conditions[0],
+      });
+    } catch (error) {
+      return next(error);
     }
-
-    res.status(200).json({
-      message: "Condition retrieved successfully",
-      condition: conditions[0],
-    });
-  } catch (error) {
-    return next(error);
-  }
-});
+  },
+);
 
 export default router;

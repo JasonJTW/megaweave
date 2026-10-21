@@ -89,14 +89,18 @@ router.post(
     console.log(filteredUpdates);
 
     if (Object.keys(filteredUpdates).length === 0) {
-      return next(new HttpError(400, "INVALID_REQUEST", "No valid fields to update"));
+      return next(
+        new HttpError(400, "INVALID_REQUEST", "No valid fields to update"),
+      );
     }
 
     if (
       "member_name" in filteredUpdates &&
       !filteredUpdates.member_name?.trim()
     ) {
-      return next(new HttpError(400, "MEMBER_NAME_REQUIRED", "Member name is required"));
+      return next(
+        new HttpError(400, "MEMBER_NAME_REQUIRED", "Member name is required"),
+      );
     }
 
     /// Construct SQL query

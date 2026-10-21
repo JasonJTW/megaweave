@@ -30,78 +30,101 @@ function toSessionHttpError(error: unknown) {
   return error;
 }
 
-router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
-  console.log("Received Request for /api/currentUser");
-  try {
-    if (!req.user) {
-      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
-    }
-
-    // Ensure req.user.username is in sync with user_profiles.custom_name
+router.get(
+  "/",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    console.log("Received Request for /api/currentUser");
     try {
-      const [profiles] = await dbPool.execute<RowDataPacket[]>(
-        "SELECT custom_name FROM user_profiles WHERE user_id = ?",
-        [req.user.userId],
-      );
-      const customName = profiles[0]?.custom_name?.trim();
-      if (customName && req.user.username !== customName) {
-        req.user.username = customName;
-        updateUserSession(req, { username: customName }).catch((err) =>
-          console.error("Failed to sync updated custom_name to session:", err),
+      if (!req.user) {
+        return next(
+          new HttpError(401, "UNAUTHENTICATED", "Please login first"),
         );
       }
-    } catch (dbErr) {
-      console.error("Error checking custom_name in currentUser:", dbErr);
-    }
 
-    console.log("Current user:", req.user);
-    return res.status(200).json({ user: req.user });
-  } catch (error) {
-    return next(toSessionHttpError(error));
-  }
-});
-
-router.post("/update", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user) {
-      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
-    }
-
-    const updates = req.body.updates;
-    console.log("User before update:", req.user);
-    console.log("Received updates:", updates);
-
-    // 安全防護：禁止一般使用者任意竄改自身權限角色或使用者 ID（防範 Privilege Escalation）
-    if (updates) {
-      if (updates.role && updates.role !== req.user.role) {
-        return next(new HttpError(403, "FORBIDDEN", "Forbidden: Cannot change user role"));
+      // Ensure req.user.username is in sync with user_profiles.custom_name
+      try {
+        const [profiles] = await dbPool.execute<RowDataPacket[]>(
+          "SELECT custom_name FROM user_profiles WHERE user_id = ?",
+          [req.user.userId],
+        );
+        const customName = profiles[0]?.custom_name?.trim();
+        if (customName && req.user.username !== customName) {
+          req.user.username = customName;
+          updateUserSession(req, { username: customName }).catch((err) =>
+            console.error(
+              "Failed to sync updated custom_name to session:",
+              err,
+            ),
+          );
+        }
+      } catch (dbErr) {
+        console.error("Error checking custom_name in currentUser:", dbErr);
       }
-      if (updates.userId && Number(updates.userId) !== req.user.userId) {
-        return next(new HttpError(403, "FORBIDDEN", "Forbidden: Cannot change user ID"));
+
+      console.log("Current user:", req.user);
+      return res.status(200).json({ user: req.user });
+    } catch (error) {
+      return next(toSessionHttpError(error));
+    }
+  },
+);
+
+router.post(
+  "/update",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return next(
+          new HttpError(401, "UNAUTHENTICATED", "Please login first"),
+        );
       }
+
+      const updates = req.body.updates;
+      console.log("User before update:", req.user);
+      console.log("Received updates:", updates);
+
+      // 安全防護：禁止一般使用者任意竄改自身權限角色或使用者 ID（防範 Privilege Escalation）
+      if (updates) {
+        if (updates.role && updates.role !== req.user.role) {
+          return next(
+            new HttpError(
+              403,
+              "FORBIDDEN",
+              "Forbidden: Cannot change user role",
+            ),
+          );
+        }
+        if (updates.userId && Number(updates.userId) !== req.user.userId) {
+          return next(
+            new HttpError(403, "FORBIDDEN", "Forbidden: Cannot change user ID"),
+          );
+        }
+      }
+
+      if (!updates || _.isEqual(updates, req.user)) {
+        return next(
+          new HttpError(
+            400,
+            "INVALID_REQUEST",
+            "No updates provided or updates are identical to current user data",
+          ),
+        );
+      }
+
+      const updatedUserSession = await updateUserSession(req, updates);
+      console.log("User after update:", updatedUserSession);
+
+      if (!updatedUserSession) {
+        return next(new Error("Failed to update user session"));
+      }
+
+      return res.status(200).json({ updatedUser: updatedUserSession });
+    } catch (error) {
+      return next(toSessionHttpError(error));
     }
-
-    if (!updates || _.isEqual(updates, req.user)) {
-      return next(
-        new HttpError(
-          400,
-          "INVALID_REQUEST",
-          "No updates provided or updates are identical to current user data",
-        ),
-      );
-    }
-
-    const updatedUserSession = await updateUserSession(req, updates);
-    console.log("User after update:", updatedUserSession);
-
-    if (!updatedUserSession) {
-      return next(new Error("Failed to update user session"));
-    }
-
-    return res.status(200).json({ updatedUser: updatedUserSession });
-  } catch (error) {
-    return next(toSessionHttpError(error));
-  }
-});
+  },
+);
 
 export default router;

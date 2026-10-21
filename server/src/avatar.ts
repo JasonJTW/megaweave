@@ -23,7 +23,9 @@ router.post(
     try {
       // * start transaction
       if (!req.file) {
-        return next(new HttpError(400, "IMAGE_REQUIRED", "Please upload an image file."));
+        return next(
+          new HttpError(400, "IMAGE_REQUIRED", "Please upload an image file."),
+        );
       }
 
       const userId = req.user!.userId;

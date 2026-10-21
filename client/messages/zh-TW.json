@@ -595,11 +595,14 @@
     "loading": "載入中⋯",
     "welcomeToast": "歡迎加入 megaweaving 🥳🎉 {username}",
     "allFieldsRequired": "所有欄位皆為必填。",
+    "signInFailed": "登入失敗",
+    "signUpFailed": "註冊失敗",
     "googleFailed": "Google 登入失敗，請再試一次。",
     "facebookNotReady": "Facebook 尚未就緒，請再試一次。",
     "facebookNoToken": "Facebook 登入失敗：未取得存取權杖",
     "facebookNotAuthorized": "Facebook 登入失敗：未授權此應用程式",
     "facebookCancelled": "Facebook 登入已取消或失敗",
+    "facebookFailed": "Facebook 登入失敗",
     "unexpectedError": "發生未預期的錯誤"
   },
   "Profile": {

@@ -595,11 +595,14 @@
     "loading": "Loading...",
     "welcomeToast": "Welcome to megaweaving 🥳🎉 {username}",
     "allFieldsRequired": "All fields are required.",
+    "signInFailed": "Sign in failed",
+    "signUpFailed": "Sign up failed",
     "googleFailed": "Google sign in failed. Please try again.",
     "facebookNotReady": "Facebook is not ready yet. Please try again.",
     "facebookNoToken": "Facebook login failed: no access token received",
     "facebookNotAuthorized": "Facebook login failed: app not authorized",
     "facebookCancelled": "Facebook login was cancelled or failed",
+    "facebookFailed": "Facebook sign in failed",
     "unexpectedError": "An unexpected error occurred"
   },
   "Profile": {

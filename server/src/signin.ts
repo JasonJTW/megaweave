@@ -331,10 +331,13 @@ async function verifyGoogleCredential(credential: string) {
     });
     return ticket.getPayload();
   } catch (error) {
+    //* 無效 / 過期的 credential 是可預期錯誤，跟 Facebook 一樣回 401
     console.error("Google credential verification failed:", error);
-    const wrappedError = new Error("Invalid Google credential");
-    (wrappedError as Error & { cause?: unknown }).cause = error;
-    throw wrappedError;
+    throw new HttpError(
+      401,
+      "INVALID_SOCIAL_TOKEN",
+      "Invalid Google credential",
+    );
   }
 }
 

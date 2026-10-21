@@ -89,7 +89,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        toast.error(apiErrorMessage(data));
+        toast.error(apiErrorMessage(data, t("googleFailed")));
         return;
       }
 
@@ -133,7 +133,7 @@ function SigninForm() {
       console.log("data:", data);
       // /// handle error
       if (!response.ok) {
-        toast.error(apiErrorMessage(data));
+        toast.error(apiErrorMessage(data, t("signInFailed")));
         console.error("Sign in failed", data.errorMessage);
         return;
       }
@@ -215,7 +215,7 @@ function SigninForm() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        toast.error(apiErrorMessage(data));
+        toast.error(apiErrorMessage(data, t("facebookFailed")));
         return;
       }
 
@@ -266,7 +266,7 @@ function SigninForm() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        toast.error(apiErrorMessage(data));
+        toast.error(apiErrorMessage(data, t("signUpFailed")));
         return;
       }
       /// Sign up success

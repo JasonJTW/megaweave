@@ -14,7 +14,7 @@
   - Types/Interfaces: PascalCase (`CreatePostInput`, `UserSession`)
 - **Validation**: Strict schema validation with Zod (`zod`) on incoming API payloads and environment variables.
 - **Error Handling**: Route handlers wrap every `await` in `try/catch` and hand errors to the Express error middleware with `return next(error)` (Express 4 doesn't forward async rejections). Expected 4xx errors use `return next(new HttpError(status, code, message))` (`server/src/utils/httpError.ts`); `errorMiddleware` responds `{ code, errorMessage[, params] }` and never leaks internals on 5xx. Don't write `res.status(4xx/5xx).json(...)` in routes (exceptions: ECPay callback and Lalamove webhook protocol responses, dev-only `/sandbox/*`).
-- **API Error Codes**: `server/src/utils/errorCodes.ts` is the single source. A new code needs a translation in the client `Errors` namespace (both locales; `client/__tests__/errorCodes.test.ts` enforces it). The client shows `translateApiError` / `useApiErrorMessage` output, never `errorMessage`.
+- **API Error Codes**: `server/src/utils/errorCodes.ts` is the single source. A new code needs a translation in the client `Errors` namespace (both locales; `client/__tests__/errorCodes.test.ts` enforces it). The client shows `translateApiError` / `useApiErrorMessage` output, never `errorMessage`. Validation: data the user typed into a form fails with `next(zodError)` → `VALIDATION_FAILED` ("check your input"); IDs, query params and other client-generated payloads fail with `INVALID_REQUEST` ("refresh and try again" — it means a client bug).
 - **Database**: Parameterized raw SQL queries via `mysql2/promise` with transactions for multi-step mutations. Never interpolate untrusted values directly into SQL strings.
 
 ## Testing

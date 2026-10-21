@@ -15,6 +15,15 @@ jest.mock("./session", () => ({
   createUserSession: jest.fn().mockResolvedValue(undefined),
 }));
 
+//* Google 驗證會連網抓憑證；這裡讓每個 credential 都驗證失敗
+jest.mock("google-auth-library", () => ({
+  OAuth2Client: jest.fn().mockImplementation(() => ({
+    verifyIdToken: jest
+      .fn()
+      .mockRejectedValue(new Error("Wrong number of segments in token")),
+  })),
+}));
+
 jest.mock("./middleware/rateLimiter", () => ({
   authRateLimiter: [
     (_req: Request, _res: Response, next: NextFunction) => next(),
@@ -133,6 +142,30 @@ describe("POST /signin (native)", () => {
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("USE_SOCIAL_SIGNIN");
     expect(res.body.params).toEqual({ providers: "Google" });
+    expect(createUserSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /signin/google", () => {
+  let app: express.Express;
+
+  beforeAll(async () => {
+    process.env.GOOGLE_CLIENT_ID =
+      process.env.GOOGLE_CLIENT_ID ?? "test-client-id";
+    const { default: signinRouter } = await import("./signin");
+    app = express();
+    app.use(express.json());
+    app.use("/signin", signinRouter);
+    app.use(errorMiddleware);
+  });
+
+  it("returns 401 INVALID_SOCIAL_TOKEN for a credential Google rejects", async () => {
+    const res = await request(app)
+      .post("/signin/google")
+      .send({ credential: "not-a-jwt" });
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("INVALID_SOCIAL_TOKEN");
     expect(createUserSession).not.toHaveBeenCalled();
   });
 });

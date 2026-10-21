@@ -44,7 +44,7 @@ export default function Signup() {
 
       if (!response.ok) {
         console.error("Facebook backend signin failed:", data.errorMessage);
-        setSignupError(apiErrorMessage(data));
+        setSignupError(apiErrorMessage(data, t("facebookFailed")));
         return;
       }
 
@@ -87,7 +87,7 @@ export default function Signup() {
 
       if (!response.ok) {
         console.error("Google sign in failed:", data.errorMessage);
-        setSignupError(apiErrorMessage(data));
+        setSignupError(apiErrorMessage(data, t("googleFailed")));
         return;
       }
 
@@ -141,7 +141,7 @@ export default function Signup() {
       const data = await response.json();
       // /// handle error
       if (!response.ok) {
-        setSignupError(apiErrorMessage(data));
+        setSignupError(apiErrorMessage(data, t("signUpFailed")));
         return;
       }
       /// Sign up success

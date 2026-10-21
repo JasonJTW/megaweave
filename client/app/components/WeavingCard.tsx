@@ -240,6 +240,10 @@ const WeavingCard = ({
           }
         : null;
 
+  const confirmLabel = t(
+    hasIConfirmed ? "actions.confirmed" : "actions.confirm",
+  );
+
   const quotationPost = post || activeWeave?.post;
   const showQuotation = shouldShowLalamoveQuotation({
     isInChatWindow,
@@ -480,12 +484,8 @@ const WeavingCard = ({
                     onClick={handleCompleteWeave}
                     disabled={isProcessing}
                     className={`transition-all ${hasIConfirmed ? "text-green-500" : "text-megaweave-forest-dark"} ${isProcessing ? "opacity-50" : ""}`}
-                    title={t(
-                      hasIConfirmed ? "actions.confirmed" : "actions.confirm",
-                    )}
-                    aria-label={t(
-                      hasIConfirmed ? "actions.confirmed" : "actions.confirm",
-                    )}
+                    title={confirmLabel}
+                    aria-label={confirmLabel}
                   >
                     <AcceptIcon
                       className={`h-auto w-[18px] ${hasIConfirmed ? "stroke-[3px]" : ""}`}

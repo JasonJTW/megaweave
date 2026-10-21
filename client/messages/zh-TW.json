@@ -926,7 +926,7 @@
     "hint": {
       "requested": {
         "decideOnRequest": "要同意還是婉拒這個請求？",
-        "awaitingAuthor": "等待發文者同意⋯"
+        "awaitingAuthor": "等待貼文作者同意⋯"
       },
       "approved": {
         "confirmHandover": "已交出物品？點勾勾確認。",
@@ -968,11 +968,11 @@
       "withdraw": "確定要撤回這個請求嗎？"
     },
     "toast": {
-      "onlyAuthorCanApprove": "只有發文者可以同意這個請求",
+      "onlyAuthorCanApprove": "只有貼文作者可以同意這個請求",
       "notAwaitingApproval": "這個交織請求已不在等待同意的狀態",
       "approved": "已同意請求！交織進行中。",
       "approveFailed": "同意請求失敗",
-      "onlyAuthorCanDecline": "只有發文者可以婉拒這個請求",
+      "onlyAuthorCanDecline": "只有貼文作者可以婉拒這個請求",
       "declined": "已婉拒請求。",
       "declineFailed": "婉拒請求失敗",
       "cannotConfirm": "目前無法確認這次交織",

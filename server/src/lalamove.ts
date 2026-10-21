@@ -95,6 +95,7 @@ export function getWebhookEventTime(
 const router = express.Router();
 
 //* Lalamove API 呼叫失敗：細節進 log，回 502 給 client 顯示通用的物流錯誤
+//* 只包 Lalamove API 呼叫本身；DB 等其他錯誤直接 next(error) 當 500
 function deliveryProviderError(context: string, error: unknown) {
   if (error instanceof HttpError) return error;
   console.error(`Lalamove ${context} error:`, error);
@@ -426,7 +427,9 @@ async function handleCancelOrder(
       );
     }
 
-    const cancelResult = await cancelLalamoveOrder(orderId);
+    const cancelResult = await cancelLalamoveOrder(orderId).catch((e) => {
+      throw deliveryProviderError(`cancel order ${orderId}`, e);
+    });
 
     // 更新資料庫 delivery_orders 狀態為 CANCELLED
     await dbPool
@@ -451,7 +454,7 @@ async function handleCancelOrder(
       result: cancelResult,
     });
   } catch (error: unknown) {
-    return next(deliveryProviderError(`cancel order ${req.params.orderId}`, error));
+    return next(error);
   }
 }
 
@@ -514,13 +517,18 @@ router.get(
       }
 
       const realLalamoveOrderId = orderRecord.lalamove_order_id || orderId;
-      const driver = await getLalamoveDriverDetail(realLalamoveOrderId, driverId);
+      const driver = await getLalamoveDriverDetail(
+        realLalamoveOrderId,
+        driverId,
+      ).catch((e) => {
+        throw deliveryProviderError("get driver details", e);
+      });
       res.json({
         success: true,
         driver,
       });
     } catch (error: unknown) {
-      return next(deliveryProviderError("get driver details", error));
+      return next(error);
     }
   },
 );

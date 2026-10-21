@@ -72,7 +72,7 @@ describe("errorMiddleware", () => {
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
       code: "DUPLICATE_ENTRY",
-      errorMessage: "Email or username already exists",
+      errorMessage: "Duplicate entry",
     });
   });
 

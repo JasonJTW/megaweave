@@ -50,7 +50,7 @@ export function errorMiddleware(
         case "ER_DUP_ENTRY":
           statusCode = 400;
           code = "DUPLICATE_ENTRY";
-          errorMessage = "Email or username already exists";
+          errorMessage = "Duplicate entry";
           break;
         case "ER_ACCESS_DENIED_ERROR":
           statusCode = 500;

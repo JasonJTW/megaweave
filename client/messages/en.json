@@ -987,7 +987,7 @@
     "SERVICE_UNAVAILABLE": "The service is temporarily unavailable. Please try again later.",
     "VALIDATION_FAILED": "Some of the information you entered is invalid. Please check and try again.",
     "INVALID_REQUEST": "The request was invalid. Please refresh and try again.",
-    "DUPLICATE_ENTRY": "That email or username is already in use.",
+    "DUPLICATE_ENTRY": "This already exists.",
     "UNAUTHENTICATED": "Please sign in first.",
     "FORBIDDEN": "You don't have permission to do that.",
     "RATE_LIMITED": "Too many attempts. Please wait a moment and try again.",

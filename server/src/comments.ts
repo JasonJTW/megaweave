@@ -53,8 +53,12 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
 
   const effectiveUserId = sessionUserId;
 
-  if (!post_id || !content?.trim()) {
+  if (!post_id) {
     return next(new HttpError(400, "INVALID_REQUEST", "Missing required fields"));
+  }
+
+  if (!content?.trim()) {
+    return next(new HttpError(400, "COMMENT_EMPTY", "Comment content cannot be empty"));
   }
 
   let connection: PoolConnection;

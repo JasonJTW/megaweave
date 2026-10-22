@@ -277,6 +277,7 @@ describe("PUT /like (declarative)", () => {
         recipient_id: OWNER.userId,
         sender_id: ALICE.userId,
         type: "LIKE",
+        params: { actorName: "alice", postTitle: "Chair" },
         link: `/item/${PUBLIC_ID}`,
       }),
     );

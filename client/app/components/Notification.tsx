@@ -7,6 +7,10 @@ import {
 } from "../contexts/NotificationContext";
 import { motion, AnimatePresence } from "framer-motion";
 import MessageIcon from "./icons/MessageIcon";
+import { notificationText } from "@/utils/notificationText";
+
+const isCommentType = (type: string) =>
+  type === "COMMENT" || type === "COMMENT_REPLY";
 
 export default function NotificationList() {
   // Use context hooks
@@ -83,7 +87,7 @@ export default function NotificationList() {
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                         n.type === "LIKE"
                           ? "bg-pink-100 text-pink-500"
-                          : n.type === "COMMENT"
+                          : isCommentType(n.type)
                             ? "bg-blue-100 text-blue-500"
                             : "bg-green-100 text-green-500"
                       }`}
@@ -100,7 +104,7 @@ export default function NotificationList() {
                         >
                           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                         </svg>
-                      ) : n.type === "COMMENT" ? (
+                      ) : isCommentType(n.type) ? (
                         <MessageIcon className="h-5 w-5" />
                       ) : (
                         <svg
@@ -129,7 +133,7 @@ export default function NotificationList() {
                         <h4
                           className={`text-sm font-semibold ${n.is_read ? "text-gray-700" : "text-gray-900"}`}
                         >
-                          {n.title}
+                          {notificationText(t, n).title}
                         </h4>
                         <span className="ml-2 whitespace-nowrap text-xs text-gray-400">
                           {formatter.dateTime(new Date(n.created_at))}
@@ -138,7 +142,7 @@ export default function NotificationList() {
                       <p
                         className={`mt-1 line-clamp-2 text-sm ${n.is_read ? "text-gray-500" : "text-gray-800"}`}
                       >
-                        {n.content}
+                        {notificationText(t, n).content}
                       </p>
                     </div>
                     {!n.is_read && (

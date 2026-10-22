@@ -760,7 +760,49 @@
     "signInToView": "請先登入以查看通知",
     "markedAllRead": "已全部標為已讀",
     "markAllReadFailed": "無法全部標為已讀",
-    "newNotification": "你有一則新通知"
+    "newNotification": "你有一則新通知",
+    "event": {
+      "LIKE": {
+        "title": "新的按讚",
+        "content": "{actorName} 對你的貼文「{postTitle}」按讚"
+      },
+      "COMMENT": {
+        "title": "新的留言",
+        "content": "{actorName} 在你的貼文「{postTitle}」留言"
+      },
+      "COMMENT_REPLY": {
+        "title": "新的回覆",
+        "content": "{actorName} 回覆了你的留言"
+      },
+      "WEAVE_REQUESTED": {
+        "title": "新的交織請求",
+        "content": "{actorName} 對「{postTitle}」送出交織請求"
+      },
+      "WEAVE_APPROVED": {
+        "title": "交織請求已同意",
+        "content": "{actorName} 同意了你對「{postTitle}」的交織請求"
+      },
+      "WEAVE_DECLINED": {
+        "title": "交織請求已婉拒",
+        "content": "{actorName} 婉拒了你對「{postTitle}」的交織請求"
+      },
+      "WEAVE_WITHDRAWN": {
+        "title": "交織請求已撤回",
+        "content": "{actorName} 撤回了對「{postTitle}」的交織請求"
+      },
+      "WEAVE_CANCELLED": {
+        "title": "交織已取消",
+        "content": "{actorName} 取消了「{postTitle}」的交織"
+      },
+      "WEAVE_CONFIRMED": {
+        "title": "對方已確認交織",
+        "content": "{actorName} 已確認「{postTitle}」的交織，等待你確認。"
+      },
+      "WEAVE_COMPLETED": {
+        "title": "交織成功",
+        "content": "「{postTitle}」的交織成功了！"
+      }
+    }
   },
   "History": {
     "signInToView": "請先登入以查看瀏覽紀錄",

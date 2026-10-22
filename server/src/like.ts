@@ -103,6 +103,7 @@ const afterLike = (
       type: "LIKE",
       title: "New Like",
       content: `${username} liked your post "${outcome.postTitle}"`,
+      params: { actorName: username ?? "", postTitle: outcome.postTitle },
       link: `/item/${publicId}`,
     }).catch((err) =>
       console.error("Failed to create like notification:", err)

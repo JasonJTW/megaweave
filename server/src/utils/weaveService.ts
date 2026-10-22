@@ -7,7 +7,7 @@ import { Pool, PoolConnection } from "mysql2/promise";
 import { Server } from "socket.io";
 import dbPool from "./db";
 import { acquireConnection } from "./acquireConnection";
-import { createNotification } from "./notificationService";
+import { createNotification, type NotificationType } from "./notificationService";
 import { messageService } from "./messageService";
 import { updateUserStats } from "./updateUserStats";
 import { enqueueSendEmail } from "../queue/queues";
@@ -264,6 +264,16 @@ export type WeaveActionType =
   | "confirmed"
   | "completed";
 
+const WEAVE_NOTIFICATION_TYPE: Record<WeaveActionType, NotificationType> = {
+  requested: "WEAVE_REQUESTED",
+  approved: "WEAVE_APPROVED",
+  declined: "WEAVE_DECLINED",
+  cancelled: "WEAVE_CANCELLED",
+  withdrawn: "WEAVE_WITHDRAWN",
+  confirmed: "WEAVE_CONFIRMED",
+  completed: "WEAVE_COMPLETED",
+};
+
 interface WeaveNoticeCopy {
   title: string;
   content: string;
@@ -388,9 +398,10 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     createNotification(io, {
       recipient_id: recipientId,
       sender_id: senderId,
-      type: "ORDER_UPDATE",
+      type: WEAVE_NOTIFICATION_TYPE[action],
       title: copy.title,
       content: copy.content,
+      params: { actorName, postTitle },
       link,
     }).catch((e) => console.error("🔔 Notification creation failed:", e));
   }

@@ -186,12 +186,19 @@ describe("approveWeave notifications", () => {
     (createNotification as jest.Mock).mock.calls.map((c) => c[1].title);
   const recipients = () =>
     (createNotification as jest.Mock).mock.calls.map((c) => c[1].recipient_id);
+  const events = () =>
+    (createNotification as jest.Mock).mock.calls.map((c) => ({
+      type: c[1].type,
+      params: c[1].params,
+    }));
+  const crib = { actorName: "Actor", postTitle: "Crib" };
 
   it("withdraw notifies the Post Author with a withdrawn notice", async () => {
     setupDb("wish", "requested");
     await run("initiator", "withdrawn", fakeIo());
     expect(titles()).toEqual(["Weave Request Withdrawn"]);
     expect(recipients()).toEqual([AUTHOR]);
+    expect(events()).toEqual([{ type: "WEAVE_WITHDRAWN", params: crib }]);
   });
 
   it("cancel in Approved stage sends the cancelled notice", async () => {
@@ -199,6 +206,7 @@ describe("approveWeave notifications", () => {
     await run("author", "cancelled", fakeIo());
     expect(titles()).toEqual(["Weave Cancelled"]);
     expect(recipients()).toEqual([INITIATOR]);
+    expect(events()).toEqual([{ type: "WEAVE_CANCELLED", params: crib }]);
   });
 
   it("decline notifies the Initiator", async () => {
@@ -206,6 +214,37 @@ describe("approveWeave notifications", () => {
     await run("author", "declined", fakeIo());
     expect(titles()).toEqual(["Weave Request Declined"]);
     expect(recipients()).toEqual([INITIATOR]);
+    expect(events()).toEqual([{ type: "WEAVE_DECLINED", params: crib }]);
+  });
+
+  it("approve notifies the Initiator", async () => {
+    setupDb("share", "requested");
+    await run("author", "approved", fakeIo());
+    expect(recipients()).toEqual([INITIATOR]);
+    expect(events()).toEqual([{ type: "WEAVE_APPROVED", params: crib }]);
+  });
+
+  it("partial confirm tells the other party it is waiting for them", async () => {
+    setupDb("share", "approved", { bothConfirmed: false });
+    await run("author", "completed", fakeIo());
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(recipients()).toEqual([INITIATOR]);
+    expect(events()).toEqual([{ type: "WEAVE_CONFIRMED", params: crib }]);
+  });
+
+  it("final confirm sends the completed notice to both parties", async () => {
+    setupDb("share", "approved");
+    (dbPool.execute as jest.Mock).mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM posts")) return [[{ title: "Crib" }]];
+      if (sql.includes("SELECT status")) return [[{ status: "completed" }]];
+      return [[]];
+    });
+    await run("author", "completed", fakeIo());
+    expect(recipients()).toEqual([INITIATOR, AUTHOR]);
+    expect(events()).toEqual([
+      { type: "WEAVE_COMPLETED", params: crib },
+      { type: "WEAVE_COMPLETED", params: crib },
+    ]);
   });
 });
 

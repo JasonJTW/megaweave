@@ -264,17 +264,8 @@ export type WeaveActionType =
   | "confirmed"
   | "completed";
 
-const WEAVE_NOTIFICATION_TYPE: Record<WeaveActionType, NotificationType> = {
-  requested: "WEAVE_REQUESTED",
-  approved: "WEAVE_APPROVED",
-  declined: "WEAVE_DECLINED",
-  cancelled: "WEAVE_CANCELLED",
-  withdrawn: "WEAVE_WITHDRAWN",
-  confirmed: "WEAVE_CONFIRMED",
-  completed: "WEAVE_COMPLETED",
-};
-
 interface WeaveNoticeCopy {
+  type: NotificationType;
   title: string;
   content: string;
 }
@@ -290,36 +281,43 @@ function getWeaveNoticeCopy(
   switch (action) {
     case "requested":
       return {
+        type: "WEAVE_REQUESTED",
         title: "New Weave Request",
         content: `${actorName} sent a weave request for "${postTitle}"`,
       };
     case "approved":
       return {
+        type: "WEAVE_APPROVED",
         title: "Weave Request Approved",
         content: `${actorName} approved your weave request for "${postTitle}"`,
       };
     case "declined":
       return {
+        type: "WEAVE_DECLINED",
         title: "Weave Request Declined",
         content: `${actorName} declined your weave request for "${postTitle}"`,
       };
     case "cancelled":
       return {
+        type: "WEAVE_CANCELLED",
         title: "Weave Cancelled",
         content: `${actorName} cancelled the weave for "${postTitle}"`,
       };
     case "withdrawn":
       return {
+        type: "WEAVE_WITHDRAWN",
         title: "Weave Request Withdrawn",
         content: `${actorName} withdrew their weave request for "${postTitle}"`,
       };
     case "confirmed":
       return {
+        type: "WEAVE_CONFIRMED",
         title: "Weave Confirmed",
         content: `${actorName} confirmed the weave for "${postTitle}". Waiting for your confirmation.`,
       };
     case "completed":
       return {
+        type: "WEAVE_COMPLETED",
         title: "Weave Completed",
         content: `Weave for "${postTitle}" is successfully completed!`,
       };
@@ -398,7 +396,7 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     createNotification(io, {
       recipient_id: recipientId,
       sender_id: senderId,
-      type: WEAVE_NOTIFICATION_TYPE[action],
+      type: copy.type,
       title: copy.title,
       content: copy.content,
       params: { actorName, postTitle },

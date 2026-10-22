@@ -13,20 +13,24 @@ import {
   Hr,
 } from "react-email";
 import EmailBanner from "./EmailBanner";
-import { WeaveStatus } from "../utils/weaveService";
+import type { WeaveStatus } from "../utils/weaveService";
+import { getTranslator } from "../utils/i18n";
+import type { Locale } from "../validations";
 
 export interface WeaveItem {
-  title?: string | null;
+  /** null: all items of the Post (quantity null) or an item that no longer exists */
+  title: string | null;
   quantity: number | null;
 }
 
 export interface EmailTemplateProps {
+  locale: Locale;
   username: string;
   title: string;
   description: string;
-  weaveId: string;
+  weaveId: number;
   weaving_status: WeaveStatus;
-  itemsOffered?: WeaveItem[];
+  itemsGiven?: WeaveItem[];
   itemsReceived?: WeaveItem[];
   ctaUrl: string;
   toEmail: string;
@@ -40,18 +44,23 @@ const STATUS_BADGE: Partial<
 };
 
 const EmailTemplate = ({
+  locale,
   username,
   title,
   description,
   weaveId,
   weaving_status,
-  itemsOffered,
+  itemsGiven,
   itemsReceived,
   ctaUrl,
   toEmail,
 }: EmailTemplateProps) => {
+  const t = getTranslator(locale, "Email");
+  const itemTitle = (item: WeaveItem) =>
+    item.title ?? (item.quantity === null ? t("weave.allItems") : t("weave.item"));
+
   return (
-    <Html lang="en">
+    <Html lang={locale}>
       <Head />
       <Preview>{title}</Preview>
 
@@ -89,7 +98,7 @@ const EmailTemplate = ({
                 margin: "0 0 20px",
               }}
             >
-              🔔 New notification
+              {t("weave.badge")}
             </Text>
 
             {/* Title */}
@@ -115,7 +124,9 @@ const EmailTemplate = ({
                 margin: "0 0 24px",
               }}
             >
-              Hi {username}, {description}
+              {t("greeting", { name: username })}
+              <br />
+              {description}
             </Text>
 
             {/* Transaction detail card */}
@@ -137,7 +148,7 @@ const EmailTemplate = ({
                   fontWeight: 600,
                 }}
               >
-                Transaction details
+                {t("weave.details")}
               </Text>
 
               {/* Order ID */}
@@ -150,7 +161,7 @@ const EmailTemplate = ({
               >
                 <Column>
                   <Text style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-                    Order ID
+                    {t("weave.weaveId")}
                   </Text>
                 </Column>
                 <Column align="right">
@@ -162,13 +173,13 @@ const EmailTemplate = ({
                       margin: 0,
                     }}
                   >
-                    {weaveId}
+                    #{weaveId}
                   </Text>
                 </Column>
               </Row>
 
-              {/* Item offered */}
-              {itemsOffered && itemsOffered.length > 0 && (
+              {/* Items given */}
+              {itemsGiven && itemsGiven.length > 0 && (
                 <Section
                   style={{
                     borderBottom: "1px solid #e5e7eb",
@@ -186,9 +197,9 @@ const EmailTemplate = ({
                       letterSpacing: "0.03em",
                     }}
                   >
-                    Item offered
+                    {t("weave.itemsGiven")}
                   </Text>
-                  {itemsOffered.map((item, idx) => (
+                  {itemsGiven.map((item, idx) => (
                     <Row key={idx} style={{ marginTop: idx > 0 ? 4 : 0 }}>
                       <Column>
                         <Text
@@ -199,7 +210,7 @@ const EmailTemplate = ({
                             margin: 0,
                           }}
                         >
-                          {item.title}
+                          {itemTitle(item)}
                         </Text>
                       </Column>
                       {item.quantity && (
@@ -220,7 +231,7 @@ const EmailTemplate = ({
                 </Section>
               )}
 
-              {/* Item received */}
+              {/* Items received */}
               {itemsReceived && itemsReceived.length > 0 && (
                 <Section
                   style={{
@@ -239,7 +250,7 @@ const EmailTemplate = ({
                       letterSpacing: "0.03em",
                     }}
                   >
-                    Item received
+                    {t("weave.itemsReceived")}
                   </Text>
                   {itemsReceived.map((item, idx) => (
                     <Row key={idx} style={{ marginTop: idx > 0 ? 4 : 0 }}>
@@ -252,7 +263,7 @@ const EmailTemplate = ({
                             margin: 0,
                           }}
                         >
-                          {item.title}
+                          {itemTitle(item)}
                         </Text>
                       </Column>
                       {item.quantity && (
@@ -277,7 +288,7 @@ const EmailTemplate = ({
               <Row>
                 <Column>
                   <Text style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>
-                    Status
+                    {t("weave.status")}
                   </Text>
                 </Column>
                 <Column align="right">
@@ -292,7 +303,7 @@ const EmailTemplate = ({
                       margin: 0,
                     }}
                   >
-                    {weaving_status}
+                    {t(`weave.statusLabel.${weaving_status}`)}
                   </Text>
                 </Column>
               </Row>
@@ -314,7 +325,7 @@ const EmailTemplate = ({
                     display: "inline-block",
                   }}
                 >
-                  View transaction →
+                  {t("weave.cta")}
                 </Button>
               </Column>
             </Row>
@@ -332,10 +343,7 @@ const EmailTemplate = ({
                 margin: 0,
               }}
             >
-              If you didn&apos;t initiate this transaction or have any
-              questions, please contact our support team immediately. This
-              notification was sent to{" "}
-              <span style={{ color: "#6b7280" }}>{toEmail}</span>.
+              {t("footerNotice", { email: toEmail })}
             </Text>
           </Section>
 
@@ -347,33 +355,9 @@ const EmailTemplate = ({
               padding: "20px 32px",
             }}
           >
-            <Row>
-              <Column>
-                <Text style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
-                  © 2024 MegaWeaving · All rights reserved
-                </Text>
-              </Column>
-              <Column align="right">
-                <Text style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
-                  <a
-                    href="#"
-                    style={{
-                      color: "#9ca3af",
-                      textDecoration: "none",
-                      marginRight: 16,
-                    }}
-                  >
-                    Unsubscribe
-                  </a>
-                  <a
-                    href="#"
-                    style={{ color: "#9ca3af", textDecoration: "none" }}
-                  >
-                    Privacy policy
-                  </a>
-                </Text>
-              </Column>
-            </Row>
+            <Text style={{ fontSize: 12, color: "#9ca3af", margin: 0 }}>
+              {t("copyright", { year: new Date().getFullYear() })}
+            </Text>
           </Section>
           {/* Banner */}
           <EmailBanner />

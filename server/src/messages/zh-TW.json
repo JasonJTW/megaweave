@@ -1,0 +1,81 @@
+{
+  "Email": {
+    "footerNotice": "如有任何問題，請聯繫客服。此通知寄送至 {email}。",
+    "copyright": "© {year} 大量交織 MegaWeaving 版權所有",
+    "greeting": "{name} 您好，",
+    "weave": {
+      "badge": "🔔 新通知",
+      "details": "交織資訊",
+      "weaveId": "交織編號",
+      "itemsGiven": "提供的物品",
+      "itemsReceived": "收到的物品",
+      "allItems": "全部物品",
+      "item": "物品",
+      "status": "狀態",
+      "cta": "查看交織 →",
+      "statusLabel": {
+        "requested": "新請求",
+        "approved": "交織中",
+        "declined": "已婉拒",
+        "cancelled": "已取消",
+        "withdrawn": "已撤回",
+        "completed": "交織成功"
+      }
+    },
+    "delivery": {
+      "badge": "🚚 外送訂單通知",
+      "details": "訂單資訊",
+      "tradeNo": "訂單編號",
+      "amount": "金額",
+      "cta": "查看訂單狀態 →"
+    }
+  },
+  "WeaveNotice": {
+    "requested": {
+      "title": "新的交織請求",
+      "content": "{actorName} 對「{postTitle}」送出了交織請求"
+    },
+    "approved": {
+      "title": "交織請求已同意",
+      "content": "{actorName} 同意了你對「{postTitle}」的交織請求"
+    },
+    "declined": {
+      "title": "交織請求已婉拒",
+      "content": "{actorName} 婉拒了你對「{postTitle}」的交織請求"
+    },
+    "cancelled": {
+      "title": "交織已取消",
+      "content": "{actorName} 取消了「{postTitle}」的交織"
+    },
+    "withdrawn": {
+      "title": "交織請求已撤回",
+      "content": "{actorName} 撤回了對「{postTitle}」的交織請求"
+    },
+    "confirmed": {
+      "title": "對方已確認交織",
+      "content": "{actorName} 已確認「{postTitle}」的交織，等待你確認。"
+    },
+    "completed": {
+      "title": "交織成功",
+      "content": "「{postTitle}」的交織已順利完成！"
+    }
+  },
+  "DeliveryNotice": {
+    "DISPATCH_FAILED": {
+      "title": "叫車失敗，將全額退款",
+      "content": "很抱歉，您的外送訂單（{tradeNo}）未能成功向 Lalamove 叫車。已支付的 NT${amount} 將全額退回原信用卡，完成後會再通知您。"
+    },
+    "PAID_AFTER_ORDER_CLOSED": {
+      "title": "付款時訂單已逾期，將全額退款",
+      "content": "您的外送訂單（{tradeNo}）在逾期後才完成付款，因此未能叫車。已支付的 NT${amount} 將全額退回原信用卡，請重新叫車。"
+    },
+    "REFUNDED": {
+      "title": "外送款項已全額退款",
+      "content": "{reason, select, LALAMOVE_EXPIRED {由於沒有司機在時限內接單，} LALAMOVE_REJECTED {由於 Lalamove 無法完成此趟外送，} PAID_AFTER_ORDER_CLOSED {由於付款時外送訂單已逾期，} other {}}外送訂單（{tradeNo}）的 NT${amount} 已退回原信用卡，實際入帳時間依發卡銀行而定。"
+    },
+    "REFUND_FAILED": {
+      "title": "退款處理中",
+      "content": "外送訂單（{tradeNo}）的 NT${amount} 退款暫時未能自動完成，我們已通知客服人員處理，將盡快與您聯繫。"
+    }
+  }
+}

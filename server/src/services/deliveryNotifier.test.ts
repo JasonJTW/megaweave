@@ -1,7 +1,8 @@
 import dbPool from "../utils/db";
 import { createNotification } from "../utils/notificationService";
 import { enqueueSendEmail } from "../queue/queues";
-import { getDeliveryNoticeCopy, notifyDeliveryUser } from "./deliveryNotifier";
+import { notifyDeliveryUser } from "./deliveryNotifier";
+import { getDeliveryNoticeCopy } from "./deliveryNoticeCopy";
 
 jest.mock("../utils/db", () => ({ __esModule: true, default: { query: jest.fn() } }));
 jest.mock("../utils/socket", () => ({ getSocketBroadcaster: () => null }));
@@ -18,7 +19,6 @@ const target = (overrides: Record<string, unknown> = {}) => ({
   amount: 150,
   email: "alice@example.com",
   locale: "zh-TW",
-  username: "Alice",
   ...overrides,
 });
 
@@ -51,7 +51,7 @@ describe("getDeliveryNoticeCopy", () => {
 });
 
 describe("notifyDeliveryUser", () => {
-  it("sends an in-app notification and a localized email linking to the result page", async () => {
+  it("sends a localized in-app notification and an email job linking to the result page", async () => {
     query.mockResolvedValueOnce([[target({ locale: "en" })]]);
 
     await notifyDeliveryUser(7, "DISPATCH_FAILED");
@@ -68,8 +68,8 @@ describe("notifyDeliveryUser", () => {
     expect(enqueueSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         template: "delivery-notice",
-        locale: "en",
-        toEmail: "alice@example.com",
+        recipientId: 42,
+        event: "DISPATCH_FAILED",
         merchantTradeNo: "MW123",
         amount: 150,
       }),

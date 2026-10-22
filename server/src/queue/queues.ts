@@ -65,7 +65,9 @@ export async function enqueueSendEmail(
   data: SendEmailJobData,
 ): Promise<void> {
   await emailQueue.add("send-email", data);
-  console.log(`📧 Enqueued email job for ${data.toEmail}`);
+  console.log(
+    `📧 Enqueued ${data.template} email job for user #${data.recipientId}`,
+  );
 }
 
 //* ─── Embedding Queue ─────────────────────────────────────────────────────────

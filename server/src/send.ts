@@ -1,29 +1,62 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { EmailTemplateProps } from "./emails/EmailTemplate";
+import z from "zod";
+import type { SendEmailJobData } from "./queue/jobs/email";
 import { enqueueSendEmail } from "./queue/queues";
 import { requireRole } from "./middleware/auth";
+import { HttpError } from "./utils/httpError";
 
 const router = Router();
 
 // 手動測試用：僅限 admin，避免被當成任意寄信入口
 router.use(requireRole("admin"));
 
-router.post("/", async (req: Request, res: Response, next: NextFunction) => {
-  // const props: EmailTemplateProps = {
-  //   username: "Jason",
-  //   title: "Your order has been confirmed ✓",
-  //   description:
-  //     "your item exchange request has been accepted. The other party has confirmed the trade — here's a summary of your transaction.",
-  //   //todo: Public WeaveId?
-  //   weaveId: "#TXN-20240614",
-  //   weaving_status: "approved",
-  //   itemOffered: "A new job🐶",
-  //   itemReceived: "A new job",
-  //   ctaUrl: "https://megaweaving.net/transactions/TXN-20240614",
-  //   toEmail: "way6107715@gmail.com",
-  // };
+const SendEmailSchema = z.discriminatedUnion("template", [
+  z.object({
+    template: z.literal("weave-status"),
+    recipientId: z.number().int().positive(),
+    action: z.enum([
+      "requested",
+      "approved",
+      "declined",
+      "cancelled",
+      "withdrawn",
+      "confirmed",
+      "completed",
+    ]),
+    actorName: z.string(),
+    postTitle: z.string(),
+    weaveId: z.number().int().positive(),
+    items: z.array(
+      z.object({
+        title: z.string().nullable(),
+        quantity: z.number().int().positive().nullable(),
+      }),
+    ),
+    isRecipientGiver: z.boolean(),
+    ctaUrl: z.url(),
+  }),
+  z.object({
+    template: z.literal("delivery-notice"),
+    recipientId: z.number().int().positive(),
+    event: z.enum([
+      "DISPATCH_FAILED",
+      "PAID_AFTER_ORDER_CLOSED",
+      "REFUNDED",
+      "REFUND_FAILED",
+    ]),
+    reason: z.string().optional(),
+    merchantTradeNo: z.string(),
+    amount: z.number().nonnegative(),
+    ctaUrl: z.url(),
+  }),
+]);
 
-  const props: EmailTemplateProps = req.body.props;
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
+  const parsed = SendEmailSchema.safeParse(req.body.props);
+  if (!parsed.success) {
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid email job payload"));
+  }
+  const props: SendEmailJobData = parsed.data;
 
   try {
     await enqueueSendEmail(props);

@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import SandboxNotice from "@/app/components/Lalamove/SandboxNotice";
 import {
   CheckCircle2,
   AlertCircle,
@@ -224,7 +225,9 @@ function PaymentResultContent() {
         </div>
         <button
           type="button"
-          onClick={() => router.push(`/delivery/${statusData?.lalamoveOrderId}`)}
+          onClick={() =>
+            router.push(`/delivery/${statusData?.lalamoveOrderId}`)
+          }
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 text-sm font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600"
         >
           {t("goTracking")}
@@ -255,7 +258,10 @@ function PaymentResultContent() {
         </button>
       </>
     );
-  } else if (!errorMessage && (outcome === "REFUNDING" || outcome === "REFUNDED")) {
+  } else if (
+    !errorMessage &&
+    (outcome === "REFUNDING" || outcome === "REFUNDED")
+  ) {
     const refunded = outcome === "REFUNDED";
     content = (
       <>
@@ -304,6 +310,7 @@ function PaymentResultContent() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
         {content}
+        <SandboxNotice className="mt-6" />
       </div>
     </div>
   );

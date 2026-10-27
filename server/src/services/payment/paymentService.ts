@@ -10,7 +10,7 @@ import { predecessorsOf } from "../deliveryStatus";
 import { cancelOrphanLalamoveOrder } from "../deliveryRecovery";
 import { LalamoveDispatchError } from "../lalamoveErrors";
 import { HttpError } from "../../utils/httpError";
-import type { DeliveryNoticeEvent } from "../deliveryNotifier";
+import type { DeliveryNoticeEvent } from "../deliveryNoticeCopy";
 
 export interface CreateCheckoutOrderInput {
   userId: number;

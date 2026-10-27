@@ -11,9 +11,11 @@ import { createNotification } from "./notificationService";
 import { messageService } from "./messageService";
 import { updateUserStats } from "./updateUserStats";
 import { enqueueSendEmail } from "../queue/queues";
-import { EmailTemplateProps, WeaveItem } from "../emails/EmailTemplate";
+import type { WeaveItem } from "../emails/EmailTemplate";
 import { ErrorCode } from "./errorCodes";
 import { HttpError } from "./httpError";
+import { getTranslator } from "./i18n";
+import { getAppOrigin } from "./env";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,9 @@ export type WeaveStatus =
   | "cancelled"
   | "withdrawn"
   | "completed";
+
+/** 物品流向：Giver 流出、Receiver 流入（見 CONTEXT.md） */
+export type WeaveRole = "giver" | "receiver";
 
 export interface RequestWeaveParams {
   postId: number;
@@ -264,58 +269,21 @@ export type WeaveActionType =
   | "confirmed"
   | "completed";
 
-interface WeaveNoticeCopy {
-  title: string;
-  content: string;
-}
-
 /**
- * 根據 Weave 動作事件 (Action) 統一生成通知與 Email 標題與內容
+ * 站內通知的標題與內容（與 Email 共用 WeaveNotice 翻譯）。
+ * 站內通知目前仍固定英文；Email 由 email job 依收件人語系產生。
  */
 function getWeaveNoticeCopy(
   action: WeaveActionType,
   actorName: string,
   postTitle: string,
-): WeaveNoticeCopy | null {
-  switch (action) {
-    case "requested":
-      return {
-        title: "New Weave Request",
-        content: `${actorName} sent a weave request for "${postTitle}"`,
-      };
-    case "approved":
-      return {
-        title: "Weave Request Approved",
-        content: `${actorName} approved your weave request for "${postTitle}"`,
-      };
-    case "declined":
-      return {
-        title: "Weave Request Declined",
-        content: `${actorName} declined your weave request for "${postTitle}"`,
-      };
-    case "cancelled":
-      return {
-        title: "Weave Cancelled",
-        content: `${actorName} cancelled the weave for "${postTitle}"`,
-      };
-    case "withdrawn":
-      return {
-        title: "Weave Request Withdrawn",
-        content: `${actorName} withdrew their weave request for "${postTitle}"`,
-      };
-    case "confirmed":
-      return {
-        title: "Weave Confirmed",
-        content: `${actorName} confirmed the weave for "${postTitle}". Waiting for your confirmation.`,
-      };
-    case "completed":
-      return {
-        title: "Weave Completed",
-        content: `Weave for "${postTitle}" is successfully completed!`,
-      };
-    default:
-      return null;
-  }
+) {
+  const t = getTranslator("en", "WeaveNotice");
+  const values = { actorName, postTitle };
+  return {
+    title: t(`${action}.title`, values),
+    content: t(`${action}.content`, values),
+  };
 }
 
 async function getWeaveItemsList(
@@ -331,8 +299,8 @@ async function getWeaveItemsList(
 
   for (const item of weaveItems) {
     if (item.item_id === null) {
-      // All-items weave — no specific item selected
-      result.push({ title: "All items", quantity: null });
+      // All-items weave — no specific item selected; the email shows "All items"
+      result.push({ title: null, quantity: null });
     } else {
       const qty: number = item.quantity ?? 1;
       const [itemRows] = await dbPool.execute<RowDataPacket[]>(
@@ -342,7 +310,7 @@ async function getWeaveItemsList(
       if (itemRows.length > 0) {
         result.push({ title: itemRows[0].title as string, quantity: qty });
       } else {
-        result.push({ title: "Item", quantity: qty });
+        result.push({ title: null, quantity: qty });
       }
     }
   }
@@ -359,7 +327,7 @@ interface NotifyWeaveStatusParams {
   postTitle: string;
   action: WeaveActionType;
   items: WeaveItem[];
-  isRecipientGiver: boolean;
+  recipientRole: WeaveRole;
 }
 
 /**
@@ -375,11 +343,10 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     postTitle,
     action,
     items,
-    isRecipientGiver,
+    recipientRole,
   } = params;
 
   const copy = getWeaveNoticeCopy(action, actorName, postTitle);
-  if (!copy) return;
 
   const link = `/user?highlightWeaveId=${weaveId}`;
 
@@ -395,48 +362,19 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     }).catch((e) => console.error("🔔 Notification creation failed:", e));
   }
 
-  // 2. 站外 Email (Queue)
+  // 2. 站外 Email (Queue)：email job 依收件人的 users.locale 產生文案
   try {
-    const [userRows] = await dbPool.execute<RowDataPacket[]>(
-      `SELECT 
-        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username, 
-        u.email 
-      FROM users u 
-      LEFT JOIN user_profiles up ON u.id = up.user_id 
-      WHERE u.id = ?`,
-      [recipientId],
-    );
-
-    if (userRows.length > 0 && userRows[0].email) {
-      const recipient = userRows[0];
-      const host =
-        process.env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
-
-      // 映射 action 至 Email 的 weaving_status 呈現
-      const emailStatusMap: Record<WeaveActionType, WeaveStatus> = {
-        requested: "requested",
-        approved: "approved",
-        declined: "declined",
-        cancelled: "cancelled",
-        withdrawn: "withdrawn",
-        confirmed: "approved",
-        completed: "completed",
-      };
-
-      const emailProps: EmailTemplateProps = {
-        username: recipient.username,
-        toEmail: recipient.email,
-        title: copy.title,
-        description: copy.content,
-        weaveId: `#TXN-${weaveId}`,
-        weaving_status: emailStatusMap[action],
-        itemsOffered: isRecipientGiver ? items : undefined,
-        itemsReceived: isRecipientGiver ? undefined : items,
-        ctaUrl: `${host}${link}`,
-      };
-
-      await enqueueSendEmail(emailProps);
-    }
+    await enqueueSendEmail({
+      template: "weave-status",
+      recipientId,
+      action,
+      actorName,
+      postTitle,
+      weaveId,
+      items,
+      recipientRole,
+      ctaUrl: `${getAppOrigin()}${link}`,
+    });
   } catch (e) {
     console.error("📧 Enqueue email failed:", e);
   }
@@ -507,7 +445,7 @@ export async function requestWeave(
       postTitle,
       action: "requested",
       items,
-      isRecipientGiver: targetUserId === giverId,
+      recipientRole: targetUserId === giverId ? "giver" : "receiver",
     });
     notificationSent = true;
   } catch (e) {
@@ -728,7 +666,7 @@ export async function approveWeave(
         postTitle,
         action: "confirmed",
         items,
-        isRecipientGiver: recipientId === weave.giver_id,
+        recipientRole: recipientId === weave.giver_id ? "giver" : "receiver",
       }).catch((err) =>
         console.error("Notification/Email failed on partial confirm:", err),
       );
@@ -782,7 +720,7 @@ export async function approveWeave(
         postTitle,
         action,
         items,
-        isRecipientGiver: recipientId === weave.giver_id,
+        recipientRole: recipientId === weave.giver_id ? "giver" : "receiver",
       });
 
       // 2. 如果狀態為「完全完成 (completed)」，觸發動作的這一方 (userId) 也必須收到 Completed 通知與 Email
@@ -796,7 +734,7 @@ export async function approveWeave(
           postTitle,
           action: "completed",
           items,
-          isRecipientGiver: userId === weave.giver_id,
+          recipientRole: userId === weave.giver_id ? "giver" : "receiver",
         });
       }
     }

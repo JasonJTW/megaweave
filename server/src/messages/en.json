@@ -1,0 +1,83 @@
+{
+  "Email": {
+    "footerNotice": "If you have any questions, please contact our support team. This notification was sent to {email}.",
+    "copyright": "© {year} MegaWeaving · All rights reserved",
+    "greeting": "Hi {name},",
+    "weave": {
+      "badge": "🔔 New notification",
+      "details": "Weave details",
+      "weaveId": "Weave ID",
+      "items": {
+        "giver": "Items given",
+        "receiver": "Items received"
+      },
+      "allItems": "All items",
+      "item": "Item",
+      "status": "Status",
+      "cta": "View weave →",
+      "statusLabel": {
+        "requested": "New Request",
+        "approved": "Weaving",
+        "declined": "Declined",
+        "cancelled": "Cancelled",
+        "withdrawn": "Withdrawn",
+        "completed": "Weaved"
+      }
+    },
+    "delivery": {
+      "badge": "🚚 Delivery update",
+      "details": "Order details",
+      "tradeNo": "Order no.",
+      "amount": "Amount",
+      "cta": "View order status →"
+    }
+  },
+  "WeaveNotice": {
+    "requested": {
+      "title": "New Weave Request",
+      "content": "{actorName} sent a weave request for \"{postTitle}\""
+    },
+    "approved": {
+      "title": "Weave Request Approved",
+      "content": "{actorName} approved your weave request for \"{postTitle}\""
+    },
+    "declined": {
+      "title": "Weave Request Declined",
+      "content": "{actorName} declined your weave request for \"{postTitle}\""
+    },
+    "cancelled": {
+      "title": "Weave Cancelled",
+      "content": "{actorName} cancelled the weave for \"{postTitle}\""
+    },
+    "withdrawn": {
+      "title": "Weave Request Withdrawn",
+      "content": "{actorName} withdrew their weave request for \"{postTitle}\""
+    },
+    "confirmed": {
+      "title": "Weave Confirmed",
+      "content": "{actorName} confirmed the weave for \"{postTitle}\". Waiting for your confirmation."
+    },
+    "completed": {
+      "title": "Weave Completed",
+      "content": "Weave for \"{postTitle}\" is successfully completed!"
+    }
+  },
+  "DeliveryNotice": {
+    "DISPATCH_FAILED": {
+      "title": "Delivery booking failed — full refund on the way",
+      "content": "We're sorry, we couldn't book a Lalamove driver for order {tradeNo}. Your payment of NT${amount} will be refunded in full to your card. We'll let you know once it's done."
+    },
+    "PAID_AFTER_ORDER_CLOSED": {
+      "title": "Order expired before payment — full refund on the way",
+      "content": "Your payment for order {tradeNo} arrived after the delivery order had expired, so no driver was booked. NT${amount} will be refunded in full to your card. Please book the delivery again."
+    },
+    "REFUNDED": {
+      "title": "Delivery payment refunded",
+      "content": "{reason, select, LALAMOVE_EXPIRED {No driver accepted your delivery in time, so your} LALAMOVE_REJECTED {Lalamove could not fulfil your delivery, so your} PAID_AFTER_ORDER_CLOSED {Your payment arrived after the delivery order expired, so your} other {Your}} payment of NT${amount} for order {tradeNo} has been refunded to your card. The exact posting date depends on your card issuer."
+    },
+    "REFUND_FAILED": {
+      "title": "Your refund is being processed",
+      "content": "We couldn't complete the refund of NT${amount} for order {tradeNo} automatically. Our support team has been notified and will contact you shortly."
+    }
+  }
+}

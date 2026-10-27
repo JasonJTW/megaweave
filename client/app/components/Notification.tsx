@@ -7,6 +7,7 @@ import {
 } from "../contexts/NotificationContext";
 import { motion, AnimatePresence } from "framer-motion";
 import MessageIcon from "./icons/MessageIcon";
+import type { Ref } from "react";
 import { notificationText } from "@/utils/notificationText";
 
 const isCommentType = (type: string) =>
@@ -23,7 +24,6 @@ export default function NotificationList() {
 
   const router = useRouter();
   const t = useTranslations("Notifications");
-  const formatter = useFormatter();
 
   const handleNotificationClick = async (notification: NotificationItem) => {
     try {
@@ -72,83 +72,11 @@ export default function NotificationList() {
                 </div>
               ) : (
                 notifications.map((n) => (
-                  <motion.div
+                  <NotificationRow
                     key={n.id}
-                    layout
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    onClick={() => handleNotificationClick(n)}
-                    className={`group flex cursor-pointer gap-4 p-4 transition-all duration-200 hover:bg-white ${
-                      n.is_read ? "bg-transparent opacity-70" : "bg-blue-50/30"
-                    }`}
-                  >
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                        n.type === "LIKE"
-                          ? "bg-pink-100 text-pink-500"
-                          : isCommentType(n.type)
-                            ? "bg-blue-100 text-blue-500"
-                            : "bg-green-100 text-green-500"
-                      }`}
-                    >
-                      {/* Icon based on type */}
-                      {n.type === "LIKE" ? (
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                        </svg>
-                      ) : isCommentType(n.type) ? (
-                        <MessageIcon className="h-5 w-5" />
-                      ) : (
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <rect
-                            x="2"
-                            y="3"
-                            width="20"
-                            height="14"
-                            rx="2"
-                            ry="2"
-                          ></rect>
-                          <line x1="8" y1="21" x2="16" y2="21"></line>
-                          <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <h4
-                          className={`text-sm font-semibold ${n.is_read ? "text-gray-700" : "text-gray-900"}`}
-                        >
-                          {notificationText(t, n).title}
-                        </h4>
-                        <span className="ml-2 whitespace-nowrap text-xs text-gray-400">
-                          {formatter.dateTime(new Date(n.created_at))}
-                        </span>
-                      </div>
-                      <p
-                        className={`mt-1 line-clamp-2 text-sm ${n.is_read ? "text-gray-500" : "text-gray-800"}`}
-                      >
-                        {notificationText(t, n).content}
-                      </p>
-                    </div>
-                    {!n.is_read && (
-                      <div className="h-2 w-2 shrink-0 self-center rounded-full bg-red-500"></div>
-                    )}
-                  </motion.div>
+                    n={n}
+                    onClick={handleNotificationClick}
+                  />
                 ))
               )}
             </AnimatePresence>
@@ -156,5 +84,93 @@ export default function NotificationList() {
         </div>
       </div>
     </div>
+  );
+}
+
+//* AnimatePresence 的 popLayout 會傳 ref 進來量測退場元素，要轉給 motion.div
+function NotificationRow({
+  n,
+  onClick,
+  ref,
+}: {
+  n: NotificationItem;
+  onClick: (n: NotificationItem) => void;
+  ref?: Ref<HTMLDivElement>;
+}) {
+  const t = useTranslations("Notifications");
+  const formatter = useFormatter();
+  const { title, content } = notificationText(t, n);
+
+  return (
+    <motion.div
+      ref={ref}
+      layout
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      onClick={() => onClick(n)}
+      className={`group flex cursor-pointer gap-4 p-4 transition-all duration-200 hover:bg-white ${
+        n.is_read ? "bg-transparent opacity-70" : "bg-blue-50/30"
+      }`}
+    >
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+          n.type === "LIKE"
+            ? "bg-pink-100 text-pink-500"
+            : isCommentType(n.type)
+              ? "bg-blue-100 text-blue-500"
+              : "bg-green-100 text-green-500"
+        }`}
+      >
+        {/* Icon based on type */}
+        {n.type === "LIKE" ? (
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+        ) : isCommentType(n.type) ? (
+          <MessageIcon className="h-5 w-5" />
+        ) : (
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+        )}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-start justify-between">
+          <h4
+            className={`text-sm font-semibold ${n.is_read ? "text-gray-700" : "text-gray-900"}`}
+          >
+            {title}
+          </h4>
+          <span className="ml-2 whitespace-nowrap text-xs text-gray-400">
+            {formatter.dateTime(new Date(n.created_at))}
+          </span>
+        </div>
+        <p
+          className={`mt-1 line-clamp-2 text-sm ${n.is_read ? "text-gray-500" : "text-gray-800"}`}
+        >
+          {content}
+        </p>
+      </div>
+      {!n.is_read && (
+        <div className="h-2 w-2 shrink-0 self-center rounded-full bg-red-500"></div>
+      )}
+    </motion.div>
   );
 }

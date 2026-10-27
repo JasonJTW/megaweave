@@ -7,7 +7,10 @@ import { Pool, PoolConnection } from "mysql2/promise";
 import { Server } from "socket.io";
 import dbPool from "./db";
 import { acquireConnection } from "./acquireConnection";
-import { createNotification } from "./notificationService";
+import {
+  createNotification,
+  type NotificationType,
+} from "./notificationService";
 import { messageService } from "./messageService";
 import { updateUserStats } from "./updateUserStats";
 import { enqueueSendEmail } from "../queue/queues";
@@ -269,9 +272,20 @@ export type WeaveActionType =
   | "confirmed"
   | "completed";
 
+//* 站內通知的 type：client 依 type + params 用讀者語言組句
+const WEAVE_NOTIFICATION_TYPE = {
+  requested: "WEAVE_REQUESTED",
+  approved: "WEAVE_APPROVED",
+  declined: "WEAVE_DECLINED",
+  cancelled: "WEAVE_CANCELLED",
+  withdrawn: "WEAVE_WITHDRAWN",
+  confirmed: "WEAVE_CONFIRMED",
+  completed: "WEAVE_COMPLETED",
+} as const satisfies Record<WeaveActionType, NotificationType>;
+
 /**
- * 站內通知的標題與內容（與 Email 共用 WeaveNotice 翻譯）。
- * 站內通知目前仍固定英文；Email 由 email job 依收件人語系產生。
+ * 站內通知的 type 與英文標題、內容（與 Email 共用 WeaveNotice 翻譯）。
+ * 英文只給 log 與舊 client fallback；畫面由 client 依 type + params 用讀者語言組句，Email 由 email job 依收件人語系產生。
  */
 function getWeaveNoticeCopy(
   action: WeaveActionType,
@@ -281,6 +295,7 @@ function getWeaveNoticeCopy(
   const t = getTranslator("en", "WeaveNotice");
   const values = { actorName, postTitle };
   return {
+    type: WEAVE_NOTIFICATION_TYPE[action],
     title: t(`${action}.title`, values),
     content: t(`${action}.content`, values),
   };
@@ -355,9 +370,10 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     createNotification(io, {
       recipient_id: recipientId,
       sender_id: senderId,
-      type: "ORDER_UPDATE",
+      type: copy.type,
       title: copy.title,
       content: copy.content,
+      params: { actorName, postTitle },
       link,
     }).catch((e) => console.error("🔔 Notification creation failed:", e));
   }

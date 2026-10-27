@@ -760,7 +760,49 @@
     "signInToView": "Please sign in to view notifications",
     "markedAllRead": "All marked as read",
     "markAllReadFailed": "Failed to mark all as read",
-    "newNotification": "New notification"
+    "newNotification": "New notification",
+    "event": {
+      "LIKE": {
+        "title": "New Like",
+        "content": "{actorName} liked your post \"{postTitle}\""
+      },
+      "COMMENT": {
+        "title": "New Comment",
+        "content": "{actorName} commented on your post \"{postTitle}\""
+      },
+      "COMMENT_REPLY": {
+        "title": "New Reply",
+        "content": "{actorName} replied to your comment"
+      },
+      "WEAVE_REQUESTED": {
+        "title": "New Weave Request",
+        "content": "{actorName} sent a weave request for \"{postTitle}\""
+      },
+      "WEAVE_APPROVED": {
+        "title": "Weave Request Approved",
+        "content": "{actorName} approved your weave request for \"{postTitle}\""
+      },
+      "WEAVE_DECLINED": {
+        "title": "Weave Request Declined",
+        "content": "{actorName} declined your weave request for \"{postTitle}\""
+      },
+      "WEAVE_WITHDRAWN": {
+        "title": "Weave Request Withdrawn",
+        "content": "{actorName} withdrew their weave request for \"{postTitle}\""
+      },
+      "WEAVE_CANCELLED": {
+        "title": "Weave Cancelled",
+        "content": "{actorName} cancelled the weave for \"{postTitle}\""
+      },
+      "WEAVE_CONFIRMED": {
+        "title": "Weave Confirmed",
+        "content": "{actorName} confirmed the weave for \"{postTitle}\". Waiting for your confirmation."
+      },
+      "WEAVE_COMPLETED": {
+        "title": "Weave Completed",
+        "content": "Weave for \"{postTitle}\" is successfully completed!"
+      }
+    }
   },
   "History": {
     "signInToView": "Please sign in to view your history",

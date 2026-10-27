@@ -6,14 +6,19 @@ import { useSocket } from "@/hooks/useSocket";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useNavbar } from "./NavBarContext";
+import {
+  notificationText,
+  type NotificationType,
+} from "@/utils/notificationText";
 
 import { useUser } from "./UserContext";
 
 export interface NotificationItem {
   id: number;
-  type: "LIKE" | "COMMENT" | "ORDER_UPDATE" | "SYSTEM";
+  type: NotificationType;
   title: string;
   content: string;
+  params?: Record<string, unknown> | null;
   link?: string;
   is_read: boolean;
   created_at: string;
@@ -121,7 +126,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Auto-show navbar and toast
       showNavbar();
-      toast.success(newNotif.title || t("newNotification"));
+      toast.success(
+        notificationText(t, newNotif).title || t("newNotification"),
+      );
     };
 
     socket.on("new_notification", handleNewNotification);

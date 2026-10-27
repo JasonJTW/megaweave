@@ -198,6 +198,7 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
               type: "COMMENT",
               title: "New Comment",
               content: `${commenterName} commented on your post "${post.title}"`,
+              params: { actorName: commenterName, postTitle: post.title },
               link: `/item/${post.public_id}#comment-${newComment.id}`,
             });
           }
@@ -226,9 +227,10 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
                 await createNotification(io, {
                   recipient_id: parentComment[0].user_id,
                   sender_id: effectiveUserId,
-                  type: "COMMENT",
+                  type: "COMMENT_REPLY",
                   title: "New Reply",
                   content: `${commenterName} replied to your comment`,
+                  params: { actorName: commenterName },
                   link: `/item/${post.public_id}#comment-${newComment.id}`,
                 });
              }

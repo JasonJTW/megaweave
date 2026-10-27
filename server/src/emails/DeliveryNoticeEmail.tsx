@@ -13,9 +13,11 @@ import {
   Hr,
 } from "react-email";
 import EmailBanner from "./EmailBanner";
+import { getTranslator } from "../utils/i18n";
+import type { Locale } from "../validations";
 
 export interface DeliveryNoticeEmailProps {
-  locale: "zh-TW" | "en";
+  locale: Locale;
   username: string;
   toEmail: string;
   title: string;
@@ -24,28 +26,6 @@ export interface DeliveryNoticeEmailProps {
   amount: number;
   ctaUrl: string;
 }
-
-const COPY = {
-  "zh-TW": {
-    badge: "🚚 外送訂單通知",
-    greeting: (name: string) => `${name} 您好，`,
-    details: "訂單資訊",
-    tradeNo: "訂單編號",
-    amount: "金額",
-    cta: "查看訂單狀態 →",
-    footer: (email: string) => `如有任何問題，請聯繫客服。此通知寄送至 ${email}。`,
-  },
-  en: {
-    badge: "🚚 Delivery update",
-    greeting: (name: string) => `Hi ${name},`,
-    details: "Order details",
-    tradeNo: "Order no.",
-    amount: "Amount",
-    cta: "View order status →",
-    footer: (email: string) =>
-      `If you have any questions, please contact our support team. This notification was sent to ${email}.`,
-  },
-} as const;
 
 const DeliveryNoticeEmail = ({
   locale,
@@ -57,7 +37,7 @@ const DeliveryNoticeEmail = ({
   amount,
   ctaUrl,
 }: DeliveryNoticeEmailProps) => {
-  const copy = COPY[locale] ?? COPY["zh-TW"];
+  const t = getTranslator(locale, "Email");
 
   return (
     <Html lang={locale}>
@@ -96,7 +76,7 @@ const DeliveryNoticeEmail = ({
                 margin: "0 0 20px",
               }}
             >
-              {copy.badge}
+              {t("delivery.badge")}
             </Text>
 
             <Heading
@@ -115,7 +95,7 @@ const DeliveryNoticeEmail = ({
             <Text
               style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.7, margin: "0 0 24px" }}
             >
-              {copy.greeting(username)}
+              {t("greeting", { name: username })}
               <br />
               {description}
             </Text>
@@ -138,12 +118,12 @@ const DeliveryNoticeEmail = ({
                   fontWeight: 600,
                 }}
               >
-                {copy.details}
+                {t("delivery.details")}
               </Text>
               <Row>
                 <Column>
                   <Text style={{ fontSize: 14, color: "#6b7280", margin: "4px 0" }}>
-                    {copy.tradeNo}
+                    {t("delivery.tradeNo")}
                   </Text>
                 </Column>
                 <Column align="right">
@@ -157,7 +137,7 @@ const DeliveryNoticeEmail = ({
               <Row>
                 <Column>
                   <Text style={{ fontSize: 14, color: "#6b7280", margin: "4px 0" }}>
-                    {copy.amount}
+                    {t("delivery.amount")}
                   </Text>
                 </Column>
                 <Column align="right">
@@ -183,7 +163,7 @@ const DeliveryNoticeEmail = ({
                     display: "inline-block",
                   }}
                 >
-                  {copy.cta}
+                  {t("delivery.cta")}
                 </Button>
               </Column>
             </Row>
@@ -193,7 +173,7 @@ const DeliveryNoticeEmail = ({
 
           <Section style={{ padding: "16px 32px 24px" }}>
             <Text style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.7, margin: 0 }}>
-              {copy.footer(toEmail)}
+              {t("footerNotice", { email: toEmail })}
             </Text>
           </Section>
 

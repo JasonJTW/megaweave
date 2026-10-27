@@ -24,3 +24,8 @@ export function requireEnv(
 
   return value;
 }
+
+/** Public site origin for links in notifications and emails */
+export function getAppOrigin(env: NodeJS.ProcessEnv = process.env): string {
+  return env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
+}

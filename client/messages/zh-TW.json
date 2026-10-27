@@ -1065,5 +1065,10 @@
     "MEMBER_NAME_REQUIRED": "請輸入成員名稱。",
     "INVALID_CATEGORY": "請選擇有效的分類。",
     "SEARCH_QUERY_TOO_LONG": "搜尋文字不能超過 300 個字。"
+  },
+  "SandboxNotice": {
+    "title": "目前僅供測試與體驗使用",
+    "body": "綠界金流與 Lalamove 皆串接測試環境：付款不會實際扣款，也不會真的派車送貨。",
+    "testCard": "可使用綠界測試信用卡 {card}，安全碼 {cvv}，有效期限填任一未來月份。"
   }
 }

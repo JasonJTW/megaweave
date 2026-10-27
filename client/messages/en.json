@@ -1065,5 +1065,10 @@
     "MEMBER_NAME_REQUIRED": "Please enter the member's name.",
     "INVALID_CATEGORY": "Please choose a valid category.",
     "SEARCH_QUERY_TOO_LONG": "Search text must be 300 characters or fewer."
+  },
+  "SandboxNotice": {
+    "title": "For testing and demo only",
+    "body": "ECPay and Lalamove are connected to their test environments: no real charge will be made and no driver will actually be dispatched.",
+    "testCard": "Use the ECPay test card {card}, CVV {cvv}, and any future expiry date."
   }
 }

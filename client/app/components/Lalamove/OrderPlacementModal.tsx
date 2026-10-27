@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import QuotationSummaryCard from "./QuotationSummaryCard";
+import SandboxNotice from "./SandboxNotice";
 import { useUser } from "@/app/contexts/UserContext";
 import {
   parseGooglePlace,
@@ -486,8 +487,7 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
 
       toast.success(t("order.allQuotesUpdated"));
     } catch (err: unknown) {
-      const msg =
-        apiErrorMessage(err, t("order.recalculateFailed"));
+      const msg = apiErrorMessage(err, t("order.recalculateFailed"));
       setErrorMessage(msg);
       toast.error(msg);
     } finally {
@@ -743,6 +743,8 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
               <X className="h-5 w-5" />
             </Dialog.Close>
           </div>
+
+          <SandboxNotice showTestCard className="mb-3" />
 
           <form onSubmit={handleSubmitOrder} className="mt-2 space-y-3.5">
             {/* 1. 取件 / 寄件人資訊 */}

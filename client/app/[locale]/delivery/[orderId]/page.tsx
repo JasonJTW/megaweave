@@ -4,6 +4,7 @@ import { useRouter } from "@/i18n/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import SandboxNotice from "@/app/components/Lalamove/SandboxNotice";
 import useSWR from "swr";
 import {
   Truck,
@@ -632,6 +633,8 @@ export default function DeliveryTrackingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50/40 via-white to-gray-50/60 pb-16 pt-4 sm:pt-8">
       <div className="mx-auto max-w-5xl px-3 sm:px-6">
+        <SandboxNotice className="mb-4" />
+
         {/* Top Navigation Bar */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

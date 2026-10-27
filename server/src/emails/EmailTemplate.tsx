@@ -13,7 +13,7 @@ import {
   Hr,
 } from "react-email";
 import EmailBanner from "./EmailBanner";
-import type { WeaveStatus } from "../utils/weaveService";
+import type { WeaveRole, WeaveStatus } from "../utils/weaveService";
 import { getTranslator } from "../utils/i18n";
 import type { Locale } from "../validations";
 
@@ -30,8 +30,9 @@ export interface EmailTemplateProps {
   description: string;
   weaveId: number;
   weaving_status: WeaveStatus;
-  itemsGiven?: WeaveItem[];
-  itemsReceived?: WeaveItem[];
+  items: WeaveItem[];
+  /** 收件人在這次 Weave 的角色，決定物品清單標題（提供 / 收到） */
+  recipientRole: WeaveRole;
   ctaUrl: string;
   toEmail: string;
 }
@@ -50,8 +51,8 @@ const EmailTemplate = ({
   description,
   weaveId,
   weaving_status,
-  itemsGiven,
-  itemsReceived,
+  items,
+  recipientRole,
   ctaUrl,
   toEmail,
 }: EmailTemplateProps) => {
@@ -178,8 +179,8 @@ const EmailTemplate = ({
                 </Column>
               </Row>
 
-              {/* Items given */}
-              {itemsGiven && itemsGiven.length > 0 && (
+              {/* Items */}
+              {items.length > 0 && (
                 <Section
                   style={{
                     borderBottom: "1px solid #e5e7eb",
@@ -197,62 +198,9 @@ const EmailTemplate = ({
                       letterSpacing: "0.03em",
                     }}
                   >
-                    {t("weave.itemsGiven")}
+                    {t(`weave.items.${recipientRole}`)}
                   </Text>
-                  {itemsGiven.map((item, idx) => (
-                    <Row key={idx} style={{ marginTop: idx > 0 ? 4 : 0 }}>
-                      <Column>
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 500,
-                            color: "#111827",
-                            margin: 0,
-                          }}
-                        >
-                          {itemTitle(item)}
-                        </Text>
-                      </Column>
-                      {item.quantity && (
-                        <Column align="right">
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: "#6b7280",
-                              margin: 0,
-                            }}
-                          >
-                            x{item.quantity}
-                          </Text>
-                        </Column>
-                      )}
-                    </Row>
-                  ))}
-                </Section>
-              )}
-
-              {/* Items received */}
-              {itemsReceived && itemsReceived.length > 0 && (
-                <Section
-                  style={{
-                    borderBottom: "1px solid #e5e7eb",
-                    paddingBottom: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      margin: "0 0 6px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.03em",
-                    }}
-                  >
-                    {t("weave.itemsReceived")}
-                  </Text>
-                  {itemsReceived.map((item, idx) => (
+                  {items.map((item, idx) => (
                     <Row key={idx} style={{ marginTop: idx > 0 ? 4 : 0 }}>
                       <Column>
                         <Text

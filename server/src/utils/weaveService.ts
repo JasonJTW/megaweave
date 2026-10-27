@@ -15,6 +15,7 @@ import type { WeaveItem } from "../emails/EmailTemplate";
 import { ErrorCode } from "./errorCodes";
 import { HttpError } from "./httpError";
 import { getTranslator } from "./i18n";
+import { getAppOrigin } from "./env";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,9 @@ export type WeaveStatus =
   | "cancelled"
   | "withdrawn"
   | "completed";
+
+/** 物品流向：Giver 流出、Receiver 流入（見 CONTEXT.md） */
+export type WeaveRole = "giver" | "receiver";
 
 export interface RequestWeaveParams {
   postId: number;
@@ -323,7 +327,7 @@ interface NotifyWeaveStatusParams {
   postTitle: string;
   action: WeaveActionType;
   items: WeaveItem[];
-  isRecipientGiver: boolean;
+  recipientRole: WeaveRole;
 }
 
 /**
@@ -339,7 +343,7 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
     postTitle,
     action,
     items,
-    isRecipientGiver,
+    recipientRole,
   } = params;
 
   const copy = getWeaveNoticeCopy(action, actorName, postTitle);
@@ -360,7 +364,6 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 
   // 2. 站外 Email (Queue)：email job 依收件人的 users.locale 產生文案
   try {
-    const host = process.env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
     await enqueueSendEmail({
       template: "weave-status",
       recipientId,
@@ -369,8 +372,8 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
       postTitle,
       weaveId,
       items,
-      isRecipientGiver,
-      ctaUrl: `${host}${link}`,
+      recipientRole,
+      ctaUrl: `${getAppOrigin()}${link}`,
     });
   } catch (e) {
     console.error("📧 Enqueue email failed:", e);
@@ -442,7 +445,7 @@ export async function requestWeave(
       postTitle,
       action: "requested",
       items,
-      isRecipientGiver: targetUserId === giverId,
+      recipientRole: targetUserId === giverId ? "giver" : "receiver",
     });
     notificationSent = true;
   } catch (e) {
@@ -663,7 +666,7 @@ export async function approveWeave(
         postTitle,
         action: "confirmed",
         items,
-        isRecipientGiver: recipientId === weave.giver_id,
+        recipientRole: recipientId === weave.giver_id ? "giver" : "receiver",
       }).catch((err) =>
         console.error("Notification/Email failed on partial confirm:", err),
       );
@@ -717,7 +720,7 @@ export async function approveWeave(
         postTitle,
         action,
         items,
-        isRecipientGiver: recipientId === weave.giver_id,
+        recipientRole: recipientId === weave.giver_id ? "giver" : "receiver",
       });
 
       // 2. 如果狀態為「完全完成 (completed)」，觸發動作的這一方 (userId) 也必須收到 Completed 通知與 Email
@@ -731,7 +734,7 @@ export async function approveWeave(
           postTitle,
           action: "completed",
           items,
-          isRecipientGiver: userId === weave.giver_id,
+          recipientRole: userId === weave.giver_id ? "giver" : "receiver",
         });
       }
     }

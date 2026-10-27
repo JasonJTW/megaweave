@@ -7,8 +7,10 @@
       "badge": "🔔 New notification",
       "details": "Weave details",
       "weaveId": "Weave ID",
-      "itemsGiven": "Items given",
-      "itemsReceived": "Items received",
+      "items": {
+        "giver": "Items given",
+        "receiver": "Items received"
+      },
       "allItems": "All items",
       "item": "Item",
       "status": "Status",

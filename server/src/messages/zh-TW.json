@@ -7,8 +7,10 @@
       "badge": "🔔 新通知",
       "details": "交織資訊",
       "weaveId": "交織編號",
-      "itemsGiven": "提供的物品",
-      "itemsReceived": "收到的物品",
+      "items": {
+        "giver": "提供的物品",
+        "receiver": "收到的物品"
+      },
       "allItems": "全部物品",
       "item": "物品",
       "status": "狀態",

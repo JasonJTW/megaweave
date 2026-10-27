@@ -8,6 +8,7 @@ import { getSocketBroadcaster } from "../utils/socket";
 import { createNotification } from "../utils/notificationService";
 import { enqueueSendEmail } from "../queue/queues";
 import { resolveLocale } from "../utils/i18n";
+import { getAppOrigin } from "../utils/env";
 import { getDeliveryNoticeCopy, type DeliveryNoticeEvent } from "./deliveryNoticeCopy";
 
 export async function notifyDeliveryUser(
@@ -49,7 +50,6 @@ export async function notifyDeliveryUser(
     }
 
     if (target.email) {
-      const host = process.env.NEXT_PUBLIC_HOSTNAME || "https://megaweaving.net";
       await enqueueSendEmail({
         template: "delivery-notice",
         recipientId: target.user_id,
@@ -57,7 +57,7 @@ export async function notifyDeliveryUser(
         reason,
         merchantTradeNo: target.merchant_trade_no,
         amount,
-        ctaUrl: `${host}${link}`,
+        ctaUrl: `${getAppOrigin()}${link}`,
       });
     }
   } catch (err) {

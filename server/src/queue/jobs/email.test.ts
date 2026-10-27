@@ -39,7 +39,7 @@ const weaveApproved: SendEmailJobData = {
   postTitle: "Rice cooker",
   weaveId: 7,
   items: [{ title: "Rice cooker", quantity: 2 }],
-  isRecipientGiver: false,
+  recipientRole: "receiver",
   ctaUrl: "https://megaweaving.net/user?highlightWeaveId=7",
 };
 
@@ -99,6 +99,16 @@ describe("email worker", () => {
 
     const { subject } = await sentEmail();
     expect(subject).toBe("交織請求已同意");
+  });
+
+  it("titles the item list by the recipient's role in the weave", async () => {
+    (dbPool.execute as jest.Mock).mockResolvedValueOnce([[recipient()]]);
+
+    await processSendEmail(mockJob({ ...weaveApproved, recipientRole: "giver" }));
+
+    const { html } = await sentEmail();
+    expect(html).toContain("提供的物品");
+    expect(html).not.toContain("收到的物品");
   });
 
   it("translates the all-items placeholder", async () => {

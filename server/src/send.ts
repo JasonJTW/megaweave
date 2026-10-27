@@ -32,7 +32,7 @@ const SendEmailSchema = z.discriminatedUnion("template", [
         quantity: z.number().int().positive().nullable(),
       }),
     ),
-    isRecipientGiver: z.boolean(),
+    recipientRole: z.enum(["giver", "receiver"]),
     ctaUrl: z.url(),
   }),
   z.object({

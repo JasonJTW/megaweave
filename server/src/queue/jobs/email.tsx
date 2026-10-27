@@ -10,7 +10,7 @@ import {
   getDeliveryNoticeCopy,
   type DeliveryNoticeEvent,
 } from "../../services/deliveryNoticeCopy";
-import type { WeaveActionType, WeaveStatus } from "../../utils/weaveService";
+import type { WeaveActionType, WeaveRole, WeaveStatus } from "../../utils/weaveService";
 import type { Locale } from "../../validations";
 
 /**
@@ -25,7 +25,7 @@ export interface WeaveEmailJobData {
   postTitle: string;
   weaveId: number;
   items: WeaveItem[];
-  isRecipientGiver: boolean;
+  recipientRole: WeaveRole;
   ctaUrl: string;
 }
 
@@ -131,8 +131,8 @@ function renderEmail(data: SendEmailJobData, to: Recipient): RenderedEmail {
         description={t(`${data.action}.content`, values)}
         weaveId={data.weaveId}
         weaving_status={WEAVE_EMAIL_STATUS[data.action]}
-        itemsGiven={data.isRecipientGiver ? data.items : undefined}
-        itemsReceived={data.isRecipientGiver ? undefined : data.items}
+        items={data.items}
+        recipientRole={data.recipientRole}
         ctaUrl={data.ctaUrl}
       />
     ),

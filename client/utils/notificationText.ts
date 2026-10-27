@@ -4,8 +4,8 @@ export type NotificationsTranslator = ReturnType<
   typeof useTranslations<"Notifications">
 >;
 
-//* 每種 type 組句需要的 params（server/src/utils/notificationService.ts 寫入）
-const REQUIRED_PARAMS = {
+//* 每種 type 組句需要的 params；type 清單要和 server/src/utils/notificationTypes.ts 的 RENDERED_NOTIFICATION_TYPES 一致（測試會檢查）
+export const REQUIRED_PARAMS = {
   LIKE: ["actorName", "postTitle"],
   COMMENT: ["actorName", "postTitle"],
   COMMENT_REPLY: ["actorName"],
@@ -20,8 +20,12 @@ const REQUIRED_PARAMS = {
 
 type EventType = keyof typeof REQUIRED_PARAMS;
 
+//* 列出已知 type 供自動完成；保留 string 是因為 server 可能先部署新 type，不認得的照存的文字顯示
+export type NotificationType =
+  EventType | "ORDER_UPDATE" | "SYSTEM" | (string & {});
+
 export interface NotificationTextInput {
-  type: string;
+  type: NotificationType;
   params?: Record<string, unknown> | null;
   title: string;
   content: string;

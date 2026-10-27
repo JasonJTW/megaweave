@@ -2,23 +2,9 @@ import dbPool from "./db";
 import { ResultSetHeader } from "mysql2";
 import type { SocketBroadcaster } from "./socket";
 import z from "zod";
+import { NOTIFICATION_TYPES } from "./notificationTypes";
 
-//* 有 params 的 type 由 client 依讀者語言組句（client/utils/notificationText.ts）；
-//* title / content 仍寫入英文，給 log 與沒有 params 的舊資料用
-export const NotificationTypeSchema = z.enum([
-  "LIKE",
-  "COMMENT",
-  "COMMENT_REPLY",
-  "WEAVE_REQUESTED",
-  "WEAVE_APPROVED",
-  "WEAVE_DECLINED",
-  "WEAVE_WITHDRAWN",
-  "WEAVE_CANCELLED",
-  "WEAVE_CONFIRMED",
-  "WEAVE_COMPLETED",
-  "ORDER_UPDATE",
-  "SYSTEM",
-]);
+export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
 
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
 
@@ -39,7 +25,7 @@ export type Notification = z.infer<typeof NotificationSchema>;
 
 export const createNotification = async (
   io: SocketBroadcaster | null,
-  data: Omit<Notification, "id" | "is_read" | "created_at">
+  data: Omit<Notification, "id" | "is_read" | "created_at">,
 ) => {
   try {
     // 1. 存入 MySQL
@@ -54,7 +40,7 @@ export const createNotification = async (
         data.content,
         data.params ? JSON.stringify(data.params) : null,
         data.link || null,
-      ]
+      ],
     );
 
     const newNotification = {
@@ -68,7 +54,7 @@ export const createNotification = async (
     // 記得你之前設定的 Room 名稱是 `user_${id}`
     io?.to(`user_${data.recipient_id}`).emit(
       "new_notification",
-      newNotification
+      newNotification,
     );
 
     return newNotification;

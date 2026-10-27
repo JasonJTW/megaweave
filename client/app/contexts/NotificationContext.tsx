@@ -6,14 +6,16 @@ import { useSocket } from "@/hooks/useSocket";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
 import { useNavbar } from "./NavBarContext";
-import { notificationText } from "@/utils/notificationText";
+import {
+  notificationText,
+  type NotificationType,
+} from "@/utils/notificationText";
 
 import { useUser } from "./UserContext";
 
 export interface NotificationItem {
   id: number;
-  //* 見 server/src/utils/notificationService.ts 的 NotificationTypeSchema
-  type: string;
+  type: NotificationType;
   title: string;
   content: string;
   params?: Record<string, unknown> | null;

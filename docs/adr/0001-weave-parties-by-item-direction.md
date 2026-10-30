@@ -12,4 +12,4 @@
 
 ## Consequences
 
-Commons（地球公物）沿用同一組欄位：保管者是 Giver，借用者是 Receiver，因為借出當下物品的流向與 Share 完全相同。Commons 與 Share 的差異在於**多一段回程**，那應該用額外的狀態與歸還期限表達，而不是新增一組兩造欄位。
+Commons（地球公物）沿用同一組欄位：Custodian（上家）是 Giver，下家是 Receiver，因為交接當下物品的流向與 Share 完全相同。Commons 與 Share 的差異在於**物資會持續流轉**：Weave 完成後 Receiver 成為新的 Custodian，下一次 Weave 再由他擔任 Giver。這應該用物資本身的狀態（使用中 / 可釋出、使用期限）表達，而不是新增一組兩造欄位。物資不會回到最初的提供者手上，所以不需要「歸還」流程。

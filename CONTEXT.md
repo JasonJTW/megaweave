@@ -19,8 +19,25 @@ _Avoid_: Offer, Donation, 贈送
 _Avoid_: Request, Want, 徵求
 
 **Commons (地球公物)**:
-開放給社群**借用**的物品：提供出來，由他人在約定時間內領取使用。與 Share 的差別在於物品會回到提供者手上，所有權不移轉。
+永久開放給社群**借用**的物資。「溢出」端的提供者建立 Share 時勾選「地球公物」，該物資即成為公共資源，不再屬於任何個人。
+採**分散式暫存**：物資沒有中央倉庫，由當下持有的使用者（Custodian）在使用期限內保管。
+與 Share 的差別：Share 是一次性送出，Commons 會一直在使用者之間流轉。
 _Avoid_: Loan, Lending, 共享物, Common Share, Share Commons
+
+**Custodian (上家)**:
+Commons 目前的保管者，負責在使用期限內保管該物資。透過 Weave 把物資交給下一位 Receiver（下家）後，下家成為新的 Custodian，原 Custodian 的責任結束。
+_Avoid_: Owner, Holder, Lender
+
+**In Use (使用中)**:
+Commons 的預設狀態。Custodian 正在使用，Commons 仍會出現在搜尋結果中，但必須標注「使用中」狀態與 Current Holder（目前保管者），且不可被請求。
+
+**Releasable (可釋出)**:
+Custodian 勾選「可釋出」或「x月x日可釋出」後的狀態。此時系統才開放 Wish 使用者請求該物資；指定日期者，到期日起才可被請求。
+
+**Current Holder (目前保管者)**:
+搜尋結果與詳情頁上標示的 Commons 現任 Custodian，讓需求者知道物資在誰手上。
+
+> Commons 的流轉：提供者勾選地球公物 → Custodian 保管（In Use，可被搜尋但不可請求）→ 標示 Releasable（開放請求）→ 新使用者經 Weave 取得 → 成為新 Custodian。物資不會回到最初的提供者手上。
 
 **Item**:
 一則 Post 裡列出的具體物品與數量。一個 Weave 可以只針對其中幾個 Item，不必涵蓋整則 Post。
@@ -32,11 +49,11 @@ _Avoid_: Loan, Lending, 共享物, Common Share, Share Commons
 _Avoid_: Transaction, Trade, Deal, Order, 訂單
 
 **Giver (提供者)**:
-物品從這一方**流出**。描述的是物品的方向，不是所有權移轉 —— Commons 的保管者雖然物品之後會回來，在該次 Weave 中仍然是 Giver。
+物品從這一方**流出**。描述的是物品的方向，不是所有權移轉 —— Commons 的 Custodian 在該次 Weave 中是 Giver。
 _Avoid_: Donor, Seller, Owner, 贈送者, 分享者
 
 **Receiver (接收者)**:
-物品**流入**這一方。同樣只描述方向 —— Commons 的借用者在該次 Weave 中是 Receiver，即使他只是暫時持有。
+物品**流入**這一方。同樣只描述方向 —— Commons 的下家在該次 Weave 中是 Receiver，Weave 完成後成為新的 Custodian。
 _Avoid_: Recipient, Buyer, Claimer, 收受者
 
 **Initiator**:

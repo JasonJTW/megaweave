@@ -17,6 +17,17 @@
 - **API Error Codes**: `server/src/utils/errorCodes.ts` is the single source. A new code needs a translation in the client `Errors` namespace (both locales; `client/__tests__/errorCodes.test.ts` enforces it). The client shows `translateApiError` / `useApiErrorMessage` output, never `errorMessage`. Validation: data the user typed into a form fails with `next(zodError)` → `VALIDATION_FAILED` ("check your input"); IDs, query params and other client-generated payloads fail with `INVALID_REQUEST` ("refresh and try again" — it means a client bug).
 - **Database**: Parameterized raw SQL queries via `mysql2/promise` with transactions for multi-step mutations. Never interpolate untrusted values directly into SQL strings.
 
+## Architecture Decisions
+- **ADRs** (`docs/adr/`, vocabulary in `CONTEXT.md`) record deliberate choices that look like bugs. Before changing or reviewing code that touches a decision's subject (weave giver/receiver, locale routing, org membership and audience tier), read the matching ADR.
+
+## Review Standards
+Used by the CI review workflows. Signal over volume: each comment names a concrete defect and a fix.
+- **Correctness**: logic errors, unhandled `await`, races, missing transaction on multi-step writes.
+- **Conventions**: the Error Handling, API Error Codes, and Database rules above.
+- **ADRs**: comment when a change contradicts an ADR (cite its number and the contradicted sentence), or makes a new architectural decision with no ADR.
+- **Tests**: a behaviour change ships with a test.
+- **Scope**: comment only on changed lines, at most 5 comments, highest severity first. Style belongs to ESLint and Prettier. Post nothing when no defect exists.
+
 ## Testing
 - Run tests: `make test` or `cd server && npm test`
 - Single test: `cd server && npx jest path/to/file.test.ts`

@@ -20,7 +20,8 @@ import toast from "react-hot-toast";
 import OrderPlacementModal from "./OrderPlacementModal";
 import QuotationSummaryCard from "./QuotationSummaryCard";
 import { useUser } from "@/app/contexts/UserContext";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch } from "@/app/store/hooks";
+import { openChat } from "@/app/store/chatPopupSlice";
 import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
 import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
@@ -38,6 +39,9 @@ import {
   GOOGLE_AUTOCOMPLETE_FIELDS,
   ParsedGooglePlace,
 } from "@/utils/locationUtils";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -110,6 +114,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const t = useTranslations("Lalamove");
+  const apiErrorMessage = useApiErrorMessage();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -145,7 +150,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const { user } = useUser();
-  const { openChat } = useChatPopup();
+  const dispatch = useAppDispatch();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   // Weaves query to check if there is a approved weave for this post
@@ -166,9 +171,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const handleWeaveThisClick = async () => {
     if (!user) {
       toast.error(t("quotation.signInToMessage"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
 
@@ -189,15 +192,17 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
       const data = await res.json();
 
-      openChat(
-        data.conversationId,
-        {
-          public_id: post.author_public_id,
-          username: post.username,
-          avatar_url: post.avatar_url,
-        },
-        post,
-        { id: "all", title: "All" },
+      dispatch(
+        openChat({
+          conversationId: data.conversationId,
+          otherUser: {
+            public_id: post.author_public_id,
+            username: post.username,
+            avatar_url: post.avatar_url,
+          },
+          post,
+          item: { id: "all", title: "All" },
+        }),
       );
     } catch (error) {
       console.error("Message error:", error);
@@ -318,7 +323,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         console.log("[Lalamove Client] Received quotation data:", data);
 
         if (!response.ok || !data.success) {
-          throw new Error(data.error || t("quotation.quoteFailed"));
+          throw new ApiError(data);
         }
 
         const quotesMap: Record<string, QuotationItem> = {};
@@ -363,7 +368,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       } catch (err: unknown) {
         console.error("Fetch quotation error:", err);
         const message =
-          err instanceof Error ? err.message : t("quotation.quoteFailed");
+          apiErrorMessage(err, t("quotation.quoteFailed"));
         setErrorMsg(message);
         toast.error(message);
       } finally {
@@ -379,6 +384,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       originLng,
       selectedService,
       t,
+      apiErrorMessage,
     ],
   );
 

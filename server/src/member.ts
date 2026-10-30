@@ -1,9 +1,10 @@
 import dbPool from "./utils/db";
 import { RowDataPacket } from "mysql2";
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import { requireAuth, requireRole } from "./middleware/auth";
 import { userRoles } from "./schema";
+import { HttpError } from "./utils/httpError";
 
 dotenv.config();
 
@@ -38,7 +39,7 @@ export interface TeamMember {
 }
 //RWD userProfile for contributor, displaying on about page
 
-router.get(`/all`, async (req: Request, res: Response) => {
+router.get(`/all`, async (req: Request, res: Response, next: NextFunction) => {
   const { userId } = req.query;
 
   let query: string;
@@ -59,8 +60,7 @@ router.get(`/all`, async (req: Request, res: Response) => {
     // );
     return res.status(200).json(row);
   } catch (error) {
-    console.error("Database error:", error);
-    res.status(500).json({ errorMessage: "Failed to fetch all members" });
+    return next(error);
   }
 });
 
@@ -68,7 +68,7 @@ router.post(
   `/`,
   requireAuth,
   requireRole(userRoles[1], userRoles[2]),
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     const userId = req.user!.userId;
     const { updates } = req.body;
     const allowedFields = [
@@ -89,18 +89,18 @@ router.post(
     console.log(filteredUpdates);
 
     if (Object.keys(filteredUpdates).length === 0) {
-      return res
-        .status(400)
-        .json({ errorMessage: "No valid fields to update" });
+      return next(
+        new HttpError(400, "INVALID_REQUEST", "No valid fields to update"),
+      );
     }
 
     if (
       "member_name" in filteredUpdates &&
       !filteredUpdates.member_name?.trim()
     ) {
-      return res.status(400).json({
-        errorMessage: "Member name is required",
-      });
+      return next(
+        new HttpError(400, "MEMBER_NAME_REQUIRED", "Member name is required"),
+      );
     }
 
     /// Construct SQL query
@@ -122,8 +122,7 @@ router.post(
         message: "Member profile updated successfully",
       });
     } catch (error) {
-      console.error("Database error:", error);
-      res.status(500).json({ errorMessage: "Failed to update member profile" });
+      return next(error);
     }
   },
 );

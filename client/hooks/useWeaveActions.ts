@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useTranslations } from "next-intl";
 import type { Weave } from "@/services/weaveService";
 import { useSocket } from "@/hooks/useSocket";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 import {
   getWeaveViewModel,
   type WeaveAction,
@@ -11,11 +14,7 @@ import {
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
-async function patchWeaveStatus(
-  weaveId: number,
-  status: Weave["status"],
-  fallbackError: string,
-) {
+async function patchWeaveStatus(weaveId: number, status: Weave["status"]) {
   const response = await fetch(`${hostName}/api/weaves/${weaveId}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -23,7 +22,7 @@ async function patchWeaveStatus(
     body: JSON.stringify({ status }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.errorMessage || fallbackError);
+  if (!response.ok) throw new ApiError(data);
   return data;
 }
 
@@ -62,6 +61,8 @@ export function useWeaveActions({
   currentUserId,
   onWeaveStatusChange,
 }: UseWeaveActionsOptions): WeaveActions {
+  const t = useTranslations("WeaveCard");
+  const apiErrorMessage = useApiErrorMessage();
   const { socket } = useSocket();
   const [isProcessing, setIsProcessing] = useState(false);
   const [localStatus, setLocalStatus] = useState(weave?.status);
@@ -131,25 +132,23 @@ export function useWeaveActions({
     e.stopPropagation();
     if (!weave || isProcessing) return;
     if (!availableActions.has("approve")) {
-      toast.error("Only the post author can approve this request");
+      toast.error(t("toast.onlyAuthorCanApprove"));
       return;
     }
     if (localStatus !== "requested") {
-      toast.error(`Weave request is no longer awaiting approval`);
+      toast.error(t("toast.notAwaitingApproval"));
       return;
     }
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "approved", "Failed to approve request");
+      await patchWeaveStatus(weave.id, "approved");
 
       setLocalStatus("approved");
-      toast.success("Request approved! Transaction is now in progress.");
+      toast.success(t("toast.approved"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to approve request",
-      );
+      toast.error(apiErrorMessage(error, t("toast.approveFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -159,23 +158,20 @@ export function useWeaveActions({
     e.stopPropagation();
     if (!weave || isProcessing) return;
     if (!availableActions.has("decline")) {
-      toast.error("Only the post author can decline this request");
+      toast.error(t("toast.onlyAuthorCanDecline"));
       return;
     }
-    if (!window.confirm("Are you sure you want to decline this request?"))
-      return;
+    if (!window.confirm(t("prompts.decline"))) return;
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "declined", "Failed to reject request");
+      await patchWeaveStatus(weave.id, "declined");
 
       setLocalStatus("declined");
-      toast.success("Request declined.");
+      toast.success(t("toast.declined"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to reject request",
-      );
+      toast.error(apiErrorMessage(error, t("toast.declineFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -185,38 +181,32 @@ export function useWeaveActions({
     e.stopPropagation();
     if (!weave || isProcessing || hasIConfirmed) return;
     if (!availableActions.has("confirm")) {
-      toast.error("You cannot confirm this weave right now");
+      toast.error(t("toast.cannotConfirm"));
       return;
     }
 
-    const confirmMessage = isReceiver
-      ? "Have you physically received the item? This action cannot be undone once both parties confirm."
-      : "Have you handed over or shipped the item? The transaction will close once the receiver also confirms.";
+    const confirmMessage = t(
+      isReceiver ? "prompts.confirmReceipt" : "prompts.confirmHandover",
+    );
     if (!window.confirm(confirmMessage)) return;
 
     setIsProcessing(true);
     try {
-      const data = await patchWeaveStatus(
-        weave.id,
-        "completed",
-        "Failed to update",
-      );
+      const data = await patchWeaveStatus(weave.id, "completed");
 
       if (data.newStatus === "completed") {
         setLocalStatus("completed");
         setLocalGiverConfirmed(true);
         setLocalReceiverConfirmed(true);
-        toast.success("Transaction fully completed!");
+        toast.success(t("toast.completed"));
       } else {
         if (isGiver) setLocalGiverConfirmed(true);
         if (isReceiver) setLocalReceiverConfirmed(true);
-        toast.success(
-          "Your confirmation received. Waiting for the other party.",
-        );
+        toast.success(t("toast.confirmedWaiting"));
       }
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Error occurred");
+      toast.error(apiErrorMessage(error, t("toast.confirmFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -226,22 +216,20 @@ export function useWeaveActions({
     e.stopPropagation();
     if (!weave || isProcessing) return;
     if (!availableActions.has("cancel")) {
-      toast.error("You cannot cancel this weave right now");
+      toast.error(t("toast.cannotCancel"));
       return;
     }
-    if (!window.confirm("Are you sure you want to cancel this weave?")) return;
+    if (!window.confirm(t("prompts.cancel"))) return;
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(weave.id, "cancelled", "Failed to cancel weave");
+      await patchWeaveStatus(weave.id, "cancelled");
 
       setLocalStatus("cancelled");
-      toast.success("Weave cancelled successfully!");
+      toast.success(t("toast.cancelled"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to cancel weave",
-      );
+      toast.error(apiErrorMessage(error, t("toast.cancelFailed")));
     } finally {
       setIsProcessing(false);
     }
@@ -251,27 +239,20 @@ export function useWeaveActions({
     e.stopPropagation();
     if (!weave || isProcessing) return;
     if (!availableActions.has("withdraw")) {
-      toast.error("You cannot withdraw this request right now");
+      toast.error(t("toast.cannotWithdraw"));
       return;
     }
-    if (!window.confirm("Are you sure you want to withdraw this request?"))
-      return;
+    if (!window.confirm(t("prompts.withdraw"))) return;
 
     setIsProcessing(true);
     try {
-      await patchWeaveStatus(
-        weave.id,
-        "withdrawn",
-        "Failed to withdraw request",
-      );
+      await patchWeaveStatus(weave.id, "withdrawn");
 
       setLocalStatus("withdrawn");
-      toast.success("Request withdrawn.");
+      toast.success(t("toast.withdrawn"));
       onWeaveStatusChange?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to withdraw request",
-      );
+      toast.error(apiErrorMessage(error, t("toast.withdrawFailed")));
     } finally {
       setIsProcessing(false);
     }

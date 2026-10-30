@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { UserRole, UserSession } from "../schema";
 import { getUserFromCookie } from "../session";
 import dotenv from "dotenv";
+import { HttpError } from "../utils/httpError";
 dotenv.config();
 
 // 擴展 Express Request 類型以包含 user 屬性
@@ -21,33 +22,32 @@ declare global {
  */
 export async function requireAuth(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ) {
   try {
     const user = await getUserFromCookie(req);
 
     if (!user) {
-      return res.status(401).json({
-        errorMessage: "Please login first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
 
     // 驗證用戶數據的完整性
     if (!user.userId || !user.email) {
-      return res.status(401).json({
-        errorMessage: "Invalid session data. Please login again.",
-      });
+      return next(
+        new HttpError(
+          401,
+          "UNAUTHENTICATED",
+          "Invalid session data. Please login again.",
+        ),
+      );
     }
 
     // 將用戶信息附加到 request 對象
     req.user = user;
     next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
-    return res.status(500).json({
-      errorMessage: "Authentication service error",
-    });
+    return next(error);
   }
 }
 
@@ -80,7 +80,7 @@ export async function optionalAuth(
  * 權威角色來源：始終以 Redis session 中的 req.user.role 為準，完全忽略客戶端可能偽造的 user-role cookie
  */
 export function requireRole(...allowedRoles: UserRole[]) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     // 若尚未經由 requireAuth 注入 req.user，嘗試從權威 session 載入
     if (!req.user) {
       try {
@@ -94,16 +94,18 @@ export function requireRole(...allowedRoles: UserRole[]) {
     }
 
     if (!req.user) {
-      return res.status(401).json({
-        errorMessage: "Please login first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
 
     // 嚴格比對來自 Redis session 的權威角色
     if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        errorMessage: "Forbidden: Insufficient permissions",
-      });
+      return next(
+        new HttpError(
+          403,
+          "FORBIDDEN",
+          `Forbidden: ${allowedRoles.join(" or ")} role required`,
+        ),
+      );
     }
 
     next();

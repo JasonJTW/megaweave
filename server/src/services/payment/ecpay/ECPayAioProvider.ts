@@ -207,13 +207,51 @@ export class ECPayAioProvider implements IPaymentProvider {
     };
   }
 
+  /**
+   * 信用卡退款。綠界依交易狀態只接受特定 Action：
+   * - R（退刷）：僅限「要關帳 / 已關帳」；對「已授權」（尚未關帳，約每日 20:00 自動關帳）一律拒絕
+   * - N（放棄）：「已授權」整筆放棄，不扣款；不支援部分金額
+   * - E（取消關帳）：「要關帳」全額退款需先 E 再 N
+   * 全額退款依序嘗試 N → R → E+N（失敗的 Action 不會改變交易狀態，可安全換下一個）；
+   * 部分退款只能 R。逾時 / 斷線會直接拋出，由 refund() 保留 PENDING 並告警。
+   */
   async refundPayment(input: RefundPaymentInput): Promise<RefundPaymentResult> {
+    const isFullRefund =
+      input.paymentAmount !== undefined && input.amount >= input.paymentAmount;
+    const doAction = (action: "R" | "E" | "N") =>
+      this.creditDoAction(input, action);
+
+    if (!isFullRefund) return doAction("R");
+
+    const voided = await doAction("N");
+    if (voided.isSuccess) return voided;
+
+    const refunded = await doAction("R");
+    if (refunded.isSuccess) return refunded;
+
+    const cancelledClose = await doAction("E");
+    if (cancelledClose.isSuccess) {
+      const retried = await doAction("N");
+      if (retried.isSuccess) return retried;
+    }
+
+    // 全部被拒：回傳 R 的結果（最常見的「正規」退款路徑），並附上各步驟訊息供排查
+    return {
+      ...refunded,
+      rtnMsg: `N: ${voided.rtnMsg} (${voided.rtnCode}) | R: ${refunded.rtnMsg} (${refunded.rtnCode}) | E: ${cancelledClose.rtnMsg} (${cancelledClose.rtnCode})`,
+    };
+  }
+
+  private async creditDoAction(
+    input: RefundPaymentInput,
+    action: "R" | "E" | "N"
+  ): Promise<RefundPaymentResult> {
     const actionUrl = `${this.config.host.replace(/\/+$/, "")}/CreditDetail/DoAction`;
     const params: Record<string, string> = {
       MerchantID: this.config.merchantId,
       MerchantTradeNo: input.merchantTradeNo,
       TradeNo: input.tradeNo,
-      Action: "R", // R = 退款 (Refund)
+      Action: action,
       TotalAmount: String(input.amount),
     };
     params.CheckMacValue = generateCheckMacValue(
@@ -238,7 +276,7 @@ export class ECPayAioProvider implements IPaymentProvider {
     return {
       isSuccess: rtnCode === 1,
       rtnCode,
-      rtnMsg: parsedParams.RtnMsg || "",
+      rtnMsg: parsedParams.RtnMsg || responseText.slice(0, 200),
       rawResponse: parsedParams,
     };
   }

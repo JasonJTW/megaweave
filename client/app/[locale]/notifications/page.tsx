@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import NotificationList from "@/app/components/Notification";
 import toast from "react-hot-toast";
 import { useUser } from "@/app/contexts/UserContext";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 export default function NotificationsPage() {
   const { user, loading } = useUser();
@@ -16,9 +17,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!loading && !user) {
       toast.error(t("signInToView"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
     }
   }, [loading, user, router, t]);
 

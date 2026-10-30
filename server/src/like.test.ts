@@ -4,6 +4,7 @@ import request from "supertest";
 import likeRouter from "./like";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
+import { errorMiddleware } from "./utils/errorHandler";
 
 jest.mock("./utils/db", () => ({
   __esModule: true,
@@ -212,6 +213,7 @@ app.use((_req, res, next) => {
   next();
 });
 app.use("/api/posts/:postId/like", likeRouter);
+app.use(errorMiddleware);
 
 const OWNER = { userId: 10, email: "owner@test.dev", username: "owner" };
 const ALICE = { userId: 20, email: "alice@test.dev", username: "alice" };
@@ -275,6 +277,7 @@ describe("PUT /like (declarative)", () => {
         recipient_id: OWNER.userId,
         sender_id: ALICE.userId,
         type: "LIKE",
+        params: { actorName: "alice", postTitle: "Chair" },
         link: `/item/${PUBLIC_ID}`,
       }),
     );

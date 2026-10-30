@@ -80,9 +80,22 @@ for (const { locale, home, messages, heading } of LOCALES) {
         .click();
 
       await expect(page.getByText(messages.HomeFeed.postCreated)).toBeVisible();
-      await page.getByText(title).click();
-      // The dev server compiles the post page on first visit
-      await expect(page).toHaveURL(/\/item\/[\w-]+$/, { timeout: 20_000 });
+      // Once the user has viewed a post the feed is personalized: it lists
+      // only posts already in the vector index, which the worker fills in
+      // asynchronously, and SWR does not refetch page 1 by itself. Reload
+      // until the new post shows up, scrolling to load further pages. The
+      // click is retried too: right after a reload it can land before React
+      // has hydrated and do nothing.
+      const card = page.getByText(title);
+      await expect(async () => {
+        await page.reload();
+        await page.evaluate(() =>
+          window.scrollTo(0, document.body.scrollHeight),
+        );
+        await expect(card).toBeAttached({ timeout: 3_000 });
+        await card.click();
+        await expect(page).toHaveURL(/\/item\/[\w-]+$/, { timeout: 4_000 });
+      }).toPass({ timeout: 25_000, intervals: [1_000] });
       await expect(page.getByText(title).first()).toBeVisible();
       // Post detail chrome is translated; the title the user typed is not
       await expect(

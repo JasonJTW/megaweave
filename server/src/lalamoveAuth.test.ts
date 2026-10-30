@@ -2,6 +2,7 @@ import { Request, Response, RequestHandler } from "express";
 import lalamoveRouter from "./lalamove";
 import dbPool from "./utils/db";
 import * as lalamoveService from "./services/lalamove";
+import { nextThroughErrorMiddleware } from "./testUtils/nextThroughErrorMiddleware";
 
 // Mock dependencies
 jest.mock("./utils/db", () => ({
@@ -65,11 +66,11 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      const next = jest.fn();
+      const next = nextThroughErrorMiddleware(res);
 
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
-      expect(next).not.toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalledWith();
     });
 
     it("should reject non-existent order request with 404", async () => {
@@ -85,11 +86,12 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await orderHandler(req, res, jest.fn());
+      await orderHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
-        error: "Delivery order not found",
+        code: "DELIVERY_ORDER_NOT_FOUND",
+        errorMessage: "Delivery order not found",
       });
     });
 
@@ -109,11 +111,12 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await orderHandler(req, res, jest.fn());
+      await orderHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
-        error: "Forbidden: You do not have permission to view this order",
+        code: "FORBIDDEN",
+        errorMessage: "Forbidden: You do not have permission to view this order",
       });
     });
 
@@ -154,7 +157,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await orderHandler(req, res, jest.fn());
+      await orderHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -185,7 +188,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await authMiddleware(req, res, jest.fn());
+      await authMiddleware(req, res, nextThroughErrorMiddleware(res));
       expect(res.status).toHaveBeenCalledWith(401);
     });
 
@@ -205,11 +208,12 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await cancelHandler(req, res, jest.fn());
+      await cancelHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
-        error: "Forbidden: You cannot cancel this order",
+        code: "FORBIDDEN",
+        errorMessage: "Forbidden: You cannot cancel this order",
       });
       expect(lalamoveService.cancelLalamoveOrder).not.toHaveBeenCalled();
     });
@@ -229,11 +233,12 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await cancelHandler(req, res, jest.fn());
+      await cancelHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
-        error: "Cannot cancel order with current status: COMPLETED",
+        code: "ORDER_NOT_CANCELLABLE",
+        errorMessage: "Cannot cancel order with current status: COMPLETED",
       });
       expect(lalamoveService.cancelLalamoveOrder).not.toHaveBeenCalled();
     });
@@ -260,7 +265,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         locals: {},
       } as unknown as Response;
 
-      await cancelHandler(req, res, jest.fn());
+      await cancelHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(lalamoveService.cancelLalamoveOrder).toHaveBeenCalledWith("LALA_123");
       expect(dbPool.query).toHaveBeenCalledWith(
@@ -292,7 +297,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await driverHandler(req, res, jest.fn());
+      await driverHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(lalamoveService.getLalamoveDriverDetail).not.toHaveBeenCalled();
@@ -314,7 +319,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await driverHandler(req, res, jest.fn());
+      await driverHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(lalamoveService.getLalamoveDriverDetail).not.toHaveBeenCalled();
@@ -340,7 +345,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
         json: jest.fn(),
       } as unknown as Response;
 
-      await driverHandler(req, res, jest.fn());
+      await driverHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(lalamoveService.getLalamoveDriverDetail).toHaveBeenCalledWith(
         "LALA_123",

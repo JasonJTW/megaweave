@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, ExternalLink, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -34,6 +35,7 @@ import { useUser } from "@/app/contexts/UserContext";
 import { Post } from "@/app/types/schema";
 // 地點工具函式
 import { formatLocationText } from "@/utils/locationUtils";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 interface OwnerProfile {
   username: string;
@@ -76,6 +78,7 @@ function parsePostContent(content: string): {
 const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const router = useRouter();
   const t = useTranslations("PostDetail");
+  const apiErrorMessage = useApiErrorMessage();
   // The share sheet reuses the page's own OG title copy
   const tItem = useTranslations("Metadata.item");
   const formatter = useFormatter();
@@ -260,14 +263,16 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         fetchPost(); // Refresh page data without changing URL layout
         mutate(() => true, undefined, { revalidate: true }); // Revalidate all SWR caches (including main page feed)
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.errorMessage || t("updateFailed"));
+        toast.error(
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("updateFailed"),
+          ),
+        );
       }
     } catch (error: unknown) {
       console.error("Error updating post:", error);
-      const message =
-        error instanceof Error ? error.message : t("updateFailed");
-      toast.error(message);
+      toast.error(apiErrorMessage(error, t("updateFailed")));
     } finally {
       setIsUpdating(false);
     }
@@ -277,9 +282,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const handleLike = () => {
     if (!user) {
       toast.error(t("signInToLike"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
 
@@ -361,8 +364,12 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         );
         router.push("/");
       } else {
-        const errorData = await response.json();
-        toast.error(errorData.errorMessage || t("deleteFailed"));
+        toast.error(
+          apiErrorMessage(
+            await response.json().catch(() => null),
+            t("deleteFailed"),
+          ),
+        );
       }
     } catch (error) {
       console.error("Error deleting post:", error);

@@ -245,7 +245,6 @@
       "recipientNameRequired": "Recipient name is required",
       "recipientPhoneRequired": "Recipient phone is required",
       "sessionExpired": "Session expired. Please sign in again.",
-      "checkoutFailed": "Failed to create the checkout order",
       "redirectingToPayment": "Redirecting to secure payment...",
       "paymentFormMissing": "No valid payment form received, please retry",
       "orderFailed": "Failed to place the order, please try again later"
@@ -309,7 +308,6 @@
     "locationFilter": "Location: {value}",
     "postCreated": "Post created successfully!",
     "postFailed": "Failed to create post",
-    "networkError": "Network error, please try again later.",
     "bannerTitle": "Let's start weaving!"
   },
   "Feed": {
@@ -704,6 +702,7 @@
     "skills": "Skills & Expertise"
   },
   "Chat": {
+    "close": "Close chat",
     "title": "Messages",
     "emptyTitle": "Your Messages",
     "emptyBody": "Select a conversation from the list to start chatting.",
@@ -761,7 +760,49 @@
     "signInToView": "Please sign in to view notifications",
     "markedAllRead": "All marked as read",
     "markAllReadFailed": "Failed to mark all as read",
-    "newNotification": "New notification"
+    "newNotification": "New notification",
+    "event": {
+      "LIKE": {
+        "title": "New Like",
+        "content": "{actorName} liked your post \"{postTitle}\""
+      },
+      "COMMENT": {
+        "title": "New Comment",
+        "content": "{actorName} commented on your post \"{postTitle}\""
+      },
+      "COMMENT_REPLY": {
+        "title": "New Reply",
+        "content": "{actorName} replied to your comment"
+      },
+      "WEAVE_REQUESTED": {
+        "title": "New Weave Request",
+        "content": "{actorName} sent a weave request for \"{postTitle}\""
+      },
+      "WEAVE_APPROVED": {
+        "title": "Weave Request Approved",
+        "content": "{actorName} approved your weave request for \"{postTitle}\""
+      },
+      "WEAVE_DECLINED": {
+        "title": "Weave Request Declined",
+        "content": "{actorName} declined your weave request for \"{postTitle}\""
+      },
+      "WEAVE_WITHDRAWN": {
+        "title": "Weave Request Withdrawn",
+        "content": "{actorName} withdrew their weave request for \"{postTitle}\""
+      },
+      "WEAVE_CANCELLED": {
+        "title": "Weave Cancelled",
+        "content": "{actorName} cancelled the weave for \"{postTitle}\""
+      },
+      "WEAVE_CONFIRMED": {
+        "title": "Weave Confirmed",
+        "content": "{actorName} confirmed the weave for \"{postTitle}\". Waiting for your confirmation."
+      },
+      "WEAVE_COMPLETED": {
+        "title": "Weave Completed",
+        "content": "Weave for \"{postTitle}\" is successfully completed!"
+      }
+    }
   },
   "History": {
     "signInToView": "Please sign in to view your history",
@@ -888,7 +929,6 @@
     "loadFailed": "Couldn't load the order right now. Please try again later."
   },
   "PaymentResult": {
-    "statusFetchFailed": "Could not get the order status",
     "checkFailed": "Status check failed",
     "checkingTitle": "Confirming payment and finding a driver...",
     "checkingBody": "Please wait while we sync your order with ECPay and Lalamove.",
@@ -911,5 +951,124 @@
     "dispatchFailedBody": "We're sorry, we couldn't book a Lalamove driver. Your payment of NT${amount} will be refunded in full to your card, and we'll let you know by in-app notification and email once it's done.",
     "refundedTitle": "Fully refunded",
     "refundedBody": "Your payment of NT${amount} has been refunded to your card. The exact posting date depends on your card issuer."
+  },
+  "WeaveCard": {
+    "status": {
+      "newRequest": "New Request",
+      "requestSent": "Request Sent",
+      "weaving": "Weaving",
+      "weaved": "Weaved",
+      "declined": "Declined",
+      "withdrawn": "Withdrawn",
+      "cancelled": "Cancelled"
+    },
+    "hint": {
+      "requested": {
+        "decideOnRequest": "Approve or decline this request?",
+        "awaitingAuthor": "Waiting for the post author's approval..."
+      },
+      "approved": {
+        "confirmHandover": "Handed over the item? Click the checkmark to confirm.",
+        "confirmReceipt": "Received the item? Click the checkmark to confirm.",
+        "waitingForReceiver": "Handover confirmed. Waiting for {name} to confirm receipt...",
+        "waitingForGiver": "Receipt confirmed. Waiting for {name} to confirm handover...",
+        "receiverConfirmedPleaseConfirmHandover": "{name} confirmed receipt. Please confirm handover!",
+        "giverConfirmedPleaseConfirmReceipt": "{name} confirmed handover. Please confirm receipt!"
+      }
+    },
+    "role": {
+      "giver": "Giver",
+      "receiver": "Receiver"
+    },
+    "chatHeading": "{viewer, select, author {Weaving Request Received} other {Weaving Request Sent}}",
+    "noImage": "No image",
+    "fallbackTitle": "Weave Request",
+    "allItems": "All items",
+    "item": "Item",
+    "chatSummary": {
+      "all": "{direction, select, give {Offer all items} other {Request all items}}",
+      "multiple": "{direction, select, give {Offer} other {Request}}: {types} items ({total} total)",
+      "single": "{direction, select, give {Offer} other {Request}} Qty: {quantity}"
+    },
+    "viewPost": "View Post Detail →",
+    "actions": {
+      "approve": "Approve request",
+      "decline": "Decline request",
+      "withdraw": "Withdraw request",
+      "confirm": "Complete weave",
+      "confirmed": "You have confirmed",
+      "cancel": "Cancel weave"
+    },
+    "prompts": {
+      "decline": "Are you sure you want to decline this request?",
+      "confirmReceipt": "Have you physically received the item? This action cannot be undone once both parties confirm.",
+      "confirmHandover": "Have you handed over or shipped the item? The weave will complete once the receiver also confirms.",
+      "cancel": "Are you sure you want to cancel this weave?",
+      "withdraw": "Are you sure you want to withdraw this request?"
+    },
+    "toast": {
+      "onlyAuthorCanApprove": "Only the post author can approve this request",
+      "notAwaitingApproval": "This weave request is no longer awaiting approval",
+      "approved": "Request approved! The weave is now in progress.",
+      "approveFailed": "Failed to approve request",
+      "onlyAuthorCanDecline": "Only the post author can decline this request",
+      "declined": "Request declined.",
+      "declineFailed": "Failed to decline request",
+      "cannotConfirm": "You cannot confirm this weave right now",
+      "completed": "Weaved!",
+      "confirmedWaiting": "Your confirmation was received. Waiting for the other party.",
+      "confirmFailed": "Failed to confirm",
+      "cannotCancel": "You cannot cancel this weave right now",
+      "cancelled": "Weave cancelled.",
+      "cancelFailed": "Failed to cancel weave",
+      "cannotWithdraw": "You cannot withdraw this request right now",
+      "withdrawn": "Request withdrawn.",
+      "withdrawFailed": "Failed to withdraw request"
+    }
+  },
+  "Errors": {
+    "UNKNOWN": "Something went wrong. Please try again.",
+    "INTERNAL_ERROR": "Something went wrong on our end. Please try again.",
+    "SERVICE_UNAVAILABLE": "The service is temporarily unavailable. Please try again later.",
+    "VALIDATION_FAILED": "Some of the information you entered is invalid. Please check and try again.",
+    "INVALID_REQUEST": "The request was invalid. Please refresh and try again.",
+    "DUPLICATE_ENTRY": "This already exists.",
+    "UNAUTHENTICATED": "Please sign in first.",
+    "FORBIDDEN": "You don't have permission to do that.",
+    "RATE_LIMITED": "Too many attempts. Please wait a moment and try again.",
+    "INVALID_CREDENTIALS": "Incorrect email or password.",
+    "ACCOUNT_EXISTS": "An account with this email already exists.",
+    "INVALID_SOCIAL_TOKEN": "We couldn't verify your social account. Please try again.",
+    "USE_SOCIAL_SIGNIN": "This email is registered with {providers}. Please sign in with {providers}.",
+    "POST_NOT_FOUND": "This post couldn't be found. It may have been deleted.",
+    "USER_NOT_FOUND": "This user couldn't be found.",
+    "COMMENT_NOT_FOUND": "This comment couldn't be found. It may have been deleted.",
+    "WEAVE_NOT_FOUND": "This weave couldn't be found.",
+    "CATEGORY_NOT_FOUND": "This category couldn't be found.",
+    "CONDITION_NOT_FOUND": "This condition couldn't be found.",
+    "WEAVE_OWN_POST": "You can't weave with your own post.",
+    "POST_INACTIVE": "This post is no longer active.",
+    "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
+    "INSUFFICIENT_STOCK": "Only {available} left of \"{title}\".",
+    "WEAVE_CLOSED": "This weave has already ended.",
+    "INVALID_STATUS_TRANSITION": "This action isn't available for the weave's current status.",
+    "DELIVERY_ORDER_NOT_FOUND": "This delivery order couldn't be found.",
+    "ORDER_NOT_CANCELLABLE": "This delivery order can't be cancelled at this stage.",
+    "DELIVERY_PROVIDER_ERROR": "The delivery service is temporarily unavailable. Please try again later.",
+    "QUOTATION_EXPIRED": "The quote has expired. Please get a new quote.",
+    "WEAVE_REQUIRED_FOR_DELIVERY": "You need an approved weave on this post before booking delivery.",
+    "PAYMENT_NOT_FOUND": "This payment couldn't be found.",
+    "COMMENT_EMPTY": "Comments can't be empty.",
+    "REPLY_DEPTH_EXCEEDED": "This thread has reached the maximum reply depth.",
+    "MESSAGE_EMPTY": "Please enter a message or attach an image.",
+    "IMAGE_REQUIRED": "Please upload an image file.",
+    "MEMBER_NAME_REQUIRED": "Please enter the member's name.",
+    "INVALID_CATEGORY": "Please choose a valid category.",
+    "SEARCH_QUERY_TOO_LONG": "Search text must be 300 characters or fewer."
+  },
+  "SandboxNotice": {
+    "title": "For testing and demo only",
+    "body": "ECPay and Lalamove are connected to their test environments: no real charge will be made and no driver will actually be dispatched.",
+    "testCard": "Use the ECPay test card {card}, CVV {cvv}, and any future expiry date."
   }
 }

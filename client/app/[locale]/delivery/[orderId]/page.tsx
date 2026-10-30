@@ -4,6 +4,7 @@ import { useRouter } from "@/i18n/navigation";
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import SandboxNotice from "@/app/components/Lalamove/SandboxNotice";
 import useSWR from "swr";
 import {
   Truck,
@@ -24,6 +25,8 @@ import { useSocketContext } from "@/app/contexts/SocketContext";
 import * as Dialog from "@radix-ui/react-dialog";
 import SandboxPanel from "@/app/components/Lalamove/SandboxPanel";
 import { deliveryStatusView, type DeliveryStage } from "@/utils/deliveryStatus";
+import { ApiError } from "@/lib/apiError";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
@@ -85,12 +88,7 @@ interface OrderDetail {
 const fetcher = async (url: string) => {
   const res = await fetch(url, { cache: "no-store", credentials: "include" });
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    const err = new Error(
-      errorData.message || errorData.error || "",
-    ) as Error & { status?: number };
-    err.status = res.status;
-    throw err;
+    throw new ApiError(await res.json().catch(() => null), res.status);
   }
   const data = await res.json();
   return data.order as OrderDetail;
@@ -130,6 +128,7 @@ export default function DeliveryTrackingPage() {
   const params = useParams();
   const router = useRouter();
   const t = useTranslations("Delivery");
+  const apiErrorMessage = useApiErrorMessage();
   const tLalamove = useTranslations("Lalamove");
   const orderId = (params?.orderId as string) || "";
   const { socket } = useSocketContext();
@@ -522,13 +521,13 @@ export default function DeliveryTrackingPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.message || data.error || t("cancelFailed"));
+        throw new ApiError(data);
       }
       toast.success(t("cancelled"));
       setIsCancelModalOpen(false);
       mutate();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t("cancelFailed");
+      const msg = apiErrorMessage(err, t("cancelFailed"));
       toast.error(msg);
     } finally {
       setIsCancelling(false);
@@ -562,7 +561,7 @@ export default function DeliveryTrackingPage() {
   }
 
   if (error || !order) {
-    const status = (error as { status?: number })?.status;
+    const status = error instanceof ApiError ? error.status : undefined;
     const isAuthError = status === 401;
     const isForbidden = status === 403;
 
@@ -583,8 +582,9 @@ export default function DeliveryTrackingPage() {
             ? t("signInBody")
             : isForbidden
               ? t("forbiddenBody")
-              : error?.message ||
-                (status === 404 ? t("notFoundBody") : t("loadFailed"))}
+              : status === 404
+                ? t("notFoundBody")
+                : apiErrorMessage(error, t("loadFailed"))}
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
           {isAuthError ? (
@@ -633,6 +633,8 @@ export default function DeliveryTrackingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50/40 via-white to-gray-50/60 pb-16 pt-4 sm:pt-8">
       <div className="mx-auto max-w-5xl px-3 sm:px-6">
+        <SandboxNotice className="mb-4" />
+
         {/* Top Navigation Bar */}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">

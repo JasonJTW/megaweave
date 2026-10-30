@@ -13,6 +13,7 @@ const router: Router = express.Router();
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { createUserSession } from "./session";
+import { HttpError } from "./utils/httpError";
 
 // Apply tiered strict rate limiting to all auth signup routes
 router.use(authRateLimiter);
@@ -52,7 +53,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     if (result) {
       userExisted = true;
       console.log(`User already exists`);
-      return res.status(400).json({ errorMessage: "User already exists" });
+      return next(new HttpError(400, "ACCOUNT_EXISTS", "User already exists"));
     }
 
     userExisted = false;
@@ -67,7 +68,12 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   const public_id = randomUUID();
   console.log("Generated public_id: ", public_id);
   const salt = generateSalt();
-  const hashedPassword = await hashPassword(user.password, salt);
+  let hashedPassword: string;
+  try {
+    hashedPassword = await hashPassword(user.password, salt);
+  } catch (error) {
+    return next(error);
+  }
   user.password = hashedPassword;
   user.salt = salt;
   user.public_id = public_id;

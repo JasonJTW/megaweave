@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import SandboxNotice from "@/app/components/Lalamove/SandboxNotice";
 import {
   CheckCircle2,
   AlertCircle,
@@ -18,6 +19,8 @@ import {
   ArrowRight,
   Undo2,
 } from "lucide-react";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 /** 由後端依付款 + 外送單狀態推導（server/src/payments.ts derivePaymentOutcome） */
 type PaymentOutcome =
@@ -50,6 +53,7 @@ const PENDING_OUTCOMES: PaymentOutcome[] = ["AWAITING_PAYMENT", "PLACING"];
 function PaymentResultContent() {
   const router = useRouter();
   const t = useTranslations("PaymentResult");
+  const apiErrorMessage = useApiErrorMessage();
   const searchParams = useSearchParams();
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
@@ -92,7 +96,7 @@ function PaymentResultContent() {
 
       const data: PaymentStatusResponse = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || t("statusFetchFailed"));
+        throw new ApiError(data);
       }
 
       setStatusData(data);
@@ -125,11 +129,11 @@ function PaymentResultContent() {
       }
     } catch (err: unknown) {
       console.error("Check payment status error:", err);
-      const msg = err instanceof Error ? err.message : t("checkFailed");
+      const msg = apiErrorMessage(err, t("checkFailed"));
       setErrorMessage(msg);
       setLoading(false);
     }
-  }, [merchantTradeNo, hostName, router, t]);
+  }, [merchantTradeNo, hostName, router, t, apiErrorMessage]);
 
   useEffect(() => {
     if (merchantTradeNo) {
@@ -221,7 +225,9 @@ function PaymentResultContent() {
         </div>
         <button
           type="button"
-          onClick={() => router.push(`/delivery/${statusData?.lalamoveOrderId}`)}
+          onClick={() =>
+            router.push(`/delivery/${statusData?.lalamoveOrderId}`)
+          }
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 text-sm font-bold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600"
         >
           {t("goTracking")}
@@ -252,7 +258,10 @@ function PaymentResultContent() {
         </button>
       </>
     );
-  } else if (!errorMessage && (outcome === "REFUNDING" || outcome === "REFUNDED")) {
+  } else if (
+    !errorMessage &&
+    (outcome === "REFUNDING" || outcome === "REFUNDED")
+  ) {
     const refunded = outcome === "REFUNDED";
     content = (
       <>
@@ -301,6 +310,7 @@ function PaymentResultContent() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
         {content}
+        <SandboxNotice className="mt-6" />
       </div>
     </div>
   );

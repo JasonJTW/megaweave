@@ -429,6 +429,7 @@ CREATE TABLE `notifications` (
   `type` varchar(50) NOT NULL,
   `title` varchar(255) NOT NULL,
   `content` text NOT NULL,
+  `params` json DEFAULT NULL,
   `link` varchar(255) DEFAULT NULL,
   `is_read` tinyint(1) DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,

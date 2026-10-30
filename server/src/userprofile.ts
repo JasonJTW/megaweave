@@ -1,4 +1,4 @@
-import Router, { Request, Response } from "express";
+import Router, { Request, Response, NextFunction } from "express";
 import { RowDataPacket } from "mysql2";
 import dotenv from "dotenv";
 dotenv.config();
@@ -6,10 +6,11 @@ dotenv.config();
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { updateUserSession } from "./session";
+import { HttpError } from "./utils/httpError";
 const router = Router();
 
 //* public get profile api
-router.get("/public/:uuid", async (req: Request, res: Response) => {
+router.get("/public/:uuid", async (req: Request, res: Response, next: NextFunction) => {
   const { uuid } = req.params;
 
   try {
@@ -17,9 +18,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(uuid)) {
-      return res.status(400).json({
-        errorMessage: "Invalid user ID format",
-      });
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid user ID format"));
     }
 
     // console.log(`Fetching public profile for user: ${uuid}`);
@@ -42,9 +41,7 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
 
     if ((userRows as RowDataPacket[]).length === 0) {
       console.log(`User not found: ${uuid}`);
-      return res.status(404).json({
-        errorMessage: "User not found",
-      });
+      return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
     }
 
     const user = (userRows as RowDataPacket[])[0];
@@ -78,23 +75,17 @@ router.get("/public/:uuid", async (req: Request, res: Response) => {
     // console.log(`Returning profile data for ${user.username}`);
     return res.status(200).json(responseData);
   } catch (error) {
-    console.error("Error fetching public profile:", error);
-    return res.status(500).json({
-      errorMessage: "Internal server error",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
+    return next(error);
   }
 });
 
 //RWD: For get & post user profile
-router.get("/bio", requireAuth, async (req: Request, res: Response) => {
+router.get("/bio", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   let query;
   try {
     //* check if userId exists
     if (!req.user?.userId) {
-      return res.status(401).json({
-        errorMessage: "User ID not found, Please signin first",
-      });
+      return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
     }
 
     query = `SELECT * FROM user_profiles WHERE user_id = ?`;
@@ -109,32 +100,20 @@ router.get("/bio", requireAuth, async (req: Request, res: Response) => {
     }
     return res.status(200).json({ bio: bio });
   } catch (error) {
-    if (error instanceof Error) {
-      console.error("DB error:", error.message);
-      return res
-        .status(500)
-        .json({ errorMessage: "Failed to fetch user profile" });
-    } else {
-      console.error("DB error: ", error);
-    }
-    return res
-      .status(500)
-      .json({ errorMessage: "Failed to fetch user profile" });
+    return next(error);
   }
 });
 
-router.post("/bio", requireAuth, async (req: Request, res: Response) => {
+router.post("/bio", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   let query;
   if (!req.user) {
-    return res.status(401).json({ errorMessage: "Please login first" });
+    return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
   }
     if (
       (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
       (req.body.userId && Number(req.body.userId) !== req.user.userId)
     ) {
-      return res.status(403).json({
-        errorMessage: "Forbidden: You cannot modify another user's profile",
-      });
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You cannot modify another user's profile"));
     }
   const userId = req.user.userId;
   const newBio = req.body.bio;
@@ -145,15 +124,14 @@ router.post("/bio", requireAuth, async (req: Request, res: Response) => {
       .status(200)
       .json({ message: "Profile update successfully", data: updateResult });
   } catch (error) {
-    console.error("Database error:", error);
-    res.status(500).json({ errorMessage: "Failed to update profile" });
+    return next(error);
   }
 });
 
-router.get("/custom_name", requireAuth, async (req: Request, res: Response) => {
+router.get("/custom_name", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   let query;
   if (!req.user) {
-    return res.status(401).json({ errorMessage: "Please login first" });
+    return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
   }
   const userId = req.user.userId;
   try {
@@ -164,26 +142,23 @@ router.get("/custom_name", requireAuth, async (req: Request, res: Response) => {
 
     return res.status(200).json({ custom_name: customName });
   } catch (error) {
-    console.error("Database error:", error);
-    res.status(500).json({ errorMessage: "Failed to fetch user profile" });
+    return next(error);
   }
 });
 
 router.post(
   "/custom_name",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     let query;
     if (!req.user) {
-      return res.status(401).json({ errorMessage: "Please login first" });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
     if (
       (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
       (req.body.userId && Number(req.body.userId) !== req.user.userId)
     ) {
-      return res.status(403).json({
-        errorMessage: "Forbidden: You cannot modify another user's profile",
-      });
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You cannot modify another user's profile"));
     }
     const userId = req.user.userId;
     const newCustomName = req.body.custom_name;
@@ -199,8 +174,7 @@ router.post(
         .status(200)
         .json({ message: "Profile update successfully", data: updateResult });
     } catch (error) {
-      console.error("Database error:", error);
-      res.status(500).json({ errorMessage: "Failed to update profile" });
+      return next(error);
     }
   },
 );
@@ -208,14 +182,12 @@ router.post(
 router.get(
   "/contact_email",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     let query;
     try {
       //* check if userId exists
       if (!req.user?.userId) {
-        return res.status(401).json({
-          errorMessage: "User ID not found, Please signin first",
-        });
+        return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
       }
 
       query = `SELECT contact_email FROM user_profiles WHERE user_id = ?`;
@@ -224,17 +196,7 @@ router.get(
       const contactEmail = (rows as RowDataPacket[])[0]?.contact_email;
       return res.status(200).json({ contactEmail: contactEmail });
     } catch (error) {
-      if (error instanceof Error) {
-        console.error("DB error:", error.message);
-        return res
-          .status(500)
-          .json({ errorMessage: "Failed to fetch user profile" });
-      } else {
-        console.error("DB error: ", error);
-      }
-      return res
-        .status(500)
-        .json({ errorMessage: "Failed to fetch user profile" });
+      return next(error);
     }
   },
 );
@@ -242,18 +204,16 @@ router.get(
 router.post(
   "/contact_email",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     let query;
     if (!req.user) {
-      return res.status(401).json({ errorMessage: "Please login first" });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
     if (
       (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
       (req.body.userId && Number(req.body.userId) !== req.user.userId)
     ) {
-      return res.status(403).json({
-        errorMessage: "Forbidden: You cannot modify another user's profile",
-      });
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You cannot modify another user's profile"));
     }
     const userId = req.user.userId;
     const newContactEmail = req.body.contact_email;
@@ -267,8 +227,7 @@ router.post(
         newContactEmail: newContactEmail,
       });
     } catch (error) {
-      console.error("Database error:", error);
-      res.status(500).json({ errorMessage: "Failed to update profile" });
+      return next(error);
     }
   },
 );
@@ -276,14 +235,12 @@ router.post(
 router.get(
   "/contact_phone",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     let query;
     try {
       //* check if userId exists
       if (!req.user?.userId) {
-        return res.status(401).json({
-          errorMessage: "User ID not found, Please signin first",
-        });
+        return next(new HttpError(401, "UNAUTHENTICATED", "User ID not found, Please signin first"));
       }
 
       query = `SELECT contact_phone FROM user_profiles WHERE user_id = ?`;
@@ -292,17 +249,7 @@ router.get(
       const contactPhone = (rows as RowDataPacket[])[0]?.contact_phone;
       return res.status(200).json({ contactPhone: contactPhone });
     } catch (error) {
-      if (error instanceof Error) {
-        console.error("DB error:", error.message);
-        return res
-          .status(500)
-          .json({ errorMessage: "Failed to fetch user profile" });
-      } else {
-        console.error("DB error: ", error);
-      }
-      return res
-        .status(500)
-        .json({ errorMessage: "Failed to fetch user profile" });
+      return next(error);
     }
   },
 );
@@ -310,18 +257,16 @@ router.get(
 router.post(
   "/contact_phone",
   requireAuth,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     let query;
     if (!req.user) {
-      return res.status(401).json({ errorMessage: "Please login first" });
+      return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
     }
     if (
       (req.body.user_id && Number(req.body.user_id) !== req.user.userId) ||
       (req.body.userId && Number(req.body.userId) !== req.user.userId)
     ) {
-      return res.status(403).json({
-        errorMessage: "Forbidden: You cannot modify another user's profile",
-      });
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You cannot modify another user's profile"));
     }
     const userId = req.user.userId;
     const newContactPhone = req.body.contact_phone;
@@ -335,8 +280,7 @@ router.post(
         newContactPhone: newContactPhone,
       });
     } catch (error) {
-      console.error("Database error:", error);
-      res.status(500).json({ errorMessage: "Failed to update profile" });
+      return next(error);
     }
   },
 );

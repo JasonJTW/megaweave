@@ -1,5 +1,5 @@
 import { Link, useRouter } from "@/i18n/navigation";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
@@ -26,7 +26,13 @@ import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import { safeCompressImage } from "@/utils/imageProcessor";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import {
+  draftSet,
+  selectConversationId,
+  selectDraft,
+  selectPost,
+} from "@/app/store/chatPopupSlice";
 import WeavingCard from "@/app/components/WeavingCard";
 import {
   getDraftBannerInfo,
@@ -43,6 +49,8 @@ import {
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 import { User } from "@/app/types/schema";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { ApiError } from "@/lib/apiError";
 
 // Helper to parse date safely as UTC if needed
 const parseDate = (dateString: string) => {
@@ -70,6 +78,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const router = useRouter();
   const t = useTranslations("Chat");
+  const apiErrorMessage = useApiErrorMessage();
   const formatter = useFormatter();
   // Copy for the "Start weaving…" divider; a null role falls through to the ICU `other` branch
   const weavingBannerText = ({ role, itemTitle }: WeavingBanner) =>
@@ -141,7 +150,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   };
 
   // Read draft (weaving intent) from global context.
-  const { draft, setDraft, post, conversationId: popupConvId } = useChatPopup();
+  const dispatch = useAppDispatch();
+  const draft = useAppSelector(selectDraft);
+  const post = useAppSelector(selectPost);
+  const popupConvId = useAppSelector(selectConversationId);
+  const setDraft = useCallback(
+    (next: WeaveDraft | null) => dispatch(draftSet(next)),
+    [dispatch],
+  );
   // ponytail: activePost only used for optimistic banner, same conv check
   const activePost = popupConvId === conversationId ? post : null;
 
@@ -599,8 +615,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             messages: currentData.messages.filter((msg) => msg.id !== tempId),
           };
         }, false);
-        const errorData = await res.json();
-        throw new Error(errorData.message || t("sendFailed"));
+        throw new ApiError(await res.json().catch(() => null), res.status);
       }
 
       // If successful, revalidate to get the actual message with real ID and status
@@ -608,7 +623,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       mutate(); // Revalidate all messages for this conversation
     } catch (error) {
       console.error("Error sending message:", error);
-      toast.error(error instanceof Error ? error.message : t("sendFailed"));
+      toast.error(apiErrorMessage(error, t("sendFailed")));
       // Restore the draft if the send failed so the user doesn't
       // lose their weaving context.
       if (draftToSend) setDraft(draftToSend);

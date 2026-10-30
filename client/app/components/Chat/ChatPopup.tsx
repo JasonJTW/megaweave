@@ -5,36 +5,44 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
-import { useChatPopup } from "@/app/contexts/ChatPopupContext";
+import { useAppDispatch, useAppSelector } from "@/app/store/hooks";
+import {
+  closeChat as closeChatAction,
+  draftSet,
+  selectConversationId,
+  selectDraft,
+  selectIsOpen,
+  selectOtherUser,
+  selectPost,
+} from "@/app/store/chatPopupSlice";
 import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
 import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
 import { createWeave } from "@/services/weaveService";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
+import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
 export const ChatPopup = () => {
   const { mutate: globalMutate } = useSWRConfig();
-  const {
-    isOpen,
-    conversationId,
-    otherUser,
-    post,
-    draft,
-    setDraft,
-    closeChat,
-  } = useChatPopup();
+  const dispatch = useAppDispatch();
+  const isOpen = useAppSelector(selectIsOpen);
+  const conversationId = useAppSelector(selectConversationId);
+  const otherUser = useAppSelector(selectOtherUser);
+  const post = useAppSelector(selectPost);
+  const draft = useAppSelector(selectDraft);
+  const closeChat = () => dispatch(closeChatAction());
   const { user: currentUser } = useUser();
   const router = useRouter();
   const t = useTranslations("Chat");
+  const apiErrorMessage = useApiErrorMessage();
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
   const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
     if (!currentUser) {
       toast.error(t("signInToRequest"));
-      router.push(
-        `/signin?returnTo=${encodeURIComponent(window.location.href)}`,
-      );
+      router.push(signinUrlForCurrentPage());
       return;
     }
     if (!post) return;
@@ -60,7 +68,7 @@ export const ChatPopup = () => {
       void newWeave;
 
       // draft is the single source of truth — clearing it collapses the PostInfoCard
-      setDraft(null);
+      dispatch(draftSet(null));
 
       const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
       if (conversationId) {
@@ -74,11 +82,7 @@ export const ChatPopup = () => {
       toast.success(t("requestSent"));
     } catch (err: unknown) {
       console.error("Weaving submit error:", err);
-      if (err instanceof Error) {
-        toast.error(err.message);
-      } else {
-        toast.error(t("unexpectedError"));
-      }
+      toast.error(apiErrorMessage(err, t("unexpectedError")));
     }
   };
 
@@ -110,6 +114,7 @@ export const ChatPopup = () => {
               </h2>
               <button
                 onClick={closeChat}
+                aria-label={t("close")}
                 className="rounded-full p-2 transition-colors hover:bg-gray-100"
               >
                 <X className="h-6 w-6 text-megaweave-forest-dark" />

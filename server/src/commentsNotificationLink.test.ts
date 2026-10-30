@@ -70,7 +70,45 @@ describe("POST /comments notification link", () => {
     expect(createNotification).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
+        type: "COMMENT",
+        params: { actorName: "commenter", postTitle: "Sofa" },
         link: `/item/${POST_PUBLIC_ID}#comment-7`,
+      }),
+    );
+  });
+
+  it("notifies the parent comment's author with a reply event", async () => {
+    const execute = jest.fn(async (sql: string) => {
+      if (sql.startsWith("INSERT INTO comments")) return [{ insertId: 8 }];
+      if (sql.includes("FROM posts"))
+        return [[{ user_id: 5, title: "Sofa", public_id: POST_PUBLIC_ID }]];
+      if (sql.includes("SELECT user_id FROM comments")) return [[{ user_id: 6 }]];
+      if (/FROM comments c\s/.test(sql))
+        return [[{ id: 8, username: "commenter" }]];
+      if (sql.includes("FROM comments"))
+        return [[{ id: 3, post_id: 123, item_id: null, depth: 0, root_id: 3, path: null }]];
+      return [{}];
+    });
+    (dbPool.getConnection as jest.Mock).mockResolvedValue({
+      beginTransaction: jest.fn(),
+      commit: jest.fn(),
+      rollback: jest.fn(),
+      release: jest.fn(),
+      execute,
+    });
+
+    const res = await request(makeApp())
+      .post("/comments")
+      .send({ post_id: 123, parent_id: 3, content: "hi" });
+
+    expect(res.status).toBe(201);
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        recipient_id: 6,
+        type: "COMMENT_REPLY",
+        params: { actorName: "commenter" },
+        link: `/item/${POST_PUBLIC_ID}#comment-8`,
       }),
     );
   });

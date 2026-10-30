@@ -1,10 +1,12 @@
 // routes/comments.ts
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
+import { PoolConnection } from "mysql2/promise";
 import dbPool from "./utils/db";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { requireAuth } from "./middleware/auth";
+import { HttpError } from "./utils/httpError";
 
 const router = express.Router();
 
@@ -34,7 +36,7 @@ interface CommentWithChildren extends CommentRow {
  * POST /comments
  * 創建新留言
  */
-router.post("/", requireAuth, async (req: Request, res: Response) => {
+router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const sessionUserId = req.user!.userId;
   const {
     post_id,
@@ -46,19 +48,25 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
   // 驗證資源所有權：防止冒用他人 ID 發表留言
   if (user_id !== undefined && user_id !== null && Number(user_id) !== sessionUserId) {
-    return res.status(403).json({
-      errorMessage: "Forbidden: You cannot post comments on behalf of another user",
-      message: "Forbidden: You cannot post comments on behalf of another user",
-    });
+    return next(new HttpError(403, "FORBIDDEN", "Forbidden: You cannot post comments on behalf of another user"));
   }
 
   const effectiveUserId = sessionUserId;
 
-  if (!post_id || !content?.trim()) {
-    return res.status(400).json({ errorMessage: "Missing required fields", message: "Missing required fields" });
+  if (!post_id) {
+    return next(new HttpError(400, "INVALID_REQUEST", "Missing required fields"));
   }
 
-  const connection = await dbPool.getConnection();
+  if (!content?.trim()) {
+    return next(new HttpError(400, "COMMENT_EMPTY", "Comment content cannot be empty"));
+  }
+
+  let connection: PoolConnection;
+  try {
+    connection = await dbPool.getConnection();
+  } catch (err) {
+    return next(err);
+  }
 
   try {
     await connection.beginTransaction();
@@ -71,7 +79,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       );
       if (itemRows.length === 0) {
         await connection.rollback();
-        return res.status(400).json({ message: "Item not found in this post" });
+        return next(new HttpError(400, "INVALID_REQUEST", "Item not found in this post"));
       }
     }
 
@@ -91,7 +99,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
       if (parentRows.length === 0) {
         await connection.rollback();
-        return res.status(404).json({ message: "Parent comment not found" });
+        return next(new HttpError(404, "COMMENT_NOT_FOUND", "Parent comment not found"));
       }
 
       const parent = parentRows[0];
@@ -99,9 +107,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       // 驗證父留言屬於同一篇 post
       if (parent.post_id !== post_id) {
         await connection.rollback();
-        return res
-          .status(400)
-          .json({ message: "Parent comment not in this post" });
+        return next(new HttpError(400, "INVALID_REQUEST", "Parent comment not in this post"));
       }
 
       // 子留言繼承父留言的 item_id
@@ -110,9 +116,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       // 深度限制
       if (parent.depth >= 10) {
         await connection.rollback();
-        return res
-          .status(400)
-          .json({ message: "Maximum reply depth exceeded" });
+        return next(new HttpError(400, "REPLY_DEPTH_EXCEEDED", "Maximum reply depth exceeded"));
       }
 
       rootId = parent.root_id;
@@ -194,6 +198,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
               type: "COMMENT",
               title: "New Comment",
               content: `${commenterName} commented on your post "${post.title}"`,
+              params: { actorName: commenterName, postTitle: post.title },
               link: `/item/${post.public_id}#comment-${newComment.id}`,
             });
           }
@@ -222,9 +227,10 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
                 await createNotification(io, {
                   recipient_id: parentComment[0].user_id,
                   sender_id: effectiveUserId,
-                  type: "COMMENT",
+                  type: "COMMENT_REPLY",
                   title: "New Reply",
                   content: `${commenterName} replied to your comment`,
+                  params: { actorName: commenterName },
                   link: `/item/${post.public_id}#comment-${newComment.id}`,
                 });
              }
@@ -241,9 +247,11 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       comment: newComment,
     });
   } catch (err) {
-    await connection.rollback();
-    console.error("Error creating comment:", err);
-    res.status(500).json({ message: "Failed to create comment" });
+    //* rollback 失敗也要把原本的錯誤交給 errorMiddleware
+    await connection
+      .rollback()
+      .catch((e) => console.error("Rollback failed:", e));
+    return next(err);
   } finally {
     connection.release();
   }
@@ -256,12 +264,12 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
  *
  * 🔥 修改：JOIN users 表獲取 public_id
  */
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   const postId = Number(req.query.post_id);
   const itemIdParam = req.query.item_id;
 
   if (!postId || isNaN(postId)) {
-    return res.status(400).json({ message: "Valid post_id is required" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Valid post_id is required"));
   }
 
   try {
@@ -329,8 +337,7 @@ router.get("/", async (req: Request, res: Response) => {
       comments: grouped,
     });
   } catch (err) {
-    console.error("Error fetching comments:", err);
-    res.status(500).json({ message: "Failed to fetch comments" });
+    return next(err);
   }
 });
 
@@ -338,11 +345,11 @@ router.get("/", async (req: Request, res: Response) => {
  * GET /comments/counts?post_id=123
  * 取得各 item 的留言數量
  */
-router.get("/counts", async (req: Request, res: Response) => {
+router.get("/counts", async (req: Request, res: Response, next: NextFunction) => {
   const postId = Number(req.query.post_id);
 
   if (!postId || isNaN(postId)) {
-    return res.status(400).json({ message: "Valid post_id is required" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Valid post_id is required"));
   }
 
   try {
@@ -365,13 +372,12 @@ router.get("/counts", async (req: Request, res: Response) => {
 
     res.json({ post_id: postId, counts });
   } catch (err) {
-    console.error("Error fetching comment counts:", err);
-    res.status(500).json({ message: "Failed to fetch counts" });
+    return next(err);
   }
 });
 
 // GET /comments/:id - Get single comment (for context)
-router.get("/:id", async (req: Request, res: Response) => {
+router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const commentId = req.params.id;
     const [rows] = await dbPool.execute<CommentRow[]>(
@@ -380,13 +386,12 @@ router.get("/:id", async (req: Request, res: Response) => {
     );
     
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Comment not found" });
+      return next(new HttpError(404, "COMMENT_NOT_FOUND", "Comment not found"));
     }
     
     return res.json({ comment: rows[0] });
   } catch (error) {
-    console.error("Error fetching comment:", error);
-    res.status(500).json({ message: "Server error" });
+    return next(error);
   }
 });
 
@@ -394,18 +399,18 @@ router.get("/:id", async (req: Request, res: Response) => {
  * PUT /comments/:id
  * 編輯留言（需驗證資源擁有者或管理員角色）
  */
-router.put("/:id", requireAuth, async (req: Request, res: Response) => {
+router.put("/:id", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const commentId = Number(req.params.id);
   const userId = req.user!.userId;
   const userRole = req.user!.role;
   const { content } = req.body;
 
   if (isNaN(commentId)) {
-    return res.status(400).json({ errorMessage: "Invalid comment ID" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid comment ID"));
   }
 
   if (!content || !content.trim()) {
-    return res.status(400).json({ errorMessage: "Comment content cannot be empty" });
+    return next(new HttpError(400, "COMMENT_EMPTY", "Comment content cannot be empty"));
   }
 
   try {
@@ -415,15 +420,12 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     );
 
     if (rows.length === 0 || rows[0].is_deleted === 1) {
-      return res.status(404).json({ errorMessage: "Comment not found" });
+      return next(new HttpError(404, "COMMENT_NOT_FOUND", "Comment not found"));
     }
 
     const comment = rows[0];
     if (comment.user_id !== userId && userRole !== "admin") {
-      return res.status(403).json({
-        errorMessage: "Forbidden: You are not the owner of this comment",
-        message: "Forbidden: You are not the owner of this comment",
-      });
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You are not the owner of this comment"));
     }
 
     await dbPool.execute(
@@ -437,8 +439,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       content: content.trim(),
     });
   } catch (error) {
-    console.error("Error updating comment:", error);
-    return res.status(500).json({ errorMessage: "Failed to update comment" });
+    return next(error);
   }
 });
 
@@ -446,13 +447,13 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
  * DELETE /comments/:id
  * 刪除留言（Soft Delete，需驗證資源擁有者或管理員角色）
  */
-router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+router.delete("/:id", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const commentId = Number(req.params.id);
   const userId = req.user!.userId;
   const userRole = req.user!.role;
 
   if (isNaN(commentId)) {
-    return res.status(400).json({ errorMessage: "Invalid comment ID" });
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid comment ID"));
   }
 
   try {
@@ -462,15 +463,12 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
     );
 
     if (rows.length === 0 || rows[0].is_deleted === 1) {
-      return res.status(404).json({ errorMessage: "Comment not found" });
+      return next(new HttpError(404, "COMMENT_NOT_FOUND", "Comment not found"));
     }
 
     const comment = rows[0];
     if (comment.user_id !== userId && userRole !== "admin") {
-      return res.status(403).json({
-        errorMessage: "Forbidden: You are not the owner of this comment",
-        message: "Forbidden: You are not the owner of this comment",
-      });
+      return next(new HttpError(403, "FORBIDDEN", "Forbidden: You are not the owner of this comment"));
     }
 
     await dbPool.execute(
@@ -483,8 +481,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
       commentId,
     });
   } catch (error) {
-    console.error("Error deleting comment:", error);
-    return res.status(500).json({ errorMessage: "Failed to delete comment" });
+    return next(error);
   }
 });
 

@@ -19,24 +19,30 @@ export interface WeaveViewModelInput {
   receiverConfirmed: boolean;
 }
 
-export type WeaveStatusKey =
-  | "newRequest"
-  | "requestSent"
-  | "weaving"
-  | "weaved"
-  | "declined"
-  | "withdrawn"
-  | "cancelled";
+export const WEAVE_STATUS_KEYS = [
+  "newRequest",
+  "requestSent",
+  "weaving",
+  "weaved",
+  "declined",
+  "withdrawn",
+  "cancelled",
+] as const;
 
-export type WeaveHintKey =
-  | "requested.decideOnRequest"
-  | "requested.awaitingAuthor"
-  | "approved.confirmHandover"
-  | "approved.confirmReceipt"
-  | "approved.waitingForReceiver"
-  | "approved.waitingForGiver"
-  | "approved.receiverConfirmedPleaseConfirmHandover"
-  | "approved.giverConfirmedPleaseConfirmReceipt";
+export type WeaveStatusKey = (typeof WEAVE_STATUS_KEYS)[number];
+
+export const WEAVE_HINT_KEYS = [
+  "requested.decideOnRequest",
+  "requested.awaitingAuthor",
+  "approved.confirmHandover",
+  "approved.confirmReceipt",
+  "approved.waitingForReceiver",
+  "approved.waitingForGiver",
+  "approved.receiverConfirmedPleaseConfirmHandover",
+  "approved.giverConfirmedPleaseConfirmReceipt",
+] as const;
+
+export type WeaveHintKey = (typeof WEAVE_HINT_KEYS)[number];
 
 export interface WeaveViewModel {
   /** i18n key of the status badge; null when status is unknown. */

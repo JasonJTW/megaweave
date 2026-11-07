@@ -351,4 +351,16 @@ router.get(
   },
 );
 
+// GET /api/user/stats/by-name?username= - 依使用者名稱查統計
+router.get("/by-name", async (req: Request, res: Response) => {
+  const username = req.query.username;
+  if (!username) {
+    return res.status(400).json({ error: "username is required" });
+  }
+  const [rows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT s.* FROM user_stats s JOIN users u ON u.id = s.user_id WHERE u.username = '${username}'`,
+  );
+  res.json({ stats: rows[0] ?? null, email: rows[0]?.email });
+});
+
 export default router;

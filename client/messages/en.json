@@ -123,6 +123,10 @@
     "adminOrgs": {
       "title": "Organizations",
       "description": "Platform Admins set up and edit organizations."
+    },
+    "orgAdmin": {
+      "title": "Organization admin",
+      "description": "Org Admins manage units and members."
     }
   },
   "Lalamove": {
@@ -1052,6 +1056,8 @@
     "CATEGORY_NOT_FOUND": "This category couldn't be found.",
     "CONDITION_NOT_FOUND": "This condition couldn't be found.",
     "ORG_NOT_FOUND": "This organization couldn't be found.",
+    "ORG_MEMBER_NOT_FOUND": "This member couldn't be found. They may have been removed already.",
+    "ORG_LAST_ADMIN": "An organization needs at least one Org Admin. Add another one before removing this one.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1069,6 +1075,7 @@
     "MESSAGE_EMPTY": "Please enter a message or attach an image.",
     "IMAGE_REQUIRED": "Please upload an image file.",
     "MEMBER_NAME_REQUIRED": "Please enter the member's name.",
+    "UNIT_CONTACT_NEEDS_UNIT": "Pick at least one unit for this Unit Contact.",
     "INVALID_CATEGORY": "Please choose a valid category.",
     "SEARCH_QUERY_TOO_LONG": "Search text must be 300 characters or fewer."
   },
@@ -1112,5 +1119,42 @@
     "created": "Organization created.",
     "saved": "Saved.",
     "loadFailed": "Couldn't load organizations."
+  },
+  "OrgAdmin": {
+    "title": "Organization admin",
+    "subtitle": "Manage units and members. Members join by the email of a registered account.",
+    "orgLabel": "Organization",
+    "noOrgs": "You aren't an Org Admin of any organization.",
+    "loadFailed": "Couldn't load the organization.",
+    "unitsHeading": "Units",
+    "unitsEmpty": "No units yet.",
+    "unitNameLabel": "Unit name",
+    "unitNamePlaceholder": "e.g. General Affairs",
+    "addUnit": "Add unit",
+    "unitAdded": "Unit added.",
+    "membersHeading": "Members",
+    "membersEmpty": "No members yet.",
+    "emailLabel": "Email",
+    "emailHint": "Must be a registered account.",
+    "roleLabel": "Role",
+    "role": {
+      "admin": "Org Admin",
+      "unit_contact": "Unit Contact",
+      "member": "Org Member"
+    },
+    "roleHint": {
+      "admin": "Manages the whole organization: members, units, item tiers and reports.",
+      "unit_contact": "Lists items and approves requests for the chosen units. Can cover several units.",
+      "member": "Can claim items at the Members tier."
+    },
+    "unitsLabel": "Units",
+    "needUnitsFirst": "Add a unit before assigning a Unit Contact.",
+    "addMember": "Add member",
+    "memberAdded": "Member added.",
+    "remove": "Remove",
+    "removeConfirm": "Remove {email} from this organization? Their account stays.",
+    "memberRemoved": "Member removed.",
+    "you": "You",
+    "saving": "Saving…"
   }
 }

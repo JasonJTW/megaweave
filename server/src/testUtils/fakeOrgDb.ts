@@ -1,6 +1,7 @@
 //* 測試用的記憶體 MySQL：只認得 orgService 會送出的語句，其他語句直接丟錯，避免測試靜默通過
 //* `users.email` 的 collation 不分大小寫，這裡比對時一律轉小寫
 //* 交易：beginTransaction 存快照，rollback 還原，模擬「失敗時什麼都沒寫入」
+//* 外鍵：刪除 membership 時連帶刪除它的 org_unit_contacts（ON DELETE CASCADE）
 
 export interface FakeUser {
   id: number;
@@ -25,12 +26,26 @@ export interface FakeMembershipRow {
   org_role: string;
 }
 
+export interface FakeUnitRow {
+  id: number;
+  org_id: number;
+  name: string;
+}
+
+export interface FakeUnitContactRow {
+  org_id: number;
+  org_unit_id: number;
+  membership_id: number;
+}
+
 type Result = [unknown, unknown];
 
 export interface FakeOrgDb {
   users: FakeUser[];
   organizations: FakeOrgRow[];
   memberships: FakeMembershipRow[];
+  units: FakeUnitRow[];
+  unitContacts: FakeUnitContactRow[];
   connection: {
     query: (...args: unknown[]) => Promise<Result>;
     execute: (...args: unknown[]) => Promise<Result>;
@@ -57,15 +72,34 @@ function dupEntry(): Error {
   return Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
 }
 
-export function createFakeOrgDb(seed: { users: FakeUser[] }): FakeOrgDb {
+type Tables = Pick<
+  FakeOrgDb,
+  "organizations" | "memberships" | "units" | "unitContacts"
+>;
+
+export function createFakeOrgDb(
+  seed: { users: FakeUser[] } & Partial<Tables>,
+): FakeOrgDb {
   const db: FakeOrgDb = {
     users: [...seed.users],
-    organizations: [],
-    memberships: [],
+    organizations: [...(seed.organizations ?? [])],
+    memberships: [...(seed.memberships ?? [])],
+    units: [...(seed.units ?? [])],
+    unitContacts: [...(seed.unitContacts ?? [])],
     connection: undefined as unknown as FakeOrgDb["connection"],
   };
-  let snapshot: Pick<FakeOrgDb, "organizations" | "memberships"> | null = null;
-  let nextId = 1;
+  let snapshot: Tables | null = null;
+  let nextId =
+    Math.max(
+      0,
+      ...db.organizations.map((r) => r.id),
+      ...db.memberships.map((r) => r.id),
+      ...db.units.map((r) => r.id),
+    ) + 1;
+
+  function emailOf(userId: number) {
+    return db.users.find((u) => u.id === userId)!.email;
+  }
 
   function run(rawSql: unknown, rawParams: unknown): Result {
     const sql = normalize(String(rawSql));
@@ -165,6 +199,153 @@ export function createFakeOrgDb(seed: { users: FakeUser[] }): FakeOrgDb {
       return [{ affectedRows: org ? 1 : 0 }, []];
     }
 
+    //* ── 組織管理員後台（orgMemberService）──
+
+    if (
+      /^SELECT o\.public_id, o\.name FROM org_memberships m JOIN organizations o ON o\.id = m\.org_id WHERE m\.user_id = \? AND m\.org_role = 'admin'/.test(
+        sql,
+      )
+    ) {
+      const rows = db.memberships
+        .filter((m) => m.user_id === params[0] && m.org_role === "admin")
+        .map((m) => db.organizations.find((o) => o.id === m.org_id)!)
+        .map((o) => ({ public_id: o.public_id, name: o.name }));
+      return [rows, []];
+    }
+
+    if (
+      /^SELECT o\.id, o\.public_id, o\.name FROM organizations o JOIN org_memberships m ON m\.org_id = o\.id WHERE o\.public_id = \? AND m\.user_id = \? AND m\.org_role = 'admin'/.test(
+        sql,
+      )
+    ) {
+      const org = db.organizations.find((o) => o.public_id === params[0]);
+      const isAdmin =
+        org &&
+        db.memberships.some(
+          (m) =>
+            m.org_id === org.id &&
+            m.user_id === params[1] &&
+            m.org_role === "admin",
+        );
+      const rows = isAdmin
+        ? [{ id: org.id, public_id: org.public_id, name: org.name }]
+        : [];
+      return [rows, []];
+    }
+
+    if (/^SELECT id, name FROM org_units WHERE org_id = \?/.test(sql)) {
+      const rows = db.units
+        .filter((u) => u.org_id === params[0])
+        .map((u) => ({ id: u.id, name: u.name }));
+      return [rows, []];
+    }
+
+    if (
+      /^SELECT id FROM org_units WHERE org_id = \? AND id IN \(\?\)/.test(sql)
+    ) {
+      const ids = (params[1] as number[]).map(Number);
+      const rows = db.units
+        .filter((u) => u.org_id === params[0] && ids.includes(u.id))
+        .map((u) => ({ id: u.id }));
+      return [rows, []];
+    }
+
+    if (
+      /^INSERT INTO org_units \(org_id, ?name\) VALUES \(\?, ?\?\)/.test(sql)
+    ) {
+      const [org_id, name] = params;
+      if (db.units.some((u) => u.org_id === org_id && u.name === name)) {
+        throw dupEntry();
+      }
+      const row: FakeUnitRow = {
+        id: nextId++,
+        org_id: Number(org_id),
+        name: String(name),
+      };
+      db.units.push(row);
+      return [{ insertId: row.id, affectedRows: 1 }, []];
+    }
+
+    if (
+      /^SELECT m\.id, m\.org_role, u\.email FROM org_memberships m JOIN users u ON u\.id = m\.user_id WHERE m\.org_id = \?/.test(
+        sql,
+      )
+    ) {
+      const rows = db.memberships
+        .filter((m) => m.org_id === params[0])
+        .map((m) => ({
+          id: m.id,
+          org_role: m.org_role,
+          email: emailOf(m.user_id),
+        }));
+      return [rows, []];
+    }
+
+    if (
+      /^SELECT membership_id, org_unit_id FROM org_unit_contacts WHERE org_id = \?/.test(
+        sql,
+      )
+    ) {
+      const rows = db.unitContacts
+        .filter((c) => c.org_id === params[0])
+        .map((c) => ({
+          membership_id: c.membership_id,
+          org_unit_id: c.org_unit_id,
+        }));
+      return [rows, []];
+    }
+
+    if (
+      /^INSERT INTO org_unit_contacts \(org_id, ?org_unit_id, ?membership_id\) VALUES \?$/.test(
+        sql,
+      )
+    ) {
+      const values = params[0] as [number, number, number][];
+      for (const [org_id, org_unit_id, membership_id] of values) {
+        const unit = db.units.find((u) => u.id === org_unit_id);
+        const membership = db.memberships.find((m) => m.id === membership_id);
+        if (unit?.org_id !== org_id || membership?.org_id !== org_id) {
+          throw new Error("fakeOrgDb: org_unit_contacts foreign key fails");
+        }
+        db.unitContacts.push({ org_id, org_unit_id, membership_id });
+      }
+      return [{ affectedRows: values.length }, []];
+    }
+
+    if (
+      /^SELECT org_role FROM org_memberships WHERE org_id = \? AND id = \? FOR UPDATE$/.test(
+        sql,
+      )
+    ) {
+      const rows = db.memberships
+        .filter((m) => m.org_id === params[0] && m.id === Number(params[1]))
+        .map((m) => ({ org_role: m.org_role }));
+      return [rows, []];
+    }
+
+    if (
+      /^SELECT id FROM org_memberships WHERE org_id = \? AND org_role = 'admin' FOR UPDATE$/.test(
+        sql,
+      )
+    ) {
+      const rows = db.memberships
+        .filter((m) => m.org_id === params[0] && m.org_role === "admin")
+        .map((m) => ({ id: m.id }));
+      return [rows, []];
+    }
+
+    if (
+      /^DELETE FROM org_memberships WHERE org_id = \? AND id = \?$/.test(sql)
+    ) {
+      const id = Number(params[1]);
+      const before = db.memberships.length;
+      db.memberships = db.memberships.filter(
+        (m) => !(m.org_id === params[0] && m.id === id),
+      );
+      db.unitContacts = db.unitContacts.filter((c) => c.membership_id !== id);
+      return [{ affectedRows: before - db.memberships.length }, []];
+    }
+
     throw new Error(`fakeOrgDb: unsupported SQL: ${sql}`);
   }
 
@@ -175,6 +356,8 @@ export function createFakeOrgDb(seed: { users: FakeUser[] }): FakeOrgDb {
       snapshot = {
         organizations: db.organizations.map((o) => ({ ...o })),
         memberships: db.memberships.map((m) => ({ ...m })),
+        units: db.units.map((u) => ({ ...u })),
+        unitContacts: db.unitContacts.map((c) => ({ ...c })),
       };
     },
     commit: async () => {
@@ -182,8 +365,10 @@ export function createFakeOrgDb(seed: { users: FakeUser[] }): FakeOrgDb {
     },
     rollback: async () => {
       if (snapshot) {
-        db.organizations.splice(0, Infinity, ...snapshot.organizations);
-        db.memberships.splice(0, Infinity, ...snapshot.memberships);
+        db.organizations = snapshot.organizations;
+        db.memberships = snapshot.memberships;
+        db.units = snapshot.units;
+        db.unitContacts = snapshot.unitContacts;
       }
       snapshot = null;
     },

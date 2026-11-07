@@ -16,6 +16,8 @@ process.env.E2E_API_URL ??= `https://localhost:${e2eEnv.PORT}`;
 if (!isRemote) {
   process.env.E2E_USER_EMAIL ??= e2eEnv.E2E_USER_EMAIL;
   process.env.E2E_USER_PASSWORD ??= e2eEnv.E2E_USER_PASSWORD;
+  process.env.E2E_ORG_VIEWER_EMAIL ??= e2eEnv.E2E_ORG_VIEWER_EMAIL;
+  process.env.E2E_ORG_VIEWER_PASSWORD ??= e2eEnv.E2E_ORG_VIEWER_PASSWORD;
 }
 
 const reuseExistingServer = !process.env.CI;

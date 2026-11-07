@@ -17,6 +17,7 @@ export const ERROR_CODES = [
   "ACCOUNT_EXISTS",
   "INVALID_SOCIAL_TOKEN",
   "USE_SOCIAL_SIGNIN",
+  "EMAIL_NOT_REGISTERED",
 
   //* 找不到資源
   "POST_NOT_FOUND",
@@ -25,6 +26,11 @@ export const ERROR_CODES = [
   "WEAVE_NOT_FOUND",
   "CATEGORY_NOT_FOUND",
   "CONDITION_NOT_FOUND",
+  "ORG_NOT_FOUND",
+  "ORG_MEMBER_NOT_FOUND",
+
+  //* 組織
+  "ORG_LAST_ADMIN",
 
   //* Weave
   "WEAVE_OWN_POST",

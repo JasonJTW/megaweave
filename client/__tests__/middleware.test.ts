@@ -22,7 +22,7 @@ function createMockRequest(
     method?: string;
     cookies?: Record<string, string>;
     headers?: Record<string, string>;
-  } = {}
+  } = {},
 ): NextRequest {
   const headers = new Headers(options.headers);
   if (options.cookies) {
@@ -77,7 +77,10 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
     it("matches any route in list", () => {
       assert.equal(matchesAnyRoute("/messages", PROTECTED_ROUTES), true);
       assert.equal(matchesAnyRoute("/user/settings", PROTECTED_ROUTES), true);
-      assert.equal(matchesAnyRoute("/delivery/ord-123", PROTECTED_ROUTES), true);
+      assert.equal(
+        matchesAnyRoute("/delivery/ord-123", PROTECTED_ROUTES),
+        true,
+      );
       assert.equal(matchesAnyRoute("/signin", GUEST_ONLY_ROUTES), true);
       assert.equal(matchesAnyRoute("/signup", GUEST_ONLY_ROUTES), true);
       assert.equal(matchesAnyRoute("/about", PUBLIC_ROUTES), true);
@@ -105,7 +108,10 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
     });
 
     it("allows safe relative paths with query parameters", () => {
-      assert.equal(getSafeReturnTo("/messages?unread=true"), "/messages?unread=true");
+      assert.equal(
+        getSafeReturnTo("/messages?unread=true"),
+        "/messages?unread=true",
+      );
       assert.equal(getSafeReturnTo("/item/uuid-456"), "/item/uuid-456");
       assert.equal(getSafeReturnTo("/user"), "/user");
     });
@@ -152,6 +158,7 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
         "/posts",
         "/delivery/order-1",
         "/notifications",
+        "/org-admin",
       ];
 
       for (const path of protectedPaths) {
@@ -163,7 +170,7 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
         const expectedReturnTo = encodeURIComponent(path);
         assert.ok(
           location.includes(`/signin?returnTo=${expectedReturnTo}`),
-          `Expected redirect to include returnTo=${expectedReturnTo}, got: ${location}`
+          `Expected redirect to include returnTo=${expectedReturnTo}, got: ${location}`,
         );
       }
     });
@@ -173,7 +180,9 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       const res = await middleware(req);
       assert.equal(res.status, 307);
       const location = res.headers.get("location");
-      const expectedReturnTo = encodeURIComponent("/messages?page=2&filter=unread");
+      const expectedReturnTo = encodeURIComponent(
+        "/messages?page=2&filter=unread",
+      );
       assert.ok(location?.includes(`/signin?returnTo=${expectedReturnTo}`));
     });
 
@@ -200,6 +209,18 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       assert.equal(res.headers.get("location"), null);
     });
 
+    it("lets a signed-in 'user' open the Org Admin back office (the server checks org_role)", async () => {
+      const req = createMockRequest("/org-admin", {
+        cookies: {
+          "session-id": "valid-session",
+          "user-role": "user",
+        },
+      });
+      const res = await middleware(req);
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("location"), null);
+    });
+
     it("allows 'admin' and 'contributor' roles to access protected routes", async () => {
       for (const role of ["admin", "contributor"]) {
         const req = createMockRequest("/delivery/order-99", {
@@ -215,12 +236,15 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
     });
 
     it("redirects authenticated user on /signin to returnTo destination", async () => {
-      const req = createMockRequest("/signin?returnTo=%2Fmessages%3Fthread%3D1", {
-        cookies: {
-          "session-id": "valid-session",
-          "user-role": "user",
+      const req = createMockRequest(
+        "/signin?returnTo=%2Fmessages%3Fthread%3D1",
+        {
+          cookies: {
+            "session-id": "valid-session",
+            "user-role": "user",
+          },
         },
-      });
+      );
       const res = await middleware(req);
       assert.equal(res.status, 307);
       const location = res.headers.get("location");
@@ -306,12 +330,18 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
     const authedUser = { "session-id": "valid-session", "user-role": "user" };
 
     it("splits the locale prefix from the pathname", () => {
-      assert.deepEqual(splitLocalePrefix("/"), { locale: "zh-TW", pathname: "/" });
+      assert.deepEqual(splitLocalePrefix("/"), {
+        locale: "zh-TW",
+        pathname: "/",
+      });
       assert.deepEqual(splitLocalePrefix("/messages/1"), {
         locale: "zh-TW",
         pathname: "/messages/1",
       });
-      assert.deepEqual(splitLocalePrefix("/en"), { locale: "en", pathname: "/" });
+      assert.deepEqual(splitLocalePrefix("/en"), {
+        locale: "en",
+        pathname: "/",
+      });
       assert.deepEqual(splitLocalePrefix("/en/messages"), {
         locale: "en",
         pathname: "/messages",
@@ -344,7 +374,9 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
 
     it("does not redirect / for an English Accept-Language", async () => {
       const res = await middleware(
-        createMockRequest("/", { headers: { "accept-language": "en-US,en;q=0.9" } })
+        createMockRequest("/", {
+          headers: { "accept-language": "en-US,en;q=0.9" },
+        }),
       );
       assert.equal(res.status, 200);
       assert.equal(res.headers.get("location"), null);
@@ -356,7 +388,7 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
           createMockRequest(path, {
             headers: { "accept-language": "en-US,en;q=0.9" },
             cookies: { [EN_PROMPT_DISMISSED_COOKIE]: "1" },
-          })
+          }),
         );
         assert.equal(res.status, 200, path);
         assert.equal(res.headers.get("location"), null, path);
@@ -375,12 +407,15 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       assert.equal(res.status, 307);
       const location = new URL(res.headers.get("location")!);
       assert.equal(location.pathname, "/en/signin");
-      assert.equal(location.searchParams.get("returnTo"), "/en/messages?page=2");
+      assert.equal(
+        location.searchParams.get("returnTo"),
+        "/en/messages?page=2",
+      );
     });
 
     it("lets authenticated users into prefixed protected routes", async () => {
       const res = await middleware(
-        createMockRequest("/en/messages", { cookies: authedUser })
+        createMockRequest("/en/messages", { cookies: authedUser }),
       );
       assert.equal(res.status, 200);
       assert.equal(res.headers.get("location"), null);
@@ -393,7 +428,7 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       assert.equal(guestLocation.searchParams.get("returnTo"), "/en/admin");
 
       const user = await middleware(
-        createMockRequest("/en/admin", { cookies: authedUser })
+        createMockRequest("/en/admin", { cookies: authedUser }),
       );
       assert.equal(user.status, 307);
       assert.equal(new URL(user.headers.get("location")!).pathname, "/en");
@@ -401,14 +436,22 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
 
     it("sends authenticated users on /en/signin back to returnTo or the English home", async () => {
       const withReturnTo = await middleware(
-        createMockRequest("/en/signin?returnTo=%2Fen%2Fmessages", { cookies: authedUser })
+        createMockRequest("/en/signin?returnTo=%2Fen%2Fmessages", {
+          cookies: authedUser,
+        }),
       );
-      assert.equal(new URL(withReturnTo.headers.get("location")!).pathname, "/en/messages");
+      assert.equal(
+        new URL(withReturnTo.headers.get("location")!).pathname,
+        "/en/messages",
+      );
 
       const withoutReturnTo = await middleware(
-        createMockRequest("/en/signup", { cookies: authedUser })
+        createMockRequest("/en/signup", { cookies: authedUser }),
       );
-      assert.equal(new URL(withoutReturnTo.headers.get("location")!).pathname, "/en");
+      assert.equal(
+        new URL(withoutReturnTo.headers.get("location")!).pathname,
+        "/en",
+      );
     });
 
     it("rejects prefixed auth pages as returnTo", () => {

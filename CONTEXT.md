@@ -118,11 +118,11 @@ _Avoid_: Tenant, 租戶, 客戶帳號
 _Avoid_: Department, 處室（僅作顯示名稱）
 
 **Unit Contact (單位窗口)**:
-代表某個單位上架物品、核可申請、替單位申請其他單位物品的人。只能管理自己單位。
+代表某個單位上架物品、核可申請、替單位申請其他單位物品的人。只能管理自己負責的單位，可同時負責多個單位，也可同時是 Org Admin。代表單位之外，仍可用「我個人」的身分交換。
 _Avoid_: Staff, 職員, 承辦
 
 **Org Admin (組織管理員)**:
-管理整個組織的人：成員、單位、全組織物品的層級、報表。一個組織可有多位。權限低於 Platform Admin。
+管理整個組織的人：成員、單位、全組織物品的層級、報表。一個組織可有多位，至少要有一位。權限低於 Platform Admin。可同時是某些單位的 Unit Contact。
 _Avoid_: Owner, 總務（僅為常見職稱）
 
 **Org Member (組織成員)**:
@@ -130,10 +130,12 @@ _Avoid_: Owner, 總務（僅為常見職稱）
 _Avoid_: Student, Employee
 
 **Platform Admin (平台管理員)**:
-大量交織的營運方，負責開通組織。
+大量交織的營運方，負責開通組織，可進入並管理任何組織的組織後台，不必是該組織的成員。
+
+同一人在一個組織內的身分可以疊加：Org Admin 與 Unit Contact 彼此獨立，不是三選一。
 
 **Audience Tier (釋出層級)**:
-組織 Post 目前開放給誰。依序為 Internal（只有 Unit Contact）、Members（加上 Org Member）、Public（所有人）。可升可降。
+組織 Post 目前開放給誰。依序為 Internal（Unit Contact 與 Org Admin）、Members（加上 Org Member）、Public（所有人）。可升可降。
 _Avoid_: Visibility, Privacy, 權限
 
 **Auto Release (自動升級)**:

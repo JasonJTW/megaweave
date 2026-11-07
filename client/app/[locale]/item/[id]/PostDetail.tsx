@@ -29,6 +29,7 @@ import PostFormModal, {
 } from "@/app/components/PostFormModal";
 import PostOwnerSidebar from "@/app/components/PostOwnerSidebar";
 import PostShareModal from "@/app/components/PostShareModal";
+import { isIndexablePost } from "@/lib/seo";
 import LalamoveQuotation from "@/app/components/Lalamove/LalamoveQuotation";
 import { useNavbar } from "@/app/contexts/NavBarContext";
 import { useUser } from "@/app/contexts/UserContext";
@@ -531,16 +532,19 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                   <ArrowLeft className="h-8 w-8" />
                 </Button>
               </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => setShareModalOpen(true)}
-                  aria-label={t("sharePost")}
-                  className="p-4"
-                >
-                  <Share2 className="h-8 w-8" />
-                </Button>
-              </div>
+              {/* Internal / Members org posts have no public page to share (ADR 0003) */}
+              {isIndexablePost(post) && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShareModalOpen(true)}
+                    aria-label={t("sharePost")}
+                    className="p-4"
+                  >
+                    <Share2 className="h-8 w-8" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>

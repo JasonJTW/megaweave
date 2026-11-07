@@ -3,6 +3,7 @@ import { RESP_TYPES } from "@redis/client";
 import { getVectorRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import { RowDataPacket } from "mysql2";
+import { publicSurfaceCondition } from "../../services/postVisibility";
 
 // ─── 行為權重 ────────────────────────────────────────────────────────────────
 
@@ -146,6 +147,23 @@ async function fetchUserVector(
   return null;
 }
 
+/**
+ * 興趣向量只從公開介面上的貼文學習：Internal／Members 組織貼文不影響公開推薦（ADR 0003）。
+ * 貼文不存在或查詢失敗時同樣不學習（fail closed）。
+ */
+async function isPostOnPublicSurfaces(postId: number): Promise<boolean> {
+  try {
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT p.id FROM posts p WHERE p.id = ? AND ${publicSurfaceCondition("p")}`,
+      [postId],
+    );
+    return rows.length > 0;
+  } catch (err) {
+    console.warn(`⚠️ Failed to check post visibility (post #${postId}):`, err);
+    return false;
+  }
+}
+
 // ─── Processor ───────────────────────────────────────────────────────────────
 
 export async function processUserVector(
@@ -156,6 +174,12 @@ export async function processUserVector(
 
   await job.log(`${logPrefix} start`);
   console.log(`${logPrefix} – start`);
+
+  // 0. 非公開組織貼文不納入興趣學習
+  if (!(await isPostOnPublicSurfaces(postId))) {
+    await job.log(`${logPrefix} – skip: post is not on public surfaces`);
+    return;
+  }
 
   // 1. 取得商品向量（若尚未 Embedding 則放棄本次更新，不拋錯）
   const postVec = await fetchPostVector(postId);

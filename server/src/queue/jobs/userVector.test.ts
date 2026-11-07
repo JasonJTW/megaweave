@@ -26,6 +26,13 @@ describe("userVector worker", () => {
     (getVectorRedisClient as jest.Mock).mockReturnValue(mockRedis);
   });
 
+  // The job only learns from posts shown on public surfaces (ADR 0003 prototype rule)
+  function mockPostOnPublicSurfaces(isPublic: boolean): void {
+    (dbPool.execute as jest.Mock).mockImplementation((sql: string) =>
+      Promise.resolve([sql.includes("audience_tier") && isPublic ? [{ id: 123 }] : []]),
+    );
+  }
+
   function createFloat32Buffer(vec: number[]): Buffer {
     const buf = Buffer.alloc(vec.length * 4);
     for (let i = 0; i < vec.length; i++) {
@@ -56,7 +63,7 @@ describe("userVector worker", () => {
       return Promise.resolve(null);
     });
 
-    (dbPool.execute as jest.Mock).mockResolvedValue([[]]);
+    mockPostOnPublicSurfaces(true);
 
     const mockJob = {
       data: {
@@ -129,7 +136,7 @@ describe("userVector worker", () => {
 
   it("gracefully skips update if post vector is missing", async () => {
     mockRedis.sendCommand.mockResolvedValue(null);
-    (dbPool.execute as jest.Mock).mockResolvedValue([[]]);
+    mockPostOnPublicSurfaces(true);
 
     const mockJob = {
       data: {
@@ -137,6 +144,24 @@ describe("userVector worker", () => {
         postId: 999,
         action: "weave",
       } as UserVectorJobData,
+      log: jest.fn().mockResolvedValue(undefined),
+    } as unknown as Job<UserVectorJobData>;
+
+    await processUserVector(mockJob);
+
+    expect(mockRedis.hSet).not.toHaveBeenCalled();
+    expect(mockRedis.sAdd).not.toHaveBeenCalled();
+  });
+
+  it("does not learn from an org post below the Public tier", async () => {
+    const postBuf = createFloat32Buffer([1, 0]);
+    mockRedis.sendCommand.mockImplementation((args: string[]) =>
+      Promise.resolve(args[1] === "post:123" ? postBuf : null),
+    );
+    mockPostOnPublicSurfaces(false);
+
+    const mockJob = {
+      data: { userId: 1, postId: 123, action: "weave" } as UserVectorJobData,
       log: jest.fn().mockResolvedValue(undefined),
     } as unknown as Job<UserVectorJobData>;
 

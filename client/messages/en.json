@@ -119,6 +119,14 @@
       "type": "{type, select, share {Share} wish {Wish} commons {Commons} other {Post}}",
       "fallbackTitle": "Post",
       "fallbackDescription": "Take a look at this post on megaweaving."
+    },
+    "adminOrgs": {
+      "title": "Organizations",
+      "description": "Platform Admins set up and edit organizations."
+    },
+    "orgAdmin": {
+      "title": "Organization admin",
+      "description": "Org Admins manage units and members."
     }
   },
   "Lalamove": {
@@ -1040,12 +1048,16 @@
     "ACCOUNT_EXISTS": "An account with this email already exists.",
     "INVALID_SOCIAL_TOKEN": "We couldn't verify your social account. Please try again.",
     "USE_SOCIAL_SIGNIN": "This email is registered with {providers}. Please sign in with {providers}.",
+    "EMAIL_NOT_REGISTERED": "No account is registered with this email. Ask them to sign up first.",
     "POST_NOT_FOUND": "This post couldn't be found. It may have been deleted.",
     "USER_NOT_FOUND": "This user couldn't be found.",
     "COMMENT_NOT_FOUND": "This comment couldn't be found. It may have been deleted.",
     "WEAVE_NOT_FOUND": "This weave couldn't be found.",
     "CATEGORY_NOT_FOUND": "This category couldn't be found.",
     "CONDITION_NOT_FOUND": "This condition couldn't be found.",
+    "ORG_NOT_FOUND": "This organization couldn't be found.",
+    "ORG_MEMBER_NOT_FOUND": "This member couldn't be found. They may have been removed already.",
+    "ORG_LAST_ADMIN": "An organization needs at least one Org Admin. Add another one before removing this one.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1070,5 +1082,82 @@
     "title": "For testing and demo only",
     "body": "ECPay and Lalamove are connected to their test environments: no real charge will be made and no driver will actually be dispatched.",
     "testCard": "Use the ECPay test card {card}, CVV {cvv}, and any future expiry date."
+  },
+  "AdminOrgs": {
+    "title": "Organizations",
+    "subtitle": "Set up organizations and assign their first Org Admin.",
+    "createHeading": "New organization",
+    "editHeading": "Edit organization",
+    "listHeading": "Organizations",
+    "empty": "No organizations yet.",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Megaweave Elementary",
+    "publisherDisplayLabel": "Public display",
+    "publisherDisplayHint": "How the poster appears once an item reaches the Public tier.",
+    "publisherDisplay": {
+      "org": "Organization name",
+      "org_unit": "Organization + unit",
+      "anonymous": "Anonymous"
+    },
+    "isDemoLabel": "Demo organization",
+    "isDemoHint": "Only admins of a demo organization can skip the 10-minute Pending Public period.",
+    "autoReleaseLabel": "Auto Release",
+    "autoReleaseHint": "Items nobody requests for this many days move from Internal to Members.",
+    "autoReleaseDaysLabel": "Days",
+    "orgAdminEmailLabel": "Org Admin email",
+    "orgAdminEmailHint": "Must belong to a registered account.",
+    "orgAdminsLabel": "Org Admins",
+    "demoBadge": "Demo",
+    "autoReleaseOn": "Auto Release after {days} days",
+    "autoReleaseOff": "No Auto Release",
+    "create": "Create",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "saving": "Saving…",
+    "created": "Organization created.",
+    "saved": "Saved.",
+    "loadFailed": "Couldn't load organizations."
+  },
+  "OrgAdmin": {
+    "title": "Organization admin",
+    "subtitle": "Manage units and members. Members join by the email of a registered account.",
+    "orgLabel": "Organization",
+    "noOrgs": "You don't manage any organization.",
+    "loadFailed": "Couldn't load the organization.",
+    "unitsHeading": "Units",
+    "unitsEmpty": "No units yet.",
+    "unitNameLabel": "Unit name",
+    "unitNamePlaceholder": "e.g. General Affairs",
+    "addUnit": "Add unit",
+    "unitAdded": "Unit added.",
+    "membersHeading": "Members",
+    "membersEmpty": "No members yet.",
+    "emailLabel": "Email",
+    "emailHint": "Must be a registered account.",
+    "roleLabel": "Role",
+    "role": {
+      "admin": "Org Admin",
+      "member": "Org Member"
+    },
+    "roleHint": {
+      "admin": "Manages the whole organization: members, units, item tiers and reports.",
+      "member": "Can claim items at the Members tier."
+    },
+    "unitsLabel": "Unit Contact for",
+    "needUnitsFirst": "Add a unit before assigning a Unit Contact.",
+    "addMember": "Add member",
+    "memberAdded": "Member added.",
+    "remove": "Remove",
+    "removeConfirm": "Remove {email} from this organization? Their account stays.",
+    "memberRemoved": "Member removed.",
+    "you": "You",
+    "saving": "Saving…",
+    "unitsHint": "Optional. A Unit Contact lists items and approves requests for these units, sees the Internal tier, and can still act personally. An Org Admin can also be a Unit Contact.",
+    "unitContact": "Unit Contact",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "memberUpdated": "Member updated."
   }
 }

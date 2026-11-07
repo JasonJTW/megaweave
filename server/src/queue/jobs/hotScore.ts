@@ -5,10 +5,13 @@ import { Job } from "bullmq";
 import { getCacheRedisClient } from "../../utils/redis";
 import dbPool from "../../utils/db";
 import { RowDataPacket } from "mysql2";
+import { publicSurfaceCondition } from "../../services/postVisibility";
 
 interface PostScoreRow extends RowDataPacket {
   id: number;
   status: string;
+  /** 個人貼文或 Public 層組織貼文才進公開熱門排行 */
+  is_public: number;
   view_count: number;
   likes_count: number;
   created_at: Date;
@@ -87,6 +90,7 @@ export async function processCalculateHotScore(
     SELECT 
       p.id,
       p.status,
+      ${publicSurfaceCondition("p")} AS is_public,
       p.view_count,
       p.likes_count,
       p.created_at,
@@ -112,8 +116,8 @@ export async function processCalculateHotScore(
     const score = calculatePostHotScore(post);
     scores.push({ id: post.id, score, status: post.status });
 
-    // 只有 active 且 score > 0 的商品納入 Redis feed:trending
-    if (post.status === "active") {
+    // 只有 active 的公開貼文納入 Redis feed:trending；Internal／Members 組織貼文仍計分，但不進公開排行
+    if (post.status === "active" && Number(post.is_public) === 1) {
       zsetMembers.push({
         score: score,
         value: String(post.id),

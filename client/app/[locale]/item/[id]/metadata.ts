@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { toLocale } from "@/i18n/routing";
-import { absoluteUrl, buildMetadata } from "@/lib/seo";
+import { absoluteUrl, buildMetadata, isIndexablePost } from "@/lib/seo";
 
 type Props = {
   params: Promise<{ locale: string; id: string }>;
@@ -28,9 +28,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // API unreachable or returned non-JSON — fall back to generic metadata
   }
 
+  // Internal / Members org posts (404 to this anonymous fetch) and missing posts
+  // get generic, noindex metadata with no share preview (ADR 0003)
+  if (!isIndexablePost(post)) {
+    return buildMetadata({
+      locale,
+      path: `/item/${id}`,
+      title: t("fallbackTitle"),
+      description: t("fallbackDescription"),
+      noindex: true,
+    });
+  }
+
   // The post itself is user content and stays in its original language; only
   // the wrapper around it (post type, fallbacks) follows the page language.
-  const title = post?.title
+  const title = post.title
     ? t("title", {
         title: post.title,
         type: t("type", { type: post.type ?? "other" }),
@@ -38,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       })
     : t("fallbackTitle");
   const description =
-    post?.content?.slice(0, 100)?.replace(/\n/g, " ") ||
+    post.content?.slice(0, 100)?.replace(/\n/g, " ") ||
     t("fallbackDescription");
 
   return buildMetadata({

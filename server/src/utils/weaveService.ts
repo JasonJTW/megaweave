@@ -19,6 +19,7 @@ import { ErrorCode } from "./errorCodes";
 import { HttpError } from "./httpError";
 import { getTranslator } from "./i18n";
 import { getAppOrigin } from "./env";
+import { viewerVisibility } from "../services/postVisibility";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -98,9 +99,11 @@ async function validatePost(
   postId: number,
   initiatorId: number,
 ): Promise<{ user_id: number; status: string; type: string }> {
+  // 能認領 = 能看到（ADR 0003）：看不到的組織貼文與不存在一樣回 404
+  const visibility = await viewerVisibility(dbPool, initiatorId);
   const [rows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT user_id, status, type FROM posts WHERE id = ?`,
-    [postId],
+    `SELECT p.user_id, p.status, p.type FROM posts p WHERE p.id = ? AND ${visibility.sql}`,
+    [postId, ...visibility.params],
   );
   if (rows.length === 0)
     throw new WeaveError(404, "POST_NOT_FOUND", "Post not found");

@@ -109,6 +109,10 @@ describe("FeedService", () => {
       expect(mockRedis.sendCommand).toHaveBeenCalledWith(
         expect.arrayContaining(["FT.SEARCH", "idx:posts_v", queryVector]),
       );
+      //* KNN 先以 scope 預先過濾，K 筆候選才全是公開貼文（ADR 0003）
+      expect(mockRedis.sendCommand.mock.calls[0][0][2]).toMatch(
+        /^\(@scope:\{public\}\)=>\[KNN \d+ @v \$vec AS vector_distance\]$/,
+      );
       expect((dbPool.execute as jest.Mock).mock.calls[0][0]).toContain(
         "p.status = 'active'",
       );
@@ -521,6 +525,21 @@ describe("FeedService", () => {
 
       expect(current.posts.length).toBeGreaterThan(0);
       expect(baseline).toEqual(current);
+    });
+
+    it("prefilters the personalized KNN recall to public-scope vectors", async () => {
+      mockDatabase([1, 3]);
+      mockRedisVectors();
+      const service = new FeedService();
+
+      await service.getPersonalizedFeed(userVector(), { userId: 7, limit: 2 });
+
+      const search = mockRedis.sendCommand.mock.calls
+        .map(([args]) => args as string[])
+        .find((args) => args[0] === "FT.SEARCH");
+      expect(search?.[2]).toMatch(
+        /^\(@scope:\{public\}\)=>\[KNN \d+ @v \$vec AS vector_distance\]$/,
+      );
     });
 
     it("ranks filtered candidates with embeddings hydrated from MySQL rather than Redis", async () => {

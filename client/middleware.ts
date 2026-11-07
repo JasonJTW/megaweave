@@ -40,6 +40,7 @@ export const PROTECTED_ROUTES = [
   "/posts",
   "/delivery",
   "/notifications",
+  "/org-admin",
 ] as const;
 
 // Public routes freely browseable by anyone
@@ -79,7 +80,7 @@ export async function middleware(request: NextRequest) {
     const returnTo = encodeURIComponent(`${pathname}${search}`);
     return new URL(
       `${localizePath(locale, "/signin")}?returnTo=${returnTo}`,
-      request.url
+      request.url,
     );
   };
 
@@ -118,7 +119,7 @@ export async function middleware(request: NextRequest) {
     return i18nResponse;
   }
 
-  // 6. Protected routes (/messages, /user, /history, /posts, /delivery, /notifications)
+  // 6. Protected routes (/messages, /user, /history, /posts, /delivery, /notifications, /org-admin)
   if (matchesAnyRoute(normalizedPath, PROTECTED_ROUTES)) {
     if (!isAuthenticated) {
       return NextResponse.redirect(signInUrl(), { status: 307 });

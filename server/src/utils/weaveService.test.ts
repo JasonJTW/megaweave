@@ -1,6 +1,6 @@
 import dbPool from "./db";
 import { createNotification } from "./notificationService";
-import { approveWeave, WeaveError, type WeaveStatus } from "./weaveService";
+import { approveWeave, requestWeave, WeaveError, type WeaveStatus } from "./weaveService";
 
 jest.mock("./db", () => ({
   __esModule: true,
@@ -340,5 +340,33 @@ describe("approveWeave inventory checks", () => {
     );
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
+  });
+});
+
+// ADR 0003: 能認領 = 能看到. A post the initiator cannot see is reported as missing.
+describe("requestWeave on an org post outside the initiator's tier", () => {
+  it("throws POST_NOT_FOUND (404) before writing a weave or notifying", async () => {
+    (createNotification as jest.Mock).mockClear();
+    const execute = dbPool.execute as jest.Mock;
+    execute.mockReset();
+    execute.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM org_memberships")) return [[]];
+      if (sql.includes("FROM posts p")) return [[]]; // filtered by postVisibleIn
+      throw new Error(`unexpected SQL: ${sql}`);
+    });
+
+    const attempt = requestWeave(
+      {
+        postId: 100,
+        items: [],
+        notes: null,
+        initiator: { id: INITIATOR, name: "initiator", publicId: "pub-2" },
+      },
+      null,
+    );
+
+    await expect(attempt).rejects.toMatchObject({ statusCode: 404, code: "POST_NOT_FOUND" });
+    expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("INSERT"))).toBe(false);
+    expect(createNotification).not.toHaveBeenCalled();
   });
 });

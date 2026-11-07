@@ -1,4 +1,9 @@
-import { calculatePostHotScore } from "./hotScore";
+import { calculatePostHotScore, processCalculateHotScore } from "./hotScore";
+import { getCacheRedisClient } from "../../utils/redis";
+import dbPool from "../../utils/db";
+
+jest.mock("../../utils/redis");
+jest.mock("../../utils/db");
 
 describe("calculatePostHotScore", () => {
   it("returns 0 if post status is not active (e.g. inactive)", () => {
@@ -52,5 +57,50 @@ describe("calculatePostHotScore", () => {
 
     expect(score).toBeLessThan(1.0);
     expect(score).toBeGreaterThan(0);
+  });
+});
+
+describe("processCalculateHotScore", () => {
+  const redis = {
+    zAdd: jest.fn().mockResolvedValue(1),
+    expire: jest.fn().mockResolvedValue(true),
+    rename: jest.fn().mockResolvedValue("OK"),
+    del: jest.fn().mockResolvedValue(1),
+    set: jest.fn().mockResolvedValue("OK"),
+  };
+
+  function post(id: number, isPublic: boolean) {
+    return {
+      id,
+      status: "active",
+      is_public: isPublic ? 1 : 0,
+      view_count: 1,
+      likes_count: 0,
+      comment_count: 0,
+      weave_count: 0,
+      created_at: new Date(),
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    (getCacheRedisClient as jest.Mock).mockReturnValue(redis);
+  });
+
+  it("keeps org posts below the Public tier out of feed:trending", async () => {
+    (dbPool.execute as jest.Mock).mockImplementation((sql: string) =>
+      Promise.resolve(
+        sql.trim().startsWith("SELECT")
+          ? [[post(1, true), post(2, false), post(3, false), post(4, true)]]
+          : [{ affectedRows: 4 }],
+      ),
+    );
+
+    const result = await processCalculateHotScore();
+
+    const members = redis.zAdd.mock.calls[0][1] as Array<{ value: string }>;
+    expect(members.map((m) => m.value)).toEqual(["1", "4"]);
+    expect(result).toEqual({ postCount: 4, trendingCount: 2 });
   });
 });

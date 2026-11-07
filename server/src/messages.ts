@@ -8,6 +8,8 @@ import { randomUUID } from "crypto";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { HttpError } from "./utils/httpError";
+import { isPostVisibleTo } from "./services/postVisibility";
+import { PostIdSchema } from "./utils/idSchemas";
 
 const router = Router();
 
@@ -109,6 +111,16 @@ router.post(
       );
     }
 
+    //* post_id 只要帶了就要合法；空字串視為沒帶
+    let postId: number | undefined;
+    if (post_id !== undefined && post_id !== "") {
+      const parsed = PostIdSchema.safeParse(post_id);
+      if (!parsed.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid post id"));
+      }
+      postId = parsed.data;
+    }
+
     try {
       // SECURITY: Map public_id to internal ID
       const recipientId =
@@ -117,6 +129,18 @@ router.post(
         return next(
           new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
         );
+      }
+
+      // 私訊本身不受組織限制，但附帶的貼文資訊會讓雙方都看到，所以寄件人與收件人都要看得到（ADR 0003）；
+      // 只要帶了 post_id 就檢查，並在上傳附件與寫入任何訊息前擋下。任一方看不到都回同一個 404，不洩漏是哪一方
+      if (postId !== undefined) {
+        const [senderSees, recipientSees] = await Promise.all([
+          isPostVisibleTo(dbPool, postId, senderId),
+          isPostVisibleTo(dbPool, postId, recipientId),
+        ]);
+        if (!senderSees || !recipientSees) {
+          return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
+        }
       }
 
       // 0. Process Attachments if any
@@ -147,13 +171,12 @@ router.post(
       // 2. If the user had a pending weaving intent, persist it as a system message first.
       //    This only happens on the FIRST real message sent for a given item.
       if (item_id && item_title) {
-        const parsedPostId = post_id ? parseInt(post_id as string) : undefined;
         let postType: string | undefined;
         let postAuthorPublicId: string | undefined;
-        if (parsedPostId) {
+        if (postId !== undefined) {
           const [postRows] = await dbPool.execute<RowDataPacket[]>(
             "SELECT p.type, u.public_id FROM posts p JOIN users u ON p.user_id = u.id WHERE p.id = ?",
-            [parsedPostId],
+            [postId],
           );
           if (postRows.length > 0) {
             postType = postRows[0].type;
@@ -169,7 +192,7 @@ router.post(
           {
             item_id,
             item_title,
-            post_id: parsedPostId,
+            post_id: postId,
             post_type: postType,
             post_author_public_id: postAuthorPublicId,
           },

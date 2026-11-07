@@ -43,6 +43,12 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 - T3 Code runs that script on worktree creation once the user imports it from `t3.json` by hand: Settings → Projects → project → Actions → **Import scripts**. Remind them once.
 - `lefthook.yml` (installed by the root `npm ci`): pre-commit formats `client/` with Prettier, runs ESLint `--fix` on staged files, then `make typecheck` and `make test`. Pre-push refuses pushes to `main`, then runs `make e2e-up && make e2e` (needs Docker). Fix failures; never bypass a hook with `--no-verify`.
 
+## Pull Requests
+- Changes reach `main` only through a PR. The `main` ruleset requires `E2E (Playwright)`, `Claude Code Review` and `Claude Security Review` to pass; a Claude review fails the check when it posts a blocking finding (`docs/agents/*.md` define blocking). Only merge commits are allowed.
+- The ruleset and merge settings live on GitHub, not in git: `npm run setup:repo` applies `scripts/main-ruleset.json` (needs `gh` with admin rights; safe to re-run). If you add or rename a required job, update that file and re-run it.
+- After opening a PR, enable auto-merge: `gh pr merge --auto --merge <PR>`. GitHub merges it once the required checks pass. Skip this for draft PRs, or when the user says to hold the merge.
+- If auto-merge stalls on a failing check, fix the failure and push. Never merge manually past a red check.
+
 ## Project Structure
 - `client/app/`: Next.js App Router pages, layouts, and route handlers
 - `client/components/`: Modular React components and Radix UI primitives

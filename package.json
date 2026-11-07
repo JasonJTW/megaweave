@@ -2,6 +2,7 @@
   "name": "megaweave",
   "private": true,
   "scripts": {
+    "setup:repo": "bash scripts/setup-repo.sh",
     "setup:worktree": "bash scripts/setup-worktree.sh",
     "prepare": "lefthook install"
   },

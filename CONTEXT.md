@@ -106,3 +106,39 @@ _Avoid_: Timeline, Stream
 
 **Hot Score**:
 一則 Post 的熱度分數，用於 Feed 排序。不等於按讚數。
+
+### 組織
+
+**Organization (組織)**:
+付費使用分層釋出的企業、學校或機構。核心流程不分組織類型，差異只在組織設定。
+_Avoid_: Tenant, 租戶, 客戶帳號
+
+**Org Unit (單位)**:
+組織內擁有物品的部門或處室。組織 Post 屬於單位，不屬於上架的個人。單位只有一層，沒有上下層。
+_Avoid_: Department, 處室（僅作顯示名稱）
+
+**Unit Contact (單位窗口)**:
+代表某個單位上架物品、核可申請、替單位申請其他單位物品的人。只能管理自己單位。
+_Avoid_: Staff, 職員, 承辦
+
+**Org Admin (組織管理員)**:
+管理整個組織的人：成員、單位、全組織物品的層級、報表。一個組織可有多位。權限低於 Platform Admin。
+_Avoid_: Owner, 總務（僅為常見職稱）
+
+**Org Member (組織成員)**:
+由組織管理員加入、可在 Members 層級認領物品的個人，例如企業全體員工、學校學生。
+_Avoid_: Student, Employee
+
+**Platform Admin (平台管理員)**:
+大量交織的營運方，負責開通組織。
+
+**Audience Tier (釋出層級)**:
+組織 Post 目前開放給誰。依序為 Internal（只有 Unit Contact）、Members（加上 Org Member）、Public（所有人）。可升可降。
+_Avoid_: Visibility, Privacy, 權限
+
+**Auto Release (自動升級)**:
+Post 在目前層級無人申請達設定天數（預設 30 天）後，自動升到下一層。只會從 Internal 升到 Members，Public 一律由 Org Admin 手動升級。
+_Avoid_: Auto Publish
+
+**Pending Public (待公開)**:
+Org Admin 按下升級到 Public 後的 10 分鐘緩衝期，期間可一鍵取消，不進排行、不發通知。

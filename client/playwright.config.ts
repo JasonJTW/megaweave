@@ -19,6 +19,10 @@ if (!isRemote) {
 }
 
 const reuseExistingServer = !process.env.CI;
+// CI and the pre-push hook (E2E_BUILD=1) test the production build. `next dev` compiles
+// pages on demand, and parallel workers hitting a cold dev server can read half-written
+// build files ("Unexpected end of JSON input"), failing most of the suite.
+const useBuild = Boolean(process.env.CI || process.env.E2E_BUILD);
 
 // E2E tests live in ./e2e and use *.spec.ts to stay separate from
 // the node:test unit tests in ./__tests__ (*.test.ts).
@@ -95,14 +99,15 @@ export default defineConfig({
         },
         {
           name: "client",
-          // CI tests the production build; locally the dev server starts faster
-          command: process.env.CI
+          // The production build is stable; the dev server starts faster for local runs
+          command: useBuild
             ? "npm run build:e2e && npm run start:e2e"
             : "npm run dev:e2e",
           url: baseURL,
           ignoreHTTPSErrors: true,
-          reuseExistingServer,
-          timeout: process.env.CI ? 600_000 : 120_000,
+          // Never reuse a running dev server when the build is what should be tested
+          reuseExistingServer: reuseExistingServer && !useBuild,
+          timeout: useBuild ? 600_000 : 120_000,
         },
       ],
 });

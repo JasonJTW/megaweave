@@ -33,4 +33,5 @@ pre-push:
         fi
     - name: e2e
       # The E2E stack (docker-compose.e2e.yml) must be up; `make e2e-up` is idempotent.
-      run: make e2e-up && make e2e
+      # E2E_BUILD tests the production build, as CI does (see client/playwright.config.ts).
+      run: make e2e-up && E2E_BUILD=1 make e2e

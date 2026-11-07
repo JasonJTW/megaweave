@@ -10,6 +10,7 @@ import { WeaveStatus } from "./utils/weaveService";
 import { buildWeavesFilter, WeavesListQuerySchema } from "./utils/weaveQuery";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { HttpError } from "./utils/httpError";
+import { publicSurfaceCondition } from "./services/postVisibility";
 const router = Router();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -372,7 +373,8 @@ router.get(
         return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
 
       const userId = userRows[0].id as number;
-      const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) GROUP BY w.id ORDER BY w.created_at DESC`;
+      // 公開個人頁：只列個人貼文與 Public 組織貼文的交換（ADR 0003）
+      const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) AND ${publicSurfaceCondition("p")} GROUP BY w.id ORDER BY w.created_at DESC`;
       const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [
         userId,
         userId,

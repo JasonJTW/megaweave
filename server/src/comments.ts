@@ -7,6 +7,12 @@ import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
+import { getUserFromCookie } from "./session";
+import {
+  isPostVisibleTo,
+  loadViewerScope,
+  postVisibleIn,
+} from "./services/postVisibility";
 
 const router = express.Router();
 
@@ -70,6 +76,12 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
 
   try {
     await connection.beginTransaction();
+
+    // 看不到的組織貼文與不存在一樣（ADR 0003）：不能留言，也不會通知
+    if (!(await isPostVisibleTo(connection, Number(post_id), effectiveUserId))) {
+      await connection.rollback();
+      return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
+    }
 
     // 如果指定了 item_id，驗證該 item 屬於這個 post
     if (item_id) {
@@ -273,6 +285,11 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   }
 
   try {
+    const session = await getUserFromCookie(req);
+    if (!(await isPostVisibleTo(dbPool, postId, session?.userId))) {
+      return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
+    }
+
     let query = `
       SELECT 
         c.*,
@@ -329,8 +346,6 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       grouped[key].push(comment);
     });
 
-    console.log("comments rows: ", rows);
-
     res.json({
       post_id: postId,
       total: rows.length,
@@ -353,6 +368,11 @@ router.get("/counts", async (req: Request, res: Response, next: NextFunction) =>
   }
 
   try {
+    const session = await getUserFromCookie(req);
+    if (!(await isPostVisibleTo(dbPool, postId, session?.userId))) {
+      return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
+    }
+
     const [rows] = await dbPool.execute<RowDataPacket[]>(
       `SELECT 
         item_id,
@@ -380,9 +400,14 @@ router.get("/counts", async (req: Request, res: Response, next: NextFunction) =>
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const commentId = req.params.id;
+    // 留言所屬貼文看不到時，留言也當作不存在
+    const session = await getUserFromCookie(req);
+    const visibility = postVisibleIn(await loadViewerScope(dbPool, session?.userId), "p");
     const [rows] = await dbPool.execute<CommentRow[]>(
-      "SELECT id, post_id, item_id FROM comments WHERE id = ?",
-      [commentId]
+      `SELECT c.id, c.post_id, c.item_id FROM comments c
+       JOIN posts p ON p.id = c.post_id
+       WHERE c.id = ? AND ${visibility.sql}`,
+      [commentId, ...visibility.params]
     );
     
     if (rows.length === 0) {

@@ -9,6 +9,7 @@ import request from "supertest";
 import commentsRouter from "./comments";
 import dbPool from "./utils/db";
 import { createNotification } from "./utils/notificationService";
+import { errorMiddleware } from "./utils/errorHandler";
 
 jest.mock("./utils/db", () => ({
   __esModule: true,
@@ -45,9 +46,13 @@ function makeApp() {
 }
 
 describe("POST /comments notification link", () => {
+  beforeEach(() => jest.clearAllMocks());
+
   it("links to /item/<public_id>, not the numeric post id", async () => {
     const execute = jest
       .fn()
+      .mockResolvedValueOnce([[]]) // SELECT org_memberships (no orgs)
+      .mockResolvedValueOnce([[{ 1: 1 }]]) // post visible to the commenter
       .mockResolvedValueOnce([{ insertId: 7 }]) // INSERT comment
       .mockResolvedValueOnce([{}]) // UPDATE root_id
       .mockResolvedValueOnce([[{ id: 7, username: "commenter" }]]) // SELECT new comment
@@ -79,6 +84,7 @@ describe("POST /comments notification link", () => {
 
   it("notifies the parent comment's author with a reply event", async () => {
     const execute = jest.fn(async (sql: string) => {
+      if (sql.includes("FROM org_memberships")) return [[]];
       if (sql.startsWith("INSERT INTO comments")) return [{ insertId: 8 }];
       if (sql.includes("FROM posts"))
         return [[{ user_id: 5, title: "Sofa", public_id: POST_PUBLIC_ID }]];
@@ -111,5 +117,36 @@ describe("POST /comments notification link", () => {
         link: `/item/${POST_PUBLIC_ID}#comment-8`,
       }),
     );
+  });
+
+  it("returns 404 for a post the commenter cannot see, without writing or notifying", async () => {
+    const execute = jest.fn(async (sql: string) => {
+      if (sql.includes("FROM org_memberships")) return [[]];
+      if (sql.includes("FROM posts")) return [[]]; // Internal org post: filtered out
+      throw new Error(`unexpected SQL: ${sql}`);
+    });
+    const rollback = jest.fn();
+    (dbPool.getConnection as jest.Mock).mockResolvedValue({
+      beginTransaction: jest.fn(),
+      commit: jest.fn(),
+      rollback,
+      release: jest.fn(),
+      execute,
+    });
+    const app = makeApp();
+    app.use(errorMiddleware);
+
+    const res = await request(app)
+      .post("/comments")
+      .send({ post_id: 123, content: "hello" });
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("POST_NOT_FOUND");
+    expect(rollback).toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO comments"),
+      expect.anything(),
+    );
+    expect(createNotification).not.toHaveBeenCalled();
   });
 });

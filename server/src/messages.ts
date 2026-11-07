@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { HttpError } from "./utils/httpError";
+import { isPostVisibleTo } from "./services/postVisibility";
 
 const router = Router();
 
@@ -117,6 +118,17 @@ router.post(
         return next(
           new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
         );
+      }
+
+      // 私訊本身不受組織限制，但附帶的貼文資訊要檢視者看得到（ADR 0003）；
+      // 在上傳附件與寫入任何訊息前擋下
+      if (
+        item_id &&
+        item_title &&
+        post_id &&
+        !(await isPostVisibleTo(dbPool, parseInt(post_id as string), senderId))
+      ) {
+        return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
       }
 
       // 0. Process Attachments if any

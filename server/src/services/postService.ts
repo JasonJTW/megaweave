@@ -22,6 +22,7 @@ import { fetchEmbedding } from "./embeddingService";
 import { calculatePostHotScore } from "../queue/jobs/hotScore";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { LocationInputData } from "../types/location";
+import { publicSurfaceCondition } from "./postVisibility";
 import { locationService } from "./locationService";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
 export type LocationData = LocationInputData;
@@ -418,7 +419,8 @@ export class PostService {
     const offset = (page - 1) * limit;
     const status = params.status || "active";
 
-    const whereConditions = ["p.status = ?", "p.deleted_at IS NULL"];
+    // 公開的貼文列表／關鍵字搜尋：排除 Internal／Members 組織貼文（ADR 0003）
+    const whereConditions = ["p.status = ?", "p.deleted_at IS NULL", publicSurfaceCondition("p")];
     const queryParams: (string | number)[] = [status];
 
     if (params.category_id) {

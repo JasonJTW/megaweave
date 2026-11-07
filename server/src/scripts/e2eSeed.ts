@@ -4,9 +4,12 @@
 import { openAppStores } from "../isolation/appStores";
 import { assertIsolatedMysql } from "../isolation/dataStoreGuard";
 import { resetAndSeedE2e, resolveE2eUser } from "../e2e/seed";
+import { resolveOrgViewer, seedOrgIsolationFixture } from "../e2e/orgIsolationFixture";
+import { processCalculateHotScore } from "../queue/jobs/hotScore";
 
 async function main(): Promise<void> {
   const user = resolveE2eUser();
+  const orgViewer = resolveOrgViewer();
   const stores = await openAppStores();
   const { default: IORedis } = await import("ioredis");
   const { bullmqConnection } = await import("../queue/connection");
@@ -18,7 +21,10 @@ async function main(): Promise<void> {
     await stores.connectRedis();
     await queueRedis.connect();
     await resetAndSeedE2e(stores, queueRedis, user);
-    console.log(`✅ E2E environment reset; seeded ${user.email}`);
+    await seedOrgIsolationFixture(stores.mysql, stores.vectorRedis, orgViewer);
+    // 建好 feed:trending，讓熱門排行路徑讀到 fixture（與排程 job 相同邏輯）
+    await processCalculateHotScore();
+    console.log(`✅ E2E environment reset; seeded ${user.email} and the org isolation fixture`);
   } finally {
     queueRedis.disconnect();
     await stores.close();

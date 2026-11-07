@@ -8,6 +8,11 @@ import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { locationService } from "./locationService";
 import { fetchQueryEmbedding } from "./embeddingService";
 import { requestHotScoreRebuild } from "../queue/queues";
+import { publicSurfaceCondition } from "./postVisibility";
+
+// 首頁 Feed、搜尋、熱門排行與向量推薦都是公開介面：Internal／Members 組織貼文一律排除（ADR 0003 prototype 例外）。
+// 召回階段與 hydration 都套用，Redis（feed:trending、向量索引）裡殘留的非公開貼文也不會被回傳。
+const PUBLIC_SURFACE_SQL = publicSurfaceCondition("p");
 
 export interface FeedParams {
   userId?: number;
@@ -161,7 +166,7 @@ async function fetchPostsByIds(
   const placeholders = postIds.map(() => "?").join(",");
   const query = `
     ${POST_FIELDS_SQL}
-    WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL
+    WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL AND ${PUBLIC_SURFACE_SQL}
     GROUP BY p.id
   `;
 
@@ -210,7 +215,7 @@ async function fetchCandidateScoringFields(
     `SELECT p.id, p.hot_score, p.expires_at, p.status, l.lat, l.lng
      FROM posts p
      LEFT JOIN locations l ON p.location_id = l.id
-     WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL`,
+     WHERE p.id IN (${placeholders}) AND p.deleted_at IS NULL AND ${PUBLIC_SURFACE_SQL}`,
     postIds,
   );
   return new Map(rows.map((row) => [row.id as number, row]));
@@ -371,7 +376,11 @@ export class FeedService {
     whereClause: string;
     queryParams: (string | number)[];
   } {
-    const whereConditions = ["p.status = 'active'", "p.deleted_at IS NULL"];
+    const whereConditions = [
+      "p.status = 'active'",
+      "p.deleted_at IS NULL",
+      PUBLIC_SURFACE_SQL,
+    ];
     const queryParams: (string | number)[] = [];
 
     if (params.type) {

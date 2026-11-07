@@ -7,6 +7,7 @@ import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
+import { PostIdSchema } from "./utils/idSchemas";
 import { getUserFromCookie } from "./session";
 import {
   isPostVisibleTo,
@@ -45,7 +46,7 @@ interface CommentWithChildren extends CommentRow {
 router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   const sessionUserId = req.user!.userId;
   const {
-    post_id,
+    post_id: rawPostId,
     item_id = null,
     parent_id = null,
     user_id,
@@ -59,9 +60,11 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
 
   const effectiveUserId = sessionUserId;
 
-  if (!post_id) {
-    return next(new HttpError(400, "INVALID_REQUEST", "Missing required fields"));
+  const parsedPostId = PostIdSchema.safeParse(rawPostId);
+  if (!parsedPostId.success) {
+    return next(new HttpError(400, "INVALID_REQUEST", "Invalid post id"));
   }
+  const post_id = parsedPostId.data;
 
   if (!content?.trim()) {
     return next(new HttpError(400, "COMMENT_EMPTY", "Comment content cannot be empty"));
@@ -78,7 +81,7 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
     await connection.beginTransaction();
 
     // 看不到的組織貼文與不存在一樣（ADR 0003）：不能留言，也不會通知
-    if (!(await isPostVisibleTo(connection, Number(post_id), effectiveUserId))) {
+    if (!(await isPostVisibleTo(connection, post_id, effectiveUserId))) {
       await connection.rollback();
       return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
     }

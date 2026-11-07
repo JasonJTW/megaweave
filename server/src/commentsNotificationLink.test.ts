@@ -150,3 +150,49 @@ describe("POST /comments notification link", () => {
     expect(createNotification).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /comments post_id validation", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it.each([["abc"], [1.5], [-1], [0], ["5abc"], [null], [undefined], [true], [["5"]]])(
+    "rejects a malformed post_id (%p) with INVALID_REQUEST before touching the DB",
+    async (postId) => {
+      const app = makeApp();
+      app.use(errorMiddleware);
+
+      const res = await request(app)
+        .post("/comments")
+        .send({ post_id: postId, content: "hello" });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe("INVALID_REQUEST");
+      expect(dbPool.getConnection).not.toHaveBeenCalled();
+    },
+  );
+
+  it("accepts a numeric-string post_id and uses the parsed number", async () => {
+    const execute = jest.fn(async (sql: string) => {
+      if (sql.includes("FROM org_memberships")) return [[]];
+      if (sql.startsWith("INSERT INTO comments")) return [{ insertId: 9 }];
+      if (sql.includes("FROM posts"))
+        return [[{ 1: 1, user_id: 5, title: "Sofa", public_id: POST_PUBLIC_ID }]];
+      if (/FROM comments c\s/.test(sql)) return [[{ id: 9, username: "commenter" }]];
+      return [{}];
+    });
+    (dbPool.getConnection as jest.Mock).mockResolvedValue({
+      beginTransaction: jest.fn(),
+      commit: jest.fn(),
+      rollback: jest.fn(),
+      release: jest.fn(),
+      execute,
+    });
+
+    const res = await request(makeApp())
+      .post("/comments")
+      .send({ post_id: "123", content: "hello" });
+
+    expect(res.status).toBe(201);
+    const insert = execute.mock.calls.find(([sql]) => String(sql).startsWith("INSERT INTO comments"));
+    expect((insert as unknown as [string, unknown[]])[1][0]).toBe(123);
+  });
+});

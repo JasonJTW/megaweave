@@ -16,7 +16,7 @@
 
 | 現況 | 改動 |
 |---|---|
-| 沒有組織概念 | 新表 `organizations`（名稱、允許網域、設定）、`org_units`、`org_memberships`（user、org、unit、成員類型：職員／學生、組織角色：admin／unit_staff／member、`verified_at`） |
+| 沒有組織概念 | 新表 `organizations`（名稱、允許網域、設定）、`org_units`、`org_memberships`（user、org、unit、成員分類：內部人員／一般成員（由網域或名單決定，不寫死職員／學生）、組織角色：admin／unit_staff／member、`verified_at`） |
 | `users.role` 是全站角色（user／admin／contributor），`requireRole` 只看全站角色 | 保留全站角色當平台管理員；新增 `requireOrgRole(orgId, roles)` middleware |
 | 無 email 驗證流程，`users` 無驗證欄位 | 新增組織 email 驗證（token 表＋Resend 寄信 job）。組織 email 可與登入 email 不同，存在 membership 上 |
 

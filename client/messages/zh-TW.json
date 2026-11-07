@@ -119,6 +119,10 @@
       "type": "{type, select, share {分享} wish {許願} commons {地球公物} other {貼文}}",
       "fallbackTitle": "貼文",
       "fallbackDescription": "在 megaweaving 看看這則貼文。"
+    },
+    "adminOrgs": {
+      "title": "組織管理",
+      "description": "平台管理員開通與編輯組織。"
     }
   },
   "Lalamove": {
@@ -1040,12 +1044,14 @@
     "ACCOUNT_EXISTS": "這個 Email 已經註冊過了。",
     "INVALID_SOCIAL_TOKEN": "社群帳號驗證失敗，請重新登入。",
     "USE_SOCIAL_SIGNIN": "這個 Email 是用 {providers} 註冊的，請改用 {providers} 登入。",
+    "EMAIL_NOT_REGISTERED": "這個 Email 還沒有註冊帳號，請對方先註冊。",
     "POST_NOT_FOUND": "找不到這則貼文，可能已被刪除。",
     "USER_NOT_FOUND": "找不到這位使用者。",
     "COMMENT_NOT_FOUND": "找不到這則留言，可能已被刪除。",
     "WEAVE_NOT_FOUND": "找不到這次交織。",
     "CATEGORY_NOT_FOUND": "找不到這個分類。",
     "CONDITION_NOT_FOUND": "找不到這個物品狀況。",
+    "ORG_NOT_FOUND": "找不到這個組織。",
     "WEAVE_OWN_POST": "不能和自己的貼文交織。",
     "POST_INACTIVE": "這則貼文已經結束了。",
     "ITEM_UNAVAILABLE": "有物品已經沒有了，請重新選擇。",
@@ -1070,5 +1076,41 @@
     "title": "目前僅供測試與體驗使用",
     "body": "綠界金流與 Lalamove 皆串接測試環境：付款不會實際扣款，也不會真的派車送貨。",
     "testCard": "可使用綠界測試信用卡 {card}，安全碼 {cvv}，有效期限填任一未來月份。"
+  },
+  "AdminOrgs": {
+    "title": "組織管理",
+    "subtitle": "開通組織並指定第一位組織管理員。",
+    "createHeading": "開通組織",
+    "editHeading": "編輯組織",
+    "listHeading": "已開通的組織",
+    "empty": "還沒有任何組織。",
+    "nameLabel": "組織名稱",
+    "namePlaceholder": "例如：大量國小",
+    "publisherDisplayLabel": "公開層顯示方式",
+    "publisherDisplayHint": "物品升到公開層時，發文者對外顯示的名稱。",
+    "publisherDisplay": {
+      "org": "組織名稱",
+      "org_unit": "組織＋單位",
+      "anonymous": "匿名"
+    },
+    "isDemoLabel": "演示組織",
+    "isDemoHint": "只有演示組織的管理員能跳過 10 分鐘待公開期。",
+    "autoReleaseLabel": "自動升級",
+    "autoReleaseHint": "物品在內部層無人申請達設定天數後，自動升到成員層。",
+    "autoReleaseDaysLabel": "天數",
+    "orgAdminEmailLabel": "組織管理員 Email",
+    "orgAdminEmailHint": "必須是已註冊的帳號。",
+    "orgAdminsLabel": "組織管理員",
+    "demoBadge": "演示",
+    "autoReleaseOn": "自動升級 {days} 天",
+    "autoReleaseOff": "不自動升級",
+    "create": "開通",
+    "save": "儲存",
+    "cancel": "取消",
+    "edit": "編輯",
+    "saving": "處理中…",
+    "created": "已開通組織。",
+    "saved": "已儲存。",
+    "loadFailed": "無法載入組織列表。"
   }
 }

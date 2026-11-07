@@ -8,6 +8,8 @@
 // - 依檢視者判斷的路徑（詳情、留言、按讚、Weave…）用 postVisibleIn(scope)，
 //   scope 由檢視者的組織成員資格算出（scopeFromMemberships）。
 
+import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
+
 export const AUDIENCE_TIERS = ["internal", "members", "public"] as const;
 export type AudienceTier = (typeof AUDIENCE_TIERS)[number];
 
@@ -80,4 +82,47 @@ export function postVisibleIn(scope: ViewerScope, alias = "p"): SqlFragment {
     params.push(access.orgId, ...access.tiers);
   }
   return { sql: `(${clauses.join(" OR ")})`, params };
+}
+
+/** 能執行查詢的 pool 或交易中的 connection */
+export type SqlExecutor = Pick<Pool, "execute"> | Pick<PoolConnection, "execute">;
+
+/**
+ * 從 org_memberships 載入檢視者的可見範圍。未登入（或沒有成員資格）只看得到 Public。
+ * 單篇貼文的讀取路徑都先呼叫這裡，再把 postVisibleIn(scope) 拼進查貼文的 SQL，
+ * 查不到就回 404（ADR 0003：不回 403，不洩漏物品存在）。
+ */
+export async function loadViewerScope(
+  db: SqlExecutor,
+  userId: number | null | undefined,
+): Promise<ViewerScope> {
+  if (!userId) return PUBLIC_SCOPE;
+  const [rows] = await db.execute<RowDataPacket[]>(
+    "SELECT org_id, access_level FROM org_memberships WHERE user_id = ?",
+    [userId],
+  );
+  if (rows.length === 0) return PUBLIC_SCOPE;
+  return scopeFromMemberships(
+    rows.map((row) => ({
+      orgId: Number(row.org_id),
+      accessLevel: row.access_level as OrgAccessLevel,
+    })),
+  );
+}
+
+/**
+ * 以數字 id 判斷檢視者能否看到某篇（未刪除的）貼文。供只拿到 post_id 的路徑
+ * （留言、私訊附帶的貼文資訊）在讀寫前先擋下，看不到就回 404。
+ */
+export async function isPostVisibleTo(
+  db: SqlExecutor,
+  postId: number,
+  userId: number | null | undefined,
+): Promise<boolean> {
+  const visibility = postVisibleIn(await loadViewerScope(db, userId), "p");
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM posts p WHERE p.id = ? AND p.deleted_at IS NULL AND ${visibility.sql}`,
+    [postId, ...visibility.params],
+  );
+  return rows.length > 0;
 }

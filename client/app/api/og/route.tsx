@@ -4,6 +4,7 @@ import sharp from "sharp";
 import fs from "fs/promises";
 import path from "path";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
+import { isIndexablePost } from "@/lib/seo";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -47,13 +48,21 @@ export async function GET(req: Request) {
       return new Response("Missing id parameter", { status: 400 });
     }
 
+    // Anonymous fetch on purpose: a share preview only ever shows what a guest
+    // may see, so Internal / Members org posts (404 here) get no image (ADR 0003)
     const response = await fetch(`${hostName}/api/posts/${id}`);
+    if (response.status === 404) {
+      return new Response("Not found", { status: 404 });
+    }
     if (!response.ok) {
       throw new Error(`Failed to fetch post: ${response.status}`);
     }
 
     const data = await response.json();
     const post = data.post;
+    if (!isIndexablePost(post)) {
+      return new Response("Not found", { status: 404 });
+    }
 
     const s3Keys = parseS3Keys(post);
 

@@ -5,6 +5,7 @@ import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
 import { updateUserStats } from "./utils/updateUserStats";
 import { HttpError } from "./utils/httpError";
+import { publicSurfaceCondition } from "./services/postVisibility";
 
 const router = Router();
 
@@ -174,7 +175,7 @@ router.get(
         userId,
       ]);
 
-      // 獲取使用者的所有貼文，並 JOIN 圖片資訊
+      // 公開個人頁：只列個人貼文與 Public 組織貼文（ADR 0003），並 JOIN 圖片資訊
       // **修正: 參考 posts.ts，使用 GROUP_CONCAT 獲取 URL 字串，避免 JSON 解析錯誤**
       const postsQuery = `
       SELECT 
@@ -182,7 +183,7 @@ router.get(
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE p.user_id = ? AND p.deleted_at IS NULL
+      WHERE p.user_id = ? AND p.deleted_at IS NULL AND ${publicSurfaceCondition("p")}
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `;

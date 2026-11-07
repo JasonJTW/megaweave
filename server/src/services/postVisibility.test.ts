@@ -1,4 +1,10 @@
-import { postVisibleIn, publicSurfaceCondition, scopeFromMemberships } from "./postVisibility";
+import {
+  loadViewerScope,
+  PUBLIC_SCOPE,
+  postVisibleIn,
+  publicSurfaceCondition,
+  scopeFromMemberships,
+} from "./postVisibility";
 
 describe("scopeFromMemberships", () => {
   it("gives Internal access the Internal and Members tiers, and Org Members only Members", () => {
@@ -35,5 +41,29 @@ describe("table alias", () => {
   it("rejects an alias that is not a plain identifier", () => {
     expect(() => publicSurfaceCondition("p; DROP TABLE posts")).toThrow(/alias/);
     expect(() => postVisibleIn(scopeFromMemberships([]), "p.x")).toThrow(/alias/);
+  });
+});
+
+describe("loadViewerScope", () => {
+  it("builds the scope from the viewer's org memberships", async () => {
+    const execute = jest.fn().mockResolvedValue([
+      [
+        { org_id: 12, access_level: "internal" },
+        { org_id: 30, access_level: "member" },
+      ],
+    ]);
+    await expect(loadViewerScope({ execute }, 7)).resolves.toEqual({
+      orgs: [
+        { orgId: 12, tiers: ["internal", "members"] },
+        { orgId: 30, tiers: ["members"] },
+      ],
+    });
+    expect(execute.mock.calls[0][1]).toEqual([7]);
+  });
+
+  it("gives signed-out viewers the Public scope without querying", async () => {
+    const execute = jest.fn();
+    await expect(loadViewerScope({ execute }, undefined)).resolves.toBe(PUBLIC_SCOPE);
+    expect(execute).not.toHaveBeenCalled();
   });
 });

@@ -115,3 +115,19 @@ export function buildMetadata({
     ...(noindex ? { robots: { index: false, follow: false } } : {}),
   };
 }
+
+/** The org fields of a post (personal posts have `org_id` null and tier `public`) */
+export type PostAudience = {
+  org_id?: number | null;
+  audience_tier?: string | null;
+};
+
+/**
+ * Whether an item page may be indexed and carry a share preview (ADR 0003).
+ * A post that did not load (404, including org posts the anonymous metadata
+ * fetch may not see) or that sits below the Public tier gets neither.
+ */
+export function isIndexablePost(post: PostAudience | null): boolean {
+  if (!post) return false;
+  return post.org_id == null || post.audience_tier === "public";
+}

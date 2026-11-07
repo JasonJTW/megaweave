@@ -5,6 +5,12 @@ import likeRouter from "./like";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { errorMiddleware } from "./utils/errorHandler";
+import {
+  fakePostVisible,
+  MEMBERSHIP_SQL,
+  type FakeMembership,
+  type FakeOrgPost,
+} from "./testUtils/fakePostVisibility";
 
 jest.mock("./utils/db", () => ({
   __esModule: true,
@@ -53,7 +59,7 @@ jest.mock("./queue/queues", () => ({
 // Unknown SQL throws, so a query change forces the fake (and thus the review of
 // these semantics) to be updated instead of silently passing.
 // ---------------------------------------------------------------------------
-type FakePost = {
+type FakePost = FakeOrgPost & {
   id: number;
   user_id: number;
   public_id: string;
@@ -70,6 +76,7 @@ const normalize = (sql: string) => sql.replace(/\s+/g, " ").trim();
 class FakeDb {
   posts = new Map<string, FakePost>();
   likes = new Set<string>(); // `${userId}:${postId}`
+  memberships = new Map<number, FakeMembership[]>();
   released = 0;
   failOn: ((sql: string) => boolean) | null = null;
   private lockTails = new Map<number, Promise<void>>();
@@ -117,13 +124,15 @@ class FakeDb {
         const sql = normalize(rawSql);
         if (this.failOn?.(sql)) throw new Error("injected DB failure");
 
+        if (sql === MEMBERSHIP_SQL) return this.membershipRows(params[0]);
+
         if (
-          /^SELECT id, user_id, title FROM posts WHERE public_id = \? AND deleted_at IS NULL( FOR UPDATE)?$/.test(
+          /^SELECT p\.id, p\.user_id, p\.title FROM posts p WHERE p\.public_id = \? AND p\.deleted_at IS NULL AND \(.*\)( FOR UPDATE)?$/.test(
             sql,
           )
         ) {
           const post = this.posts.get(params[0] as string);
-          if (!post) return [[], undefined];
+          if (!post || !fakePostVisible(post, params.slice(1))) return [[], undefined];
           if (sql.endsWith("FOR UPDATE")) held.push(await this.acquire(post.id));
           return [[{ id: post.id, user_id: post.user_id, title: post.title }], undefined];
         }
@@ -187,15 +196,21 @@ class FakeDb {
     };
   }
 
+  membershipRows(userId: unknown) {
+    return [this.memberships.get(userId as number) ?? [], undefined];
+  }
+
   async poolExecute(rawSql: string, params: unknown[]) {
     const sql = normalize(rawSql);
+    if (sql === MEMBERSHIP_SQL) return this.membershipRows(params[0]);
     if (
-      sql ===
-      "SELECT 1 FROM post_likes pl JOIN posts p ON pl.post_id = p.id WHERE pl.user_id = ? AND p.public_id = ? AND p.deleted_at IS NULL"
+      /^SELECT EXISTS\(SELECT 1 FROM post_likes pl WHERE pl\.post_id = p\.id AND pl\.user_id = \?\) AS liked FROM posts p WHERE p\.public_id = \? AND p\.deleted_at IS NULL AND \(.*\)$/.test(
+        sql,
+      )
     ) {
       const post = this.posts.get(params[1] as string);
-      const liked = !!post && this.likes.has(`${params[0]}:${post.id}`);
-      return [liked ? [{ 1: 1 }] : [], undefined];
+      if (!post || !fakePostVisible(post, params.slice(2))) return [[], undefined];
+      return [[{ liked: this.likes.has(`${params[0]}:${post.id}`) ? 1 : 0 }], undefined];
     }
     throw new Error(`FakeDb: unexpected pool SQL: ${sql}`);
   }
@@ -474,5 +489,75 @@ describe("GET /like", () => {
 
     await send("put", ALICE, { liked: true });
     expect((await send("get", ALICE)).body).toEqual({ liked: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Org isolation (ADR 0003): a post the viewer cannot see behaves as missing
+// ---------------------------------------------------------------------------
+describe("org posts below Public", () => {
+  const ORG_ID = 7;
+  const seedOrgPost = (audience_tier: "internal" | "members") =>
+    mockDb.addPost({
+      id: POST_ID,
+      user_id: OWNER.userId,
+      public_id: PUBLIC_ID,
+      title: "Projector",
+      likes_count: 0,
+      org_id: ORG_ID,
+      audience_tier,
+    });
+
+  it.each(["put", "post"] as const)(
+    "%s returns 404 to a viewer outside the org, writes nothing and notifies no one",
+    async (method) => {
+      seedOrgPost("internal");
+
+      const res = await send(method, ALICE, method === "put" ? { liked: true } : undefined);
+
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("POST_NOT_FOUND");
+      expect(mockDb.likeRows(POST_ID)).toBe(0);
+      expect(createNotification).not.toHaveBeenCalled();
+      expect(enqueueUserVectorUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("GET returns 404 instead of liked:false to a viewer outside the org", async () => {
+    seedOrgPost("members");
+
+    const res = await send("get", ALICE);
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("POST_NOT_FOUND");
+  });
+
+  it("a Members-tier post is not visible to an Org Member of another org", async () => {
+    seedOrgPost("members");
+    mockDb.memberships.set(ALICE.userId, [{ org_id: ORG_ID + 1, access_level: "internal" }]);
+
+    expect((await send("put", ALICE, { liked: true })).status).toBe(404);
+  });
+
+  it("an Org Member can like a Members-tier post but not an Internal one", async () => {
+    mockDb.memberships.set(ALICE.userId, [{ org_id: ORG_ID, access_level: "member" }]);
+
+    seedOrgPost("members");
+    const members = await send("put", ALICE, { liked: true });
+    expect(members.status).toBe(200);
+    expect(members.body).toEqual({ liked: true, likesCount: 1 });
+
+    seedOrgPost("internal");
+    expect((await send("put", ALICE, { liked: false })).status).toBe(404);
+  });
+
+  it("Internal access sees the Internal tier", async () => {
+    mockDb.memberships.set(ALICE.userId, [{ org_id: ORG_ID, access_level: "internal" }]);
+    seedOrgPost("internal");
+
+    const res = await send("get", ALICE);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ liked: false });
   });
 });

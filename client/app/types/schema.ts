@@ -21,6 +21,9 @@ export interface Post extends LocationData {
   content: string;
   type: "wish" | "share" | "commons";
   status: "active" | "inactive";
+  /** null for personal posts (ADR 0003) */
+  org_id?: number | null;
+  audience_tier?: "internal" | "members" | "public";
   tags?: string;
   category_id: number;
   condition_level: number;
@@ -175,4 +178,7 @@ export interface User {
 }
 
 /** 可用於 onLocationClick 的地理欄位鍵，直接從 Post 推導，不需手動維護 */
-export type PostLocationField = Extract<keyof Post, "province" | "city" | "route" | "location_name">;
+export type PostLocationField = Extract<
+  keyof Post,
+  "province" | "city" | "route" | "location_name"
+>;

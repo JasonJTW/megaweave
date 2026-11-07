@@ -22,7 +22,11 @@ import { fetchEmbedding } from "./embeddingService";
 import { calculatePostHotScore } from "../queue/jobs/hotScore";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { LocationInputData } from "../types/location";
-import { publicSurfaceCondition } from "./postVisibility";
+import {
+  loadViewerScope,
+  postVisibleIn,
+  publicSurfaceCondition,
+} from "./postVisibility";
 import { locationService } from "./locationService";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
 export type LocationData = LocationInputData;
@@ -265,6 +269,10 @@ export class PostService {
     publicId: string,
     options?: { currentUserId?: number; viewerIp?: string },
   ): Promise<PostDetail | null> {
+    // 檢視者看不到的組織貼文與不存在的貼文一樣回 null（→ 404），且不計觀看數
+    const visibility = postVisibleIn(
+      await loadViewerScope(dbPool, options?.currentUserId),
+    );
     const postQuery = `
       SELECT 
         p.*,
@@ -282,10 +290,13 @@ export class PostService {
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
-      WHERE p.public_id = ? AND p.deleted_at IS NULL
+      WHERE p.public_id = ? AND p.deleted_at IS NULL AND ${visibility.sql}
     `;
 
-    const [rows] = await dbPool.execute<RowDataPacket[]>(postQuery, [publicId]);
+    const [rows] = await dbPool.execute<RowDataPacket[]>(postQuery, [
+      publicId,
+      ...visibility.params,
+    ]);
     if (rows.length === 0) {
       return null;
     }
@@ -519,7 +530,7 @@ export class PostService {
     };
   }
 
-  /** 取得特地使用者的貼文 */
+  /** 取得特定使用者的貼文（公開介面：只含個人貼文與 Public 組織貼文） */
   async getUserPosts(userId: number): Promise<RowDataPacket[]> {
     const postsQuery = `
       SELECT 
@@ -539,7 +550,7 @@ export class PostService {
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE p.user_id = ? AND p.deleted_at IS NULL
+      WHERE p.user_id = ? AND p.deleted_at IS NULL AND ${publicSurfaceCondition("p")}
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `;
@@ -565,15 +576,17 @@ export class PostService {
     };
   }> {
     const offset = (page - 1) * limit;
+    // 失去成員資格後，瀏覽紀錄也不再列出看不到的組織貼文
+    const visibility = postVisibleIn(await loadViewerScope(dbPool, userId));
 
     const [countRows] = await dbPool.execute<RowDataPacket[]>(
       `
       SELECT COUNT(DISTINCT pv.post_id) as total
       FROM post_views pv
       JOIN posts p ON pv.post_id = p.id
-      WHERE pv.user_id = ? AND p.deleted_at IS NULL
+      WHERE pv.user_id = ? AND p.deleted_at IS NULL AND ${visibility.sql}
       `,
-      [userId],
+      [userId, ...visibility.params],
     );
     const total = (countRows[0] as { total: number })?.total || 0;
     const totalPages = Math.ceil(total / limit);
@@ -598,7 +611,7 @@ export class PostService {
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE pv.user_id = ? AND p.deleted_at IS NULL
+      WHERE pv.user_id = ? AND p.deleted_at IS NULL AND ${visibility.sql}
       GROUP BY p.id
       ORDER BY viewed_at DESC
       LIMIT ? OFFSET ?
@@ -606,6 +619,7 @@ export class PostService {
 
     const [viewedPosts] = await dbPool.query<RowDataPacket[]>(postsQuery, [
       userId,
+      ...visibility.params,
       Number(limit),
       Number(offset),
     ]);

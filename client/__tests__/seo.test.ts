@@ -151,3 +151,33 @@ describe("buildMetadata", () => {
     ]);
   });
 });
+
+// ADR 0003: an Internal / Members org post must not reach search engines or
+// share previews. The page's metadata fetch is anonymous, so such a post
+// arrives as a 404 (null); a non-public post that slips through is treated
+// the same way.
+describe("isIndexablePost", () => {
+  it("indexes personal posts and Public org posts", () => {
+    assert.equal(
+      seo.isIndexablePost({ org_id: null, audience_tier: "public" }),
+      true,
+    );
+    assert.equal(seo.isIndexablePost({}), true);
+    assert.equal(
+      seo.isIndexablePost({ org_id: 12, audience_tier: "public" }),
+      true,
+    );
+  });
+
+  it("does not index a post that did not load or is below Public", () => {
+    assert.equal(seo.isIndexablePost(null), false);
+    assert.equal(
+      seo.isIndexablePost({ org_id: 12, audience_tier: "internal" }),
+      false,
+    );
+    assert.equal(
+      seo.isIndexablePost({ org_id: 12, audience_tier: "members" }),
+      false,
+    );
+  });
+});

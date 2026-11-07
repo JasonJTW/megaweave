@@ -131,10 +131,16 @@ router.post(
         );
       }
 
-      // 私訊本身不受組織限制，但附帶的貼文資訊要檢視者看得到（ADR 0003）；
-      // 只要帶了 post_id 就檢查，並在上傳附件與寫入任何訊息前擋下
-      if (postId !== undefined && !(await isPostVisibleTo(dbPool, postId, senderId))) {
-        return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
+      // 私訊本身不受組織限制，但附帶的貼文資訊會讓雙方都看到，所以寄件人與收件人都要看得到（ADR 0003）；
+      // 只要帶了 post_id 就檢查，並在上傳附件與寫入任何訊息前擋下。任一方看不到都回同一個 404，不洩漏是哪一方
+      if (postId !== undefined) {
+        const [senderSees, recipientSees] = await Promise.all([
+          isPostVisibleTo(dbPool, postId, senderId),
+          isPostVisibleTo(dbPool, postId, recipientId),
+        ]);
+        if (!senderSees || !recipientSees) {
+          return next(new HttpError(404, "POST_NOT_FOUND", "Post not found"));
+        }
       }
 
       // 0. Process Attachments if any

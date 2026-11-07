@@ -1075,7 +1075,6 @@
     "MESSAGE_EMPTY": "請輸入訊息或附上圖片。",
     "IMAGE_REQUIRED": "請上傳圖片檔。",
     "MEMBER_NAME_REQUIRED": "請輸入成員名稱。",
-    "UNIT_CONTACT_NEEDS_UNIT": "請至少選一個單位給這位單位窗口。",
     "INVALID_CATEGORY": "請選擇有效的分類。",
     "SEARCH_QUERY_TOO_LONG": "搜尋文字不能超過 300 個字。"
   },
@@ -1124,7 +1123,7 @@
     "title": "組織後台",
     "subtitle": "管理單位與成員。成員只能用已註冊帳號的 Email 加入。",
     "orgLabel": "組織",
-    "noOrgs": "你目前不是任何組織的組織管理員。",
+    "noOrgs": "你目前沒有可管理的組織。",
     "loadFailed": "無法載入組織資料。",
     "unitsHeading": "單位",
     "unitsEmpty": "還沒有單位。",
@@ -1139,15 +1138,13 @@
     "roleLabel": "身分",
     "role": {
       "admin": "組織管理員",
-      "unit_contact": "單位窗口",
       "member": "組織成員"
     },
     "roleHint": {
       "admin": "管理整個組織：成員、單位、全組織物品的層級與報表。",
-      "unit_contact": "代表選定的單位上架物品、核可申請。可同時負責多個單位。",
       "member": "可在成員層認領物品。"
     },
-    "unitsLabel": "負責單位",
+    "unitsLabel": "擔任單位窗口",
     "needUnitsFirst": "請先新增單位，才能指定單位窗口。",
     "addMember": "加入成員",
     "memberAdded": "已加入成員。",
@@ -1155,6 +1152,12 @@
     "removeConfirm": "確定要移除 {email} 的組織身分嗎？帳號本身會保留。",
     "memberRemoved": "已移除成員。",
     "you": "你",
-    "saving": "處理中…"
+    "saving": "處理中…",
+    "unitsHint": "選填。單位窗口代表這些單位上架物品、核可申請，可看內部層，也仍可用個人身分交換。組織管理員也可以同時擔任單位窗口。",
+    "unitContact": "單位窗口",
+    "edit": "編輯",
+    "save": "儲存",
+    "cancel": "取消",
+    "memberUpdated": "已更新成員。"
   }
 }

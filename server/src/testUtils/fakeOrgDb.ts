@@ -213,6 +213,22 @@ export function createFakeOrgDb(
       return [rows, []];
     }
 
+    if (/^SELECT public_id, name FROM organizations ORDER BY name$/.test(sql)) {
+      const rows = db.organizations.map((o) => ({ public_id: o.public_id, name: o.name }));
+      return [rows, []];
+    }
+
+    if (
+      /^SELECT id, public_id, name FROM organizations WHERE public_id = \? LIMIT 1$/.test(
+        sql,
+      )
+    ) {
+      const rows = db.organizations
+        .filter((o) => o.public_id === params[0])
+        .map((o) => ({ id: o.id, public_id: o.public_id, name: o.name }));
+      return [rows, []];
+    }
+
     if (
       /^SELECT o\.id, o\.public_id, o\.name FROM organizations o JOIN org_memberships m ON m\.org_id = o\.id WHERE o\.public_id = \? AND m\.user_id = \? AND m\.org_role = 'admin'/.test(
         sql,
@@ -313,14 +329,42 @@ export function createFakeOrgDb(
     }
 
     if (
-      /^SELECT org_role FROM org_memberships WHERE org_id = \? AND id = \? FOR UPDATE$/.test(
+      /^SELECT m\.org_role, u\.email FROM org_memberships m JOIN users u ON u\.id = m\.user_id WHERE m\.org_id = \? AND m\.id = \? FOR UPDATE$/.test(
         sql,
       )
     ) {
       const rows = db.memberships
         .filter((m) => m.org_id === params[0] && m.id === Number(params[1]))
-        .map((m) => ({ org_role: m.org_role }));
+        .map((m) => ({ org_role: m.org_role, email: emailOf(m.user_id) }));
       return [rows, []];
+    }
+
+    if (
+      /^UPDATE org_memberships SET org_role = \?, access_level = \? WHERE org_id = \? AND id = \?$/.test(
+        sql,
+      )
+    ) {
+      const [org_role, access_level, org_id, id] = params;
+      const row = db.memberships.find(
+        (m) => m.org_id === org_id && m.id === Number(id),
+      );
+      if (row) {
+        row.org_role = String(org_role);
+        row.access_level = String(access_level);
+      }
+      return [{ affectedRows: row ? 1 : 0 }, []];
+    }
+
+    if (
+      /^DELETE FROM org_unit_contacts WHERE org_id = \? AND membership_id = \?$/.test(
+        sql,
+      )
+    ) {
+      const before = db.unitContacts.length;
+      db.unitContacts = db.unitContacts.filter(
+        (c) => !(c.org_id === params[0] && c.membership_id === Number(params[1])),
+      );
+      return [{ affectedRows: before - db.unitContacts.length }, []];
     }
 
     if (

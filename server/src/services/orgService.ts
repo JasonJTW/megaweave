@@ -15,7 +15,8 @@ import type { AccessLevel } from "./postVisibility";
 export const PUBLISHER_DISPLAYS = ["org", "org_unit", "anonymous"] as const;
 export type PublisherDisplay = (typeof PUBLISHER_DISPLAYS)[number];
 
-export const ORG_ROLES = ["admin", "staff", "member"] as const;
+//* Unit Contact 不是 org_role，而是 org_unit_contacts 的指派（和 Org Admin 可並存，ADR 0004）
+export const ORG_ROLES = ["admin", "member"] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
 /** 一筆 membership 授予的身分：org_role 管能管什麼，access_level 管看得到什麼 */
@@ -46,7 +47,7 @@ export interface OrgSummary extends OrgSettings {
   orgAdmins: { email: string }[];
 }
 
-type Queryable = Pick<PoolConnection, "query" | "execute">;
+export type Queryable = Pick<PoolConnection, "query" | "execute">;
 
 interface OrgRow extends RowDataPacket {
   id: number;

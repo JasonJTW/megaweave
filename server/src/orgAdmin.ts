@@ -1,5 +1,6 @@
 //* 組織管理員後台（PRD 0001 §5.1、ADR 0003）：Org Admin 管理自己組織的單位與成員
-//* 權限：每個 `/orgs/:orgId` 底下的請求先確認呼叫者是該組織的 Org Admin，否則一律 404 ORG_NOT_FOUND
+//* 權限：每個 `/orgs/:orgId` 底下的請求先確認呼叫者是該組織的 Org Admin 或 Platform Admin，
+//* 否則一律 404 ORG_NOT_FOUND
 import Router, { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware/auth";
@@ -8,6 +9,7 @@ import { OrgIdSchema } from "./utils/idSchemas";
 import {
   AdminOrg,
   MEMBER_ROLES,
+  OrgAdminCaller,
   orgMemberService,
 } from "./services/orgMemberService";
 
@@ -29,17 +31,30 @@ const AddMemberFormSchema = z.object({
 const UnitIdsSchema = z.array(z.number().int().positive()).max(100).default([]);
 const MemberIdSchema = z.coerce.number().int().positive();
 
+//* 改身分：身分選單與單位勾選都由 client 帶入，沒有使用者打字的欄位 → INVALID_REQUEST
+const UpdateMemberSchema = z.object({
+  role: z.enum(MEMBER_ROLES),
+  unitIds: z.array(z.number().int().positive()).max(100),
+});
+
 function adminOrg(res: Response): AdminOrg {
   return res.locals.adminOrg as AdminOrg;
 }
 
+function caller(req: Request): OrgAdminCaller {
+  return {
+    userId: req.user!.userId,
+    isPlatformAdmin: req.user!.role === "admin",
+  };
+}
+
 /**
  * GET /api/org-admin/orgs
- * 呼叫者擔任 Org Admin 的組織
+ * 呼叫者能管理的組織（Platform Admin 看到全部）
  */
 router.get("/orgs", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const orgs = await orgMemberService.listAdminOrgs(req.user!.userId);
+    const orgs = await orgMemberService.listAdminOrgs(caller(req));
     return res.status(200).json({ orgs });
   } catch (error) {
     return next(error);
@@ -56,7 +71,7 @@ router.use(
       }
       res.locals.adminOrg = await orgMemberService.requireAdminOrg(
         orgId.data,
-        req.user!.userId,
+        caller(req),
       );
       return next();
     } catch (error) {
@@ -112,7 +127,7 @@ router.post(
 
 /**
  * POST /api/org-admin/orgs/:orgId/members
- * 以 email 加入已註冊帳號，指定為 Org Admin、Unit Contact（一或多個單位）或 Org Member
+ * 以 email 加入已註冊帳號：`role` 是 Org Admin 或 Org Member，`unitIds` 是擔任 Unit Contact 的單位（可空、可和 Org Admin 並存）
  */
 router.post(
   "/orgs/:orgId/members",
@@ -126,32 +141,38 @@ router.post(
         return next(new HttpError(400, "INVALID_REQUEST", "Invalid unit ids"));
       }
 
-      const isUnitContact = form.data.role === "unit_contact";
-      if (isUnitContact && unitIds.data.length === 0) {
-        //* 使用者選了 Unit Contact 但沒勾單位：表單問題
-        return next(
-          new HttpError(
-            400,
-            "UNIT_CONTACT_NEEDS_UNIT",
-            "A Unit Contact needs at least one unit",
-          ),
-        );
-      }
-      if (!isUnitContact && unitIds.data.length > 0) {
-        return next(
-          new HttpError(
-            400,
-            "INVALID_REQUEST",
-            "Only a Unit Contact can have units",
-          ),
-        );
-      }
-
       const member = await orgMemberService.addMember(adminOrg(res).id, {
         ...form.data,
         unitIds: unitIds.data,
       });
       return res.status(201).json({ member });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * PATCH /api/org-admin/orgs/:orgId/members/:memberId
+ * 改成員的身分（Org Admin／Org Member 與窗口單位整組取代）；組織至少要留一位 Org Admin
+ */
+router.patch(
+  "/orgs/:orgId/members/:memberId",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const memberId = MemberIdSchema.safeParse(req.params.memberId);
+      const identity = UpdateMemberSchema.safeParse(req.body ?? {});
+      if (!memberId.success || !identity.success) {
+        return next(
+          new HttpError(400, "INVALID_REQUEST", "Invalid member update"),
+        );
+      }
+      const member = await orgMemberService.updateMember(
+        adminOrg(res).id,
+        memberId.data,
+        identity.data,
+      );
+      return res.status(200).json({ member });
     } catch (error) {
       return next(error);
     }

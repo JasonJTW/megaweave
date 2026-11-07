@@ -1,8 +1,10 @@
 /**
  * 組織管理員後台：管理單位與成員（#135，PRD 0001 §5.1、ADR 0003）
  *
- * 透過 HTTP 測 `/api/org-admin`：只有該組織的 Org Admin（`org_memberships.org_role = 'admin'`）能進入；
- * 成員只能用已註冊帳號的 email 加入，可指定為 Org Admin、某幾個單位的 Unit Contact 或 Org Member。
+ * 透過 HTTP 測 `/api/org-admin`：只有該組織的 Org Admin（`org_memberships.org_role = 'admin'`）
+ * 與 Platform Admin（`users.role = 'admin'`）能進入；
+ * 成員只能用已註冊帳號的 email 加入。Org Admin 與 Unit Contact 是兩個獨立的身分：
+ * `role` 是 Org Admin 或 Org Member，`unitIds` 是擔任窗口的單位，同一人可以兩者都有。
  * MySQL 換成記憶體裡的假資料表（只認得 service 用到的語句），斷言停在 HTTP 回應。
  */
 
@@ -115,7 +117,7 @@ beforeEach(() => {
         id: CONTACT_MEMBERSHIP,
         org_id: 10,
         user_id: UNIT_CONTACT,
-        org_role: "staff",
+        org_role: "member",
         access_level: "internal",
       },
       {
@@ -171,7 +173,7 @@ describe("who can enter the Org Admin back office", () => {
         {
           id: CONTACT_MEMBERSHIP,
           email: "contact@school.edu.tw",
-          role: "unit_contact",
+          role: "member",
           unitIds: [GENERAL_AFFAIRS],
         },
         {
@@ -197,7 +199,6 @@ describe("who can enter the Org Admin back office", () => {
     ["a Unit Contact", UNIT_CONTACT, "user"],
     ["an Org Member", ORG_MEMBER, "user"],
     ["another org's Org Admin", OTHER_ORG_ADMIN, "user"],
-    ["a Platform Admin who is not an Org Admin", PLATFORM_ADMIN, "admin"],
     ["a non-member", OUTSIDER, "user"],
   ] as const)(
     "%s cannot see or change the org, and learns nothing about it",
@@ -214,6 +215,9 @@ describe("who can enter the Org Admin back office", () => {
         await request(app)
           .post(`/api/org-admin/orgs/${ORG}/members`)
           .send({ email: "new@school.edu.tw", role: "member" }),
+        await request(app)
+          .patch(`/api/org-admin/orgs/${ORG}/members/${MEMBER_MEMBERSHIP}`)
+          .send({ role: "admin", unitIds: [] }),
         await request(app).delete(
           `/api/org-admin/orgs/${ORG}/members/${MEMBER_MEMBERSHIP}`,
         ),
@@ -225,8 +229,48 @@ describe("who can enter the Org Admin back office", () => {
       }
       expect(fakeDb.units).toHaveLength(3);
       expect(fakeDb.memberships).toHaveLength(4);
+      expect(
+        fakeDb.memberships.find((m) => m.id === MEMBER_MEMBERSHIP)?.org_role,
+      ).toBe("member");
     },
   );
+
+  it("lists every org for a Platform Admin", async () => {
+    signInAs(PLATFORM_ADMIN, "admin");
+
+    const res = await api().get("/api/org-admin/orgs");
+
+    expect(res.status).toBe(200);
+    expect(res.body.orgs).toHaveLength(2);
+    expect(res.body.orgs).toEqual(
+      expect.arrayContaining([
+        { id: ORG, name: "甲校" },
+        { id: OTHER_ORG, name: "乙校" },
+      ]),
+    );
+  });
+
+  it("lets a Platform Admin manage an org they are not a member of", async () => {
+    signInAs(PLATFORM_ADMIN, "admin");
+
+    const overview = await api().get(`/api/org-admin/orgs/${OTHER_ORG}`);
+    const added = await api()
+      .post(`/api/org-admin/orgs/${OTHER_ORG}/members`)
+      .send({ email: "new@school.edu.tw", role: "admin" });
+
+    expect(overview.status).toBe(200);
+    expect(overview.body.org).toEqual({ id: OTHER_ORG, name: "乙校" });
+    expect(added.status).toBe(201);
+  });
+
+  it("still answers ORG_NOT_FOUND to a Platform Admin for an unknown org", async () => {
+    signInAs(PLATFORM_ADMIN, "admin");
+
+    const res = await api().get(`/api/org-admin/orgs/${UNKNOWN_ORG}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("ORG_NOT_FOUND");
+  });
 
   it("answers an unknown org the same way as one the user doesn't admin", async () => {
     signInAs(ORG_ADMIN);
@@ -327,10 +371,20 @@ describe("POST /api/org-admin/orgs/:orgId/members", () => {
     expect(await overviewMember("new@school.edu.tw")).toEqual(res.body.member);
   });
 
-  it("makes one person the Unit Contact of several units", async () => {
+  function accessLevelOf(membershipId: number) {
+    return fakeDb.memberships.find((m) => m.id === membershipId)?.access_level;
+  }
+
+  it("gives a plain Org Member only Members-tier access", async () => {
+    const res = await addMember({ email: "new@school.edu.tw", role: "member" });
+
+    expect(accessLevelOf(res.body.member.id)).toBe("member");
+  });
+
+  it("makes one person the Unit Contact of several units, with Internal access", async () => {
     const res = await addMember({
       email: "new@school.edu.tw",
-      role: "unit_contact",
+      role: "member",
       unitIds: [LIBRARY, GENERAL_AFFAIRS],
     });
 
@@ -338,9 +392,27 @@ describe("POST /api/org-admin/orgs/:orgId/members", () => {
     expect(await overviewMember("new@school.edu.tw")).toEqual({
       id: res.body.member.id,
       email: "new@school.edu.tw",
-      role: "unit_contact",
+      role: "member",
       unitIds: [GENERAL_AFFAIRS, LIBRARY],
     });
+    expect(accessLevelOf(res.body.member.id)).toBe("internal");
+  });
+
+  it("makes one person both Org Admin and Unit Contact", async () => {
+    const res = await addMember({
+      email: "new@school.edu.tw",
+      role: "admin",
+      unitIds: [LIBRARY],
+    });
+
+    expect(res.status).toBe(201);
+    expect(await overviewMember("new@school.edu.tw")).toEqual({
+      id: res.body.member.id,
+      email: "new@school.edu.tw",
+      role: "admin",
+      unitIds: [LIBRARY],
+    });
+    expect(accessLevelOf(res.body.member.id)).toBe("internal");
   });
 
   it("adds another Org Admin, who can then run the back office", async () => {
@@ -373,7 +445,7 @@ describe("POST /api/org-admin/orgs/:orgId/members", () => {
   it("rejects an email with no registered account", async () => {
     const res = await addMember({
       email: "nobody@school.edu.tw",
-      role: "unit_contact",
+      role: "member",
       unitIds: [LIBRARY],
     });
 
@@ -396,18 +468,6 @@ describe("POST /api/org-admin/orgs/:orgId/members", () => {
     ).toBe("member");
   });
 
-  it("asks for at least one unit when adding a Unit Contact", async () => {
-    const res = await addMember({
-      email: "new@school.edu.tw",
-      role: "unit_contact",
-      unitIds: [],
-    });
-
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe("UNIT_CONTACT_NEEDS_UNIT");
-    expect(fakeDb.memberships).toHaveLength(4);
-  });
-
   it.each([
     ["a malformed email", { email: "not-an-email", role: "member" }],
     ["an unknown role", { email: "new@school.edu.tw", role: "owner" }],
@@ -423,11 +483,10 @@ describe("POST /api/org-admin/orgs/:orgId/members", () => {
   it.each([
     [
       "a unit from another org",
-      { role: "unit_contact", unitIds: [GENERAL_AFFAIRS, OTHER_ORG_UNIT] },
+      { role: "member", unitIds: [GENERAL_AFFAIRS, OTHER_ORG_UNIT] },
     ],
-    ["a unit that does not exist", { role: "unit_contact", unitIds: [999] }],
-    ["malformed unit ids", { role: "unit_contact", unitIds: ["總務處"] }],
-    ["units on a non-Unit-Contact", { role: "member", unitIds: [LIBRARY] }],
+    ["a unit that does not exist", { role: "member", unitIds: [999] }],
+    ["malformed unit ids", { role: "member", unitIds: ["總務處"] }],
   ])("treats %s as a client bug and adds no one", async (_label, body) => {
     const res = await addMember({ email: "new@school.edu.tw", ...body });
 
@@ -435,6 +494,138 @@ describe("POST /api/org-admin/orgs/:orgId/members", () => {
     expect(res.body.code).toBe("INVALID_REQUEST");
     expect(fakeDb.memberships).toHaveLength(4);
     expect(fakeDb.unitContacts).toHaveLength(1);
+  });
+});
+
+describe("PATCH /api/org-admin/orgs/:orgId/members/:memberId", () => {
+  beforeEach(() => signInAs(ORG_ADMIN));
+
+  function changeMember(
+    memberId: number | string,
+    body: Record<string, unknown>,
+  ) {
+    return api()
+      .patch(`/api/org-admin/orgs/${ORG}/members/${memberId}`)
+      .send(body);
+  }
+
+  function membership(id: number) {
+    return fakeDb.memberships.find((m) => m.id === id);
+  }
+
+  function unitsOf(id: number) {
+    return fakeDb.unitContacts
+      .filter((c) => c.membership_id === id)
+      .map((c) => c.org_unit_id)
+      .sort((a, b) => a - b);
+  }
+
+  it("makes an Org Member the Unit Contact of units, granting Internal access", async () => {
+    const res = await changeMember(MEMBER_MEMBERSHIP, {
+      role: "member",
+      unitIds: [GENERAL_AFFAIRS, LIBRARY],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.member).toEqual({
+      id: MEMBER_MEMBERSHIP,
+      email: "student@school.edu.tw",
+      role: "member",
+      unitIds: [GENERAL_AFFAIRS, LIBRARY],
+    });
+    expect(unitsOf(MEMBER_MEMBERSHIP)).toEqual([GENERAL_AFFAIRS, LIBRARY]);
+    expect(membership(MEMBER_MEMBERSHIP)?.access_level).toBe("internal");
+  });
+
+  it("replaces a Unit Contact's units", async () => {
+    const res = await changeMember(CONTACT_MEMBERSHIP, {
+      role: "member",
+      unitIds: [LIBRARY],
+    });
+
+    expect(res.status).toBe(200);
+    expect(unitsOf(CONTACT_MEMBERSHIP)).toEqual([LIBRARY]);
+  });
+
+  it("turns a Unit Contact back into a plain Org Member with Members-tier access", async () => {
+    const res = await changeMember(CONTACT_MEMBERSHIP, {
+      role: "member",
+      unitIds: [],
+    });
+
+    expect(res.status).toBe(200);
+    expect(unitsOf(CONTACT_MEMBERSHIP)).toEqual([]);
+    expect(membership(CONTACT_MEMBERSHIP)?.access_level).toBe("member");
+  });
+
+  it("promotes a Unit Contact to Org Admin while keeping their units", async () => {
+    const res = await changeMember(CONTACT_MEMBERSHIP, {
+      role: "admin",
+      unitIds: [GENERAL_AFFAIRS],
+    });
+
+    expect(res.status).toBe(200);
+    signInAs(UNIT_CONTACT);
+    const overview = await api().get(`/api/org-admin/orgs/${ORG}`);
+    expect(overview.status).toBe(200);
+    expect(unitsOf(CONTACT_MEMBERSHIP)).toEqual([GENERAL_AFFAIRS]);
+    expect(membership(CONTACT_MEMBERSHIP)?.access_level).toBe("internal");
+  });
+
+  it("demotes one of two Org Admins", async () => {
+    await changeMember(MEMBER_MEMBERSHIP, { role: "admin", unitIds: [] });
+
+    const res = await changeMember(ADMIN_MEMBERSHIP, {
+      role: "member",
+      unitIds: [],
+    });
+
+    expect(res.status).toBe(200);
+    expect(membership(ADMIN_MEMBERSHIP)).toMatchObject({
+      org_role: "member",
+      access_level: "member",
+    });
+  });
+
+  it("keeps the last Org Admin", async () => {
+    const res = await changeMember(ADMIN_MEMBERSHIP, {
+      role: "member",
+      unitIds: [LIBRARY],
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("ORG_LAST_ADMIN");
+    expect(membership(ADMIN_MEMBERSHIP)?.org_role).toBe("admin");
+    expect(unitsOf(ADMIN_MEMBERSHIP)).toEqual([]);
+  });
+
+  it("does not reach a membership of another org", async () => {
+    const res = await changeMember(104, { role: "member", unitIds: [] });
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("ORG_MEMBER_NOT_FOUND");
+    expect(membership(104)?.org_role).toBe("admin");
+  });
+
+  it.each([
+    ["a unit from another org", { role: "member", unitIds: [OTHER_ORG_UNIT] }],
+    ["an unknown role", { role: "owner", unitIds: [] }],
+    ["missing unit ids", { role: "member" }],
+    ["malformed unit ids", { role: "member", unitIds: ["總務處"] }],
+  ])("treats %s as a client bug and changes nothing", async (_label, body) => {
+    const res = await changeMember(CONTACT_MEMBERSHIP, body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_REQUEST");
+    expect(unitsOf(CONTACT_MEMBERSHIP)).toEqual([GENERAL_AFFAIRS]);
+    expect(membership(CONTACT_MEMBERSHIP)?.access_level).toBe("internal");
+  });
+
+  it("treats a malformed member id as a client bug", async () => {
+    const res = await changeMember("abc", { role: "member", unitIds: [] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_REQUEST");
   });
 });
 

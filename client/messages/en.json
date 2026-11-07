@@ -1075,7 +1075,6 @@
     "MESSAGE_EMPTY": "Please enter a message or attach an image.",
     "IMAGE_REQUIRED": "Please upload an image file.",
     "MEMBER_NAME_REQUIRED": "Please enter the member's name.",
-    "UNIT_CONTACT_NEEDS_UNIT": "Pick at least one unit for this Unit Contact.",
     "INVALID_CATEGORY": "Please choose a valid category.",
     "SEARCH_QUERY_TOO_LONG": "Search text must be 300 characters or fewer."
   },
@@ -1124,7 +1123,7 @@
     "title": "Organization admin",
     "subtitle": "Manage units and members. Members join by the email of a registered account.",
     "orgLabel": "Organization",
-    "noOrgs": "You aren't an Org Admin of any organization.",
+    "noOrgs": "You don't manage any organization.",
     "loadFailed": "Couldn't load the organization.",
     "unitsHeading": "Units",
     "unitsEmpty": "No units yet.",
@@ -1139,15 +1138,13 @@
     "roleLabel": "Role",
     "role": {
       "admin": "Org Admin",
-      "unit_contact": "Unit Contact",
       "member": "Org Member"
     },
     "roleHint": {
       "admin": "Manages the whole organization: members, units, item tiers and reports.",
-      "unit_contact": "Lists items and approves requests for the chosen units. Can cover several units.",
       "member": "Can claim items at the Members tier."
     },
-    "unitsLabel": "Units",
+    "unitsLabel": "Unit Contact for",
     "needUnitsFirst": "Add a unit before assigning a Unit Contact.",
     "addMember": "Add member",
     "memberAdded": "Member added.",
@@ -1155,6 +1152,12 @@
     "removeConfirm": "Remove {email} from this organization? Their account stays.",
     "memberRemoved": "Member removed.",
     "you": "You",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "unitsHint": "Optional. A Unit Contact lists items and approves requests for these units, sees the Internal tier, and can still act personally. An Org Admin can also be a Unit Contact.",
+    "unitContact": "Unit Contact",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "memberUpdated": "Member updated."
   }
 }

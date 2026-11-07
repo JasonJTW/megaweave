@@ -1,7 +1,9 @@
 -- Organizations, units and memberships (ADR 0003, PRD 0001 §5.1).
 -- Accounts stay platform-wide: org identity is a membership on the account.
 -- `access_level` decides what a member can see, `org_role` what they can manage.
--- A membership can be the Unit Contact of several units (org_unit_contacts).
+-- Unit Contact is not an org_role: it is an org_unit_contacts assignment, so one
+-- membership can be Org Admin and the Unit Contact of several units at once (ADR 0004).
+-- `access_level` is derived on write: 'internal' for an Org Admin or a Unit Contact, else 'member'.
 --
 -- Posts gain `org_id`, `org_unit_id` and `audience_tier`. Existing rows get
 -- `org_id = NULL` and `audience_tier = 'public'`, so personal posts behave as before.
@@ -41,7 +43,7 @@ CREATE TABLE `org_memberships` (
   `org_id` bigint unsigned NOT NULL,
   `user_id` bigint unsigned NOT NULL,
   `access_level` enum('internal','member') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `org_role` enum('admin','staff','member') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'member',
+  `org_role` enum('admin','member') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'member',
   -- Verified separately from the sign-in email; NULL in the prototype (members are matched by sign-in email)
   `org_email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `verified_at` timestamp NULL DEFAULT NULL,

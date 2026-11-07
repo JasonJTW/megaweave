@@ -445,7 +445,7 @@ CREATE TABLE `org_memberships` (
   `org_id` bigint unsigned NOT NULL,
   `user_id` bigint unsigned NOT NULL,
   `access_level` enum('internal','member') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `org_role` enum('admin','staff','member') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'member',
+  `org_role` enum('admin','member') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'member',
   `org_email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `verified_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,

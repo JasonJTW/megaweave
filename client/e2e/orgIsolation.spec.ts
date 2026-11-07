@@ -52,6 +52,9 @@ test.describe("Org posts below Public stay out of public surfaces", () => {
     ({ browserName, isMobile }) => browserName !== "chromium" || isMobile,
     "API-only spec",
   );
+  // One worker, one sign-in: the auth rate limiter (10/min per IP) is shared with the
+  // UI sign-in specs, and a per-worker beforeAll would exhaust it
+  test.describe.configure({ mode: "serial" });
 
   let guest: APIRequestContext;
   let member: APIRequestContext;

@@ -24,6 +24,7 @@ import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { LocationInputData } from "../types/location";
 import { publicSurfaceCondition, viewerVisibility } from "./postVisibility";
 import { locationService } from "./locationService";
+import { loadPostVectorScope } from "./postVectorScope";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
 export type LocationData = LocationInputData;
 
@@ -900,12 +901,15 @@ export class PostService {
       byteLength,
     } = await fetchEmbedding(text);
 
-    // 寫入 Redis 向量索引
+    // 寫入 Redis 向量索引（scope 與 postEmbedding job 相同，依 MySQL 當下的層級）
+    const scope = await loadPostVectorScope(dbPool, postId);
+    if (scope === null) throw new Error("POST_NOT_FOUND");
     const redis = getVectorRedisClient();
     await redis.hSet(`post:${postId}`, {
       v: vectorBuffer,
       post_id: postId,
       status: post.type,
+      scope,
     });
 
     // 持久化到 MySQL

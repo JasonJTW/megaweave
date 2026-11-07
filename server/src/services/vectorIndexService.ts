@@ -1,10 +1,15 @@
 import { RowDataPacket } from "mysql2";
 import dbPool from "../utils/db";
 import { AppRedisClient, getVectorRedisClient } from "../utils/redis";
+import { backfillPostVectorScopes, vectorScopeOf } from "./postVectorScope";
+import type { AudienceTier } from "./postVisibility";
 
 export const POST_VECTOR_INDEX = "idx:posts_v";
 
-/** 建立貼文 HNSW 向量索引；索引已存在時 Redis 會回傳錯誤。 */
+/**
+ * 建立貼文 HNSW 向量索引；索引已存在時 Redis 會回傳錯誤。
+ * `scope` TAG 是貼文的可見範圍（ADR 0003，見 postVectorScope.ts），公開介面的 KNN 以它預先過濾。
+ */
 export async function createPostVectorIndex(
   redis: Pick<AppRedisClient, "sendCommand">,
 ): Promise<void> {
@@ -31,7 +36,44 @@ export async function createPostVectorIndex(
     "NUMERIC",
     "status",
     "TAG",
+    "scope",
+    "TAG",
   ]);
+}
+
+/** 替建立 scope 之前的舊索引補上 `scope` TAG；FT.ALTER 會在背景重新掃描既有文件 */
+export async function addScopeFieldToPostVectorIndex(
+  redis: Pick<AppRedisClient, "sendCommand">,
+): Promise<void> {
+  await redis.sendCommand([
+    "FT.ALTER",
+    POST_VECTOR_INDEX,
+    "SCHEMA",
+    "ADD",
+    "scope",
+    "TAG",
+  ]);
+}
+
+/** FT.INFO 的 attributes 是否已有某個欄位 */
+export function ftInfoHasField(rawInfo: unknown, field: string): boolean {
+  if (!Array.isArray(rawInfo)) return false;
+  for (let i = 0; i < rawInfo.length; i += 2) {
+    if (String(rawInfo[i]) !== "attributes") continue;
+    const attributes = rawInfo[i + 1];
+    if (!Array.isArray(attributes)) return false;
+    return attributes.some((attr) => {
+      if (!Array.isArray(attr)) return false;
+      for (let j = 0; j < attr.length; j += 2) {
+        const key = String(attr[j]);
+        if ((key === "identifier" || key === "attribute") && String(attr[j + 1]) === field) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+  return false;
 }
 
 /**
@@ -58,7 +100,7 @@ export async function syncVectorsFromMySQL(): Promise<number> {
 
   try {
     const [dbRows] = await dbPool.query<RowDataPacket[]>(
-      `SELECT id, type, embedding 
+      `SELECT id, type, org_id, audience_tier, embedding
        FROM posts 
        WHERE embedding IS NOT NULL 
          AND deleted_at IS NULL 
@@ -111,6 +153,10 @@ export async function syncVectorsFromMySQL(): Promise<number> {
             v: buffer,
             post_id: row.id,
             status: row.type || "active",
+            scope: vectorScopeOf({
+              orgId: row.org_id === null ? null : Number(row.org_id),
+              audienceTier: row.audience_tier as AudienceTier,
+            }),
           });
           synced++;
         } catch (itemErr) {
@@ -165,7 +211,7 @@ export async function autoSyncVectorsIfEmpty(): Promise<number> {
 
 /**
  * 確保 Redis Vector Index (idx:posts_v) 存在。
- * 若不存在則自動建立 HNSW 向量索引。
+ * 若不存在則自動建立 HNSW 向量索引；舊索引缺 scope TAG 時以 FT.ALTER 補上並回填。
  * 若索引已就緒但內容為空 (num_docs = 0)，自動從 MySQL 回填現有向量。
  */
 export async function ensureVectorIndexExists(): Promise<void> {
@@ -177,6 +223,14 @@ export async function ensureVectorIndexExists(): Promise<void> {
     const info = await redis.sendCommand(["FT.INFO", "idx:posts_v"]);
     console.log("✅ Redis Vector Index (idx:posts_v) is ready.");
     indexReady = true;
+
+    if (!ftInfoHasField(info, "scope")) {
+      //* 舊索引沒有 scope：補欄位並回填，否則 `@scope:{public}` 預先過濾會選不到任何貼文
+      console.log("⚙️  Adding scope TAG to Redis Vector Index (idx:posts_v)...");
+      await addScopeFieldToPostVectorIndex(redis);
+      const { updated } = await backfillPostVectorScopes(dbPool, redis);
+      console.log(`✅ Backfilled scope on ${updated} vector document(s).`);
+    }
 
     const numDocs = getNumDocsFromFtInfo(info);
     if (numDocs === 0) {

@@ -8,6 +8,7 @@ import dbPool from "../../utils/db";
 import { generatePostText } from "../../utils/generatePostText";
 import { PostTextInput } from "../../types/post";
 import { fetchEmbedding } from "../../services/embeddingService";
+import { loadPostVectorScope } from "../../services/postVectorScope";
 
 export { fetchEmbedding } from "../../services/embeddingService";
 
@@ -102,11 +103,19 @@ export async function processPostEmbedding(
 
   // 4. 寫入 Redis 向量索引實例
   //    key 格式必須與 vectorIndexService PREFIX 一致：post:{id}
+  //    scope 在寫入前才從 MySQL 讀（不放進 job payload），排隊期間層級改了也不會寫入舊值
+  const scope = await loadPostVectorScope(dbPool, postId);
+  if (scope === null) {
+    //* 貼文已刪除：不再建立向量 hash（刪除流程已清掉它）
+    await job.log(`${logPrefix} post gone, skipped`);
+    return;
+  }
   const redis = getVectorRedisClient();
   await redis.hSet(`post:${postId}`, {
     v: vectorBuffer,
     post_id: postId,
     status: post.type, // TAG 欄位，方便後續依類型過濾
+    scope, // TAG 欄位：可見範圍（ADR 0003），公開介面的 KNN 以 @scope:{public} 預先過濾
   });
   console.log(`${logPrefix} – Redis HSET post:${postId} done`);
 

@@ -13,6 +13,7 @@ import {
   toFloat32Buffer,
 } from "./embeddings";
 import { FixtureDataset, FixturePost } from "./generateFixture";
+import { PUBLIC_VECTOR_SCOPE } from "../../services/postVectorScope";
 
 const ROW_BATCH_SIZE = 1000;
 /** 每篇貼文的 embedding JSON 約 30KB，縮小批次以避開 max_allowed_packet */
@@ -214,6 +215,8 @@ export async function loadFixture(
           post_id: postId,
           // 與 postEmbedding worker 相同：status TAG 實際存放貼文類型
           status: postsById.get(postId)!.type,
+          // fixture 只有個人貼文，公開介面的 KNN 以 @scope:{public} 預先過濾
+          scope: PUBLIC_VECTOR_SCOPE,
         }),
       ),
     ),

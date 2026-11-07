@@ -47,7 +47,11 @@ describe("postEmbedding worker", () => {
       }),
     } as unknown as OpenAI.Embeddings);
 
-    (dbPool.execute as jest.Mock).mockResolvedValue([{}]);
+    (dbPool.execute as jest.Mock).mockImplementation(async (sql: string) =>
+      sql.startsWith("SELECT org_id, audience_tier FROM posts")
+        ? [[{ org_id: 7, audience_tier: "members" }]]
+        : [{}],
+    );
 
     const mockJob = {
       data: {
@@ -73,12 +77,17 @@ describe("postEmbedding worker", () => {
     expect(redisKey).toBe("post:101");
     expect(payload.post_id).toBe(101);
     expect(payload.status).toBe("share");
+    //* scope 依 MySQL 當下的層級（ADR 0003），不是排入佇列時的快照
+    expect(payload.scope).toBe("org:7:members");
     expect(Buffer.isBuffer(payload.v)).toBe(true);
     expect(payload.v.length).toBe(1536 * 4);
 
     // Verify MySQL UPDATE
-    expect(dbPool.execute).toHaveBeenCalledTimes(1);
-    const [sql, params] = (dbPool.execute as jest.Mock).mock.calls[0];
+    const updates = (dbPool.execute as jest.Mock).mock.calls.filter(([sql]) =>
+      String(sql).startsWith("UPDATE posts"),
+    );
+    expect(updates).toHaveLength(1);
+    const [sql, params] = updates[0];
     expect(sql).toContain("UPDATE posts SET embedding = ? WHERE id = ?");
     expect(params[1]).toBe(101);
     const savedArr = JSON.parse(params[0]);

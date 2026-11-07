@@ -8,6 +8,7 @@ import type { Pool, ResultSetHeader } from "mysql2/promise";
 import { z } from "zod";
 import type { AppRedisClient } from "../utils/redis";
 import type { AudienceTier } from "../services/postVisibility";
+import { vectorScopeOf } from "../services/postVectorScope";
 import { seedE2eUser, type E2eUser } from "./seed";
 
 export const ORG_ISOLATION_TITLE_PREFIX = "E2E Org Isolation";
@@ -64,7 +65,7 @@ export async function seedOrgIsolationFixture(
   );
   const [membership] = await mysql.query<ResultSetHeader>(
     `INSERT INTO org_memberships (org_id, user_id, access_level, org_role)
-     VALUES (?, ?, 'internal', 'staff')`,
+     VALUES (?, ?, 'internal', 'member')`,
     [orgId, viewerId],
   );
   await mysql.query(
@@ -95,11 +96,12 @@ export async function seedOrgIsolationFixture(
         vectorJson,
       ],
     );
-    // 與 postEmbedding job 相同的索引格式。非公開貼文照樣進索引：隔離要在讀取端成立
+    // 與 postEmbedding job 相同的索引格式（含 scope TAG）。非公開貼文照樣進索引：隔離要在讀取端成立
     await vectorRedis.hSet(`post:${result.insertId}`, {
       v: toFloat32Buffer(vector),
       post_id: result.insertId,
       status: "share",
+      scope: vectorScopeOf({ orgId: post.org ? orgId : null, audienceTier: post.tier }),
     });
   }
 

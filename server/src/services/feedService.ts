@@ -9,6 +9,7 @@ import { locationService } from "./locationService";
 import { fetchQueryEmbedding } from "./embeddingService";
 import { requestHotScoreRebuild } from "../queue/queues";
 import { publicSurfaceCondition } from "./postVisibility";
+import { publicKnnQuery } from "./postVectorScope";
 
 // 首頁 Feed、搜尋、熱門排行與向量推薦都是公開介面：Internal／Members 組織貼文一律排除（ADR 0003 prototype 例外）。
 // 召回階段與 hydration 都套用，Redis（feed:trending、向量索引）裡殘留的非公開貼文也不會被回傳。
@@ -800,7 +801,8 @@ export class FeedService {
     const candidates: VectorCandidate[] = [];
 
     try {
-      const knnQuery = `*=>[KNN ${candidateLimit} @v $vec AS vector_distance]`;
+      //* 先以 scope 預先過濾，K 筆候選全是公開貼文；MySQL 端的 publicSurfaceCondition 仍是第二道防線
+      const knnQuery = publicKnnQuery(candidateLimit);
       const rawResult = (await redis.sendCommand([
         "FT.SEARCH",
         "idx:posts_v",
@@ -920,7 +922,8 @@ export class FeedService {
 
     // 1. Redis HNSW 向量檢索召回 (KNN Top-K)
     try {
-      const knnQuery = `*=>[KNN ${CANDIDATE_LIMIT} @v $vec AS vector_distance]`;
+      //* 先以 scope 預先過濾，K 筆候選全是公開貼文；MySQL 端的 publicSurfaceCondition 仍是第二道防線
+      const knnQuery = publicKnnQuery(CANDIDATE_LIMIT);
       const rawResult = (await redis.sendCommand([
         "FT.SEARCH",
         "idx:posts_v",

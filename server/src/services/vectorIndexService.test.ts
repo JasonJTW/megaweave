@@ -56,11 +56,15 @@ describe("vectorIndexService", () => {
           {
             id: 101,
             type: "giveaway",
+            org_id: null,
+            audience_tier: "public",
             embedding: JSON.stringify(sampleVector),
           },
           {
             id: 102,
             type: "request",
+            org_id: 7,
+            audience_tier: "internal",
             embedding: sampleVector,
           },
         ],
@@ -73,11 +77,13 @@ describe("vectorIndexService", () => {
         v: expect.any(Buffer),
         post_id: 101,
         status: "giveaway",
+        scope: "public",
       });
       expect(mockRedis.hSet).toHaveBeenCalledWith("post:102", {
         v: expect.any(Buffer),
         post_id: 102,
         status: "request",
+        scope: "org:7:internal",
       });
     });
 
@@ -120,13 +126,66 @@ describe("vectorIndexService", () => {
   });
 
   describe("ensureVectorIndexExists", () => {
-    it("checks existing index and triggers autoSync when num_docs is 0", async () => {
-      mockRedis.sendCommand.mockResolvedValue([
-        "index_name",
+    //* FT.INFO 的 attributes：每個欄位一個 [identifier, ..., attribute, ..., type, ...] 陣列
+    const attribute = (name: string, type: string) => [
+      "identifier",
+      name,
+      "attribute",
+      name,
+      "type",
+      type,
+    ];
+    const ftInfo = (numDocs: number, fields: string[][]) => [
+      "index_name",
+      "idx:posts_v",
+      "attributes",
+      fields,
+      "num_docs",
+      String(numDocs),
+    ];
+    const FIELDS_BEFORE_SCOPE = [
+      attribute("v", "VECTOR"),
+      attribute("post_id", "NUMERIC"),
+      attribute("status", "TAG"),
+    ];
+
+    it("adds the scope TAG to an existing index that lacks it, then backfills scopes", async () => {
+      mockRedis.sendCommand.mockImplementation(async (args: string[]) =>
+        args[0] === "FT.INFO" ? ftInfo(10, FIELDS_BEFORE_SCOPE) : "OK",
+      );
+      (dbPool.execute as jest.Mock).mockResolvedValue([[]]);
+
+      await ensureVectorIndexExists();
+
+      expect(mockRedis.sendCommand).toHaveBeenCalledWith([
+        "FT.ALTER",
         "idx:posts_v",
-        "num_docs",
-        "0",
+        "SCHEMA",
+        "ADD",
+        "scope",
+        "TAG",
       ]);
+      expect(dbPool.execute).toHaveBeenCalledWith(
+        expect.stringContaining("SELECT id, org_id, audience_tier FROM posts"),
+        [0],
+      );
+    });
+
+    it("leaves an index that already has the scope TAG alone", async () => {
+      mockRedis.sendCommand.mockResolvedValue(
+        ftInfo(10, [...FIELDS_BEFORE_SCOPE, attribute("scope", "TAG")]),
+      );
+
+      await ensureVectorIndexExists();
+
+      expect(mockRedis.sendCommand).toHaveBeenCalledTimes(1);
+      expect(dbPool.execute).not.toHaveBeenCalled();
+    });
+
+    it("checks existing index and triggers autoSync when num_docs is 0", async () => {
+      mockRedis.sendCommand.mockResolvedValue(
+        ftInfo(0, [...FIELDS_BEFORE_SCOPE, attribute("scope", "TAG")]),
+      );
       (dbPool.query as jest.Mock).mockResolvedValue([[]]);
 
       await ensureVectorIndexExists();
@@ -167,6 +226,8 @@ describe("vectorIndexService", () => {
         "post_id",
         "NUMERIC",
         "status",
+        "TAG",
+        "scope",
         "TAG",
       ]);
     });

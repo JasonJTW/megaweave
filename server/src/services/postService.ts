@@ -22,11 +22,7 @@ import { fetchEmbedding } from "./embeddingService";
 import { calculatePostHotScore } from "../queue/jobs/hotScore";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { LocationInputData } from "../types/location";
-import {
-  loadViewerScope,
-  postVisibleIn,
-  publicSurfaceCondition,
-} from "./postVisibility";
+import { publicSurfaceCondition, viewerVisibility } from "./postVisibility";
 import { locationService } from "./locationService";
 export type { PostType, PostItemData, PostTextInput, PostTextRendered, PostDetail, PostImage };
 export type LocationData = LocationInputData;
@@ -270,9 +266,7 @@ export class PostService {
     options?: { currentUserId?: number; viewerIp?: string },
   ): Promise<PostDetail | null> {
     // 檢視者看不到的組織貼文與不存在的貼文一樣回 null（→ 404），且不計觀看數
-    const visibility = postVisibleIn(
-      await loadViewerScope(dbPool, options?.currentUserId),
-    );
+    const visibility = await viewerVisibility(dbPool, options?.currentUserId);
     const postQuery = `
       SELECT 
         p.*,
@@ -577,7 +571,7 @@ export class PostService {
   }> {
     const offset = (page - 1) * limit;
     // 失去成員資格後，瀏覽紀錄也不再列出看不到的組織貼文
-    const visibility = postVisibleIn(await loadViewerScope(dbPool, userId));
+    const visibility = await viewerVisibility(dbPool, userId);
 
     const [countRows] = await dbPool.execute<RowDataPacket[]>(
       `

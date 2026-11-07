@@ -7,15 +7,18 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import dbPool from "../utils/db";
 import { HttpError } from "../utils/httpError";
-import { addMembershipByEmail, AccessLevel, OrgRole } from "./orgService";
+import { withTransaction } from "../utils/transaction";
+import {
+  addMembershipByEmail,
+  MembershipGrant,
+  orgNotFound,
+  OrgRole,
+} from "./orgService";
 
 export const MEMBER_ROLES = ["admin", "unit_contact", "member"] as const;
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 
-const ROLE_COLUMNS: Record<
-  MemberRole,
-  { orgRole: OrgRole; accessLevel: AccessLevel }
-> = {
+const ROLE_COLUMNS: Record<MemberRole, MembershipGrant> = {
   admin: { orgRole: "admin", accessLevel: "internal" },
   unit_contact: { orgRole: "staff", accessLevel: "internal" },
   member: { orgRole: "member", accessLevel: "member" },
@@ -50,10 +53,6 @@ export interface AddMemberInput {
   email: string;
   role: MemberRole;
   unitIds: number[];
-}
-
-function orgNotFound() {
-  return new HttpError(404, "ORG_NOT_FOUND", "Organization not found");
 }
 
 export const orgMemberService = {
@@ -131,9 +130,7 @@ export const orgMemberService = {
    */
   async addMember(orgId: number, input: AddMemberInput): Promise<OrgMember> {
     const unitIds = [...new Set(input.unitIds)];
-    const connection = await dbPool.getConnection();
-    try {
-      await connection.beginTransaction();
+    return withTransaction(async (connection) => {
       if (unitIds.length > 0) {
         //* IN (?) 需要 query() 展開陣列
         const [units] = await connection.query<RowDataPacket[]>(
@@ -160,19 +157,13 @@ export const orgMemberService = {
           [unitIds.map((unitId) => [orgId, unitId, membershipId])],
         );
       }
-      await connection.commit();
       return {
         id: membershipId,
         email: input.email.trim(),
         role: input.role,
         unitIds: [...unitIds].sort((a, b) => a - b),
       };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+    });
   },
 
   /**
@@ -180,9 +171,7 @@ export const orgMemberService = {
    * 鎖住該組織的 Org Admin 列，避免兩位管理員同時互相移除後組織沒人管。
    */
   async removeMember(orgId: number, membershipId: number): Promise<void> {
-    const connection = await dbPool.getConnection();
-    try {
-      await connection.beginTransaction();
+    await withTransaction(async (connection) => {
       const [targets] = await connection.execute<RowDataPacket[]>(
         "SELECT org_role FROM org_memberships WHERE org_id = ? AND id = ? FOR UPDATE",
         [orgId, membershipId],
@@ -207,12 +196,6 @@ export const orgMemberService = {
         "DELETE FROM org_memberships WHERE org_id = ? AND id = ?",
         [orgId, membershipId],
       );
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+    });
   },
 };

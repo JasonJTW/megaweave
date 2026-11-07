@@ -4,7 +4,12 @@ import dbPool from "./utils/db";
 import { getRedisClient } from "./utils/redis";
 import { z } from "zod";
 import { HttpError } from "./utils/httpError";
-import { orgService, PUBLISHER_DISPLAYS } from "./services/orgService";
+import {
+  orgNotFound,
+  orgService,
+  PUBLISHER_DISPLAYS,
+} from "./services/orgService";
+import { OrgIdSchema } from "./utils/idSchemas";
 
 const router = Router();
 
@@ -75,8 +80,6 @@ router.post(
 );
 
 //* ── 組織開通（PRD 0001 §5.1、ADR 0003）：只有 Platform Admin（全站 role = admin）能建立與編輯 ──
-
-const OrgIdSchema = z.uuid();
 
 //* 表單內容（使用者輸入）→ 失敗時 next(zodError) 回 VALIDATION_FAILED
 const orgSettingsShape = {
@@ -150,9 +153,7 @@ router.get(
       }
       const org = await orgService.getOrganization(orgId);
       if (!org) {
-        return next(
-          new HttpError(404, "ORG_NOT_FOUND", "Organization not found"),
-        );
+        return next(orgNotFound());
       }
       return res.status(200).json({ org });
     } catch (error) {
@@ -177,9 +178,7 @@ router.patch(
       if (!parsed.success) return next(parsed.error);
       const org = await orgService.updateOrganization(orgId, parsed.data);
       if (!org) {
-        return next(
-          new HttpError(404, "ORG_NOT_FOUND", "Organization not found"),
-        );
+        return next(orgNotFound());
       }
       return res.status(200).json({ org });
     } catch (error) {

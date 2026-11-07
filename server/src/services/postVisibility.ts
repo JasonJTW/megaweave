@@ -14,7 +14,8 @@ export const AUDIENCE_TIERS = ["internal", "members", "public"] as const;
 export type AudienceTier = (typeof AUDIENCE_TIERS)[number];
 
 /** org_memberships.access_level */
-export type OrgAccessLevel = "internal" | "member";
+export const ACCESS_LEVELS = ["internal", "member"] as const;
+export type AccessLevel = (typeof ACCESS_LEVELS)[number];
 
 export interface SqlFragment {
   sql: string;
@@ -34,14 +35,14 @@ export interface ViewerScope {
 
 export const PUBLIC_SCOPE: ViewerScope = Object.freeze({ orgs: Object.freeze([]) });
 
-const TIERS_BY_ACCESS_LEVEL: Record<OrgAccessLevel, readonly AudienceTier[]> = {
+const TIERS_BY_ACCESS_LEVEL: Record<AccessLevel, readonly AudienceTier[]> = {
   internal: ["internal", "members"],
   member: ["members"],
 };
 
 /** 由 org_memberships 列算出檢視者的可見範圍 */
 export function scopeFromMemberships(
-  memberships: ReadonlyArray<{ orgId: number; accessLevel: OrgAccessLevel }>,
+  memberships: ReadonlyArray<{ orgId: number; accessLevel: AccessLevel }>,
 ): ViewerScope {
   return {
     orgs: memberships.map(({ orgId, accessLevel }) => ({
@@ -89,7 +90,7 @@ export type SqlExecutor = Pick<Pool, "execute"> | Pick<PoolConnection, "execute"
 
 /**
  * 從 org_memberships 載入檢視者的可見範圍。未登入（或沒有成員資格）只看得到 Public。
- * 單篇貼文的讀取路徑都先呼叫這裡，再把 postVisibleIn(scope) 拼進查貼文的 SQL，
+ * 單篇貼文的讀取路徑透過 viewerVisibility 呼叫這裡，再把條件拼進查貼文的 SQL，
  * 查不到就回 404（ADR 0003：不回 403，不洩漏物品存在）。
  */
 export async function loadViewerScope(
@@ -105,9 +106,21 @@ export async function loadViewerScope(
   return scopeFromMemberships(
     rows.map((row) => ({
       orgId: Number(row.org_id),
-      accessLevel: row.access_level as OrgAccessLevel,
+      accessLevel: row.access_level as AccessLevel,
     })),
   );
+}
+
+/**
+ * 檢視者的可見性條件：loadViewerScope + postVisibleIn。依檢視者判斷的查詢都用這個。
+ * @param alias posts 資料表在查詢中的別名
+ */
+export async function viewerVisibility(
+  db: SqlExecutor,
+  userId: number | null | undefined,
+  alias = "p",
+): Promise<SqlFragment> {
+  return postVisibleIn(await loadViewerScope(db, userId), alias);
 }
 
 /**
@@ -119,7 +132,7 @@ export async function isPostVisibleTo(
   postId: number,
   userId: number | null | undefined,
 ): Promise<boolean> {
-  const visibility = postVisibleIn(await loadViewerScope(db, userId), "p");
+  const visibility = await viewerVisibility(db, userId);
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT 1 FROM posts p WHERE p.id = ? AND p.deleted_at IS NULL AND ${visibility.sql}`,
     [postId, ...visibility.params],

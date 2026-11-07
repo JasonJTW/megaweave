@@ -7,7 +7,7 @@ import { RowDataPacket } from "mysql2";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { HttpError } from "./utils/httpError";
-import { loadViewerScope, postVisibleIn } from "./services/postVisibility";
+import { viewerVisibility } from "./services/postVisibility";
 
 const router = Router({ mergeParams: true });
 
@@ -32,7 +32,7 @@ const applyLike = async (
   desired?: boolean
 ): Promise<LikeOutcome | null> => {
   //* 看不到的組織貼文與不存在一樣（ADR 0003），不能按讚也不能觸發通知
-  const visibility = postVisibleIn(await loadViewerScope(connection, userId), "p");
+  const visibility = await viewerVisibility(connection, userId);
   const [postRows] = await connection.execute<RowDataPacket[]>(
     `SELECT p.id, p.user_id, p.title FROM posts p
      WHERE p.public_id = ? AND p.deleted_at IS NULL AND ${visibility.sql} FOR UPDATE`,
@@ -138,7 +138,7 @@ router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunct
     return next(new HttpError(401, "UNAUTHENTICATED", "Please signin first"));
 
   try {
-    const visibility = postVisibleIn(await loadViewerScope(dbPool, userId), "p");
+    const visibility = await viewerVisibility(dbPool, userId);
     const [rows] = await dbPool.execute<RowDataPacket[]>(
       `SELECT EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) AS liked
        FROM posts p

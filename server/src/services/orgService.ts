@@ -9,6 +9,8 @@ import type {
 } from "mysql2/promise";
 import dbPool from "../utils/db";
 import { HttpError } from "../utils/httpError";
+import { withTransaction } from "../utils/transaction";
+import type { AccessLevel } from "./postVisibility";
 
 export const PUBLISHER_DISPLAYS = ["org", "org_unit", "anonymous"] as const;
 export type PublisherDisplay = (typeof PUBLISHER_DISPLAYS)[number];
@@ -16,8 +18,16 @@ export type PublisherDisplay = (typeof PUBLISHER_DISPLAYS)[number];
 export const ORG_ROLES = ["admin", "staff", "member"] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
-export const ACCESS_LEVELS = ["internal", "member"] as const;
-export type AccessLevel = (typeof ACCESS_LEVELS)[number];
+/** 一筆 membership 授予的身分：org_role 管能管什麼，access_level 管看得到什麼 */
+export interface MembershipGrant {
+  orgRole: OrgRole;
+  accessLevel: AccessLevel;
+}
+
+/** 組織不存在，或呼叫者無權得知它存在 */
+export function orgNotFound() {
+  return new HttpError(404, "ORG_NOT_FOUND", "Organization not found");
+}
 
 export interface OrgSettings {
   name: string;
@@ -81,7 +91,7 @@ export async function addMembershipByEmail(
   db: Queryable,
   orgId: number,
   email: string,
-  role: { orgRole: OrgRole; accessLevel: AccessLevel },
+  grant: MembershipGrant,
 ): Promise<{ membershipId: number; userId: number }> {
   const userId = await findUserIdByEmail(db, email);
   if (userId === null) {
@@ -93,7 +103,7 @@ export async function addMembershipByEmail(
   }
   const [result] = await db.execute<ResultSetHeader>(
     "INSERT INTO org_memberships (org_id, user_id, access_level, org_role) VALUES (?, ?, ?, ?)",
-    [orgId, userId, role.accessLevel, role.orgRole],
+    [orgId, userId, grant.accessLevel, grant.orgRole],
   );
   return { membershipId: result.insertId, userId };
 }
@@ -160,9 +170,7 @@ export const orgService = {
   /** 建立組織並指定第一位 Org Admin（可看 Internal 層）；email 未註冊時整筆不寫入 */
   async createOrganization(input: CreateOrgInput): Promise<OrgSummary> {
     const publicId = randomUUID();
-    const connection = await dbPool.getConnection();
-    try {
-      await connection.beginTransaction();
+    await withTransaction(async (connection) => {
       const [result] = await connection.execute<ResultSetHeader>(
         "INSERT INTO organizations (public_id, name, publisher_display, is_demo, auto_release_enabled, auto_release_days) VALUES (?, ?, ?, ?, ?, ?)",
         [
@@ -174,22 +182,11 @@ export const orgService = {
           input.autoReleaseDays,
         ],
       );
-      await addMembershipByEmail(
-        connection,
-        result.insertId,
-        input.orgAdminEmail,
-        {
-          orgRole: "admin",
-          accessLevel: "internal",
-        },
-      );
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+      await addMembershipByEmail(connection, result.insertId, input.orgAdminEmail, {
+        orgRole: "admin",
+        accessLevel: "internal",
+      });
+    });
     const org = await getOrganizationWith(dbPool, publicId);
     if (!org) throw new Error(`Organization ${publicId} vanished after create`);
     return org;

@@ -19,7 +19,7 @@ import { ErrorCode } from "./errorCodes";
 import { HttpError } from "./httpError";
 import { getTranslator } from "./i18n";
 import { getAppOrigin } from "./env";
-import { loadViewerScope, postVisibleIn } from "../services/postVisibility";
+import { viewerVisibility } from "../services/postVisibility";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -100,10 +100,7 @@ async function validatePost(
   initiatorId: number,
 ): Promise<{ user_id: number; status: string; type: string }> {
   // 能認領 = 能看到（ADR 0003）：看不到的組織貼文與不存在一樣回 404
-  const visibility = postVisibleIn(
-    await loadViewerScope(dbPool, initiatorId),
-    "p",
-  );
+  const visibility = await viewerVisibility(dbPool, initiatorId);
   const [rows] = await dbPool.execute<RowDataPacket[]>(
     `SELECT p.user_id, p.status, p.type FROM posts p WHERE p.id = ? AND ${visibility.sql}`,
     [postId, ...visibility.params],

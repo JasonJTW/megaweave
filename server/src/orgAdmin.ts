@@ -4,6 +4,7 @@ import Router, { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
+import { OrgIdSchema } from "./utils/idSchemas";
 import {
   AdminOrg,
   MEMBER_ROLES,
@@ -26,7 +27,6 @@ const AddMemberFormSchema = z.object({
 
 //* 單位 id 由 client 從清單帶入 → 格式錯是 client bug（INVALID_REQUEST）
 const UnitIdsSchema = z.array(z.number().int().positive()).max(100).default([]);
-const OrgIdSchema = z.uuid();
 const MemberIdSchema = z.coerce.number().int().positive();
 
 function adminOrg(res: Response): AdminOrg {

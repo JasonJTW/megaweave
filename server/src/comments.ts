@@ -9,11 +9,7 @@ import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
 import { PostIdSchema } from "./utils/idSchemas";
 import { getUserFromCookie } from "./session";
-import {
-  isPostVisibleTo,
-  loadViewerScope,
-  postVisibleIn,
-} from "./services/postVisibility";
+import { isPostVisibleTo, viewerVisibility } from "./services/postVisibility";
 
 const router = express.Router();
 
@@ -405,7 +401,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
     const commentId = req.params.id;
     // 留言所屬貼文看不到時，留言也當作不存在
     const session = await getUserFromCookie(req);
-    const visibility = postVisibleIn(await loadViewerScope(dbPool, session?.userId), "p");
+    const visibility = await viewerVisibility(dbPool, session?.userId);
     const [rows] = await dbPool.execute<CommentRow[]>(
       `SELECT c.id, c.post_id, c.item_id FROM comments c
        JOIN posts p ON p.id = c.post_id

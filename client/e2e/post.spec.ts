@@ -20,7 +20,7 @@ const CONDITION_LEVEL = "2";
 
 for (const { locale, home, messages, heading } of LOCALES) {
   test.describe(`create post (${locale})`, () => {
-    test("shares an item with a photo and shows it in the feed", async ({
+    test("shares an item with a photo and opens its detail page", async ({
       page,
       request,
     }, testInfo) => {
@@ -75,27 +75,24 @@ for (const { locale, home, messages, heading } of LOCALES) {
       await page.getByRole("gridcell", { name: "15" }).click();
       await page.keyboard.press("Escape");
 
+      // The new post's id comes from the create response. The spec opens its detail
+      // page directly instead of waiting for it in the feed: the personalized feed
+      // only lists posts the worker has already embedded, so finding it there meant
+      // reloading and scrolling until indexing caught up, which was slow and flaky.
+      const created = page.waitForResponse(
+        (res) =>
+          res.request().method() === "POST" &&
+          new URL(res.url()).pathname === "/api/posts",
+      );
       await form
         .getByRole("button", { name: copy.submit, exact: true })
         .click();
+      const response = await created;
+      expect(response.status()).toBe(201);
+      const publicId: string = (await response.json()).post.public_id;
 
       await expect(page.getByText(messages.HomeFeed.postCreated)).toBeVisible();
-      // Once the user has viewed a post the feed is personalized: it lists
-      // only posts already in the vector index, which the worker fills in
-      // asynchronously, and SWR does not refetch page 1 by itself. Reload
-      // until the new post shows up, scrolling to load further pages. The
-      // click is retried too: right after a reload it can land before React
-      // has hydrated and do nothing.
-      const card = page.getByText(title);
-      await expect(async () => {
-        await page.reload();
-        await page.evaluate(() =>
-          window.scrollTo(0, document.body.scrollHeight),
-        );
-        await expect(card).toBeAttached({ timeout: 3_000 });
-        await card.click();
-        await expect(page).toHaveURL(/\/item\/[\w-]+$/, { timeout: 4_000 });
-      }).toPass({ timeout: 25_000, intervals: [1_000] });
+      await page.goto(`${home === "/" ? "" : home}/item/${publicId}`);
       await expect(page.getByText(title).first()).toBeVisible();
       // Post detail chrome is translated; the title the user typed is not
       await expect(
@@ -103,7 +100,6 @@ for (const { locale, home, messages, heading } of LOCALES) {
       ).toBeVisible();
 
       // The worker moves the photo out of staging asynchronously
-      const publicId = new URL(page.url()).pathname.split("/").pop();
       await expect
         .poll(async () => {
           const res = await request.get(`${API_URL}/api/posts/${publicId}`);

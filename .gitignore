@@ -45,7 +45,9 @@ next-env.d.ts
 services/**/**.zip
 
 # Local dev TLS certs — generate with mkcert, never commit
-server/cert/
+# directories, or symlinks to them in a worktree (scripts/setup-worktree.sh)
+server/cert
+client/certificates
 
 # Playwright
 /client/test-results/

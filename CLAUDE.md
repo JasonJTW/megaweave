@@ -21,12 +21,7 @@
 - **ADRs** (`docs/adr/`, vocabulary in `CONTEXT.md`) record deliberate choices that look like bugs. Before changing or reviewing code that touches a decision's subject (weave giver/receiver, locale routing, org membership and audience tier), read the matching ADR.
 
 ## Review Standards
-Used by the CI review workflows. Signal over volume: each comment names a concrete defect and a fix.
-- **Correctness**: logic errors, unhandled `await`, races, missing transaction on multi-step writes.
-- **Conventions**: the Error Handling, API Error Codes, and Database rules above.
-- **ADRs**: comment when a change contradicts an ADR (cite its number and the contradicted sentence), or makes a new architectural decision with no ADR.
-- **Tests**: a behaviour change ships with a test.
-- **Scope**: comment only on changed lines, at most 5 comments, highest severity first. Style belongs to ESLint and Prettier. Post nothing when no defect exists.
+The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/security-review.md`. Read them before reviewing a change; touching routes, auth, webhooks, secrets or workflows also needs the security one.
 
 ## Testing
 - Run tests: `make test` or `cd server && npm test`
@@ -42,6 +37,11 @@ Used by the CI review workflows. Signal over volume: each comment names a concre
 - **Typecheck**: `make typecheck` (runs `tsc --noEmit` across client and server)
 - **Lint**: `make lint` / `make lint-fix` (ESLint on client and server)
 - **Build**: `make build` (production build) or `make build-dev` (development build)
+
+## Worktrees & Git Hooks
+- `npm run setup:worktree` (repo root): links the main checkout's `.env*` files and localhost certificates into a worktree, then runs `npm ci` in the root, `client/` and `server/`. Run it in any worktree missing them. Every worktree gets its own `node_modules`; never symlink one.
+- T3 Code runs that script on worktree creation once the user imports it from `t3.json` by hand: Settings → Projects → project → Actions → **Import scripts**. Remind them once.
+- `lefthook.yml` (installed by the root `npm ci`): pre-commit formats `client/` with Prettier, runs ESLint `--fix` on staged files, then `make typecheck` and `make test`. Pre-push refuses pushes to `main`, then runs `make e2e-up && make e2e` (needs Docker). Fix failures; never bypass a hook with `--no-verify`.
 
 ## Project Structure
 - `client/app/`: Next.js App Router pages, layouts, and route handlers

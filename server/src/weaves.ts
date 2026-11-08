@@ -16,7 +16,7 @@ import { enqueueUserVectorUpdate } from "./queue/queues";
 import { HttpError } from "./utils/httpError";
 import { z } from "zod";
 import { publicSurfaceCondition } from "./services/postVisibility";
-import { maskOrgPublishers } from "./services/orgPublisher";
+import { maskOrgPublishers, memberOrgIds } from "./services/orgPublisher";
 const router = Router();
 
 const ActingUnitIdSchema = z.number().int().positive().nullable().optional();
@@ -154,16 +154,6 @@ export interface ProcessWeaveRowsOptions {
   viewerUserId?: number;
 }
 
-/** 檢視者是哪些組織的成員（只查這批 Weave 涉及的組織） */
-async function memberOrgIds(viewerUserId: number | undefined, orgIds: number[]): Promise<Set<number>> {
-  if (viewerUserId === undefined || orgIds.length === 0) return new Set();
-  const [rows] = await dbPool.query<RowDataPacket[]>(
-    "SELECT org_id FROM org_memberships WHERE user_id = ? AND org_id IN (?)",
-    [viewerUserId, orgIds],
-  );
-  return new Set(rows.map((row) => Number(row.org_id)));
-}
-
 export async function processWeaveRows(
   weaveRows: WeaveOutput[],
   { includeReceiverOrgUnit = true, viewerUserId }: ProcessWeaveRowsOptions = {},
@@ -188,7 +178,7 @@ export async function processWeaveRows(
   const orgIds = [
     ...new Set(weaveRows.flatMap((r) => (r.post_org_id == null ? [] : [Number(r.post_org_id)]))),
   ];
-  const memberOf = await memberOrgIds(viewerUserId, orgIds);
+  const memberOf = await memberOrgIds(dbPool, viewerUserId, orgIds);
   const masked = (row: WeaveOutput) =>
     row.post_org_id != null && !memberOf.has(Number(row.post_org_id));
 

@@ -79,3 +79,17 @@ export async function canReviewOrgRequest(
   );
   return rows.length > 0;
 }
+
+/** 能審核這個單位物品申請的人：所屬單位的所有窗口與該組織的所有 Org Admin（新申請通知所有人） */
+export async function orgReviewerIds(db: SqlExecutor, owner: OrgPostOwner): Promise<number[]> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT m.user_id FROM org_memberships m
+     WHERE m.org_id = ?
+       AND (m.org_role = 'admin'
+            OR EXISTS (SELECT 1 FROM org_unit_contacts c
+                       WHERE c.membership_id = m.id AND c.org_unit_id = ?))
+     ORDER BY m.user_id`,
+    [owner.orgId, owner.orgUnitId],
+  );
+  return rows.map((row) => Number(row.user_id));
+}

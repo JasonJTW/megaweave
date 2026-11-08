@@ -60,7 +60,8 @@
     "completed": {
       "title": "交織成功",
       "content": "「{postTitle}」的交織已順利完成！"
-    }
+    },
+    "anonymousActor": "匿名"
   },
   "DeliveryNotice": {
     "DISPATCH_FAILED": {

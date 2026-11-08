@@ -16,10 +16,12 @@ import weavesRouter from "./weaves";
 import * as sessionModule from "./session";
 import { enqueueSendEmail } from "./queue/queues";
 import { messageService } from "./utils/messageService";
+import { createNotification } from "./utils/notificationService";
 import { errorMiddleware } from "./utils/errorHandler";
 import {
   createFakeOrgHandoverDb,
   FakeOrgHandoverDb,
+  publicIdOf,
 } from "./testUtils/fakeOrgHandoverDb";
 
 let fakeDb: FakeOrgHandoverDb;
@@ -49,13 +51,33 @@ jest.mock("./utils/notificationService", () => ({
   createNotification: jest.fn().mockResolvedValue(true),
 }));
 
-//* 一對一對話：每對帳號固定一個對話 id，方便斷言 Weave 指到哪個對話；系統訊息不在這張票的範圍
+//* 一對一對話：每對帳號固定一個對話 id，方便斷言 Weave 指到哪個對話；
+//* createMessage 回傳寫入的訊息（交接的系統訊息要推播給雙方）
 jest.mock("./utils/messageService", () => ({
   messageService: {
     getConversationId: jest.fn(
       async (a: number, b: number) => Math.min(a, b) * 1000 + Math.max(a, b),
     ),
-    createMessage: jest.fn().mockRejectedValue(new Error("not under test")),
+    createMessage: jest.fn(
+      async (
+        conversationId: number,
+        senderId: number,
+        content: string,
+        _attachments: unknown,
+        messageType: string,
+        metadata: unknown,
+      ) => ({
+        id: 1,
+        conversation_id: conversationId,
+        sender_id: senderId,
+        content,
+        message_type: messageType,
+        metadata,
+        is_read: false,
+        created_at: new Date(),
+      }),
+    ),
+    toMessageDTO: jest.fn((message: Record<string, unknown>) => message),
   },
 }));
 
@@ -90,11 +112,20 @@ function conversationOf(a: number, b: number) {
   return Math.min(a, b) * 1000 + Math.max(a, b);
 }
 
+//* Socket 推播：記下每一則 (房間, 事件, 內容)
+let emitted: Array<{ room: string; event: string; payload: Record<string, unknown> }> = [];
+
 function makeApp() {
   const app = express();
   app.use(express.json());
   app.use((_req, res, next) => {
-    res.locals.io = { to: () => ({ emit: () => {} }) };
+    res.locals.io = {
+      to: (room: string) => ({
+        emit: (event: string, payload: Record<string, unknown>) => {
+          emitted.push({ room, event, payload });
+        },
+      }),
+    };
     next();
   });
   app.use("/api/org-admin", orgAdminRouter);
@@ -181,6 +212,7 @@ afterAll(() => jest.restoreAllMocks());
 
 beforeEach(() => {
   jest.clearAllMocks();
+  emitted = [];
   const userIds = [
     ORG_ADMIN,
     GA_CONTACT,
@@ -289,6 +321,54 @@ describe("DELETE /api/org-admin/orgs/:orgId/members/:memberId: the member's open
   });
 });
 
+describe("PATCH /api/org-admin/orgs/:orgId/members/:memberId: dropping a unit", () => {
+  async function setUnits(userId: keyof typeof MEMBERSHIP, unitIds: number[], role = "member") {
+    signInAs(ORG_ADMIN);
+    const res = await api()
+      .patch(`/api/org-admin/orgs/${ORG}/members/${MEMBERSHIP[userId]}`)
+      .send({ role, unitIds });
+    expect(res.status).toBe(200);
+    return res;
+  }
+
+  it("declines the Requested requests they made on behalf of that unit and tells the requester", async () => {
+    const postId = await listItem();
+    const onBehalf = await requestAs(ADMIN_IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+    const personal = await requestAs(IT_CONTACT, postId, { actingUnitId: null });
+    const approved = await requestAs(IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+    await setStatus(GA_CONTACT, approved, "approved");
+    const stillContact = await requestAs(IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+    jest.clearAllMocks();
+
+    //* Org Admin 兼資訊部窗口不再負責資訊部；資訊部窗口照舊
+    const res = await setUnits(ADMIN_IT_CONTACT, [], "admin");
+
+    expect(res.body.member).toMatchObject({ role: "admin", unitIds: [] });
+    expect(weaveRow(onBehalf).status).toBe("declined");
+    expect(weaveRow(personal).status).toBe("requested");
+    expect(weaveRow(approved).status).toBe("approved");
+    expect(weaveRow(stillContact).status).toBe("requested");
+    expect(enqueueSendEmail).toHaveBeenCalledTimes(1);
+    expect(enqueueSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientId: ADMIN_IT_CONTACT,
+        action: "declined",
+        actorName: "甲公司",
+        weaveId: onBehalf,
+      }),
+    );
+  });
+
+  it("declines nothing when the units stay the same", async () => {
+    const postId = await listItem();
+    const onBehalf = await requestAs(IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+
+    await setUnits(IT_CONTACT, [IT_DEPT, GENERAL_AFFAIRS]);
+
+    expect(weaveRow(onBehalf).status).toBe("requested");
+  });
+});
+
 describe("GET /api/org-admin/orgs/:orgId/handovers: who still handles items they no longer contact for", () => {
   async function pending() {
     signInAs(ORG_ADMIN);
@@ -310,7 +390,7 @@ describe("GET /api/org-admin/orgs/:orgId/handovers: who still handles items they
 
     expect(await pending()).toEqual([
       {
-        user: { id: "u-2", email: "user2@example.com", isMember: false },
+        user: { id: publicIdOf(GA_CONTACT), email: "user2@example.com", isMember: false },
         unit: { id: GENERAL_AFFAIRS, name: "總務部" },
         itemCount: 2,
         openWeaveCount: 2,
@@ -327,7 +407,7 @@ describe("GET /api/org-admin/orgs/:orgId/handovers: who still handles items they
 
     expect(await pending()).toEqual([
       expect.objectContaining({
-        user: { id: "u-2", email: "user2@example.com", isMember: true },
+        user: { id: publicIdOf(GA_CONTACT), email: "user2@example.com", isMember: true },
         unit: { id: GENERAL_AFFAIRS, name: "總務部" },
       }),
     ]);
@@ -356,7 +436,7 @@ describe("POST /api/org-admin/orgs/:orgId/handovers: handing items to another co
   }
 
   const TO_GA_CONTACT_2 = {
-    fromUserId: "u-2",
+    fromUserId: publicIdOf(GA_CONTACT),
     unitId: GENERAL_AFFAIRS,
     toMemberId: MEMBERSHIP[GA_CONTACT_2],
   };
@@ -372,10 +452,12 @@ describe("POST /api/org-admin/orgs/:orgId/handovers: handing items to another co
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ items: 1, weaves: 1 });
-    expect(messageService.getConversationId).toHaveBeenLastCalledWith(GA_CONTACT_2, IT_CONTACT, {
-      orgId: 10,
-      orgUserId: GA_CONTACT_2,
-    });
+    expect(messageService.getConversationId).toHaveBeenLastCalledWith(
+      GA_CONTACT_2,
+      IT_CONTACT,
+      { orgId: 10, orgUserId: GA_CONTACT_2 },
+      expect.anything(),
+    );
     expect(weaveRow(weaveId)).toMatchObject({
       giver_id: GA_CONTACT_2,
       receiver_id: IT_CONTACT,
@@ -389,6 +471,110 @@ describe("POST /api/org-admin/orgs/:orgId/handovers: handing items to another co
     expect((await setStatus(GA_CONTACT, weaveId, "completed")).status).toBe(403);
     expect((await setStatus(GA_CONTACT_2, weaveId, "completed")).status).toBe(200);
     expect((await setStatus(IT_CONTACT, weaveId, "completed")).body.fullyCompleted).toBe(true);
+  });
+
+  it("tells both conversations about the handover and points each to the other", async () => {
+    const postId = await listItem();
+    const weaveId = await requestAs(IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+    await setStatus(GA_CONTACT, weaveId, "approved");
+    await removeMember(GA_CONTACT);
+    const oldConversation = conversationOf(GA_CONTACT, IT_CONTACT);
+    const newConversation = conversationOf(GA_CONTACT_2, IT_CONTACT);
+    jest.clearAllMocks();
+    emitted = [];
+
+    expect((await handOver(TO_GA_CONTACT_2)).status).toBe(200);
+
+    const calls = (messageService.createMessage as jest.Mock).mock.calls;
+    expect(calls).toHaveLength(2);
+    //* 原對話：原窗口名下，告訴申請人去新的對話
+    expect(calls[0].slice(0, 6)).toEqual([
+      oldConversation,
+      GA_CONTACT,
+      expect.any(String),
+      undefined,
+      "system_handover",
+      {
+        handover: "moved_out",
+        weave_id: weaveId,
+        post_id: postId,
+        item_title: MONITOR.title,
+        other_conversation_id: newConversation,
+      },
+    ]);
+    //* 新對話：新窗口名下，連回先前的對話
+    expect(calls[1].slice(0, 6)).toEqual([
+      newConversation,
+      GA_CONTACT_2,
+      expect.any(String),
+      undefined,
+      "system_handover",
+      {
+        handover: "moved_in",
+        weave_id: weaveId,
+        post_id: postId,
+        item_title: MONITOR.title,
+        other_conversation_id: oldConversation,
+      },
+    ]);
+    //* 跟交接的其他寫入在同一個交易：用交易的連線，不另開
+    expect(calls[0][6]).toBeDefined();
+    expect((messageService.getConversationId as jest.Mock).mock.calls[0][3]).toBe(calls[0][6]);
+
+    //* 兩個對話的參與者都即時收到
+    const rooms = emitted
+      .filter((e) => e.event === "new_message")
+      .map((e) => `${e.room}:${e.payload.conversation_id}`);
+    expect(rooms.sort()).toEqual(
+      [
+        `user_${GA_CONTACT}:${oldConversation}`,
+        `user_${IT_CONTACT}:${oldConversation}`,
+        `user_${GA_CONTACT_2}:${newConversation}`,
+        `user_${IT_CONTACT}:${newConversation}`,
+      ].sort(),
+    );
+  });
+
+  it("notifies the new contact of the items and requests they took over", async () => {
+    const postId = await listItem();
+    await listItem();
+    await requestAs(IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+    await removeMember(GA_CONTACT);
+    jest.clearAllMocks();
+
+    await handOver(TO_GA_CONTACT_2);
+
+    expect(createNotification).toHaveBeenCalledTimes(1);
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        recipient_id: GA_CONTACT_2,
+        sender_id: null,
+        type: "ORG_HANDOVER",
+        params: { unitName: "總務部", itemCount: "2", weaveCount: "1" },
+        link: "/org/items",
+      }),
+    );
+  });
+
+  it("changes nothing when moving a conversation fails", async () => {
+    const postId = await listItem();
+    const weaveId = await requestAs(IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+    await removeMember(GA_CONTACT);
+    jest.clearAllMocks();
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    (messageService.getConversationId as jest.Mock).mockRejectedValueOnce(new Error("db down"));
+
+    const res = await handOver(TO_GA_CONTACT_2);
+
+    expect(res.status).toBe(500);
+    expect(fakeDb.posts.find((p) => p.id === postId)!.user_id).toBe(GA_CONTACT);
+    expect(weaveRow(weaveId)).toMatchObject({
+      giver_id: GA_CONTACT,
+      conversation_id: conversationOf(GA_CONTACT, IT_CONTACT),
+    });
+    expect(fakeDb.handoverEvents).toEqual([]);
+    expect(createNotification).not.toHaveBeenCalled();
   });
 
   it("makes the new contact the handler a requester's later messages reach", async () => {
@@ -452,7 +638,7 @@ describe("POST /api/org-admin/orgs/:orgId/handovers: handing items to another co
   it.each([
     ["a member who is not a contact of the unit", { toMemberId: MEMBERSHIP[IT_CONTACT] }],
     ["the person handing over", { toMemberId: MEMBERSHIP[GA_CONTACT] }],
-    ["an unknown handler", { fromUserId: "u-999" }],
+    ["an unknown handler", { fromUserId: publicIdOf(999) }],
     ["a malformed body", { unitId: "總務部" }],
   ])("rejects %s with INVALID_REQUEST", async (_what, override) => {
     const postId = await listItem();

@@ -20,12 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/apiError";
+import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
-const PUBLISHER_DISPLAYS = ["org", "org_unit", "anonymous"] as const;
-type PublisherDisplay = (typeof PUBLISHER_DISPLAYS)[number];
 
 interface Org {
   id: string;

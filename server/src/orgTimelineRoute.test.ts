@@ -17,6 +17,7 @@ import weavesRouter from "./weaves";
 import * as sessionModule from "./session";
 import { errorMiddleware } from "./utils/errorHandler";
 import { createFakeOrgTimelineDb, FakeOrgTimelineDb } from "./testUtils/fakeOrgTimelineDb";
+import { publicIdOf } from "./testUtils/fakeOrgHandoverDb";
 
 let fakeDb: FakeOrgTimelineDb;
 
@@ -54,7 +55,16 @@ jest.mock("./utils/messageService", () => ({
     getConversationId: jest.fn(
       async (a: number, b: number) => Math.min(a, b) * 1000 + Math.max(a, b),
     ),
-    createMessage: jest.fn().mockRejectedValue(new Error("not under test")),
+    //* 交接會在兩個對話各寫一則系統訊息（同一個交易）；內容不在這裡驗
+    createMessage: jest.fn(async (conversationId: number, senderId: number) => ({
+      id: 1,
+      conversation_id: conversationId,
+      sender_id: senderId,
+      content: "",
+      is_read: false,
+      created_at: new Date(),
+    })),
+    toMessageDTO: jest.fn((message: unknown) => message),
   },
 }));
 
@@ -342,7 +352,7 @@ describe("GET /api/orgs/:orgId/items/:itemId/timeline: after the Unit Contact ch
     signInAs(ORG_ADMIN);
     const handover = await api()
       .post(`/api/org-admin/orgs/${ORG}/handovers`)
-      .send({ fromUserId: "u-2", unitId: GENERAL_AFFAIRS, toMemberId: 107 });
+      .send({ fromUserId: publicIdOf(GA_CONTACT), unitId: GENERAL_AFFAIRS, toMemberId: 107 });
     expect(handover.status).toBe(200);
     await setStatus(GA_CONTACT_2, weaveId, "completed");
     await setStatus(IT_CONTACT, weaveId, "completed");

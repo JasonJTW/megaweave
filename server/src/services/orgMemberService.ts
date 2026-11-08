@@ -12,6 +12,7 @@ import { withTransaction } from "../utils/transaction";
 import {
   DeclinedWeave,
   declineRequestsOfRemovedMember,
+  declineRequestsOnBehalfOfUnits,
 } from "./orgHandoverService";
 import {
   addMembershipByEmail,
@@ -255,16 +256,21 @@ export const orgMemberService = {
 
   /**
    * 改成員的身分：Org Admin／Org Member 與窗口單位整組取代，access_level 隨之重新推導。
+   * 拿掉的窗口單位：他代表那些單位的 Requested 申請在同一交易裡婉拒，由呼叫端在 commit 後通知。
    * 把最後一位 Org Admin 降級回 ORG_LAST_ADMIN。
    */
   async updateMember(
     orgId: number,
     membershipId: number,
     identity: MemberIdentity,
-  ): Promise<OrgMember> {
+  ): Promise<{ member: OrgMember; declined: DeclinedWeave[] }> {
     const unitIds = uniqueSorted(identity.unitIds);
     return withTransaction(async (connection) => {
       const target = await lockMembership(connection, orgId, membershipId);
+      const [previous] = await connection.execute<RowDataPacket[]>(
+        "SELECT org_unit_id FROM org_unit_contacts WHERE org_id = ? AND membership_id = ? FOR UPDATE",
+        [orgId, membershipId],
+      );
       if (target.orgRole === "admin" && identity.role !== "admin") {
         await assertNotLastAdmin(connection, orgId);
       }
@@ -279,11 +285,24 @@ export const orgMemberService = {
         [orgId, membershipId],
       );
       await insertUnitContacts(connection, orgId, membershipId, unitIds);
+      //* 不再擔任窗口的單位：他代表那些單位送出的 Requested 申請自動婉拒（與移除成員一致）
+      const dropped = previous
+        .map((row) => Number(row.org_unit_id))
+        .filter((id) => !unitIds.includes(id));
+      const declined = await declineRequestsOnBehalfOfUnits(
+        connection,
+        orgId,
+        target.userId,
+        dropped,
+      );
       return {
-        id: membershipId,
-        email: target.email,
-        role: identity.role,
-        unitIds,
+        member: {
+          id: membershipId,
+          email: target.email,
+          role: identity.role,
+          unitIds,
+        },
+        declined,
       };
     });
   },

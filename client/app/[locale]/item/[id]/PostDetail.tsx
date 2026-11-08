@@ -38,6 +38,7 @@ import { Post } from "@/app/types/schema";
 // 地點工具函式
 import { formatLocationText } from "@/utils/locationUtils";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface OwnerProfile {
   username: string;
@@ -89,6 +90,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
+  const displayName = useDisplayName();
+  //* 組織設定匿名時是代號，依讀者語言顯示（#140）
+  const posterName = displayName(post?.username);
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
 
@@ -399,7 +403,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       const shareCard = new File([blob], "post.png", { type: "image/png" });
       const title = tItem("title", {
         title: post?.title ?? tItem("fallbackTitle"),
-        username: post?.username ?? t("userFallback"),
+        username: posterName ?? t("userFallback"),
         type: tItem("type", { type: post?.type ?? "other" }),
       });
       await navigator.share({
@@ -725,19 +729,19 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       fill
                       src={post!.avatar_url!}
                       alt={t("avatarAlt", {
-                        username: post!.username ?? t("userFallback"),
+                        username: posterName ?? t("userFallback"),
                       })}
                       className="rounded-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-xl">
-                      {post.username ? post.username.charAt(0) : "?"}
+                      {posterName ? posterName.charAt(0) : "?"}
                     </div>
                   )}
                 </div>
                 <div className="ml-[18px]">
                   <h3 className="font-semibold text-gray-900">
-                    {`${post.username}`}
+                    {`${posterName}`}
                   </h3>
                 </div>
               </div>
@@ -775,7 +779,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 {post.user_id && user?.userId !== post.user_id && (
                   <MessageButton
                     recipientPublicId={post.author_public_id}
-                    recipientName={post.username || t("userFallback")}
+                    recipientName={posterName || t("userFallback")}
                     className="ml-2 h-auto border-0 p-0 text-gray-500 hover:bg-transparent hover:text-primary"
                   />
                 )}
@@ -815,7 +819,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
           {/* 右側：桌機版擁有者側欄 */}
           <PostOwnerSidebar
-            username={ownerProfile?.username || post.username}
+            username={ownerProfile?.username || posterName || ""}
             avatarUrl={ownerProfile?.avatar_url || post.avatar_url}
             contactEmail={ownerProfile?.contact_email}
             authorPublicId={post.author_public_id}

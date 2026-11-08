@@ -25,6 +25,7 @@ import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
 import ShareBadgeIcon from "../icons/ShareBadgeIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 // ─── Image Retry Hook (Exponential Backoff) ───────────────────────────────────
 const MAX_RETRIES = 4; // 最多重試 4 次
@@ -138,6 +139,8 @@ function PostCardInner({
   } = useImageWithRetry(primarySrc, fallbackSrc);
 
   const t = useTranslations("PostCard");
+  const displayName = useDisplayName();
+  const posterName = displayName(post.username);
   const { coords } = useLocation();
   const distanceStr = getPostDistance(coords, post.lat, post.lng);
 
@@ -240,12 +243,12 @@ function PostCardInner({
                 <Avatar
                   size="sm"
                   className="ring-[3px] ring-white"
-                  title={post.username ?? undefined}
-                  aria-label={post.username ?? undefined}
+                  title={posterName ?? undefined}
+                  aria-label={posterName ?? undefined}
                 >
                   <AvatarImage src={post.avatar_url} />
                   <AvatarFallback>
-                    {post.username?.charAt(0).toUpperCase()}
+                    {posterName?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 {post.view_count > 0 && (

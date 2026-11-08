@@ -147,6 +147,25 @@ export function createFakeOrgWeavesDb(
       return [ok ? [{ 1: 1 }] : [], []];
     }
 
+    if (
+      sql ===
+      "SELECT m.user_id FROM org_memberships m WHERE m.org_id = ? AND (m.org_role = 'admin' OR EXISTS (SELECT 1 FROM org_unit_contacts c WHERE c.membership_id = m.id AND c.org_unit_id = ?)) ORDER BY m.user_id"
+    ) {
+      const [orgId, unitId] = params;
+      const rows = base.memberships
+        .filter(
+          (m) =>
+            m.org_id === orgId &&
+            (m.org_role === "admin" ||
+              base.unitContacts.some(
+                (c) => c.membership_id === m.id && c.org_unit_id === unitId,
+              )),
+        )
+        .map((m) => ({ user_id: m.user_id }))
+        .sort((a, b) => a.user_id - b.user_id);
+      return [rows, []];
+    }
+
     if (sql === "SELECT quantity, title FROM items WHERE id = ? AND post_id = ?") {
       const rows = base.items
         .filter((i) => i.id === Number(params[0]) && i.post_id === Number(params[1]))

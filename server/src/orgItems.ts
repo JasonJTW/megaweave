@@ -308,7 +308,10 @@ router.post(
 );
 
 //* 模式是選單（client bug → INVALID_REQUEST），天數是使用者打字（VALIDATION_FAILED）
-const AutoReleaseModeSchema = z.object({ mode: z.enum(["org", "auto", "manual"]) });
+//* `days` 只在 auto 模式出現：其他模式帶了天數是 client bug
+const AutoReleaseModeSchema = z
+  .object({ mode: z.enum(["org", "auto", "manual"]), days: z.unknown() })
+  .refine((body) => body.mode === "auto" || body.days === undefined);
 const AutoReleaseDaysSchema = z.object({
   days: z.number({ error: "Days is required" }).int().min(1).max(AUTO_RELEASE_MAX_DAYS),
 });
@@ -325,7 +328,7 @@ router.patch(
       const body = req.body ?? {};
       const itemId = ItemIdSchema.safeParse(req.params.itemId);
       const mode = AutoReleaseModeSchema.safeParse(body);
-      if (!itemId.success || !mode.success || (mode.data.mode !== "auto" && body.days !== undefined)) {
+      if (!itemId.success || !mode.success) {
         return next(new HttpError(400, "INVALID_REQUEST", "Invalid auto release setting"));
       }
       let input: ItemAutoReleaseInput;

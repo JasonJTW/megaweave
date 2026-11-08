@@ -777,6 +777,12 @@
       "actingAs": "代表",
       "actingAsPlaceholder": "選擇代表誰",
       "actingAsMyself": "我個人"
+    },
+    "handover": {
+      "movedOut": "「{title}」已由同單位的另一位窗口接手，之後請到新的對話繼續。",
+      "movedIn": "「{title}」由同單位的另一位窗口接手，先前的對話紀錄仍保留。",
+      "openNew": "前往新的對話",
+      "openPrevious": "查看先前的對話"
     }
   },
   "Notifications": {
@@ -828,8 +834,13 @@
       "WEAVE_COMPLETED": {
         "title": "交織成功",
         "content": "「{postTitle}」的交織成功了！"
+      },
+      "ORG_HANDOVER": {
+        "title": "你接手了交接的物品",
+        "content": "你已接手「{unitName}」的 {itemCount} 件物品與 {weaveCount} 筆進行中的申請"
       }
-    }
+    },
+    "anonymousActor": "匿名"
   },
   "History": {
     "signInToView": "請先登入以查看瀏覽紀錄",
@@ -1051,7 +1062,8 @@
       "cannotWithdraw": "目前無法撤回這個請求",
       "withdrawn": "已撤回請求。",
       "withdrawFailed": "撤回請求失敗"
-    }
+    },
+    "receiverUnit": "流向單位：{unit}"
   },
   "Errors": {
     "UNKNOWN": "發生錯誤，請稍後再試。",
@@ -1211,7 +1223,18 @@
       "save": "儲存",
       "saved": "已更新自動升級設定。"
     },
-    "reportLink": "查看組織報表"
+    "reportLink": "查看組織報表",
+    "publisherDisplay": {
+      "heading": "公開層顯示方式",
+      "hint": "物品升到公開層後，發文者對外顯示的名稱；不會出現窗口的個人帳號。",
+      "label": "對外顯示",
+      "option": {
+        "org": "組織名稱",
+        "org_unit": "組織＋單位",
+        "anonymous": "匿名"
+      },
+      "saved": "已更新公開層顯示方式。"
+    }
   },
   "Org": {
     "title": "組織頁",
@@ -1463,5 +1486,8 @@
       "reference_epd": "採參考產品 EPD（較低）"
     },
     "footnote": "本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 {version}。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。"
+  },
+  "Publisher": {
+    "anonymous": "匿名"
   }
 }

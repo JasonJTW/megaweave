@@ -5,10 +5,13 @@
 //*   名稱、頭像、users.public_id 都換掉（含訊息的寄件人、系統訊息 metadata、Socket 推播）
 //* - 回訊息：組織對話裡的對方一律是 `org-conv:<id>`，兩邊回訊息都留在這個對話裡
 import type { RowDataPacket } from "mysql2/promise";
+import type { SocketBroadcaster } from "../utils/socket";
+import { Message, messageService } from "../utils/messageService";
 import { viewerVisibility, SqlExecutor } from "./postVisibility";
 import {
   ContactToken,
   loadPublisherNames,
+  memberOrgIds,
   orgConversationToken,
   PublisherDb,
 } from "./orgPublisher";
@@ -55,14 +58,7 @@ export async function loadConversationMasks(
   );
   if (candidates.length === 0) return masks;
   const orgIds = [...new Set(candidates.map((c) => Number(c.org_id)))];
-  const memberOf = new Set(
-    (
-      await rowsOf(db, "SELECT org_id FROM org_memberships WHERE user_id = ? AND org_id IN (?)", [
-        viewerId,
-        orgIds,
-      ])
-    ).map((r) => Number(r.org_id)),
-  );
+  const memberOf = await memberOrgIds(db, viewerId, orgIds);
   const masked = candidates.filter((c) => !memberOf.has(Number(c.org_id)));
   if (masked.length === 0) return masks;
   const names = await loadPublisherNames(
@@ -163,6 +159,27 @@ export async function loadConversationMask(
     { id: Number(rows[0].id), org_id: rows[0].org_id, org_user_id: rows[0].org_user_id },
   ]);
   return masks.get(conversationId);
+}
+
+/**
+ * 把一則訊息以 `new_message` 推給對話裡的每位檢視者，各自依視角遮蔽組織方（#140）。
+ * `fallbackSenderPublicId`：剛寫入的訊息沒有 join 寄件人的 public_id，由呼叫端補上
+ */
+export async function emitNewMessage(
+  io: SocketBroadcaster,
+  db: PublisherDb,
+  message: Message,
+  viewerIds: readonly number[],
+  fallbackSenderPublicId?: string,
+): Promise<void> {
+  const conversationId = message.conversation_id;
+  for (const viewerId of new Set(viewerIds)) {
+    const mask = await loadConversationMask(db, viewerId, conversationId);
+    io.to(`user_${viewerId}`).emit("new_message", {
+      ...messageService.toMessageDTO(presentMessage(message, mask), fallbackSenderPublicId),
+      conversation_id: conversationId,
+    });
+  }
 }
 
 /** 聯絡代號解析的結果：收件人、要開的組織對話，或既有的對話 */

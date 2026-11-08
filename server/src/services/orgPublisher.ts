@@ -11,7 +11,11 @@ import type { RowDataPacket } from "mysql2/promise";
 export const PUBLISHER_DISPLAYS = ["org", "org_unit", "anonymous"] as const;
 export type PublisherDisplay = (typeof PUBLISHER_DISPLAYS)[number];
 
-export const ANONYMOUS_PUBLISHER_NAME = "匿名";
+/**
+ * 匿名設定的顯示名稱是代號，不是文字：client 依讀者語言翻成「匿名」／"Anonymous"
+ * （client/lib/orgContact.ts 的 ANONYMOUS_PUBLISHER），Email 由 server 依收件人語言翻譯
+ */
+export const ANONYMOUS_PUBLISHER_NAME = "org-anonymous";
 
 /** 能執行 query() 的 pool 或 connection（IN (?) 需要 query 展開陣列） */
 export interface PublisherDb {
@@ -161,6 +165,21 @@ export async function maskOrgPublishers<T extends object>(
   return input;
 }
 
+/** 使用者是這批組織裡哪些組織的成員（Weave、對話的遮蔽依此判斷） */
+export async function memberOrgIds(
+  db: PublisherDb,
+  userId: number | undefined,
+  orgIds: readonly number[],
+): Promise<Set<number>> {
+  if (userId === undefined || orgIds.length === 0) return new Set();
+  const rows = await rowsOf(
+    db,
+    "SELECT org_id FROM org_memberships WHERE user_id = ? AND org_id IN (?)",
+    [userId, orgIds],
+  );
+  return new Set(rows.map((row) => Number(row.org_id)));
+}
+
 /** 使用者是不是這個組織的成員（同組織的同事在 Weave、通知、私訊裡照舊看到彼此） */
 export async function isOrgMember(db: PublisherDb, orgId: number, userId: number): Promise<boolean> {
   const rows = await rowsOf(
@@ -191,7 +210,10 @@ export async function orgSideNameFor(
 }
 
 /**
- * 留言：經手窗口在自己的組織物品下留言或回覆時，同樣以組織名義顯示（就地修改並回傳同一批列）
+ * 留言：組織方（目前的經手窗口、物品所屬單位的任一窗口、該組織的 Org Admin，以及交接前經手過這件物品的人）
+ * 在組織物品下留言或回覆時，同樣以組織名義顯示（就地修改並回傳同一批列）。
+ * 交接後原窗口不再是經手人，他先前的留言仍要遮住，否則公開頁會露出他的個人帳號。
+ * 檢視者自己的留言不遮（編輯、刪除依 user_id 判斷）
  */
 export async function maskOrgComments<T extends object>(
   db: PublisherDb,
@@ -207,16 +229,30 @@ export async function maskOrgComments<T extends object>(
   );
   if (posts.length === 0 || posts[0].org_id == null) return comments;
   const post = posts[0];
-  const handlerId = Number(post.user_id);
-  //* 窗口本人看自己的留言時不遮（編輯、刪除依 user_id 判斷）
-  if (options.viewerUserId != null && Number(options.viewerUserId) === handlerId) return comments;
+  const viewerId = options.viewerUserId == null ? null : Number(options.viewerUserId);
   const rows = comments as unknown as Array<Record<string, unknown>>;
-  const mine = rows.filter((c) => Number(c.user_id) === handlerId);
-  if (mine.length === 0) return comments;
+  const candidates = rows.filter((c) => c.user_id != null && Number(c.user_id) !== viewerId);
+  if (candidates.length === 0) return comments;
   const orgId = Number(post.org_id);
   const unitId = post.org_unit_id == null ? null : Number(post.org_unit_id);
+  const orgSide = new Set<number>([Number(post.user_id)]);
+  for (const row of await rowsOf(
+    db,
+    `SELECT m.user_id FROM org_memberships m
+     WHERE m.org_id = ?
+       AND (m.org_role = 'admin'
+            OR EXISTS (SELECT 1 FROM org_unit_contacts c
+                       WHERE c.membership_id = m.id AND c.org_unit_id = ?))
+     UNION
+     SELECT e.from_user_id FROM org_handover_events e WHERE e.post_id = ?`,
+    [orgId, unitId, postId],
+  )) {
+    orgSide.add(Number(row.user_id));
+  }
+  const masked = candidates.filter((c) => orgSide.has(Number(c.user_id)));
+  if (masked.length === 0) return comments;
   const name = (await loadPublisherNames(db, [{ orgId, unitId }])).nameOf(orgId, unitId);
-  for (const c of mine) {
+  for (const c of masked) {
     Object.assign(c, {
       username: name,
       avatar_url: null,

@@ -20,6 +20,7 @@ import {
   SqlExecutor,
   ViewerScope,
 } from "./postVisibility";
+import { displayNameSql } from "../utils/displayName";
 
 /** 誰改的：使用者，或系統（#139 自動升級） */
 export type TierActor = { type: "user"; userId: number } | { type: "system" };
@@ -191,7 +192,7 @@ export async function afterTierChange(
 export async function listTierEvents(db: SqlExecutor, postId: number): Promise<TierEvent[]> {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT e.from_tier, e.to_tier, e.actor_type, e.created_at,
-            COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS actor_name
+            ${displayNameSql()} AS actor_name
      FROM org_post_tier_events e
      LEFT JOIN users u ON u.id = e.actor_user_id
      LEFT JOIN user_profiles up ON up.user_id = u.id

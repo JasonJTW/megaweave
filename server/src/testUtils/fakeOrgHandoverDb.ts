@@ -1,6 +1,6 @@
 //* 測試用的記憶體 MySQL：在 fakeOrgWeavesDb 之上加 org_handover_events，
 //* 只認得 orgHandoverService 送出的語句；不認得的交給下一層，最底層丟錯
-//* users.public_id：假資料的帳號沒有這欄，一律是 `u-<id>`（與測試的 signInAs 一致）
+//* users.public_id：假資料的帳號沒有這欄，一律由 id 推出一個固定的 UUID（publicIdOf）
 import { createFakeOrgWeavesDb, FakeOrgWeavesDb } from "./fakeOrgWeavesDb";
 
 export interface FakeHandoverEventRow {
@@ -25,10 +25,14 @@ function normalize(sql: string) {
   return sql.replace(/\s+/g, " ").trim();
 }
 
-export const publicIdOf = (userId: number) => `u-${userId}`;
+export const publicIdOf = (userId: number) =>
+  `00000000-0000-4000-8000-${String(userId).padStart(12, "0")}`;
 
 const DECLINE_REMOVED_SQL =
   "SELECT w.id, w.post_id, w.giver_id, w.receiver_id FROM weaves w JOIN posts p ON p.id = w.post_id WHERE p.org_id = ? AND w.receiver_id = ? AND w.status = 'requested' AND (p.audience_tier <> 'public' OR w.receiver_org_unit_id IS NOT NULL) FOR UPDATE";
+
+const DECLINE_ON_BEHALF_SQL =
+  "SELECT w.id, w.post_id, w.giver_id, w.receiver_id FROM weaves w JOIN posts p ON p.id = w.post_id WHERE p.org_id = ? AND w.receiver_id = ? AND w.status = 'requested' AND w.receiver_org_unit_id IN (?) FOR UPDATE";
 
 const LIST_PENDING_SQL =
   "SELECT u.public_id, u.email, ou.id AS unit_id, ou.name AS unit_name, MAX(m.id) IS NOT NULL AS is_member, COUNT(DISTINCT p.id) AS item_count, COUNT(DISTINCT w.id) AS open_weave_count FROM posts p JOIN users u ON u.id = p.user_id JOIN org_units ou ON ou.id = p.org_unit_id LEFT JOIN org_memberships m ON m.org_id = p.org_id AND m.user_id = p.user_id LEFT JOIN weaves w ON w.post_id = p.id AND w.giver_id = p.user_id AND w.status IN ('requested', 'approved') WHERE p.org_id = ? AND p.deleted_at IS NULL AND NOT EXISTS ( SELECT 1 FROM org_memberships cm WHERE cm.org_id = p.org_id AND cm.user_id = p.user_id AND (cm.org_role = 'admin' OR EXISTS (SELECT 1 FROM org_unit_contacts c WHERE c.membership_id = cm.id AND c.org_unit_id = p.org_unit_id))) GROUP BY u.id, u.public_id, u.email, ou.id, ou.name ORDER BY ou.name, u.email";
@@ -74,6 +78,29 @@ export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWe
             w.receiver_id === userId &&
             w.status === "requested" &&
             (post.audience_tier !== "public" || w.receiver_org_unit_id !== null)
+          );
+        })
+        .map((w) => ({
+          id: w.id,
+          post_id: w.post_id,
+          giver_id: w.giver_id,
+          receiver_id: w.receiver_id,
+        }));
+      return [rows, []];
+    }
+
+    if (sql === DECLINE_ON_BEHALF_SQL) {
+      const [orgId, userId, unitIds] = params;
+      const units = ids(unitIds);
+      const rows = base.weaves
+        .filter((w) => {
+          const post = base.posts.find((p) => p.id === w.post_id)!;
+          return (
+            post.org_id === orgId &&
+            w.receiver_id === userId &&
+            w.status === "requested" &&
+            w.receiver_org_unit_id !== null &&
+            units.includes(w.receiver_org_unit_id)
           );
         })
         .map((w) => ({
@@ -168,7 +195,7 @@ export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWe
 
     if (
       sql ===
-      "SELECT id FROM posts WHERE org_id = ? AND org_unit_id = ? AND user_id = ? AND deleted_at IS NULL FOR UPDATE"
+      "SELECT id, title FROM posts WHERE org_id = ? AND org_unit_id = ? AND user_id = ? AND deleted_at IS NULL FOR UPDATE"
     ) {
       const [orgId, unitId, userId] = params;
       const rows = base.posts
@@ -179,13 +206,13 @@ export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWe
             p.user_id === userId &&
             p.deleted_at === null,
         )
-        .map((p) => ({ id: p.id }));
+        .map((p) => ({ id: p.id, title: p.title }));
       return [rows, []];
     }
 
     if (
       sql ===
-      "SELECT id, post_id, receiver_id FROM weaves WHERE post_id IN (?) AND giver_id = ? AND status IN ('requested', 'approved') FOR UPDATE"
+      "SELECT id, post_id, receiver_id, conversation_id FROM weaves WHERE post_id IN (?) AND giver_id = ? AND status IN ('requested', 'approved') FOR UPDATE"
     ) {
       const postIds = ids(params[0]);
       const rows = base.weaves
@@ -195,7 +222,12 @@ export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWe
             w.giver_id === params[1] &&
             OPEN.includes(w.status),
         )
-        .map((w) => ({ id: w.id, post_id: w.post_id, receiver_id: w.receiver_id }));
+        .map((w) => ({
+          id: w.id,
+          post_id: w.post_id,
+          receiver_id: w.receiver_id,
+          conversation_id: w.conversation_id ?? null,
+        }));
       return [rows, []];
     }
 
@@ -234,13 +266,21 @@ export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWe
       return [{ affectedRows: rows.length }, []];
     }
 
-    if (sql === "UPDATE weaves SET conversation_id = ? WHERE id = ? AND giver_id = ?") {
-      const [conversationId, weaveId, giverId] = params;
-      const weave = base.weaves.find(
-        (w) => w.id === Number(weaveId) && w.giver_id === giverId,
-      );
+    if (sql === "UPDATE weaves SET conversation_id = ? WHERE id = ?") {
+      const [conversationId, weaveId] = params;
+      const weave = base.weaves.find((w) => w.id === Number(weaveId));
       if (weave) weave.conversation_id = Number(conversationId);
       return [{ affectedRows: weave ? 1 : 0 }, []];
+    }
+
+    //* 對話的組織脈絡：假資料不存對話，一律當成個人對話（不遮蔽；遮蔽另有測試）
+    if (sql === "SELECT id, org_id, org_user_id FROM conversations WHERE id = ?") {
+      return [[], []];
+    }
+
+    if (sql === "SELECT name FROM org_units WHERE id = ?") {
+      const unit = base.units.find((u) => u.id === Number(params[0]));
+      return [unit ? [{ name: unit.name }] : [], []];
     }
 
     return null;

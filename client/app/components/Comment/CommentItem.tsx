@@ -12,6 +12,7 @@ import User from "../../types/user";
 import Image from "next/image";
 import UnlockIcon from "../icons/UnlockIcon";
 import MessageIcon from "../icons/MessageIcon";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface CommentItemProps {
   comment: Comment;
@@ -30,8 +31,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const router = useRouter();
   const t = useTranslations("Comments");
   const formatter = useFormatter();
+  const displayName = useDisplayName();
   const authorName =
-    comment.username || t("userFallback", { publicId: comment.public_id });
+    displayName(comment.username) ||
+    t("userFallback", { publicId: comment.public_id });
 
   // 回覆成功後
   const handleReplySuccess = () => {
@@ -99,7 +102,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           ) : (
             <div className="flex h-full w-full items-center justify-center rounded-full bg-gray-300">
               <span className="text-xs text-gray-600">
-                {comment.username?.charAt(0) || "?"}
+                {authorName.charAt(0) || "?"}
               </span>
             </div>
           )}

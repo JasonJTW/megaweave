@@ -1,6 +1,7 @@
 import { Link, useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { profilePublicId } from "@/lib/orgContact";
+import { handoverNotice } from "@/utils/handoverMessage";
 import { useFormatter, useTranslations } from "next-intl";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
@@ -52,6 +53,7 @@ const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 import { User } from "@/app/types/schema";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { ApiError } from "@/lib/apiError";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 // Helper to parse date safely as UTC if needed
 const parseDate = (dateString: string) => {
@@ -79,6 +81,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const router = useRouter();
   const t = useTranslations("Chat");
+  const displayName = useDisplayName();
   const apiErrorMessage = useApiErrorMessage();
   const formatter = useFormatter();
   // Copy for the "Start weaving…" divider; a null role falls through to the ICU `other` branch
@@ -220,7 +223,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   }, [messages, draft, setDraft]);
 
   // Use prop if available (from list), otherwise fallback to fetched conversation details
-  const otherUser =
+  const rawOtherUser =
     propOtherUser ||
     (conversation
       ? {
@@ -229,6 +232,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           avatar_url: conversation.other_avatar_url,
         }
       : undefined);
+  //* 組織設定匿名時是代號，依讀者語言顯示（#140）
+  const otherUser = rawOtherUser && {
+    ...rawOtherUser,
+    username: displayName(rawOtherUser.username),
+  };
 
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -789,6 +797,35 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                 (m) => m.sender_public_id === myPublicId && m.is_read,
               );
               const isLastReadMessage = lastReadIndex === index;
+
+              //* 交接（#142）：物品由同單位另一位窗口接手，連到另一個對話
+              const handover = handoverNotice(msg, myPublicId);
+              if (handover) {
+                return (
+                  <React.Fragment key={msg.id}>
+                    <div className="my-2 flex w-full min-w-0 flex-col items-center gap-1 py-2 text-center">
+                      <p className="max-w-[80%] text-sm text-gray-600">
+                        {t(`handover.${handover.kind}`, {
+                          title: handover.title,
+                        })}
+                      </p>
+                      {handover.otherConversationId !== null && (
+                        <Link
+                          href={`/messages/${handover.otherConversationId}`}
+                          className="text-sm font-semibold text-primary underline"
+                        >
+                          {t(
+                            handover.kind === "movedOut"
+                              ? "handover.openNew"
+                              : "handover.openPrevious",
+                          )}
+                        </Link>
+                      )}
+                    </div>
+                    {dateHeader}
+                  </React.Fragment>
+                );
+              }
 
               if (msg.message_type === "system_start_weaving") {
                 let itemTitle = "";

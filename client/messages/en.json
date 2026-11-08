@@ -777,6 +777,12 @@
       "actingAs": "On behalf of",
       "actingAsPlaceholder": "Choose who you represent",
       "actingAsMyself": "Myself"
+    },
+    "handover": {
+      "movedOut": "“{title}” was taken over by another contact of the unit. Please continue in the new conversation.",
+      "movedIn": "“{title}” was taken over by another contact of the unit. The earlier conversation is still available.",
+      "openNew": "Go to the new conversation",
+      "openPrevious": "View the earlier conversation"
     }
   },
   "Notifications": {
@@ -828,8 +834,13 @@
       "WEAVE_COMPLETED": {
         "title": "Weave Completed",
         "content": "Weave for \"{postTitle}\" is successfully completed!"
+      },
+      "ORG_HANDOVER": {
+        "title": "Items handed over to you",
+        "content": "You took over {itemCount} items and {weaveCount} open requests of {unitName}"
       }
-    }
+    },
+    "anonymousActor": "Anonymous"
   },
   "History": {
     "signInToView": "Please sign in to view your history",
@@ -1051,7 +1062,8 @@
       "cannotWithdraw": "You cannot withdraw this request right now",
       "withdrawn": "Request withdrawn.",
       "withdrawFailed": "Failed to withdraw request"
-    }
+    },
+    "receiverUnit": "Receiving unit: {unit}"
   },
   "Errors": {
     "UNKNOWN": "Something went wrong. Please try again.",
@@ -1211,7 +1223,18 @@
       "save": "Save",
       "saved": "Auto Release setting updated."
     },
-    "reportLink": "View org report"
+    "reportLink": "View org report",
+    "publisherDisplay": {
+      "heading": "Public publisher name",
+      "hint": "The name shown as the poster once an item is Public. Contacts’ personal accounts are never shown.",
+      "label": "Shown as",
+      "option": {
+        "org": "Organisation name",
+        "org_unit": "Organisation + unit",
+        "anonymous": "Anonymous"
+      },
+      "saved": "Updated how Public items show the poster."
+    }
   },
   "Org": {
     "title": "Organization",
@@ -1463,5 +1486,8 @@
       "reference_epd": "Reference EPDs used (lower)"
     },
     "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party."
+  },
+  "Publisher": {
+    "anonymous": "Anonymous"
   }
 }

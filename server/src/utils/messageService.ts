@@ -1,5 +1,10 @@
 import dbPool from "./db";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
+import type { PoolConnection } from "mysql2/promise";
+import { displayNameSql } from "./displayName";
+
+/** 已在交易裡的連線：傳入時改用它、不另開交易（例如交接要和其他寫入一起 commit） */
+type TxConnection = Pick<PoolConnection, "execute">;
 
 export interface Conversation {
   id: number;
@@ -57,12 +62,13 @@ export const messageService = {
     userA: number,
     userB: number,
     org?: { orgId: number; orgUserId: number },
+    tx?: TxConnection,
   ): Promise<number> => {
     // Try to find existing
     const user1 = Math.min(userA, userB);
     const user2 = Math.max(userA, userB);
 
-    const [rows] = await dbPool.execute<RowDataPacket[]>(
+    const [rows] = await (tx ?? dbPool).execute<RowDataPacket[]>(
       "SELECT id FROM conversations WHERE user1_id = ? AND user2_id = ? AND org_key = ?",
       [user1, user2, org?.orgId ?? 0]
     );
@@ -71,23 +77,26 @@ export const messageService = {
       return rows[0].id;
     }
 
+    const insert = async (db: TxConnection) => {
+      const [result] = await db.execute<ResultSetHeader>(
+        "INSERT INTO conversations (user1_id, user2_id, org_id, org_user_id) VALUES (?, ?, ?, ?)",
+        [user1, user2, org?.orgId ?? null, org?.orgUserId ?? null]
+      );
+      const conversationId = result.insertId;
+      // Insert into conversation_users
+      await db.execute(
+        "INSERT INTO conversation_users (conversation_id, user_id) VALUES (?, ?), (?, ?)",
+        [conversationId, userA, conversationId, userB]
+      );
+      return conversationId;
+    };
+    if (tx) return insert(tx);
+
     // Create new
     const connection = await dbPool.getConnection();
     try {
         await connection.beginTransaction();
-        
-        const [result] = await connection.execute<ResultSetHeader>(
-            "INSERT INTO conversations (user1_id, user2_id, org_id, org_user_id) VALUES (?, ?, ?, ?)",
-            [user1, user2, org?.orgId ?? null, org?.orgUserId ?? null]
-        );
-        const conversationId = result.insertId;
-
-        // Insert into conversation_users
-        await connection.execute(
-            "INSERT INTO conversation_users (conversation_id, user_id) VALUES (?, ?), (?, ?)",
-            [conversationId, userA, conversationId, userB]
-        );
-
+        const conversationId = await insert(connection);
         await connection.commit();
         return conversationId;
     } catch (error) {
@@ -104,12 +113,10 @@ export const messageService = {
     content: string,
     attachments?: Array<{ url: string; type: 'image' | 'video' | 'file' }>,
     messageType: string = 'text',
-    metadata: unknown = null
+    metadata: unknown = null,
+    tx?: TxConnection,
   ): Promise<Message> => {
-    const connection = await dbPool.getConnection();
-    try {
-        await connection.beginTransaction();
-
+    const write = async (connection: TxConnection): Promise<Message> => {
         // 1. Insert message
         const [result] = await connection.execute<ResultSetHeader>(
             "INSERT INTO messages (conversation_id, sender_id, content, message_type, metadata) VALUES (?, ?, ?, ?, ?)",
@@ -147,8 +154,6 @@ export const messageService = {
             [messageId, conversationId, senderId]
         );
 
-        await connection.commit();
-
         return {
             id: messageId,
             conversation_id: conversationId,
@@ -160,6 +165,15 @@ export const messageService = {
             created_at: new Date(),
             attachments: insertedAttachments
         };
+    };
+    if (tx) return write(tx);
+
+    const connection = await dbPool.getConnection();
+    try {
+        await connection.beginTransaction();
+        const message = await write(connection);
+        await connection.commit();
+        return message;
     } catch (error) {
         await connection.rollback();
         throw error;
@@ -174,7 +188,7 @@ export const messageService = {
       SELECT 
         c.*,
         u.public_id as other_public_id,
-        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) as other_username,
+        ${displayNameSql()} as other_username,
         u.avatar_url as other_avatar_url,
         u.id as other_user_id,
         m.content as last_message_content,
@@ -215,7 +229,7 @@ export const messageService = {
       SELECT 
         m.id, m.conversation_id, m.sender_id, m.content, m.message_type, m.metadata, m.created_at,
         IF(m.id <= cu.last_read_message_id, 1, 0) as is_read,
-        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
+        ${displayNameSql()} as sender_name, u.avatar_url as sender_avatar, u.public_id as sender_public_id
       FROM messages m
       JOIN users u ON m.sender_id = u.id
       LEFT JOIN user_profiles up ON u.id = up.user_id
@@ -286,7 +300,7 @@ export const messageService = {
       SELECT 
         c.*,
         u.public_id as other_public_id,
-        COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) as other_username,
+        ${displayNameSql()} as other_username,
         u.avatar_url as other_avatar_url,
         u.id as other_user_id
       FROM conversation_users cu1

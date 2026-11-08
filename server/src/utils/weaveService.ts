@@ -21,10 +21,11 @@ import { getTranslator } from "./i18n";
 import { getAppOrigin } from "./env";
 import { viewerVisibility } from "../services/postVisibility";
 import { orgSideNameFor } from "../services/orgPublisher";
-import { loadConversationMask, presentMessage } from "../services/orgConversation";
+import { emitNewMessage } from "../services/orgConversation";
 import {
   actingUnitsFor,
   canReviewOrgRequest,
+  orgReviewerIds,
   resolveActingUnit,
 } from "../services/orgWeaveService";
 import type { OrgUnitRef } from "../services/orgItemService";
@@ -382,6 +383,8 @@ interface NotifyWeaveStatusParams {
   action: WeaveActionType;
   items: WeaveItem[];
   recipientRole: WeaveRole;
+  /** 預設連到收件人的 Weave 清單；不是 Weave 一方的審核者（#137）連到組織物品管理頁 */
+  link?: string;
 }
 
 /**
@@ -401,7 +404,7 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 
   const copy = getWeaveNoticeCopy(action, actorName, postTitle);
 
-  const link = `/user?highlightWeaveId=${weaveId}`;
+  const link = params.link ?? `/user?highlightWeaveId=${weaveId}`;
 
   // 1. 站內通知 (Socket + DB)
   if (io) {
@@ -596,6 +599,30 @@ export async function requestWeave(
       recipientRole: targetUserId === giverId ? "giver" : "receiver",
     });
     notificationSent = true;
+
+    //* 組織物品（#137）：物品屬於單位，單位的其他窗口與 Org Admin 都能審核，一起通知（申請人自己除外）
+    if (post.org_id !== null && post.org_unit_id !== null && !isWish) {
+      const reviewers = await orgReviewerIds(dbPool, {
+        orgId: post.org_id,
+        orgUnitId: post.org_unit_id,
+      });
+      for (const reviewerId of reviewers) {
+        if (reviewerId === initiator.id || reviewerId === targetUserId) continue;
+        await notifyWeaveStatusChange({
+          io,
+          weaveId: Number(weaveId),
+          postId,
+          recipientId: reviewerId,
+          senderId: initiator.id,
+          actorName: initiator.name,
+          postTitle,
+          action: "requested",
+          items,
+          recipientRole: "giver",
+          link: "/org/items",
+        });
+      }
+    }
   } catch (e) {
     console.error("🔔 [requestWeave] Notification/Email failed:", e);
   }
@@ -620,11 +647,7 @@ export async function requestWeave(
       );
       if (io) {
         //* 系統訊息的 metadata 帶發文者 public_id：組織對話依各自的視角遮蔽（#140）
-        for (const viewerId of [targetUserId, initiator.id]) {
-          const mask = await loadConversationMask(dbPool, viewerId, conversationId);
-          const dto = messageService.toMessageDTO(presentMessage(sysMsg, mask), initiator.publicId);
-          io.to(`user_${viewerId}`).emit("new_message", { ...dto, conversation_id: conversationId });
-        }
+        await emitNewMessage(io, dbPool, sysMsg, [targetUserId, initiator.id], initiator.publicId);
       }
     } catch (e) {
       console.error("[requestWeave] System message failed:", e);

@@ -20,6 +20,7 @@ import {
 } from "@/services/commentService";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface CommentSectionProps {
   post: Post;
@@ -31,6 +32,7 @@ type ItemKey = "all" | number;
 const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
   const router = useRouter();
   const t = useTranslations("Comments");
+  const displayName = useDisplayName();
   const apiErrorMessage = useApiErrorMessage();
   const [activeItemKey, setActiveItemKey] = useState<ItemKey | null>(null);
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
@@ -82,7 +84,9 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
       );
     } catch (error) {
       console.error("Message error:", error);
-      toast.error(t("messageFailed", { username: post.username }));
+      toast.error(
+        t("messageFailed", { username: displayName(post.username) ?? "" }),
+      );
     }
   };
 

@@ -11,6 +11,7 @@ import type { AudienceTier } from "./postVisibility";
 import { listTierEvents } from "./orgTierService";
 import { listPendingPublicEvents } from "./orgPendingPublicService";
 import type { OrgWeaveEventAction } from "./orgWeaveEvents";
+import { displayNameSql } from "../utils/displayName";
 
 /** 操作者：使用者（顯示名稱），或系統（自動升級、自動婉拒） */
 export type TimelineActor = { type: "user"; name: string } | { type: "system" };
@@ -129,7 +130,7 @@ async function userNames(db: Queryable, ids: number[]): Promise<Map<number, stri
   if (unique.length === 0) return new Map();
   //* IN (?) 需要 query() 展開陣列
   const [rows] = await db.query<RowDataPacket[]>(
-    `SELECT u.id, COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS name
+    `SELECT u.id, ${displayNameSql()} AS name
      FROM users u LEFT JOIN user_profiles up ON up.user_id = u.id
      WHERE u.id IN (?)`,
     [unique],

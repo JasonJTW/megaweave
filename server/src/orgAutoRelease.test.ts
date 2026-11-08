@@ -346,11 +346,33 @@ describe("Org Admin settings", () => {
     signInAs(ORG_ADMIN);
     const before = await api().get(`/api/org-admin/orgs/${ORG}/settings`);
     expect(before.status).toBe(200);
-    expect(before.body.settings).toEqual({ autoReleaseEnabled: true, autoReleaseDays: 30 });
+    expect(before.body.settings).toMatchObject({ autoReleaseEnabled: true, autoReleaseDays: 30 });
 
     const res = await setOrgSettings({ autoReleaseEnabled: true, autoReleaseDays: 14 });
     expect(res.status).toBe(200);
-    expect(res.body.settings).toEqual({ autoReleaseEnabled: true, autoReleaseDays: 14 });
+    expect(res.body.settings).toMatchObject({ autoReleaseEnabled: true, autoReleaseDays: 14 });
+  });
+
+  it("lets the Org Admin choose how Public items show the publisher (#140)", async () => {
+    signInAs(ORG_ADMIN);
+    const before = await api().get(`/api/org-admin/orgs/${ORG}/settings`);
+    expect(before.body.settings.publisherDisplay).toBe("org");
+
+    const res = await setOrgSettings({ publisherDisplay: "anonymous" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.settings).toEqual({
+      autoReleaseEnabled: true,
+      autoReleaseDays: 30,
+      publisherDisplay: "anonymous",
+    });
+  });
+
+  it("rejects an unknown publisher display as INVALID_REQUEST", async () => {
+    const res = await setOrgSettings({ publisherDisplay: "personal" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_REQUEST");
   });
 
   it("releases after the org's day count", async () => {

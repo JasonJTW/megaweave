@@ -11,6 +11,8 @@ import { HttpError } from "../utils/httpError";
 import { withTransaction } from "../utils/transaction";
 import { afterTierChange, changePostTier, TierChangeResult } from "./orgTierService";
 import type { AudienceTier } from "./postVisibility";
+import { displayNameSql } from "../utils/displayName";
+import { tierNotAllowed, unitNotManaged } from "./orgErrors";
 
 export const PENDING_PUBLIC_DELAY_MS = 10 * 60 * 1000;
 
@@ -42,10 +44,6 @@ export function itemPendingPublic() {
     "ORG_ITEM_PENDING_PUBLIC",
     "Cancel the pending public period before changing the tier",
   );
-}
-
-function tierNotAllowed() {
-  return new HttpError(403, "ORG_TIER_NOT_ALLOWED", "You cannot move this item to that tier");
 }
 
 interface PendingRow {
@@ -86,7 +84,7 @@ export async function lockPendingRow(
 
 function assertAdminOf(access: PendingPublicAccess, row: PendingRow) {
   if (!access.manageableUnits.some((u) => u.id === row.orgUnitId)) {
-    throw new HttpError(403, "ORG_UNIT_NOT_MANAGED", "You are not a Unit Contact of this unit");
+    throw unitNotManaged();
   }
   if (!access.isAdmin) throw tierNotAllowed();
 }
@@ -234,7 +232,7 @@ export async function listPendingPublicEvents(
 ): Promise<PendingPublicEvent[]> {
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT e.action, e.asset_disposal_confirmed, e.created_at,
-            COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS actor_name
+            ${displayNameSql()} AS actor_name
      FROM org_pending_public_events e
      JOIN users u ON u.id = e.actor_user_id
      LEFT JOIN user_profiles up ON up.user_id = u.id

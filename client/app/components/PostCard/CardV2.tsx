@@ -11,6 +11,7 @@ import TagIcon from "../icons/TagIcon";
 import { formatLocationText } from "@/utils/locationUtils";
 import LocationIcon from "../icons/LocationIcon";
 import ClockIcon from "../icons/ClockIcon";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface PostCardProps {
   key: number;
@@ -36,6 +37,7 @@ const CardV2 = ({
   const container = useRef(null);
   const categoryName = useCategoryName();
   const conditionText = useConditionText();
+  const displayName = useDisplayName();
 
   const scale = useTransform(progress, range, [1, targetScale]);
 
@@ -73,7 +75,7 @@ const CardV2 = ({
           </h2>
           <div className="hidden items-center text-sm text-gray-500 md:flex">
             <UserIcon className="mr-1 h-4 w-4" />
-            {post.username}
+            {displayName(post.username)}
           </div>
         </div>
 

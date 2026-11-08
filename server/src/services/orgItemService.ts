@@ -37,6 +37,8 @@ import {
   OrgItemCategoryId,
   publicCategoryIdOf,
 } from "./orgItemCategories";
+import { displayNameSql } from "../utils/displayName";
+import { tierNotAllowed, unitNotManaged } from "./orgErrors";
 
 export const ORG_ITEM_STATUSES = ["active", "inactive"] as const;
 export type OrgItemStatus = (typeof ORG_ITEM_STATUSES)[number];
@@ -147,13 +149,6 @@ export type OrgPagePost = Pick<
 
 const LIST_LIMIT = 500;
 
-export function unitNotManaged() {
-  return new HttpError(
-    403,
-    "ORG_UNIT_NOT_MANAGED",
-    "You are not a Unit Contact of this unit",
-  );
-}
 
 interface MembershipRow extends RowDataPacket {
   id: number;
@@ -232,13 +227,6 @@ export function visibleTiers(accessLevel: AccessLevel): AudienceTier[] {
   return [...access.tiers, "public"];
 }
 
-export function tierNotAllowed() {
-  return new HttpError(
-    403,
-    "ORG_TIER_NOT_ALLOWED",
-    "You cannot move this item to that tier",
-  );
-}
 
 /**
  * 誰能改成哪一層（PRD 0001 §5.1）：Unit Contact 只能把自己單位的物品從 Internal 升到 Members；
@@ -314,7 +302,7 @@ async function queryOutcomes(postIds: number[]): Promise<Map<number, OrgItemOutc
   const [rows] = await dbPool.query<RowDataPacket[]>(
     `SELECT w.id, w.post_id, w.completed_at, w.receiver_org_unit_id,
             ru.name AS receiver_org_unit_name,
-            COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS receiver_name,
+            ${displayNameSql()} AS receiver_name,
             (SELECT COALESCE(SUM(wi.quantity), 0) FROM weave_items wi WHERE wi.weave_id = w.id) AS quantity
      FROM weaves w
      JOIN users u ON u.id = w.receiver_id
@@ -471,7 +459,7 @@ export const orgItemService = {
     const [rows] = await dbPool.execute<RowDataPacket[]>(
       `SELECT w.id, w.status, w.created_at, w.receiver_org_unit_id,
               ru.name AS receiver_org_unit_name,
-              COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS receiver_name,
+              ${displayNameSql()} AS receiver_name,
               (SELECT COALESCE(SUM(wi.quantity), 0) FROM weave_items wi WHERE wi.weave_id = w.id) AS quantity
        FROM weaves w
        JOIN users u ON u.id = w.receiver_id

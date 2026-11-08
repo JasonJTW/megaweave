@@ -1,4 +1,5 @@
 import type { useTranslations } from "next-intl";
+import { publisherDisplayName } from "@/lib/orgContact";
 
 export type NotificationsTranslator = ReturnType<
   typeof useTranslations<"Notifications">
@@ -16,6 +17,7 @@ export const REQUIRED_PARAMS = {
   WEAVE_CANCELLED: ["actorName", "postTitle"],
   WEAVE_CONFIRMED: ["actorName", "postTitle"],
   WEAVE_COMPLETED: ["postTitle"],
+  ORG_HANDOVER: ["unitName", "itemCount", "weaveCount"],
 } as const satisfies Record<string, readonly string[]>;
 
 type EventType = keyof typeof REQUIRED_PARAMS;
@@ -44,7 +46,11 @@ export function notificationText(
   for (const key of REQUIRED_PARAMS[event]) {
     const value = params[key];
     if (typeof value !== "string" || value === "") return legacy;
-    values[key] = value;
+    //* 組織設定匿名時，actorName 是代號（#140），依讀者語言顯示
+    values[key] =
+      key === "actorName"
+        ? publisherDisplayName(value, t("anonymousActor"))
+        : value;
   }
 
   return {

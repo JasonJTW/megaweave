@@ -11,7 +11,9 @@ import { HttpError } from "./utils/httpError";
 import { isPostVisibleTo } from "./services/postVisibility";
 import { PostIdSchema } from "./utils/idSchemas";
 import { parseContactToken } from "./services/orgPublisher";
+import { z } from "zod";
 import {
+  emitNewMessage,
   loadConversationMask,
   loadConversationMasks,
   OrgContext,
@@ -19,6 +21,9 @@ import {
   presentMessage,
   resolveContactToken,
 } from "./services/orgConversation";
+
+//* 收件人由 client 從 API 回應帶入（users.public_id 或組織聯絡代號）→ 格式錯是 client bug
+const RecipientIdSchema = z.string().trim().min(1).max(64);
 
 /**
  * 收件人：一般是 users.public_id；組織物品是聯絡代號（#140、ADR 0004），
@@ -139,6 +144,10 @@ router.post(
         ),
       );
     }
+    const recipientPublicId = RecipientIdSchema.safeParse(recipient_public_id);
+    if (!recipientPublicId.success) {
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid recipient"));
+    }
 
     //* post_id 只要帶了就要合法；空字串視為沒帶
     let postId: number | undefined;
@@ -152,7 +161,7 @@ router.post(
 
     try {
       // SECURITY: Map public_id (or an org contact token) to internal ID
-      const recipient = await resolveRecipient(senderId, String(recipient_public_id));
+      const recipient = await resolveRecipient(senderId, recipientPublicId.data);
       if (!recipient) {
         return next(
           new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
@@ -195,13 +204,6 @@ router.post(
         (await messageService.getConversationId(senderId, recipientId, recipient.org));
 
       const io: Server = res.locals.io;
-      //* 推給收件人的訊息依收件人的視角遮蔽組織方（寄件人看自己的訊息不需遮）
-      const recipientMask = io
-        ? await loadConversationMask(dbPool, recipientId, conversationId)
-        : undefined;
-      const senderMask = io
-        ? await loadConversationMask(dbPool, senderId, conversationId)
-        : undefined;
 
       // 2. If the user had a pending weaving intent, persist it as a system message first.
       //    This only happens on the FIRST real message sent for a given item.
@@ -232,13 +234,9 @@ router.post(
             post_author_public_id: postAuthorPublicId,
           },
         );
+        //* 推播依各自的視角遮蔽組織方（#140）
         if (io) {
-          const forViewer = (mask: typeof recipientMask) => ({
-            ...messageService.toMessageDTO(presentMessage(sysMsg, mask), senderPublicId),
-            conversation_id: conversationId,
-          });
-          io.to(`user_${recipientId}`).emit("new_message", forViewer(recipientMask));
-          io.to(`user_${senderId}`).emit("new_message", forViewer(senderMask));
+          await emitNewMessage(io, dbPool, sysMsg, [recipientId, senderId], senderPublicId);
         }
       }
 
@@ -261,18 +259,8 @@ router.post(
         console.log(
           `[POST /messages] Emitting new_message to user_${recipientId} and user_${senderId}`,
         );
-        const payload = {
-          ...messageDTO,
-          conversation_id: conversationId,
-        };
-        // Push to recipient's personal room
-        io.to(`user_${recipientId}`).emit("new_message", {
-          ...messageService.toMessageDTO(presentMessage(message, recipientMask), senderPublicId),
-          conversation_id: conversationId,
-        });
-
-        // Push to sender (for multi-device sync)
-        io.to(`user_${senderId}`).emit("new_message", payload);
+        // Push to the recipient and to the sender (multi-device sync), each masked for their view
+        await emitNewMessage(io, dbPool, message, [recipientId, senderId], senderPublicId);
         console.log(`[POST /messages] Emission complete.`);
       } else {
         console.warn(
@@ -293,16 +281,15 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     const senderId = req.user!.userId;
-    const { recipient_public_id } = req.body;
-
-    if (!recipient_public_id) {
+    const recipientPublicId = RecipientIdSchema.safeParse(req.body?.recipient_public_id);
+    if (!recipientPublicId.success) {
       return next(
         new HttpError(400, "INVALID_REQUEST", "Recipient Public ID required"),
       );
     }
 
     try {
-      const recipient = await resolveRecipient(senderId, String(recipient_public_id));
+      const recipient = await resolveRecipient(senderId, recipientPublicId.data);
       if (!recipient) {
         return next(
           new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),

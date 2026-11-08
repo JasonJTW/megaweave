@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/apiError";
+import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { useUser } from "@/app/contexts/UserContext";
 import { Link } from "@/i18n/navigation";
@@ -316,6 +317,75 @@ function HandoverCard({
 interface OrgSettings {
   autoReleaseEnabled: boolean;
   autoReleaseDays: number;
+  publisherDisplay: PublisherDisplay;
+}
+
+/** 公開層的發文者顯示（#140）：組織名稱、組織＋單位或匿名；和自動升級共用 settings 的 SWR key */
+function PublisherDisplayCard({ orgUrl }: { orgUrl: string }) {
+  const t = useTranslations("OrgAdmin.publisherDisplay");
+  const errorMessage = useApiErrorMessage();
+  const { data, error, mutate } = useSWR(`${orgUrl}/settings`, (url: string) =>
+    requestJson<{ settings: OrgSettings }>(url),
+  );
+  const [saving, setSaving] = useState(false);
+  const { mutate: revalidate } = useSWRConfig();
+  const current = data?.settings.publisherDisplay;
+
+  async function change(value: PublisherDisplay) {
+    if (value === current) return;
+    setSaving(true);
+    try {
+      const result = await requestJson<{ settings: OrgSettings }>(
+        `${orgUrl}/settings`,
+        { method: "PATCH", body: JSON.stringify({ publisherDisplay: value }) },
+      );
+      await mutate(result, { revalidate: false });
+      //* 公開物品的卡片、詳情都換了名稱
+      await revalidate(
+        (key) => typeof key === "string" && key.startsWith(`${hostName}/api/`),
+      );
+      toast.success(t("saved"));
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("heading")}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t("hint")}</p>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <p className="text-sm text-destructive">{errorMessage(error)}</p>
+        )}
+        {current && (
+          <div className="space-y-2">
+            <Label htmlFor="org-publisher-display">{t("label")}</Label>
+            <Select
+              value={current}
+              disabled={saving}
+              onValueChange={(value) => void change(value as PublisherDisplay)}
+            >
+              <SelectTrigger id="org-publisher-display" className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PUBLISHER_DISPLAYS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {t(`option.${option}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 /** 組織的自動升級設定：自動（天數）或手動 */
@@ -741,6 +811,7 @@ export default function OrgAdminPage() {
           </Card>
 
           <AutoReleaseCard key={orgUrl} orgUrl={orgUrl!} />
+          <PublisherDisplayCard key={`${orgUrl}-display`} orgUrl={orgUrl!} />
 
           <HandoverCard
             orgUrl={orgUrl!}

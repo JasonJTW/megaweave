@@ -11,6 +11,7 @@ import { getOrgReport } from "./services/orgReportService";
 import { OrgIdSchema } from "./utils/idSchemas";
 import { orgNotFound, orgService, OrgSummary } from "./services/orgService";
 import { AUTO_RELEASE_MAX_DAYS } from "./services/orgAutoReleaseService";
+import { PUBLISHER_DISPLAYS } from "./services/orgPublisher";
 import {
   AdminOrg,
   MEMBER_ROLES,
@@ -44,24 +45,29 @@ const UpdateMemberSchema = z.object({
 
 //* 交接：交出的人、單位、接手的人都由 client 從待交接清單與窗口選單帶入 → INVALID_REQUEST
 const HandoverSchema = z.object({
-  fromUserId: z.string().min(1).max(36),
+  fromUserId: z.uuid(),
   unitId: z.number().int().positive(),
   toMemberId: z.number().int().positive(),
 });
 
-//* 組織設定（#139）：Org Admin 只能改 Auto Release；名稱、公開層顯示、演示組織由 Platform Admin 管（admin.ts）
-//* 開關與天數都是使用者在表單輸入 → VALIDATION_FAILED
+//* 組織設定：Org Admin 能改 Auto Release（#139）與公開層顯示（#140）；名稱、演示組織由 Platform Admin 管（admin.ts）
+//* 開關與天數是使用者在表單輸入 → VALIDATION_FAILED
 const OrgSettingsSchema = z
   .object({
     autoReleaseEnabled: z.boolean(),
     autoReleaseDays: z.number().int().min(1).max(AUTO_RELEASE_MAX_DAYS),
   })
   .partial();
+//* 公開層顯示是選單帶入的值 → 格式錯是 client bug（INVALID_REQUEST）
+const PublisherDisplaySettingSchema = z.object({
+  publisherDisplay: z.enum(PUBLISHER_DISPLAYS).optional(),
+});
 
 function settingsView(org: OrgSummary) {
   return {
     autoReleaseEnabled: org.autoReleaseEnabled,
     autoReleaseDays: org.autoReleaseDays,
+    publisherDisplay: org.publisherDisplay,
   };
 }
 
@@ -134,7 +140,7 @@ router.get(
 
 /**
  * GET /api/org-admin/orgs/:orgId/settings
- * 組織的 Auto Release 設定
+ * 組織的 Auto Release 與公開層顯示設定
  */
 router.get(
   "/orgs/:orgId/settings",
@@ -151,15 +157,22 @@ router.get(
 
 /**
  * PATCH /api/org-admin/orgs/:orgId/settings
- * 改 Auto Release：自動（天數）或手動；只更新有傳入的欄位
+ * 改 Auto Release（自動＋天數或手動）與公開層顯示（組織名稱／組織＋單位／匿名）；只更新有傳入的欄位
  */
 router.patch(
   "/orgs/:orgId/settings",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const display = PublisherDisplaySettingSchema.safeParse(req.body ?? {});
+      if (!display.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid publisher display"));
+      }
       const parsed = OrgSettingsSchema.safeParse(req.body ?? {});
       if (!parsed.success) return next(parsed.error);
-      const org = await orgService.updateOrganization(adminOrg(res).publicId, parsed.data);
+      const org = await orgService.updateOrganization(adminOrg(res).publicId, {
+        ...parsed.data,
+        ...display.data,
+      });
       if (!org) return next(orgNotFound());
       return res.status(200).json({ settings: settingsView(org) });
     } catch (error) {
@@ -218,7 +231,8 @@ router.post(
 
 /**
  * PATCH /api/org-admin/orgs/:orgId/members/:memberId
- * 改成員的身分（Org Admin／Org Member 與窗口單位整組取代）；組織至少要留一位 Org Admin
+ * 改成員的身分（Org Admin／Org Member 與窗口單位整組取代）；組織至少要留一位 Org Admin。
+ * 拿掉的窗口單位：他代表那些單位送出的 Requested 申請自動婉拒並通知
  */
 router.patch(
   "/orgs/:orgId/members/:memberId",
@@ -231,11 +245,16 @@ router.patch(
           new HttpError(400, "INVALID_REQUEST", "Invalid member update"),
         );
       }
-      const member = await orgMemberService.updateMember(
-        adminOrg(res).id,
+      const org = adminOrg(res);
+      const { member, declined } = await orgMemberService.updateMember(
+        org.id,
         memberId.data,
         identity.data,
       );
+      await announceAutoDeclined(res.locals.io ?? null, declined, {
+        id: req.user!.userId,
+        name: org.name,
+      });
       return res.status(200).json({ member });
     } catch (error) {
       return next(error);
@@ -320,6 +339,7 @@ router.post(
         adminOrg(res).id,
         input.data,
         req.user!.userId,
+        res.locals.io ?? null,
       );
       return res.status(200).json(result);
     } catch (error) {

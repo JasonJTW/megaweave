@@ -99,29 +99,45 @@ describe("maskOrgPublishers", () => {
 });
 
 describe("maskOrgComments", () => {
+  //* 經手人 2；總務部另一位窗口 7、Org Admin 1；交接前的經手人 9
   const db = {
     query: jest.fn(async (sql: string) => {
       if (sql.includes("FROM posts")) {
         return [[{ public_id: "33333333-3333-4333-8333-333333333333", user_id: 2, org_id: 10, org_unit_id: 201 }], []];
       }
       if (sql.includes("FROM organizations")) return [[{ id: 10, name: "甲公司", publisher_display: "org" }], []];
+      if (sql.includes("FROM org_memberships")) {
+        return [[{ user_id: 1 }, { user_id: 2 }, { user_id: 7 }, { user_id: 9 }], []];
+      }
       return [[{ id: 201, name: "總務部" }], []];
     }),
   };
 
-  it("shows the handling contact's comments as the org and leaves the public's comments alone", async () => {
-    const rows = [
-      { id: 1, user_id: 5, username: "Alice", avatar_url: "a.png", public_id: "u-5" },
-      { id: 2, user_id: 2, username: "王小明", avatar_url: "ming.png", public_id: "u-2" },
-    ];
-    const [publicComment, contactComment] = await maskOrgComments(db, 1000, rows);
+  const comments = () => [
+    { id: 1, user_id: 5, username: "Alice", avatar_url: "a.png", public_id: "u-5" },
+    { id: 2, user_id: 2, username: "王小明", avatar_url: "ming.png", public_id: "u-2" },
+    { id: 3, user_id: 7, username: "陳同事", avatar_url: "c.png", public_id: "u-7" },
+    { id: 4, user_id: 1, username: "管理員", avatar_url: "m.png", public_id: "u-1" },
+    { id: 5, user_id: 9, username: "前窗口", avatar_url: "p.png", public_id: "u-9" },
+  ];
+  const asOrg = {
+    username: "甲公司",
+    avatar_url: null,
+    user_id: null,
+    public_id: "org-post:33333333-3333-4333-8333-333333333333",
+  };
+
+  it("shows every contact, Org Admin and earlier handler as the org and leaves the public alone", async () => {
+    const [publicComment, ...orgSide] = await maskOrgComments(db, 1000, comments());
 
     expect(publicComment).toMatchObject({ username: "Alice", public_id: "u-5", user_id: 5 });
-    expect(contactComment).toMatchObject({
-      username: "甲公司",
-      avatar_url: null,
-      user_id: null,
-      public_id: "org-post:33333333-3333-4333-8333-333333333333",
-    });
+    for (const comment of orgSide) expect(comment).toMatchObject(asOrg);
+  });
+
+  it("keeps a viewer's own comments unmasked so they can edit them", async () => {
+    const rows = await maskOrgComments(db, 1000, comments(), { viewerUserId: 7 });
+
+    expect(rows[2]).toMatchObject({ username: "陳同事", user_id: 7 });
+    expect(rows[1]).toMatchObject(asOrg);
   });
 });

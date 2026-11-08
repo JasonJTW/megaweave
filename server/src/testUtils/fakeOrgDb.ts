@@ -312,6 +312,16 @@ export function createFakeOrgDb(
     }
 
     if (
+      sql ===
+      "SELECT org_unit_id FROM org_unit_contacts WHERE org_id = ? AND membership_id = ? FOR UPDATE"
+    ) {
+      const rows = db.unitContacts
+        .filter((c) => c.org_id === params[0] && c.membership_id === Number(params[1]))
+        .map((c) => ({ org_unit_id: c.org_unit_id }));
+      return [rows, []];
+    }
+
+    if (
       /^INSERT INTO org_unit_contacts \(org_id, ?org_unit_id, ?membership_id\) VALUES \?$/.test(
         sql,
       )

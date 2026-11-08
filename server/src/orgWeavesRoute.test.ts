@@ -213,6 +213,33 @@ describe("POST /api/weaves on an Internal org item: who may request", () => {
   });
 });
 
+describe("POST /api/weaves on an org item: who hears about a new request", () => {
+  it("notifies every contact of the owning unit and every Org Admin, but not the requester", async () => {
+    const { postId } = await listInternalItem();
+    const { createNotification } = jest.requireMock("./utils/notificationService");
+    (createNotification as jest.Mock).mockClear();
+
+    const res = await requestAs(ADMIN_IT_CONTACT, postId, { actingUnitId: IT_DEPT });
+
+    expect(res.status).toBe(201);
+    const recipients = (createNotification as jest.Mock).mock.calls
+      .filter(([, n]) => n.type === "WEAVE_REQUESTED")
+      .map(([, n]) => n.recipient_id)
+      .sort();
+    //* 總務部的兩位窗口（含經手人）與另一位 Org Admin；申請人自己（Org Admin 兼資訊部窗口）不收
+    expect(recipients).toEqual([ORG_ADMIN, GA_CONTACT, GA_CONTACT_2].sort());
+    expect(createNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        recipient_id: GA_CONTACT_2,
+        type: "WEAVE_REQUESTED",
+        //* 不是 Weave 一方的審核者到組織物品管理頁核可
+        link: "/org/items",
+      }),
+    );
+  });
+});
+
 describe("POST /api/weaves: who the request is on behalf of", () => {
   it("records a personal request with no receiving unit", async () => {
     const { postId } = await listInternalItem();

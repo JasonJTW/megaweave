@@ -1076,6 +1076,8 @@
     "ORG_UNIT_NOT_MANAGED": "You are not a Unit Contact of this unit, so you can't list or manage its items.",
     "ORG_ITEM_DELIVERY_UNAVAILABLE": "Org items are pickup only. Payment and delivery aren't available.",
     "ORG_HANDOVER_TARGET_IS_REQUESTER": "The new contact has a request open on one of these items. Settle that request first, or pick another contact.",
+    "ORG_TIER_NOT_ALLOWED": "You can't move this item to that tier.",
+    "ORG_TIER_DEMOTION_BLOCKED": "This item already has an approved or completed request, so it can't be moved down.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1274,7 +1276,13 @@
       "requestQuantity": "Qty {quantity}",
       "approve": "Approve",
       "decline": "Decline",
-      "reviewFailed": "Couldn't update the request. Please try again."
+      "reviewFailed": "Couldn't update the request. Please try again.",
+      "promoteToMembers": "Release to Members",
+      "demoteToInternal": "Move back to Internal",
+      "demoteConfirm": "Move “{title}” back to Internal? Pending requests from Org Members will be declined automatically and they will be notified.",
+      "promoted": "Released to Members. Org Members can see this item now.",
+      "demoted": "Moved back to Internal.",
+      "tierChangeFailed": "Couldn't change the tier. Please try again later."
     },
     "weaveStatus": {
       "requested": "Awaiting review",

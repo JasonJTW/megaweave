@@ -23,6 +23,16 @@ export const ORG_LISTER = {
   username: "E2E Org Lister",
 };
 
+/** #138：檢視者單位（E2E Unit）的 Internal 物品，檢視者在後台升到 Members（client/e2e/orgTier.spec.ts） */
+export const ORG_TIER_TITLE = "E2E Org Tier internal";
+
+/** #138：只有 Org Member 身分（access_level = member），在 Members 層看到並申請物品 */
+export const ORG_MEMBER = {
+  email: "e2e-org-member@megaweave.test",
+  password: "e2e-org-member-123",
+  username: "E2E Org Member",
+};
+
 const orgViewerSchema = z.object({
   E2E_ORG_VIEWER_EMAIL: z.email(),
   E2E_ORG_VIEWER_PASSWORD: z.string().min(8),
@@ -149,6 +159,33 @@ export async function seedOrgIsolationFixture(
     ORG_CLAIM_TITLE,
     2,
   ]);
+
+  // #138：檢視者單位的 Internal 物品（待升到 Members），與只有 Org Member 身分的帳號
+  const [tierPost] = await mysql.query<ResultSetHeader>(
+    `INSERT INTO posts
+       (public_id, user_id, org_id, org_unit_id, audience_tier, title, content, type,
+        category_id, condition_level, expires_at)
+     VALUES (?, ?, ?, ?, 'internal', ?, ?, 'share', 1, 2, NULL)`,
+    [
+      randomUUID(),
+      viewerId,
+      orgId,
+      unit.insertId,
+      ORG_TIER_TITLE,
+      "Seeded by the E2E org tier fixture",
+    ],
+  );
+  await mysql.query("INSERT INTO items (post_id, title, quantity) VALUES (?, ?, ?)", [
+    tierPost.insertId,
+    ORG_TIER_TITLE,
+    1,
+  ]);
+  const memberId = await seedE2eUser(mysql, ORG_MEMBER);
+  await mysql.query(
+    `INSERT INTO org_memberships (org_id, user_id, access_level, org_role)
+     VALUES (?, ?, 'member', 'member')`,
+    [orgId, memberId],
+  );
 
   await mysql.query("UPDATE user_profiles SET interest_vector = ? WHERE user_id = ?", [
     vectorJson,

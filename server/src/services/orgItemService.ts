@@ -17,6 +17,13 @@ import {
   scopeFromMemberships,
 } from "./postVisibility";
 import {
+  afterTierChange,
+  changePostTier,
+  listTierEvents,
+  TierEvent,
+} from "./orgTierService";
+import type { Server } from "socket.io";
+import {
   defaultUnitWeightKg,
   OrgItemCategoryId,
   publicCategoryIdOf,
@@ -180,6 +187,44 @@ export function visibleTiers(accessLevel: AccessLevel): AudienceTier[] {
   return [...access.tiers, "public"];
 }
 
+export function tierNotAllowed() {
+  return new HttpError(
+    403,
+    "ORG_TIER_NOT_ALLOWED",
+    "You cannot move this item to that tier",
+  );
+}
+
+/**
+ * 誰能改成哪一層（PRD 0001 §5.1）：Unit Contact 只能把自己單位的物品從 Internal 升到 Members；
+ * Org Admin 可在 Internal／Members 之間升降任何單位的物品。升到 Public 走待公開流程（#140），這裡一律拒絕。
+ */
+function assertTierChangeAllowed(
+  access: OrgAccess,
+  post: { fromTier: AudienceTier; orgUnitId: number },
+  toTier: AudienceTier,
+) {
+  assertManages(access, post.orgUnitId);
+  if (toTier === "public") throw tierNotAllowed();
+  if (access.isAdmin) return;
+  if (!(post.fromTier === "internal" && toTier === "members")) throw tierNotAllowed();
+}
+
+/** 後台：能管這件物品所屬單位的人才找得到它，否則 404／403 */
+async function findManagedPost(access: OrgAccess, itemPublicId: string): Promise<number> {
+  if (access.manageableUnits.length === 0) throw unitNotManaged();
+  const [posts] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT p.id, p.org_unit_id FROM posts p
+     WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL`,
+    [access.orgId, itemPublicId],
+  );
+  if (posts.length === 0) {
+    throw new HttpError(404, "POST_NOT_FOUND", "Item not found");
+  }
+  assertManages(access, Number(posts[0].org_unit_id));
+  return Number(posts[0].id);
+}
+
 function assertManages(access: OrgAccess, unitId: number): OrgUnitRef {
   const unit = access.manageableUnits.find((u) => u.id === unitId);
   if (!unit) throw unitNotManaged();
@@ -316,16 +361,7 @@ export const orgItemService = {
     access: OrgAccess,
     itemPublicId: string,
   ): Promise<OrgItemRequest[]> {
-    if (access.manageableUnits.length === 0) throw unitNotManaged();
-    const [posts] = await dbPool.execute<RowDataPacket[]>(
-      `SELECT p.id, p.org_unit_id FROM posts p
-       WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL`,
-      [access.orgId, itemPublicId],
-    );
-    if (posts.length === 0) {
-      throw new HttpError(404, "POST_NOT_FOUND", "Item not found");
-    }
-    assertManages(access, Number(posts[0].org_unit_id));
+    const postId = await findManagedPost(access, itemPublicId);
 
     const [rows] = await dbPool.execute<RowDataPacket[]>(
       `SELECT w.id, w.status, w.created_at, w.receiver_org_unit_id,
@@ -338,7 +374,7 @@ export const orgItemService = {
        LEFT JOIN org_units ru ON ru.id = w.receiver_org_unit_id
        WHERE w.post_id = ? AND w.status IN ('requested', 'approved', 'completed')
        ORDER BY w.created_at DESC, w.id DESC`,
-      [posts[0].id],
+      [postId],
     );
     return rows.map((row) => ({
       id: Number(row.id),
@@ -351,6 +387,38 @@ export const orgItemService = {
           ? null
           : { id: Number(row.receiver_org_unit_id), name: String(row.receiver_org_unit_name) },
     }));
+  },
+
+  /**
+   * 後台：改物品層級（升到 Members、降回 Internal）。降級時看不到新層級的人的 Requested 請求自動婉拒。
+   * 權限見 assertTierChangeAllowed；貼文鎖住後才判斷，同時升降不會互相覆蓋
+   */
+  async changeItemTier(
+    access: OrgAccess,
+    userId: number,
+    itemPublicId: string,
+    toTier: AudienceTier,
+    io: Server | null,
+  ): Promise<OrgItem> {
+    if (access.manageableUnits.length === 0) throw unitNotManaged();
+    const result = await withTransaction((connection) =>
+      changePostTier(connection, {
+        orgId: access.orgId,
+        postPublicId: itemPublicId,
+        toTier,
+        actor: { type: "user", userId },
+        authorize: (post) => assertTierChangeAllowed(access, post, toTier),
+      }),
+    );
+    await afterTierChange(result, { io, actorName: access.name, actorUserId: userId });
+    const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
+    return item;
+  },
+
+  /** 後台：一件物品的層級紀錄（誰、何時、從哪層到哪層），舊的在前 */
+  async listItemTierEvents(access: OrgAccess, itemPublicId: string): Promise<TierEvent[]> {
+    const postId = await findManagedPost(access, itemPublicId);
+    return listTierEvents(dbPool, postId);
   },
 
   /** 代表單位上架：Share、Internal */

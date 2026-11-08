@@ -429,7 +429,7 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** 系統代為婉拒的 Weave（例如移除成員、#138 的降級） */
+/** 系統代為婉拒的 Weave（#142 移除成員、#138 降級） */
 export interface AutoDeclinedWeave {
   id: number;
   postId: number;
@@ -440,11 +440,12 @@ export interface AutoDeclinedWeave {
 /**
  * 交易 commit 後通知系統代為婉拒的申請：申請人（Receiver）收到 declined 通知與 Email，
  * 兩造的畫面收到 weave_status_updated。`actorName` 用組織名稱，不曝光操作的管理員。失敗只記 log。
+ * `actor.id` 為 null 代表系統操作（#139 自動升級），通知的 sender 改記 Giver。
  */
 export async function announceAutoDeclined(
   io: Server | null,
   weaves: readonly AutoDeclinedWeave[],
-  actor: { id: number; name: string },
+  actor: { id: number | null; name: string },
 ): Promise<void> {
   for (const weave of weaves) {
     try {
@@ -457,7 +458,7 @@ export async function announceAutoDeclined(
         io,
         weaveId: weave.id,
         recipientId: weave.receiverId,
-        senderId: actor.id,
+        senderId: actor.id ?? weave.giverId,
         actorName: actor.name,
         postTitle,
         action: "declined",

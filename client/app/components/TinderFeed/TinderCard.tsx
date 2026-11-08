@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { motion, useMotionValue, useTransform, PanInfo, MotionValue } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useTransform,
+  PanInfo,
+  MotionValue,
+} from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import Image from "next/image";
@@ -17,6 +23,7 @@ import ElfIcon from "../icons/ElfIcon";
 import WazowskiIcon from "../icons/WazowskiIcon";
 import { Info, ChevronLeft, ChevronRight, Package } from "lucide-react";
 import ReuseIcon from "../icons/ReuseIcon";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 // Duration each card is shown before auto-advancing (seconds)
 const AUTO_ADVANCE_SECS = 8;
@@ -41,6 +48,7 @@ export default function TinderCard({
   forcedDirection,
 }: TinderCardProps) {
   const t = useTranslations("Tinder.card");
+  const displayName = useDisplayName();
   const categoryName = useCategoryName();
   const conditionText = useConditionText();
   const { coords } = useLocation();
@@ -67,7 +75,10 @@ export default function TinderCard({
   const rotate = useTransform(x, [-260, 260], [-18, 18]);
 
   // For top card: keep the shared dragX in sync so under-cards can respond in real-time
-  useTransform(x, (v) => { if (isTop) dragX.set(v); return v; });
+  useTransform(x, (v) => {
+    if (isTop) dragX.set(v);
+    return v;
+  });
 
   // 隨著左右拖曳接近 SWIPE_THRESHOLD 平滑降低卡片透明度 (純 GPU 合成，不觸發 CPU/GPU 重繪)
   const cardDragOpacity = useTransform(
@@ -206,8 +217,8 @@ export default function TinderCard({
 
   // Stack styling for cards underneath (keep 100% solid opacity so they don't look transparent behind top card)
   // Under-card scale and y are driven by the top card's dragX so they grow in real-time as the user drags
-  const baseScale = 1 - indexInStack * 0.04;   // resting scale (e.g. 0.96 for index 1)
-  const baseY = indexInStack * 10;              // resting vertical offset
+  const baseScale = 1 - indexInStack * 0.04; // resting scale (e.g. 0.96 for index 1)
+  const baseY = indexInStack * 10; // resting vertical offset
   const undercardScale = useTransform(
     dragX,
     [-200, 0, 200],
@@ -216,7 +227,9 @@ export default function TinderCard({
   const undercardY = useTransform(
     dragX,
     [-200, 0, 200],
-    isTop ? [0, 0, 0] : [Math.max(0, baseY - 10), baseY, Math.max(0, baseY - 10)],
+    isTop
+      ? [0, 0, 0]
+      : [Math.max(0, baseY - 10), baseY, Math.max(0, baseY - 10)],
   );
   const opacity = indexInStack > 2 ? 0 : 1;
   const zIndex = 30 - indexInStack;
@@ -530,13 +543,16 @@ export default function TinderCard({
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <Avatar className="h-5 w-5 border border-white/20">
-                <AvatarImage src={post.avatar_url} alt={post.username} />
+                <AvatarImage
+                  src={post.avatar_url}
+                  alt={displayName(post.username)}
+                />
                 <AvatarFallback className="bg-stone-700 text-[10px] text-white">
-                  {post.username?.slice(0, 1).toUpperCase() || "U"}
+                  {displayName(post.username)?.slice(0, 1).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
               <span className="font-semibold text-white/90">
-                {post.username}
+                {displayName(post.username)}
               </span>
               {post.created_at && (
                 <div className="flex items-center gap-1 text-stone-400">

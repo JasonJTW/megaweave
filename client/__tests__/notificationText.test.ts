@@ -4,6 +4,7 @@ import { createTranslator } from "next-intl";
 import zhTW from "../messages/zh-TW.json";
 import en from "../messages/en.json";
 import { notificationText } from "../utils/notificationText";
+import { ANONYMOUS_PUBLISHER, publisherDisplayName } from "../lib/orgContact";
 
 const tZh = createTranslator({
   locale: "zh-TW",
@@ -205,5 +206,39 @@ describe("notificationText", () => {
         content: '{x} liked your post "<b>50% off {free}</b>"',
       },
     );
+  });
+
+  it("shows an anonymous org in the reader's language", () => {
+    const n = {
+      type: "WEAVE_APPROVED",
+      params: { actorName: ANONYMOUS_PUBLISHER, postTitle: "螢幕" },
+      ...legacy,
+    };
+    assert.match(notificationText(tZh, n).content, /^匿名 同意了/);
+    assert.match(notificationText(tEn, n).content, /^Anonymous /);
+  });
+
+  it("tells the new contact what they took over", () => {
+    const n = {
+      type: "ORG_HANDOVER",
+      params: { unitName: "總務部", itemCount: "2", weaveCount: "1" },
+      ...legacy,
+    };
+    assert.equal(
+      notificationText(tZh, n).content,
+      "你已接手「總務部」的 2 件物品與 1 筆進行中的申請",
+    );
+    assert.equal(
+      notificationText(tEn, n).content,
+      "You took over 2 items and 1 open requests of 總務部",
+    );
+  });
+});
+
+describe("publisherDisplayName", () => {
+  it("translates only the anonymous token", () => {
+    assert.equal(publisherDisplayName(ANONYMOUS_PUBLISHER, "匿名"), "匿名");
+    assert.equal(publisherDisplayName("甲公司", "匿名"), "甲公司");
+    assert.equal(publisherDisplayName(undefined, "匿名"), undefined);
   });
 });

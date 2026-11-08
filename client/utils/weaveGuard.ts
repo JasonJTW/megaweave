@@ -50,16 +50,21 @@ export function getLalamoveAction({
 
 /**
  * Determines whether LalamoveQuotation should be displayed below WeavingCard.
- * It is displayed only when in chat window, the weave status is 'approved', and post data exists.
+ * It is displayed only when in chat window, the weave status is 'approved', post data exists, and the post is not an org item.
  */
 export function shouldShowLalamoveQuotation({
   isInChatWindow,
   status,
   hasPost,
+  isOrgItem,
 }: {
   isInChatWindow?: boolean;
   status?: WeaveStatus | null;
   hasPost?: boolean;
+  /** Org items are pickup only: no ECPay, no Lalamove (PRD 0001 §5.1) */
+  isOrgItem?: boolean;
 }): boolean {
-  return Boolean(isInChatWindow && status === "approved" && hasPost);
+  return Boolean(
+    isInChatWindow && status === "approved" && hasPost && !isOrgItem,
+  );
 }

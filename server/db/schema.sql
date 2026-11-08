@@ -240,18 +240,25 @@ CREATE TABLE `conversations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user1_id` bigint unsigned NOT NULL,
   `user2_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned DEFAULT NULL,
+  `org_user_id` bigint unsigned DEFAULT NULL,
+  `org_key` bigint unsigned GENERATED ALWAYS AS (ifnull(`org_id`,0)) STORED,
   `last_message_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `last_message_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_conversation_users` (`user1_id`,`user2_id`),
+  UNIQUE KEY `idx_conversation_users_org` (`user1_id`,`user2_id`,`org_key`),
+  KEY `idx_conversations_org` (`org_id`),
   KEY `idx_last_message_at` (`last_message_at`),
   KEY `fk_conv_user2` (`user2_id`),
   KEY `last_message_id` (`last_message_id`),
   CONSTRAINT `fk_conv_last_message` FOREIGN KEY (`last_message_id`) REFERENCES `messages` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_conv_user1` FOREIGN KEY (`user1_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_conv_user2` FOREIGN KEY (`user2_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_conv_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_conv_org_user` FOREIGN KEY (`org_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `check_conv_org_user` CHECK (((`org_id` is null) = (`org_user_id` is null))),
   CONSTRAINT `check_user_order` CHECK ((`user1_id` < `user2_id`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -440,6 +447,33 @@ CREATE TABLE `notifications` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_handover_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `org_id` bigint unsigned NOT NULL,
+  `org_unit_id` bigint unsigned NOT NULL,
+  `post_id` bigint unsigned NOT NULL,
+  `weave_id` bigint unsigned DEFAULT NULL COMMENT 'NULL = 物品的經手人移轉；有值 = 這筆進行中 Weave 的 Giver 移轉',
+  `from_user_id` bigint unsigned NOT NULL COMMENT '原經手人',
+  `to_user_id` bigint unsigned NOT NULL COMMENT '新經手人（同單位窗口）',
+  `operator_user_id` bigint unsigned NOT NULL COMMENT '執行交接的 Org Admin（或 Platform Admin）',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_org_handover_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_handover_events_weave` (`weave_id`),
+  KEY `fk_org_handover_events_unit` (`org_id`,`org_unit_id`),
+  KEY `fk_org_handover_events_from` (`from_user_id`),
+  KEY `fk_org_handover_events_to` (`to_user_id`),
+  KEY `fk_org_handover_events_operator` (`operator_user_id`),
+  CONSTRAINT `fk_org_handover_events_unit` FOREIGN KEY (`org_id`, `org_unit_id`) REFERENCES `org_units` (`org_id`, `id`),
+  CONSTRAINT `fk_org_handover_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_handover_events_weave` FOREIGN KEY (`weave_id`) REFERENCES `weaves` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_handover_events_from` FOREIGN KEY (`from_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_handover_events_to` FOREIGN KEY (`to_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_handover_events_operator` FOREIGN KEY (`operator_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `org_memberships` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `org_id` bigint unsigned NOT NULL,
@@ -456,6 +490,73 @@ CREATE TABLE `org_memberships` (
   KEY `idx_org_memberships_user_id` (`user_id`),
   CONSTRAINT `fk_org_memberships_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
   CONSTRAINT `fk_org_memberships_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_post_details` (
+  `post_id` bigint unsigned NOT NULL,
+  `org_category` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantity` int unsigned NOT NULL,
+  `unit_weight_kg` decimal(10,3) NOT NULL,
+  `weight_is_default` tinyint(1) NOT NULL DEFAULT '0',
+  `asset_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estimated_value_twd` int unsigned DEFAULT NULL,
+  `auto_release_override` enum('auto','manual') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `auto_release_days` smallint unsigned DEFAULT NULL,
+  `pending_public_due_at` datetime(3) DEFAULT NULL,
+  `pending_public_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`post_id`),
+  KEY `idx_org_post_details_category` (`org_category`),
+  KEY `idx_org_post_details_pending_public` (`pending_public_due_at`),
+  CONSTRAINT `fk_org_post_details_pending_public_by` FOREIGN KEY (`pending_public_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fk_org_post_details_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `org_post_details_chk_auto_release` CHECK (((`auto_release_days` is not null) = (`auto_release_override` <=> 'auto'))),
+  CONSTRAINT `org_post_details_chk_pending_public` CHECK (((`pending_public_due_at` is null) = (`pending_public_by` is null))),
+  CONSTRAINT `org_post_details_chk_auto_release_days` CHECK (((`auto_release_days` is null) or (`auto_release_days` between 1 and 365))),
+  CONSTRAINT `org_post_details_chk_quantity` CHECK ((`quantity` >= 1)),
+  CONSTRAINT `org_post_details_chk_weight` CHECK ((`unit_weight_kg` > 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_pending_public_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `post_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned NOT NULL,
+  `action` enum('started','cancelled','skipped') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `asset_disposal_confirmed` tinyint(1) NOT NULL DEFAULT '0',
+  `actor_user_id` bigint unsigned NOT NULL,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_pending_public_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_pending_public_events_org` (`org_id`,`created_at`),
+  KEY `idx_org_pending_public_events_actor` (`actor_user_id`),
+  CONSTRAINT `fk_org_pending_public_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_pending_public_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_org_pending_public_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `org_post_tier_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `post_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned NOT NULL,
+  `from_tier` enum('internal','members','public') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `to_tier` enum('internal','members','public') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_type` enum('user','system') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_user_id` bigint unsigned DEFAULT NULL COMMENT '操作者；系統操作（自動升級）為 NULL',
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_post_tier_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_post_tier_events_org` (`org_id`,`created_at`),
+  KEY `idx_org_post_tier_events_actor` (`actor_user_id`),
+  CONSTRAINT `fk_org_post_tier_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_post_tier_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_org_post_tier_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `org_post_tier_events_chk_actor` CHECK (((`actor_type` = 'system') = (`actor_user_id` is null))),
+  CONSTRAINT `org_post_tier_events_chk_change` CHECK ((`from_tier` <> `to_tier`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -483,6 +584,27 @@ CREATE TABLE `org_units` (
   UNIQUE KEY `uq_org_units_org_id_id` (`org_id`,`id`),
   UNIQUE KEY `uq_org_units_org_id_name` (`org_id`,`name`),
   CONSTRAINT `fk_org_units_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_weave_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `weave_id` bigint unsigned NOT NULL,
+  `post_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned NOT NULL,
+  `action` enum('approved','declined','withdrawn','cancelled','confirmed','completed') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_user_id` bigint unsigned DEFAULT NULL COMMENT '操作者；系統自動婉拒為 NULL',
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_weave_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_weave_events_org` (`org_id`,`created_at`),
+  KEY `idx_org_weave_events_weave` (`weave_id`),
+  KEY `idx_org_weave_events_actor` (`actor_user_id`),
+  CONSTRAINT `fk_org_weave_events_weave` FOREIGN KEY (`weave_id`) REFERENCES `weaves` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_weave_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_weave_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_org_weave_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -720,6 +842,7 @@ CREATE TABLE `weaves` (
   `post_id` bigint unsigned NOT NULL COMMENT '哪篇貼文',
   `giver_id` bigint unsigned NOT NULL COMMENT '給予者（交出物品的一方；Share 為 Post Author，Wish 為 Initiator，見 ADR 0001）',
   `receiver_id` bigint unsigned NOT NULL COMMENT '接收者（收到物品的一方；Share 為 Initiator，Wish 為 Post Author，見 ADR 0001）',
+  `receiver_org_unit_id` bigint unsigned DEFAULT NULL COMMENT '物品流向的單位（申請人送出時選擇；個人 Weave 為 NULL，見 ADR 0004）',
   `conversation_id` bigint unsigned DEFAULT NULL,
   `status` enum('approved','completed','cancelled','requested','declined','withdrawn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'requested',
   `giver_confirmed` tinyint(1) DEFAULT '0',
@@ -735,10 +858,12 @@ CREATE TABLE `weaves` (
   KEY `idx_status` (`status`),
   KEY `idx_completed_at` (`completed_at`),
   KEY `idx_conversation_id` (`conversation_id`),
+  KEY `idx_weaves_receiver_org_unit` (`receiver_org_unit_id`),
   CONSTRAINT `fk_weaves_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_weaves_giver` FOREIGN KEY (`giver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_weaves_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_weaves_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_weaves_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_weaves_receiver_org_unit` FOREIGN KEY (`receiver_org_unit_id`) REFERENCES `org_units` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

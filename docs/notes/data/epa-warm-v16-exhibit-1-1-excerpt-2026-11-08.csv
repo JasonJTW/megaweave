@@ -1,0 +1,19 @@
+material,net_source_reduction_current_mix,net_source_reduction_100pct_virgin,net_recycling,net_combustion,net_landfilling,unit,locator,used_in_model
+Desktop CPUs,-20.86,-20.86,-1.49,-0.66,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2; Electronics ch. Exhibit 1-5 p.1-4 and Exhibit 1-7 p.1-7,yes
+Portable Electronic Devices,-29.83,-29.83,-1.06,0.65,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2; Electronics ch. Exhibit 1-5 p.1-4 and Exhibit 1-7 p.1-7,yes
+Flat-Panel Displays,-24.19,-24.19,-0.99,0.03,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2; Electronics ch. Exhibit 1-5 p.1-4 and Exhibit 1-7 p.1-7,yes
+Electronic Peripherals,-10.32,-10.32,-0.36,2.08,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2; Electronics ch. Exhibit 1-5 p.1-4 and Exhibit 1-7 p.1-7,yes
+Hard-Copy Devices,-7.65,-7.65,-0.56,1.20,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2; Electronics ch. Exhibit 1-5 p.1-4 and Exhibit 1-7 p.1-7,yes
+Mixed Electronics,-20.79,-20.79,-0.90,0.34,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2,no (cross-check only)
+Medium-density Fiberboard,-2.41,-2.41,NA,-0.58,-0.85,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2 (includes forest carbon storage),no (cross-check only)
+Dimensional Lumber,-2.11,-2.11,-1.66,-0.58,-0.92,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2 (includes forest carbon storage),no (cross-check only)
+Steel Cans,-3.03,-3.64,-1.83,-1.59,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2,no (cross-check only)
+Aluminum Ingot,-7.48,-7.48,-7.20,0.03,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2,no (cross-check only)
+PP,-1.52,-1.54,-0.79,1.29,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-1,no (cross-check only)
+HDPE,-1.42,-1.52,-0.76,1.29,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-1,no (cross-check only)
+Mixed Plastics,-1.87,-1.94,-0.93,1.26,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-1,no (cross-check only)
+Office Paper,-7.95,-8.23,-2.86,-0.47,1.13,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-1 (includes forest carbon storage),no (cross-check only)
+Textbooks,-9.02,-9.32,-3.10,-0.47,1.13,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-1 (includes forest carbon storage),no (cross-check only)
+Glass,-0.53,-0.60,-0.28,0.03,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2,no (cross-check only)
+Carpet,-3.68,-3.68,-2.38,1.10,0.02,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2,no (cross-check only)
+Mixed MSW,NA,NA,NA,0.01,0.31,MTCO2E/short ton,Management Practices ch.1 Exhibit 1-1 p.1-2,no (cross-check only)

@@ -172,6 +172,33 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       expect(mockProvider.createPaymentSession).not.toHaveBeenCalled();
     });
 
+    it("rejects checkout for an org item: org items are free pickup only (PRD 0001 §5.1)", async () => {
+      mockPool.query
+        .mockResolvedValueOnce([[{ id: 1, full_address: "Taipei Main Station" }]]) // pickup
+        .mockResolvedValueOnce([[{ id: 2, full_address: "Taipei 101" }]]); // dropoff
+      mockConnection.query.mockResolvedValueOnce([[{ id: 7, org_id: 10 }]]); // approved weave on an org post
+
+      await expect(
+        paymentService.createCheckoutOrder({
+          userId: 42,
+          postId: 99,
+          serviceType: "MOTORCYCLE",
+          quotationId: "QUOTE_12345",
+          feeTotal: 150,
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          pickupLocationId: 1,
+          dropoffLocationId: 2,
+          senderName: "Alice",
+          senderPhone: "+886912345678",
+          recipientName: "Bob",
+          recipientPhone: "+886987654321",
+        }),
+      ).rejects.toMatchObject({ statusCode: 400, code: "ORG_ITEM_DELIVERY_UNAVAILABLE" });
+      expect(mockConnection.rollback).toHaveBeenCalled();
+      expect(mockConnection.commit).not.toHaveBeenCalled();
+      expect(mockProvider.createPaymentSession).not.toHaveBeenCalled();
+    });
+
     it("should reject checkout if quotation has already expired", async () => {
       const input: CreateCheckoutOrderInput = {
         userId: 42,

@@ -5,6 +5,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useConversations } from "@/hooks/useChat";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface ConversationListProps {
   currentConversationId?: number;
@@ -15,6 +16,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 }) => {
   const { conversations, isLoading } = useConversations();
   const t = useTranslations("Chat");
+  const displayName = useDisplayName();
   const formatter = useFormatter();
   const now = new Date();
 
@@ -49,13 +51,15 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             <Avatar className="h-12 w-12">
               <AvatarImage src={conversation.other_avatar_url} />
               <AvatarFallback>
-                {conversation.other_username?.substring(0, 2).toUpperCase()}
+                {displayName(conversation.other_username)
+                  ?.substring(0, 2)
+                  .toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex items-center justify-between">
                 <span className="truncate font-semibold">
-                  {conversation.other_username}
+                  {displayName(conversation.other_username)}
                 </span>
                 {conversation.last_message_at && (
                   <span className="ml-2 whitespace-nowrap text-xs text-gray-500">

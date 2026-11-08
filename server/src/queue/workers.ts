@@ -23,9 +23,13 @@ import {
   DeliveryRefundJobData,
 } from "./jobs/deliveryRefund";
 import { processDeliveryDispatchCheck } from "./jobs/deliveryDispatchCheck";
+import { processOrgAutoRelease } from "./jobs/orgAutoRelease";
+import { processOrgPendingPublic } from "./jobs/orgPendingPublic";
 import {
   initUserVectorFlushCron,
   initDeliveryReconcileCron,
+  initOrgAutoReleaseCron,
+  initOrgPendingPublicCron,
   DeliveryDispatchCheckJobData,
 } from "./queues";
 import { WORKER_CONCURRENCY } from "./concurrency";
@@ -331,6 +335,62 @@ export async function startWorkers(): Promise<void> {
     );
   });
 
+  // ─── Org Auto Release Worker (#139，每小時把到期的 Internal 物品升到 Members) ───
+  const orgAutoReleaseWorker = new Worker(
+    "org-auto-release",
+    async (job: Job) => {
+      if (job.name === "release-org-items") {
+        return await processOrgAutoRelease(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["org-auto-release"] },
+  );
+
+  orgAutoReleaseWorker.on("completed", (job, result) => {
+    const res = result as { released?: number } | undefined;
+    if (res && (res.released ?? 0) > 0) {
+      console.log(
+        `🎉 [org-auto-release] Job ${formatJobId(job.id)} finished at ${formatDateTime()} (Released: ${res.released})`,
+      );
+    }
+  });
+
+  orgAutoReleaseWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [org-auto-release] Job ${formatJobId(job?.id)} failed at ${formatDateTime()}: ${err.message}`,
+    );
+  });
+
+  await initOrgAutoReleaseCron();
+
+  // ─── Org Pending Public Worker (#140，每分鐘把待公開期已到的物品升到 Public) ───
+  const orgPendingPublicWorker = new Worker(
+    "org-pending-public",
+    async (job: Job) => {
+      if (job.name === "publish-pending-org-items") {
+        return await processOrgPendingPublic(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["org-pending-public"] },
+  );
+
+  orgPendingPublicWorker.on("completed", (job, result) => {
+    const res = result as { published?: number } | undefined;
+    if (res && (res.published ?? 0) > 0) {
+      console.log(
+        `🎉 [org-pending-public] Job ${formatJobId(job.id)} finished at ${formatDateTime()} (Published: ${res.published})`,
+      );
+    }
+  });
+
+  orgPendingPublicWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [org-pending-public] Job ${formatJobId(job?.id)} failed at ${formatDateTime()}: ${err.message}`,
+    );
+  });
+
+  await initOrgPendingPublicCron();
+
   activeWorkers = [
     postImageWorker,
     emailWorker,
@@ -341,6 +401,8 @@ export async function startWorkers(): Promise<void> {
     deliveryReconcileWorker,
     deliveryRefundWorker,
     deliveryDispatchCheckWorker,
+    orgAutoReleaseWorker,
+    orgPendingPublicWorker,
   ];
 
   console.log("🚀 All workers started");

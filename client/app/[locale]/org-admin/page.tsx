@@ -3,15 +3,18 @@
 //* 組織管理員後台（PRD 0001 §5.1）：管理單位與成員
 //* 頁面守門：middleware 只確認已登入；是否為該組織的 Org Admin（或 Platform Admin）由 server 判斷（不是就回 ORG_NOT_FOUND）
 //* 身分：`role` 是 Org Admin 或 Org Member；`unitIds` 是擔任 Unit Contact 的單位，兩者可並存（ADR 0004）
+//* 交接（E8-1）：窗口離職或異動後，他經手的物品與進行中的 Weave 在「待交接」轉給同單位另一位窗口
+//* 自動升級（#139）：組織層級的開關與天數；單件覆寫在 /org/items
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -21,8 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/apiError";
+import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { useUser } from "@/app/contexts/UserContext";
+import { Link } from "@/i18n/navigation";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -155,6 +160,333 @@ function IdentityFields({
   );
 }
 
+interface PendingHandover {
+  user: { id: string; email: string; isMember: boolean };
+  unit: OrgUnit;
+  itemCount: number;
+  openWeaveCount: number;
+}
+
+function handoverKey(handover: PendingHandover): string {
+  return `${handover.user.id}:${handover.unit.id}`;
+}
+
+/**
+ * 待交接（E8-1）：離職或異動的窗口還經手著的物品，轉給同單位另一位窗口。
+ * 接手人選項 = 該單位現任窗口，扣掉交出的人
+ */
+function HandoverCard({
+  orgUrl,
+  members,
+  onDone,
+}: {
+  orgUrl: string;
+  members: OrgMember[];
+  onDone: () => Promise<unknown>;
+}) {
+  const t = useTranslations("OrgAdmin.handover");
+  const errorMessage = useApiErrorMessage();
+  const [targets, setTargets] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const { data, error, mutate } = useSWR(`${orgUrl}/handovers`, (url: string) =>
+    requestJson<{ handovers: PendingHandover[] }>(url),
+  );
+
+  async function handOver(handover: PendingHandover) {
+    const key = handoverKey(handover);
+    const toMemberId = Number(targets[key]);
+    if (!toMemberId) return;
+    setSubmitting(key);
+    try {
+      const result = await requestJson<{ items: number; weaves: number }>(
+        `${orgUrl}/handovers`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            fromUserId: handover.user.id,
+            unitId: handover.unit.id,
+            toMemberId,
+          }),
+        },
+      );
+      toast.success(t("done", result));
+      await Promise.all([mutate(), onDone()]);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("heading")}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t("hint")}</p>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {error && (
+          <p className="text-sm text-destructive">{errorMessage(error)}</p>
+        )}
+        {data && data.handovers.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+        )}
+        {data && data.handovers.length > 0 && (
+          <ul className="space-y-2">
+            {data.handovers.map((handover) => {
+              const key = handoverKey(handover);
+              const candidates = members.filter(
+                (m) =>
+                  m.unitIds.includes(handover.unit.id) &&
+                  m.email !== handover.user.email,
+              );
+              return (
+                <li
+                  key={key}
+                  className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-end sm:justify-between"
+                >
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-medium">
+                        {handover.user.email}
+                      </span>
+                      {!handover.user.isMember && (
+                        <Badge variant="outline">{t("leftOrg")}</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("summary", {
+                        unit: handover.unit.name,
+                        items: handover.itemCount,
+                        weaves: handover.openWeaveCount,
+                      })}
+                    </p>
+                  </div>
+                  {candidates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t("noCandidates", { unit: handover.unit.name })}
+                    </p>
+                  ) : (
+                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+                      <Select
+                        value={targets[key] ?? ""}
+                        onValueChange={(value) =>
+                          setTargets((prev) => ({ ...prev, [key]: value }))
+                        }
+                      >
+                        <SelectTrigger
+                          className="w-full sm:w-56"
+                          aria-label={t("targetLabel", {
+                            email: handover.user.email,
+                            unit: handover.unit.name,
+                          })}
+                        >
+                          <SelectValue placeholder={t("targetPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {candidates.map((member) => (
+                            <SelectItem
+                              key={member.id}
+                              value={String(member.id)}
+                            >
+                              {member.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={!targets[key] || submitting !== null}
+                        onClick={() => void handOver(handover)}
+                      >
+                        {submitting === key ? t("submitting") : t("submit")}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface OrgSettings {
+  autoReleaseEnabled: boolean;
+  autoReleaseDays: number;
+  publisherDisplay: PublisherDisplay;
+}
+
+/** 公開層的發文者顯示（#140）：組織名稱、組織＋單位或匿名；和自動升級共用 settings 的 SWR key */
+function PublisherDisplayCard({ orgUrl }: { orgUrl: string }) {
+  const t = useTranslations("OrgAdmin.publisherDisplay");
+  const errorMessage = useApiErrorMessage();
+  const { data, error, mutate } = useSWR(`${orgUrl}/settings`, (url: string) =>
+    requestJson<{ settings: OrgSettings }>(url),
+  );
+  const [saving, setSaving] = useState(false);
+  const { mutate: revalidate } = useSWRConfig();
+  const current = data?.settings.publisherDisplay;
+
+  async function change(value: PublisherDisplay) {
+    if (value === current) return;
+    setSaving(true);
+    try {
+      const result = await requestJson<{ settings: OrgSettings }>(
+        `${orgUrl}/settings`,
+        { method: "PATCH", body: JSON.stringify({ publisherDisplay: value }) },
+      );
+      await mutate(result, { revalidate: false });
+      //* 公開物品的卡片、詳情都換了名稱
+      await revalidate(
+        (key) => typeof key === "string" && key.startsWith(`${hostName}/api/`),
+      );
+      toast.success(t("saved"));
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("heading")}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t("hint")}</p>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <p className="text-sm text-destructive">{errorMessage(error)}</p>
+        )}
+        {current && (
+          <div className="space-y-2">
+            <Label htmlFor="org-publisher-display">{t("label")}</Label>
+            <Select
+              value={current}
+              disabled={saving}
+              onValueChange={(value) => void change(value as PublisherDisplay)}
+            >
+              <SelectTrigger id="org-publisher-display" className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PUBLISHER_DISPLAYS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {t(`option.${option}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** 組織的自動升級設定：自動（天數）或手動 */
+function AutoReleaseCard({ orgUrl }: { orgUrl: string }) {
+  const t = useTranslations("OrgAdmin.settings");
+  const errorMessage = useApiErrorMessage();
+  const { data, error, mutate } = useSWR(`${orgUrl}/settings`, (url: string) =>
+    requestJson<{ settings: OrgSettings }>(url),
+  );
+  const [draft, setDraft] = useState<{ enabled: boolean; days: string } | null>(
+    null,
+  );
+  const [saving, setSaving] = useState(false);
+  const { mutate: revalidate } = useSWRConfig();
+
+  const settings = data?.settings;
+  const enabled = draft?.enabled ?? settings?.autoReleaseEnabled ?? true;
+  const days = draft?.days ?? String(settings?.autoReleaseDays ?? 30);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const result = await requestJson<{ settings: OrgSettings }>(
+        `${orgUrl}/settings`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(
+            enabled
+              ? { autoReleaseEnabled: true, autoReleaseDays: Number(days) }
+              : { autoReleaseEnabled: false },
+          ),
+        },
+      );
+      await mutate(result, { revalidate: false });
+      setDraft(null);
+      //* /org/items 的「跟組織設定」標示來自 GET /api/orgs
+      await revalidate(
+        (key) =>
+          typeof key === "string" && key.startsWith(`${hostName}/api/orgs`),
+      );
+      toast.success(t("saved"));
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("heading")}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t("hint")}</p>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <p className="text-sm text-destructive">{errorMessage(error)}</p>
+        )}
+        {settings && (
+          <form className="space-y-4" onSubmit={save}>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="org-auto-release-enabled"
+                checked={enabled}
+                onCheckedChange={(checked) =>
+                  setDraft({ enabled: checked, days })
+                }
+              />
+              <Label htmlFor="org-auto-release-enabled">
+                {t("enabledLabel")}
+              </Label>
+            </div>
+            {enabled ? (
+              <div className="space-y-2">
+                <Label htmlFor="org-auto-release-days">{t("daysLabel")}</Label>
+                <Input
+                  id="org-auto-release-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  required
+                  className="w-32"
+                  value={days}
+                  onChange={(e) => setDraft({ enabled, days: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">{t("daysHint")}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("manualHint")}</p>
+            )}
+            <Button type="submit" disabled={saving || draft === null}>
+              {t("save")}
+            </Button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OrgAdminPage() {
   const t = useTranslations("OrgAdmin");
   const errorMessage = useApiErrorMessage();
@@ -167,6 +499,7 @@ export default function OrgAdminPage() {
     identity: MemberIdentity;
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { mutate: revalidate } = useSWRConfig();
 
   const { data: orgList, error: orgListError } = useSWR(
     `${hostName}/api/org-admin/orgs`,
@@ -187,7 +520,8 @@ export default function OrgAdminPage() {
     try {
       await action();
       toast.success(success);
-      await mutate();
+      //* 移除或改單位後，待交接清單也會變
+      await Promise.all([mutate(), revalidate(`${orgUrl}/handovers`)]);
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -250,6 +584,22 @@ export default function OrgAdminPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+        {orgId && (
+          <Link
+            href={`/org/items?org=${orgId}`}
+            className="inline-block text-sm underline"
+          >
+            {t("manageItemsLink")}
+          </Link>
+        )}
+        {orgId && (
+          <Link
+            href={`/org-admin/report?org=${orgId}`}
+            className="ml-4 inline-block text-sm underline"
+          >
+            {t("reportLink")}
+          </Link>
+        )}
       </header>
 
       {loadError && (
@@ -457,113 +807,17 @@ export default function OrgAdminPage() {
                   )}
                 </ul>
               )}
-              <form
-                className="flex flex-col gap-2 sm:flex-row sm:items-end"
-                onSubmit={handleAddUnit}
-              >
-                <div className="flex-1 space-y-2">
-                  <Label htmlFor="org-unit-name">{t("unitNameLabel")}</Label>
-                  <Input
-                    id="org-unit-name"
-                    required
-                    maxLength={100}
-                    placeholder={t("unitNamePlaceholder")}
-                    value={unitName}
-                    onChange={(e) => setUnitName(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? t("saving") : t("addUnit")}
-                </Button>
-              </form>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("membersHeading")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <form className="space-y-4" onSubmit={handleAddMember}>
-                <div className="space-y-2">
-                  <Label htmlFor="org-member-email">{t("emailLabel")}</Label>
-                  <Input
-                    id="org-member-email"
-                    type="email"
-                    required
-                    value={memberForm.email}
-                    onChange={(e) =>
-                      setMemberForm((prev) => ({
-                        ...prev,
-                        email: e.target.value,
-                      }))
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("emailHint")}
-                  </p>
-                </div>
+          <AutoReleaseCard key={orgUrl} orgUrl={orgUrl!} />
+          <PublisherDisplayCard key={`${orgUrl}-display`} orgUrl={orgUrl!} />
 
-                <IdentityFields
-                  idPrefix="org-member"
-                  units={overview.units}
-                  value={memberForm}
-                  onChange={(identity) =>
-                    setMemberForm((prev) => ({ ...prev, ...identity }))
-                  }
-                />
-
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? t("saving") : t("addMember")}
-                </Button>
-              </form>
-
-              {overview.members.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("membersEmpty")}
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {overview.members.map((member) => (
-                    <li
-                      key={member.id}
-                      className="flex items-start justify-between gap-4 rounded-lg border p-4"
-                    >
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate font-medium">
-                            {member.email}
-                          </span>
-                          {member.email === user?.email && (
-                            <Badge variant="outline">{t("you")}</Badge>
-                          )}
-                          <Badge variant="secondary">
-                            {t(`role.${member.role}`)}
-                          </Badge>
-                        </div>
-                        {member.unitIds.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {member.unitIds
-                              .map((id) => unitNames.get(id))
-                              .join("、")}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={submitting}
-                        onClick={() => handleRemove(member)}
-                      >
-                        {t("remove")}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+          <HandoverCard
+            orgUrl={orgUrl!}
+            members={overview.members}
+            onDone={() => mutate()}
+          />
         </>
       )}
     </main>

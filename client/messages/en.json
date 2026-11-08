@@ -127,6 +127,22 @@
     "orgAdmin": {
       "title": "Organization admin",
       "description": "Org Admins manage units and members."
+    },
+    "org": {
+      "title": "Organization",
+      "description": "Items released inside your organization."
+    },
+    "orgItems": {
+      "title": "Manage org items",
+      "description": "Unit Contacts and Org Admins manage org items."
+    },
+    "orgItemNew": {
+      "title": "List an org item",
+      "description": "Unit Contacts list items on behalf of their unit."
+    },
+    "orgReport": {
+      "title": "Org report",
+      "description": "Org admins see circulation, the share claimed at each tier and estimated avoided emissions."
     }
   },
   "Lalamove": {
@@ -757,7 +773,16 @@
       "submit": "{type, select, wish {Offer} other {Request}}",
       "submitWithCount": "{type, select, wish {Offer} other {Request}} ({count})",
       "quantityLeft": "(Left: {quantity})",
-      "quantity": "Qty:"
+      "quantity": "Qty:",
+      "actingAs": "On behalf of",
+      "actingAsPlaceholder": "Choose who you represent",
+      "actingAsMyself": "Myself"
+    },
+    "handover": {
+      "movedOut": "“{title}” was taken over by another contact of the unit. Please continue in the new conversation.",
+      "movedIn": "“{title}” was taken over by another contact of the unit. The earlier conversation is still available.",
+      "openNew": "Go to the new conversation",
+      "openPrevious": "View the earlier conversation"
     }
   },
   "Notifications": {
@@ -809,8 +834,13 @@
       "WEAVE_COMPLETED": {
         "title": "Weave Completed",
         "content": "Weave for \"{postTitle}\" is successfully completed!"
+      },
+      "ORG_HANDOVER": {
+        "title": "Items handed over to you",
+        "content": "You took over {itemCount} items and {weaveCount} open requests of {unitName}"
       }
-    }
+    },
+    "anonymousActor": "Anonymous"
   },
   "History": {
     "signInToView": "Please sign in to view your history",
@@ -1032,7 +1062,8 @@
       "cannotWithdraw": "You cannot withdraw this request right now",
       "withdrawn": "Request withdrawn.",
       "withdrawFailed": "Failed to withdraw request"
-    }
+    },
+    "receiverUnit": "Receiving unit: {unit}"
   },
   "Errors": {
     "UNKNOWN": "Something went wrong. Please try again.",
@@ -1058,6 +1089,15 @@
     "ORG_NOT_FOUND": "This organization couldn't be found.",
     "ORG_MEMBER_NOT_FOUND": "This member couldn't be found. They may have been removed already.",
     "ORG_LAST_ADMIN": "An organization needs at least one Org Admin. Add another one before removing this one.",
+    "ORG_UNIT_NOT_MANAGED": "You are not a Unit Contact of this unit, so you can't list or manage its items.",
+    "ORG_ITEM_DELIVERY_UNAVAILABLE": "Org items are pickup only. Payment and delivery aren't available.",
+    "ORG_HANDOVER_TARGET_IS_REQUESTER": "The new contact has a request open on one of these items. Settle that request first, or pick another contact.",
+    "ORG_TIER_NOT_ALLOWED": "You can't move this item to that tier.",
+    "ORG_TIER_DEMOTION_BLOCKED": "This item already has an approved or completed request, so it can't be moved down.",
+    "ORG_ASSET_DISPOSAL_UNCONFIRMED": "This item has an asset number. Confirm its scrapping or disposal is done before making it public.",
+    "ORG_ITEM_PENDING_PUBLIC": "This item is about to go public. Cancel that first to change its tier.",
+    "ORG_PENDING_PUBLIC_NOT_PENDING": "This item is no longer waiting to go public. It may already be public. Refresh the page.",
+    "ORG_PENDING_PUBLIC_SKIP_NOT_ALLOWED": "Only demo organizations can skip the waiting period.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1149,7 +1189,7 @@
     "addMember": "Add member",
     "memberAdded": "Member added.",
     "remove": "Remove",
-    "removeConfirm": "Remove {email} from this organization? Their account stays.",
+    "removeConfirm": "Remove {email} from the organization? Their account stays. Pending requests they no longer qualify for are declined automatically, and approved ones are kept. You can hand the items they handled to another contact under \"Pending handovers\".",
     "memberRemoved": "Member removed.",
     "you": "You",
     "saving": "Saving…",
@@ -1158,6 +1198,296 @@
     "edit": "Edit",
     "save": "Save",
     "cancel": "Cancel",
-    "memberUpdated": "Member updated."
+    "memberUpdated": "Member updated.",
+    "manageItemsLink": "Manage org items",
+    "handover": {
+      "heading": "Pending handovers",
+      "hint": "These people have left the organization or no longer contact for the unit, but the items and open requests they handled stay with the unit. Hand them to another contact of the same unit, who then takes over the conversations and handoffs. Finished records keep the original handler.",
+      "empty": "Nothing is waiting for a handover.",
+      "leftOrg": "Left the organization",
+      "summary": "{unit}: {items} items, {weaves} open requests",
+      "noCandidates": "{unit} has no other contact yet. Assign one first.",
+      "targetLabel": "Who takes over {email}'s items in {unit}",
+      "targetPlaceholder": "Choose the new contact",
+      "submit": "Hand over",
+      "submitting": "Handing over…",
+      "done": "Handed over {items} items and {weaves} requests."
+    },
+    "settings": {
+      "heading": "Auto Release",
+      "hint": "An Internal item that nobody requests for the set number of days is released to Members automatically. The timer pauses while a request is pending and resumes after it is declined or withdrawn. An item with an approved request is never released. Public is always manual.",
+      "enabledLabel": "Release to Members automatically",
+      "manualHint": "Manual: only Unit Contacts and Org Admins release items.",
+      "daysLabel": "Days without requests",
+      "daysHint": "1 to 365 days. Unit Contacts can set a different value for one item.",
+      "save": "Save",
+      "saved": "Auto Release setting updated."
+    },
+    "reportLink": "View org report",
+    "publisherDisplay": {
+      "heading": "Public publisher name",
+      "hint": "The name shown as the poster once an item is Public. Contacts’ personal accounts are never shown.",
+      "label": "Shown as",
+      "option": {
+        "org": "Organisation name",
+        "org_unit": "Organisation + unit",
+        "anonymous": "Anonymous"
+      },
+      "saved": "Updated how Public items show the poster."
+    }
+  },
+  "Org": {
+    "title": "Organization",
+    "subtitle": "Only people inside the organization see these items. They never appear in the home feed or search.",
+    "orgLabel": "Organization",
+    "noOrgs": "You don't belong to any organization yet.",
+    "loadFailed": "Couldn't load the organization.",
+    "loading": "Loading…",
+    "listItem": "List an item",
+    "manageItems": "Manage items",
+    "backToOrg": "Back to the org page",
+    "empty": "There are no items you can see yet.",
+    "unitLabel": "Unit",
+    "quantity": "{count, plural, one {# item} other {# items}}",
+    "tier": {
+      "internal": "Internal",
+      "members": "Members",
+      "public": "Public"
+    },
+    "status": {
+      "active": "Listed",
+      "inactive": "Unlisted"
+    },
+    "access": {
+      "internal": "Internal",
+      "member": "Member"
+    },
+    "form": {
+      "title": "List an org item",
+      "subtitle": "The item belongs to the unit, not to you. It opens to the org's units first (Internal) and is free pickup only.",
+      "unit": "Listing for",
+      "unitPlaceholder": "Choose a unit",
+      "noUnits": "You aren't a Unit Contact of any unit, so you can't list items.",
+      "category": "Category",
+      "categoryPlaceholder": "Choose a category",
+      "itemTitle": "Item name",
+      "content": "Description",
+      "contentPlaceholder": "Condition, size, pickup place…",
+      "condition": "Condition",
+      "conditionPlaceholder": "Choose a condition",
+      "quantity": "Quantity",
+      "unitWeight": "Weight per item (kg)",
+      "weightDefaultHint": "Prefilled with the category default from {publisher} ({year}). Change it if the real weight differs.",
+      "weightRequiredHint": "This category has no published average weight. Enter the real weight.",
+      "assetNumber": "Asset number (optional)",
+      "estimatedValue": "Estimated value per piece in TWD (optional)",
+      "photos": "Photos (up to {max})",
+      "submit": "List item",
+      "submitting": "Listing…",
+      "created": "Listed. The org's units can see it now.",
+      "createFailed": "Couldn't list the item. Try again later.",
+      "missingSelection": "Choose a unit, a category and a condition.",
+      "tooManyPhotos": "You can add up to {max} photos."
+    },
+    "manage": {
+      "title": "Manage org items",
+      "subtitleAdmin": "Every item in the org. Filter by unit, tier and status.",
+      "subtitleContact": "Items of the units you represent.",
+      "noUnits": "You aren't a Unit Contact or an Org Admin.",
+      "filterUnit": "Unit",
+      "filterTier": "Tier",
+      "filterStatus": "Status",
+      "all": "All",
+      "colTitle": "Item",
+      "colUnit": "Unit",
+      "colTier": "Tier",
+      "colStatus": "Status",
+      "colQuantity": "Qty",
+      "colWeight": "Weight per item",
+      "colAsset": "Asset no.",
+      "colCreated": "Listed at",
+      "weightKg": "{kg} kg",
+      "empty": "No items match these filters.",
+      "filterWeaveStatus": "Requests",
+      "colRequests": "Requests",
+      "viewRequests": "{count, plural, =0 {View requests} one {# awaiting review} other {# awaiting review}}",
+      "hideRequests": "Hide requests",
+      "requestsEmpty": "No requests for this item yet.",
+      "requestPersonal": "{name} (personal)",
+      "requestOnBehalf": "{name} (for {unit})",
+      "requestQuantity": "Qty {quantity}",
+      "approve": "Approve",
+      "decline": "Decline",
+      "reviewFailed": "Couldn't update the request. Please try again.",
+      "promoteToMembers": "Release to Members",
+      "demoteToInternal": "Move back to Internal",
+      "demoteConfirm": "Move “{title}” back to Internal? Pending requests from Org Members will be declined automatically and they will be notified.",
+      "promoted": "Released to Members. Org Members can see this item now.",
+      "demoted": "Moved back to Internal.",
+      "tierChangeFailed": "Couldn't change the tier. Please try again later.",
+      "colAutoRelease": "Auto Release",
+      "autoReleaseLabel": "Auto Release for “{title}”",
+      "autoReleaseDaysLabel": "Days without requests for “{title}”",
+      "autoReleaseFollowOrg": "Org setting ({setting})",
+      "autoReleaseOrgAuto": "{days, plural, one {# day} other {# days}}",
+      "autoReleaseOrgManual": "manual",
+      "autoReleaseAuto": "Custom days",
+      "autoReleaseManual": "Manual",
+      "autoReleaseDays": "days",
+      "autoReleaseSave": "Save",
+      "autoReleaseSaved": "Auto Release updated for this item.",
+      "autoReleaseFailed": "Couldn't update Auto Release. Please try again later.",
+      "autoReleaseNotInternal": "—",
+      "colOutcome": "Went to",
+      "outcomeNone": "Not handed over yet",
+      "outcomeUnit": "{unit} × {quantity}",
+      "outcomePerson": "{name} (personal) × {quantity}",
+      "viewTimeline": "Timeline",
+      "hideTimeline": "Hide timeline",
+      "makePublic": "Make public",
+      "publicConfirmTitle": "Make “{title}” public?",
+      "publicConfirmBody": "In 10 minutes everyone can see this item on the home feed, in search and in trending, shown under the organization's name. You can cancel until then.",
+      "publicConfirmAsset": "Asset number: {asset}",
+      "publicConfirmDisposal": "Scrapping or disposal is done",
+      "publicConfirmSubmit": "Start pending public",
+      "publicConfirmCancel": "Not now",
+      "pendingPublic": "Going public in {time}",
+      "pendingPublicDue": "Going public now",
+      "cancelPendingPublic": "Cancel",
+      "skipPendingPublic": "Skip the wait and publish now",
+      "pendingPublicStarted": "Sent. It goes public in 10 minutes.",
+      "pendingPublicCancelled": "Cancelled. The item stays in its tier.",
+      "publishedNow": "Published.",
+      "demoteFromPublic": "Move back to org members",
+      "demoteFromPublicConfirm": "Move “{title}” from public back to org members? It disappears from the home feed, search and trending, and pending requests from non-members are declined with a notice. Previews already shared can't be taken back.",
+      "demotedFromPublic": "Moved back to org members. Public pages no longer show it."
+    },
+    "weaveStatus": {
+      "requested": "Awaiting review",
+      "approved": "Approved",
+      "completed": "Completed"
+    },
+    "timeline": {
+      "title": "Item timeline",
+      "empty": "No records.",
+      "system": "System",
+      "unknownActor": "Unknown",
+      "kind": {
+        "listed": "Listed",
+        "tier_changed": "Tier changed",
+        "handed_over": "Handler changed",
+        "requested": "Requested",
+        "approved": "Approved",
+        "declined": "Declined",
+        "withdrawn": "Request withdrawn",
+        "cancelled": "Cancelled",
+        "confirmed": "Hand-over confirmed",
+        "completed": "Handed over",
+        "deleted": "Item deleted",
+        "other": "Other record",
+        "public_pending_started": "Sent to pending public",
+        "public_pending_cancelled": "Pending public cancelled",
+        "public_pending_skipped": "Pending period skipped"
+      },
+      "listedDetail": "{unit}",
+      "assetNumber": "Asset number {asset}",
+      "tierDetail": "{from} → {to}",
+      "handoverItem": "Item handler {from} → {to}",
+      "handoverWeave": "Handler of request #{weaveId} {from} → {to}",
+      "requestPersonal": "Request #{weaveId}: personal, quantity {quantity}",
+      "requestOnBehalf": "Request #{weaveId}: on behalf of {unit}, quantity {quantity}",
+      "weaveStep": "Request #{weaveId}",
+      "completedUnit": "Request #{weaveId}: {unit} ({name}) received {quantity}",
+      "completedPerson": "Request #{weaveId}: {name} (personal) received {quantity}",
+      "pendingPublicConfirmed": "Scrapping or disposal confirmed"
+    }
+  },
+  "OrgReport": {
+    "title": "Org report",
+    "subtitle": "How items circulate in your organisation, with estimated weight, value and avoided emissions. Numbers come from completed hand-overs.",
+    "backToAdmin": "Back to org admin",
+    "orgLabel": "Organisation",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the report. Please try again later.",
+    "noOrgs": "You aren't an admin of any organisation.",
+    "pieces": "{count, plural, one {# piece} other {# pieces}}",
+    "circulationHeading": "Circulation",
+    "listed": "Pieces listed",
+    "listedItems": "{count, plural, one {# item} other {# items}}",
+    "circulated": "Pieces circulated",
+    "circulatedWeaves": "{count, plural, one {# completed hand-over} other {# completed hand-overs}}",
+    "circulationRate": "Circulation rate",
+    "circulationRateHint": "Pieces circulated ÷ pieces listed",
+    "tiersHeading": "Share claimed at each tier",
+    "colTier": "Tier",
+    "colReached": "Items that reached it",
+    "colClaimed": "Pieces claimed there",
+    "colRate": "Share of listed pieces",
+    "tiersHint": "Each hand-over counts at the tier the item was in when it was requested. Only completed hand-overs count; the tier shares add up to the circulation rate.",
+    "tier": {
+      "internal": "Units (Internal)",
+      "members": "Org members (Members)",
+      "public": "Public"
+    },
+    "unitsHeading": "By unit",
+    "unitsEmpty": "No units yet.",
+    "colUnit": "Unit",
+    "colListed": "Pieces listed",
+    "colGiven": "Pieces given",
+    "colReceived": "Pieces claimed for the unit",
+    "colUnitEstimated": "Avoided emissions of pieces given (kgCO2e)",
+    "unitsHint": "Given = this unit's pieces in completed hand-overs. Claimed for the unit = pieces a contact requested on the unit's behalf (personal requests count for no unit).",
+    "emissionsHeading": "Estimated weight, value and avoided emissions",
+    "emissionsScope": "Only items in completed hand-overs count, once per hand-over.",
+    "estimatedKg": "Estimated avoided emissions",
+    "estimatedKgHint": "Potential × replacement rate R ({rate})",
+    "potentialKg": "Potential (R = 1)",
+    "potentialKgHint": "If every piece replaced a new one",
+    "kgCO2e": "{value} kgCO2e",
+    "kg": "{value} kg",
+    "twd": "NT$ {value}",
+    "totalWeight": "Estimated weight",
+    "defaultWeightShare": "{share} uses the category default weight",
+    "estimatedValue": "Estimated value",
+    "unvalued": "{count, plural, one {# piece has} other {# pieces have}} no estimated value and {count, plural, one {is} other {are}} left out",
+    "replacementRate": "Replacement rate R",
+    "replacementRateValue": "{rate} ({status})",
+    "replacementRateSource": "Source",
+    "rateStatus": {
+      "assumed": "assumed, not yet measured by a survey on this platform",
+      "surveyed": "measured by survey"
+    },
+    "factorTableVersion": "Factor table version",
+    "defaultWeightShareLabel": "Default-weight share",
+    "uncounted": "Pieces not counted (no factor or no weight)",
+    "formulaHeading": "Method",
+    "formulaPotential": "Potential = weight (kg) × category production factor for a new item (kgCO2e/kg)",
+    "formulaEstimated": "Estimated avoided emissions = potential × replacement rate R",
+    "formulaFactor": "Furniture uses the lower of “material composition × MOENV material factors” and the reference products' EPD average; electronics use US EPA WARM product factors; categories without a citable factor are not counted.",
+    "byCategoryHeading": "By category",
+    "colCategory": "Category",
+    "colQuantity": "Pieces",
+    "colWeight": "Weight (kg)",
+    "colPotential": "Potential (kgCO2e)",
+    "colEstimated": "Estimated (kgCO2e)",
+    "factorsHeading": "Emission factors and sources",
+    "colFactor": "Factor (kgCO2e/kg)",
+    "colMethod": "Method",
+    "colSources": "Sources",
+    "notCounted": "Not counted",
+    "method": {
+      "reference_products": "Material composition and reference EPDs",
+      "fixed_bom": "Fixed material composition",
+      "product_factor": "Product factor",
+      "not_counted": "No citable factor"
+    },
+    "basis": {
+      "material_bom": "Material composition used (lower)",
+      "reference_epd": "Reference EPDs used (lower)"
+    },
+    "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party."
+  },
+  "Publisher": {
+    "anonymous": "Anonymous"
   }
 }

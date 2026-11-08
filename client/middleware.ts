@@ -41,6 +41,7 @@ export const PROTECTED_ROUTES = [
   "/delivery",
   "/notifications",
   "/org-admin",
+  "/org",
 ] as const;
 
 // Public routes freely browseable by anyone
@@ -119,7 +120,7 @@ export async function middleware(request: NextRequest) {
     return i18nResponse;
   }
 
-  // 6. Protected routes (/messages, /user, /history, /posts, /delivery, /notifications, /org-admin)
+  // 6. Protected routes (/messages, /user, /history, /posts, /delivery, /notifications, /org-admin, /org)
   if (matchesAnyRoute(normalizedPath, PROTECTED_ROUTES)) {
     if (!isAuthenticated) {
       return NextResponse.redirect(signInUrl(), { status: 307 });

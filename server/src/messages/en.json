@@ -60,7 +60,8 @@
     "completed": {
       "title": "Weave Completed",
       "content": "Weave for \"{postTitle}\" is successfully completed!"
-    }
+    },
+    "anonymousActor": "Anonymous"
   },
   "DeliveryNotice": {
     "DISPATCH_FAILED": {

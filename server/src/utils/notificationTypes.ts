@@ -14,6 +14,7 @@ export const RENDERED_NOTIFICATION_TYPES = [
   "WEAVE_CANCELLED",
   "WEAVE_CONFIRMED",
   "WEAVE_COMPLETED",
+  "ORG_HANDOVER",
 ] as const;
 
 //* 寫入時就組好 title / content、沒有 params

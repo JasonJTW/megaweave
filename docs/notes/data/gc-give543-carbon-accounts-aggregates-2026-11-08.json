@@ -1,0 +1,144 @@
+{
+  "_meta": {
+    "source": "GET https://api.give543.com/api/carbonLabelling/{id} (ids from GET /carbonLabelling?keyword=&page=N&perPage=3)",
+    "fetchedAt": "2026-11-08",
+    "access": "Public, unauthenticated",
+    "fieldsKept": "organisation-level aggregates only; invite_code, manager_user_id, member data, thanks messages and beneficiary nicknames intentionally not stored",
+    "units": "carbon_reduction = kgCO2e (= Σ quantity × carbon_coefficient[g/件] ÷ 1000); give_material_value = NTD",
+    "note": "Research evidence for docs/notes/avoided-emissions-reuse-research.md §2.6"
+  },
+  "groups": [
+    {
+      "id": 1,
+      "name": "ABC公司",
+      "give_quantity": 414,
+      "request_quantity": 16,
+      "commonweal_donate_quantity": 432,
+      "carbon_reduction": 3030.74005,
+      "give_material_value": 2242645.95,
+      "commonweal_beneficiary_count": 19,
+      "member_beneficiary_count": 126,
+      "active_group_count": 4
+    },
+    {
+      "id": 3,
+      "name": "大溪國際青年商會",
+      "give_quantity": 565,
+      "request_quantity": 219,
+      "commonweal_donate_quantity": 109,
+      "carbon_reduction": 1443.9776000000002,
+      "give_material_value": 1314124.76,
+      "commonweal_beneficiary_count": 1,
+      "member_beneficiary_count": 64,
+      "active_group_count": 4
+    },
+    {
+      "id": 44,
+      "name": "凱基銀行",
+      "give_quantity": 1918,
+      "request_quantity": 246,
+      "commonweal_donate_quantity": 813,
+      "carbon_reduction": 18859.59534,
+      "give_material_value": 5989710.75,
+      "commonweal_beneficiary_count": 39,
+      "member_beneficiary_count": 526,
+      "active_group_count": 4
+    },
+    {
+      "id": 50,
+      "name": "錼創顯示科技",
+      "give_quantity": 15,
+      "request_quantity": 19,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 46.56598,
+      "give_material_value": 49788.99,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 12,
+      "active_group_count": 4
+    },
+    {
+      "id": 51,
+      "name": "萬箖",
+      "give_quantity": 0,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 0,
+      "give_material_value": 0,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 0,
+      "active_group_count": 4
+    },
+    {
+      "id": 52,
+      "name": "力誠實業",
+      "give_quantity": 0,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 0,
+      "give_material_value": 0,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 0,
+      "active_group_count": 4
+    },
+    {
+      "id": 53,
+      "name": "Avery",
+      "give_quantity": 0,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 0,
+      "give_material_value": 0,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 0,
+      "active_group_count": 4
+    },
+    {
+      "id": 54,
+      "name": "台灣百和工業",
+      "give_quantity": 0,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 0,
+      "give_material_value": 0,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 0,
+      "active_group_count": 4
+    },
+    {
+      "id": 55,
+      "name": "逸祥國際",
+      "give_quantity": 0,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 0,
+      "give_material_value": 0,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 0,
+      "active_group_count": 4
+    },
+    {
+      "id": 56,
+      "name": "聚益實業",
+      "give_quantity": 0,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 0,
+      "give_material_value": 0,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 0,
+      "active_group_count": 4
+    },
+    {
+      "id": 57,
+      "name": "聚陽實業",
+      "give_quantity": 1,
+      "request_quantity": 0,
+      "commonweal_donate_quantity": 0,
+      "carbon_reduction": 2.1424000000000003,
+      "give_material_value": 635,
+      "commonweal_beneficiary_count": 0,
+      "member_beneficiary_count": 1,
+      "active_group_count": 4
+    }
+  ]
+}

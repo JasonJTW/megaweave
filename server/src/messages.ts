@@ -10,6 +10,35 @@ import dbPool from "./utils/db";
 import { HttpError } from "./utils/httpError";
 import { isPostVisibleTo } from "./services/postVisibility";
 import { PostIdSchema } from "./utils/idSchemas";
+import { parseContactToken } from "./services/orgPublisher";
+import { z } from "zod";
+import {
+  emitNewMessage,
+  loadConversationMask,
+  loadConversationMasks,
+  OrgContext,
+  presentConversation,
+  presentMessage,
+  resolveContactToken,
+} from "./services/orgConversation";
+
+//* 收件人由 client 從 API 回應帶入（users.public_id 或組織聯絡代號）→ 格式錯是 client bug
+const RecipientIdSchema = z.string().trim().min(1).max(64);
+
+/**
+ * 收件人：一般是 users.public_id；組織物品是聯絡代號（#140、ADR 0004），
+ * `org-post:<貼文>` 寄給經手窗口並開組織對話，`org-conv:<對話>` 回到既有的組織對話。查不到 → null
+ */
+async function resolveRecipient(
+  senderId: number,
+  recipientPublicId: string,
+): Promise<{ recipientId: number; org?: OrgContext; conversationId?: number } | null> {
+  const token = parseContactToken(recipientPublicId);
+  if (token) return resolveContactToken(dbPool, senderId, token);
+  if (recipientPublicId.startsWith("org-")) return null;
+  const recipientId = await messageService.getUserIdByPublicId(recipientPublicId);
+  return recipientId ? { recipientId } : null;
+}
 
 const router = Router();
 
@@ -22,8 +51,10 @@ router.get(
     // console.log(`[GET /conversations] Fetching for userId: ${userId}`);
     try {
       const conversations = await messageService.getUserConversations(userId);
+      //* 組織對話的組織方對不是成員的人顯示為組織（#140）
+      const masks = await loadConversationMasks(dbPool, userId, conversations);
       const dtos = conversations.map((c) =>
-        messageService.toConversationDTO(c),
+        messageService.toConversationDTO(presentConversation(c, masks.get(c.id))),
       );
       // console.log(
       //   `[GET /conversations] Found ${conversations.length} conversations`,
@@ -73,10 +104,13 @@ router.get(
         userId,
       );
 
+      const mask = await loadConversationMask(dbPool, userId, conversationId);
       return res.json({
-        messages: messages.map((m) => messageService.toMessageDTO(m)),
+        messages: messages.map((m) =>
+          messageService.toMessageDTO(presentMessage(m, mask)),
+        ),
         conversation: conversation
-          ? messageService.toConversationDTO(conversation)
+          ? messageService.toConversationDTO(presentConversation(conversation, mask))
           : null,
         hasMore: messages.length === limit,
       });
@@ -110,6 +144,10 @@ router.post(
         ),
       );
     }
+    const recipientPublicId = RecipientIdSchema.safeParse(recipient_public_id);
+    if (!recipientPublicId.success) {
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid recipient"));
+    }
 
     //* post_id 只要帶了就要合法；空字串視為沒帶
     let postId: number | undefined;
@@ -122,14 +160,14 @@ router.post(
     }
 
     try {
-      // SECURITY: Map public_id to internal ID
-      const recipientId =
-        await messageService.getUserIdByPublicId(recipient_public_id);
-      if (!recipientId) {
+      // SECURITY: Map public_id (or an org contact token) to internal ID
+      const recipient = await resolveRecipient(senderId, recipientPublicId.data);
+      if (!recipient) {
         return next(
           new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
         );
       }
+      const { recipientId } = recipient;
 
       // 私訊本身不受組織限制，但附帶的貼文資訊會讓雙方都看到，所以寄件人與收件人都要看得到（ADR 0003）；
       // 只要帶了 post_id 就檢查，並在上傳附件與寫入任何訊息前擋下。任一方看不到都回同一個 404，不洩漏是哪一方
@@ -160,11 +198,10 @@ router.post(
         }
       }
 
-      // 1. Get or Create Conversation
-      const conversationId = await messageService.getConversationId(
-        senderId,
-        recipientId,
-      );
+      // 1. Get or Create Conversation（組織物品是組織對話，#140）
+      const conversationId =
+        recipient.conversationId ??
+        (await messageService.getConversationId(senderId, recipientId, recipient.org));
 
       const io: Server = res.locals.io;
 
@@ -197,11 +234,9 @@ router.post(
             post_author_public_id: postAuthorPublicId,
           },
         );
+        //* 推播依各自的視角遮蔽組織方（#140）
         if (io) {
-          const sysMsgDTO = messageService.toMessageDTO(sysMsg, senderPublicId);
-          const sysPayload = { ...sysMsgDTO, conversation_id: conversationId };
-          io.to(`user_${recipientId}`).emit("new_message", sysPayload);
-          io.to(`user_${senderId}`).emit("new_message", sysPayload);
+          await emitNewMessage(io, dbPool, sysMsg, [recipientId, senderId], senderPublicId);
         }
       }
 
@@ -224,15 +259,8 @@ router.post(
         console.log(
           `[POST /messages] Emitting new_message to user_${recipientId} and user_${senderId}`,
         );
-        const payload = {
-          ...messageDTO,
-          conversation_id: conversationId,
-        };
-        // Push to recipient's personal room
-        io.to(`user_${recipientId}`).emit("new_message", payload);
-
-        // Push to sender (for multi-device sync)
-        io.to(`user_${senderId}`).emit("new_message", payload);
+        // Push to the recipient and to the sender (multi-device sync), each masked for their view
+        await emitNewMessage(io, dbPool, message, [recipientId, senderId], senderPublicId);
         console.log(`[POST /messages] Emission complete.`);
       } else {
         console.warn(
@@ -253,26 +281,27 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     const senderId = req.user!.userId;
-    const { recipient_public_id } = req.body;
-
-    if (!recipient_public_id) {
+    const recipientPublicId = RecipientIdSchema.safeParse(req.body?.recipient_public_id);
+    if (!recipientPublicId.success) {
       return next(
         new HttpError(400, "INVALID_REQUEST", "Recipient Public ID required"),
       );
     }
 
     try {
-      const recipientId =
-        await messageService.getUserIdByPublicId(recipient_public_id);
-      if (!recipientId) {
+      const recipient = await resolveRecipient(senderId, recipientPublicId.data);
+      if (!recipient) {
         return next(
           new HttpError(404, "USER_NOT_FOUND", "Recipient not found"),
         );
       }
-      const conversationId = await messageService.getConversationId(
-        senderId,
-        recipientId,
-      );
+      const conversationId =
+        recipient.conversationId ??
+        (await messageService.getConversationId(
+          senderId,
+          recipient.recipientId,
+          recipient.org,
+        ));
 
       return res.json({ conversationId });
     } catch (error) {
@@ -313,10 +342,14 @@ router.patch(
             `[PATCH /read] Notifying user_${otherUserId} and user_${userId} that messages are read in conv_${conversationId}`,
           );
 
-          // Notify the other user (the sender)
+          // Notify the other user (the sender)；組織方讀取時，不是成員的對方只看到組織代號（#140）
+          const otherMask = otherUserId
+            ? await loadConversationMask(dbPool, otherUserId, conversationId)
+            : undefined;
           io.to(`user_${otherUserId}`).emit("messages_read", {
             conversation_id: conversationId,
-            reader_public_id: req.user!.public_id,
+            reader_public_id:
+              otherMask?.maskedUserId === userId ? otherMask.token : req.user!.public_id,
           });
 
           // Notify the current user's other devices

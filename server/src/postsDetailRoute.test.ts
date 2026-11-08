@@ -11,6 +11,7 @@ import request from "supertest";
 import postsRouter from "./posts";
 import { postService } from "./services/postService";
 import * as sessionModule from "./session";
+import dbPool from "./utils/db";
 
 jest.mock("./utils/db", () => ({
   query: jest.fn(),
@@ -86,5 +87,54 @@ describe("GET /api/posts/:id", () => {
     const options = (postService.getPostByPublicId as jest.Mock).mock
       .calls[0][1];
     expect(options.viewerIp).not.toContain("6.6.6.6");
+  });
+});
+
+describe("GET /api/posts/:id for an org item (#140, ADR 0004)", () => {
+  const orgPost = () => ({
+    id: 1000,
+    public_id: VALID_ID,
+    org_id: 10,
+    org_unit_id: 201,
+    audience_tier: "public",
+    user_id: 2,
+    author_user_id: 2,
+    username: "王小明",
+    author_public_id: "u-2",
+    avatar_url: "https://cdn/ming.png",
+    email: "ming@example.com",
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (dbPool.query as jest.Mock).mockImplementation(async (sql: string) =>
+      sql.includes("FROM organizations")
+        ? [[{ id: 10, name: "甲公司", publisher_display: "org" }], []]
+        : [[{ id: 201, name: "總務部" }], []],
+    );
+  });
+
+  it("shows the org, not the Unit Contact, to the public", async () => {
+    (sessionModule.getUserFromCookie as jest.Mock).mockResolvedValue(null);
+    (postService.getPostByPublicId as jest.Mock).mockResolvedValueOnce(orgPost());
+
+    const res = await request(makeApp()).get(`/api/posts/${VALID_ID}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.post).toMatchObject({
+      username: "甲公司",
+      author_public_id: `org-post:${VALID_ID}`,
+      avatar_url: null,
+      user_id: null,
+    });
+    expect(JSON.stringify(res.body)).not.toMatch(/王小明|u-2|ming/);
+  });
+
+  it("still shows the contact their own item as theirs", async () => {
+    (sessionModule.getUserFromCookie as jest.Mock).mockResolvedValue({ userId: 2 });
+    (postService.getPostByPublicId as jest.Mock).mockResolvedValueOnce(orgPost());
+
+    const res = await request(makeApp()).get(`/api/posts/${VALID_ID}`);
+    expect(res.body.post.username).toBe("王小明");
   });
 });

@@ -2,7 +2,10 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { getPostDistance, buildLocationDisplayParts } from "@/utils/locationUtils";
+import {
+  getPostDistance,
+  buildLocationDisplayParts,
+} from "@/utils/locationUtils";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -22,6 +25,7 @@ import ShareBadgeExpiredIcon from "../icons/ShareBadgeExpiredIcon";
 import ShareBadgeIcon from "../icons/ShareBadgeIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 // ─── Image Retry Hook (Exponential Backoff) ───────────────────────────────────
 const MAX_RETRIES = 4; // 最多重試 4 次
@@ -135,6 +139,8 @@ function PostCardInner({
   } = useImageWithRetry(primarySrc, fallbackSrc);
 
   const t = useTranslations("PostCard");
+  const displayName = useDisplayName();
+  const posterName = displayName(post.username);
   const { coords } = useLocation();
   const distanceStr = getPostDistance(coords, post.lat, post.lng);
 
@@ -233,10 +239,16 @@ function PostCardInner({
               )}
 
               <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
-                <Avatar size="sm" className="ring-[3px] ring-white">
+                {/* 發文者名稱：組織物品是組織名義（#140） */}
+                <Avatar
+                  size="sm"
+                  className="ring-[3px] ring-white"
+                  title={posterName ?? undefined}
+                  aria-label={posterName ?? undefined}
+                >
                   <AvatarImage src={post.avatar_url} />
                   <AvatarFallback>
-                    {post.username?.charAt(0).toUpperCase()}
+                    {posterName?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 {post.view_count > 0 && (

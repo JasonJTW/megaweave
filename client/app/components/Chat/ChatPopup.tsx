@@ -23,6 +23,7 @@ import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 export const ChatPopup = () => {
   const { mutate: globalMutate } = useSWRConfig();
@@ -36,10 +37,14 @@ export const ChatPopup = () => {
   const { user: currentUser } = useUser();
   const router = useRouter();
   const t = useTranslations("Chat");
+  const displayName = useDisplayName();
   const apiErrorMessage = useApiErrorMessage();
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
-  const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
+  const handleWeavingSubmit = async (
+    selectedItems: SelectedWeaveItem[],
+    actingUnitId?: number | null,
+  ) => {
     if (!currentUser) {
       toast.error(t("signInToRequest"));
       router.push(signinUrlForCurrentPage());
@@ -64,6 +69,7 @@ export const ChatPopup = () => {
           itemId: it.itemId ?? null,
           quantity: it.quantity,
         })),
+        actingUnitId,
       });
       void newWeave;
 
@@ -110,7 +116,7 @@ export const ChatPopup = () => {
             {/* Header */}
             <div className="z-10 flex items-center justify-between bg-white px-8 pb-2 pt-4">
               <h2 className="font-ddin text-[20px] font-bold text-gray-800">
-                {otherUser.username}
+                {displayName(otherUser.username)}
               </h2>
               <button
                 onClick={closeChat}

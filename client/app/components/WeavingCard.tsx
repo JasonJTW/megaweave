@@ -16,6 +16,7 @@ import { useSocket } from "@/hooks/useSocket";
 import LalamoveQuotation from "./Lalamove/LalamoveQuotation";
 import { shouldShowLalamoveQuotation } from "@/utils/weaveGuard";
 import { getWeaveStatusKey, type WeaveStatusKey } from "@/utils/weaveViewModel";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -84,6 +85,7 @@ const WeavingCard = ({
   inChatWindow,
 }: WeavesCardProps) => {
   const t = useTranslations("WeaveCard");
+  const displayName = useDisplayName();
   const { socket } = useSocket();
   const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(
     undefined,
@@ -175,7 +177,7 @@ const WeavingCard = ({
         viewer: inChatWindow.isPostAuthor ? "author" : "initiator",
       })
     : post
-      ? getDisplayUsername(post, activeWeave, currentUserId)
+      ? displayName(getDisplayUsername(post, activeWeave, currentUserId))
       : "";
 
   const currentStatus =
@@ -223,12 +225,12 @@ const WeavingCard = ({
     activeWeave && currentUserId
       ? currentUserId === activeWeave.giver_id
         ? {
-            name: activeWeave.receiver_name,
+            name: displayName(activeWeave.receiver_name),
             avatar: activeWeave.receiver_avatar,
             role: t("role.receiver"),
           }
         : {
-            name: activeWeave.giver_name,
+            name: displayName(activeWeave.giver_name),
             avatar: activeWeave.giver_avatar,
             role: t("role.giver"),
           }
@@ -249,6 +251,7 @@ const WeavingCard = ({
     isInChatWindow,
     status: currentStatus,
     hasPost: Boolean(quotationPost),
+    isOrgItem: quotationPost?.org_id != null,
   });
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -414,6 +417,14 @@ const WeavingCard = ({
               <span className="type-body-t5 text-[#666]">
                 {displayUser.role}
               </span>
+              {/* 組織物品流向的單位（#137、ADR 0004）；個人 Weave 沒有 */}
+              {activeWeave?.receiver_org_unit && (
+                <span className="type-body-t5 text-[#666]">
+                  {t("receiverUnit", {
+                    unit: activeWeave.receiver_org_unit.name,
+                  })}
+                </span>
+              )}
 
               {hintKey && (
                 <span

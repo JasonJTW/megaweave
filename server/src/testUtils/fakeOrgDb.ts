@@ -312,6 +312,16 @@ export function createFakeOrgDb(
     }
 
     if (
+      sql ===
+      "SELECT org_unit_id FROM org_unit_contacts WHERE org_id = ? AND membership_id = ? FOR UPDATE"
+    ) {
+      const rows = db.unitContacts
+        .filter((c) => c.org_id === params[0] && c.membership_id === Number(params[1]))
+        .map((c) => ({ org_unit_id: c.org_unit_id }));
+      return [rows, []];
+    }
+
+    if (
       /^INSERT INTO org_unit_contacts \(org_id, ?org_unit_id, ?membership_id\) VALUES \?$/.test(
         sql,
       )
@@ -329,13 +339,17 @@ export function createFakeOrgDb(
     }
 
     if (
-      /^SELECT m\.org_role, u\.email FROM org_memberships m JOIN users u ON u\.id = m\.user_id WHERE m\.org_id = \? AND m\.id = \? FOR UPDATE$/.test(
+      /^SELECT m\.org_role, m\.user_id, u\.email FROM org_memberships m JOIN users u ON u\.id = m\.user_id WHERE m\.org_id = \? AND m\.id = \? FOR UPDATE$/.test(
         sql,
       )
     ) {
       const rows = db.memberships
         .filter((m) => m.org_id === params[0] && m.id === Number(params[1]))
-        .map((m) => ({ org_role: m.org_role, email: emailOf(m.user_id) }));
+        .map((m) => ({
+          org_role: m.org_role,
+          user_id: m.user_id,
+          email: emailOf(m.user_id),
+        }));
       return [rows, []];
     }
 
@@ -388,6 +402,15 @@ export function createFakeOrgDb(
       );
       db.unitContacts = db.unitContacts.filter((c) => c.membership_id !== id);
       return [{ affectedRows: before - db.memberships.length }, []];
+    }
+
+    //* 移除成員時婉拒他的 Requested 申請（orgHandoverService）：這一層沒有 weaves 表，fakeOrgHandoverDb 會先接手
+    if (
+      sql.startsWith(
+        "SELECT w.id, w.post_id, w.giver_id, w.receiver_id FROM weaves w JOIN posts p ON p.id = w.post_id WHERE p.org_id = ? AND w.receiver_id = ?",
+      )
+    ) {
+      return [[], []];
     }
 
     throw new Error(`fakeOrgDb: unsupported SQL: ${sql}`);

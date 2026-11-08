@@ -19,7 +19,13 @@ jest.mock("./utils/db", () => ({
       if (sql.startsWith("SELECT id FROM users WHERE public_id = ?")) return [[{ id: 10 }]];
       if (sql.includes("FROM user_stats")) return [[]];
       if (sql.includes("FROM posts p")) {
-        return [POSTS_BY_TIER.filter((post) => fakeOnPublicSurface(sql, post))];
+        //* 個人頁只列個人貼文（#140）：組織物品屬於組織，列在窗口個人頁會曝光經手的人
+        const personalOnly = sql.includes("p.org_id IS NULL AND");
+        return [
+          POSTS_BY_TIER.filter(
+            (post) => fakeOnPublicSurface(sql, post) && (!personalOnly || post.org_id === null),
+          ),
+        ];
       }
       throw new Error(`unexpected SQL: ${sql}`);
     }),
@@ -42,13 +48,12 @@ function makeApp() {
 }
 
 describe("GET /api/user/stats/public/:uuid", () => {
-  it("lists personal and Public org posts only, never Internal or Members ones", async () => {
+  it("lists personal posts only: org items, even Public ones, would expose the Unit Contact", async () => {
     const res = await request(makeApp()).get(`/api/user/stats/public/${USER_UUID}`);
 
     expect(res.status).toBe(200);
     expect(res.body.posts.map((p: { title: string }) => p.title)).toEqual([
       "personal",
-      "org-public",
     ]);
   });
 });

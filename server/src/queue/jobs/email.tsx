@@ -6,6 +6,7 @@ import dbPool from "../../utils/db";
 import EmailTemplate, { WeaveItem } from "../../emails/EmailTemplate";
 import DeliveryNoticeEmail from "../../emails/DeliveryNoticeEmail";
 import { getTranslator, resolveLocale } from "../../utils/i18n";
+import { ANONYMOUS_PUBLISHER_NAME } from "../../services/orgPublisher";
 import {
   getDeliveryNoticeCopy,
   type DeliveryNoticeEvent,
@@ -118,7 +119,10 @@ function renderEmail(data: SendEmailJobData, to: Recipient): RenderedEmail {
   }
 
   const t = getTranslator(to.locale, "WeaveNotice");
-  const values = { actorName: data.actorName, postTitle: data.postTitle };
+  //* 組織設定匿名時，actorName 是代號，依收件人語言翻譯（#140）
+  const actorName =
+    data.actorName === ANONYMOUS_PUBLISHER_NAME ? t("anonymousActor") : data.actorName;
+  const values = { actorName, postTitle: data.postTitle };
   const subject = t(`${data.action}.title`, values);
   return {
     subject,

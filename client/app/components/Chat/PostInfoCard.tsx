@@ -21,14 +21,24 @@ import {
   getDraftSelectedCount,
 } from "@/app/types/weaveDraft";
 import { QuantityStepper } from "@/app/components/ui/QuantityStepper";
+import { useActingUnits } from "@/hooks/useActingUnits";
 
 export type { SelectedWeaveItem };
 
 interface PostInfoCardProps {
   post: Post;
   user?: User | null;
-  onWeavingSubmit?: (items: SelectedWeaveItem[]) => void;
+  /**
+   * actingUnitId：組織物品的「代表誰」（單位 id 或 null = 我個人）；
+   * 沒有選項（只有一種身分、個人貼文）時為 undefined
+   */
+  onWeavingSubmit?: (
+    items: SelectedWeaveItem[],
+    actingUnitId?: number | null,
+  ) => void;
 }
+
+const ACTING_AS_MYSELF = "myself";
 
 const PostInfoCard: React.FC<PostInfoCardProps> = ({
   post,
@@ -57,6 +67,12 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
     contextDraft && contextDraft.postId === post.id ? contextDraft : localDraft;
 
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // ADR 0004：同時是窗口與成員（或多個單位的窗口）才選「代表某單位」或「我個人」，沒有預設值
+  const { units: actingUnits, isLoading: actingUnitsLoading } =
+    useActingUnits(post);
+  const [actingAs, setActingAs] = useState("");
+  const hasActingChoice = actingUnits.length > 0;
 
   const s3Keys = parseS3Keys(post);
   const firstKey = s3Keys[0];
@@ -95,10 +111,20 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
   const handleSubmit = () => {
     if (!onWeavingSubmit) return;
     const payload = getWeaveSubmitPayload(draft);
-    onWeavingSubmit(payload);
+    if (!hasActingChoice) {
+      onWeavingSubmit(payload);
+      return;
+    }
+    onWeavingSubmit(
+      payload,
+      actingAs === ACTING_AS_MYSELF ? null : Number(actingAs),
+    );
   };
 
-  const isSubmitDisabled = draft.mode === "custom" && selectedCount === 0;
+  const isSubmitDisabled =
+    (draft.mode === "custom" && selectedCount === 0) ||
+    actingUnitsLoading ||
+    (hasActingChoice && actingAs === "");
   const selectedLabel = getDraftSelectedCount(draft);
 
   return (
@@ -170,6 +196,34 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
           </div>
         )}
       </div>
+
+      {/* 代表誰：只有多種身分的人看得到（原生 select，避免下拉選單被聊天視窗的 z-index 蓋住） */}
+      {onWeavingSubmit && hasActingChoice && (
+        <div className="flex items-center gap-2 px-3 pb-2 text-[13px]">
+          <label
+            htmlFor={`acting-as-${post.id}`}
+            className="shrink-0 font-semibold text-gray-700"
+          >
+            {t("actingAs")}
+          </label>
+          <select
+            id={`acting-as-${post.id}`}
+            value={actingAs}
+            onChange={(e) => setActingAs(e.target.value)}
+            className="h-8 min-w-0 flex-1 rounded-md border border-primary-30 bg-white px-2 text-gray-800"
+          >
+            <option value="" disabled>
+              {t("actingAsPlaceholder")}
+            </option>
+            {actingUnits.map((unit) => (
+              <option key={unit.id} value={String(unit.id)}>
+                {unit.name}
+              </option>
+            ))}
+            <option value={ACTING_AS_MYSELF}>{t("actingAsMyself")}</option>
+          </select>
+        </div>
+      )}
 
       {/* 下半部 (只在點擊 Choose items 展開時才顯示)：包含該 Post 下所有 Items 勾選與數量步進器 */}
       <AnimatePresence initial={false}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { profilePublicId } from "@/lib/orgContact";
 import { Link, useRouter } from "@/i18n/navigation";
 import type { Post } from "@/app/types/schema";
 import Image from "next/image";
@@ -29,6 +30,11 @@ export default function PostOwnerSidebar({
 }: PostOwnerSidebarProps) {
   const router = useRouter();
   const t = useTranslations("PostDetail");
+  //* 組織物品的發文者是組織（#140），沒有個人頁
+  const profileId = profilePublicId(authorPublicId);
+  const openProfile = () => {
+    if (profileId) router.push(`/profile/${profileId}`);
+  };
 
   return (
     <aside className="sticky top-28 hidden w-[280px] shrink-0 flex-col items-center font-ddin lg:flex xl:w-[300px]">
@@ -47,7 +53,8 @@ export default function PostOwnerSidebar({
       {/* Owner avatar */}
       <button
         type="button"
-        onClick={() => router.push(`/profile/${authorPublicId}`)}
+        onClick={openProfile}
+        disabled={!profileId}
         className="relative mb-4 aspect-square w-full max-w-[220px] overflow-hidden rounded-[24px] bg-secondary/50"
       >
         {avatarUrl ? (
@@ -68,7 +75,8 @@ export default function PostOwnerSidebar({
       {/* Name & email */}
       <button
         type="button"
-        onClick={() => router.push(`/profile/${authorPublicId}`)}
+        onClick={openProfile}
+        disabled={!profileId}
         className="mb-1 text-center text-[22px] font-bold text-gray-900 hover:text-primary"
       >
         {username || t("userFallback")}

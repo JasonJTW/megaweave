@@ -38,6 +38,18 @@ describe("getLalamoveAction", () => {
 });
 
 describe("shouldShowLalamoveQuotation", () => {
+  it("returns false for an org item: org items are pickup only (PRD 0001 §5.1)", () => {
+    assert.equal(
+      shouldShowLalamoveQuotation({
+        isInChatWindow: true,
+        status: "approved",
+        hasPost: true,
+        isOrgItem: true,
+      }),
+      false,
+    );
+  });
+
   it("returns true only when in chat window, status is approved, and post exists", () => {
     assert.equal(
       shouldShowLalamoveQuotation({

@@ -184,9 +184,11 @@ export class PaymentService {
       await conn.beginTransaction();
 
       // 必須是該貼文某筆 pending weave 的 giver 或 receiver 才能叫車（鎖定該 weave 列避免同時被取消/完成）
+      // 組織物品只能免費面交或自取，不開放 ECPay 與 Lalamove（PRD 0001 §5.1）
       const [pendingWeaveRows] = await conn.query<RowDataPacket[]>(
-        `SELECT id FROM weaves
-         WHERE post_id = ? AND status = 'approved' AND (giver_id = ? OR receiver_id = ?)
+        `SELECT w.id, p.org_id FROM weaves w
+         JOIN posts p ON p.id = w.post_id
+         WHERE w.post_id = ? AND w.status = 'approved' AND (w.giver_id = ? OR w.receiver_id = ?)
          LIMIT 1 FOR UPDATE`,
         [input.postId, input.userId, input.userId]
       );
@@ -195,6 +197,13 @@ export class PaymentService {
           400,
           "WEAVE_REQUIRED_FOR_DELIVERY",
           "A pending weave for this post is required to book Lalamove delivery.",
+        );
+      }
+      if (pendingWeaveRows[0].org_id != null) {
+        throw new HttpError(
+          400,
+          "ORG_ITEM_DELIVERY_UNAVAILABLE",
+          "Org items are pickup only; delivery and payment are not available.",
         );
       }
 

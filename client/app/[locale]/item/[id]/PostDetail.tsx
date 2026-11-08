@@ -1,6 +1,7 @@
 //* item/id/page.tsx
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
+import { profilePublicId } from "@/lib/orgContact";
 import { useRouter } from "@/i18n/navigation";
 import { useCategoryName, usePostConditionName } from "@/i18n/referenceNames";
 import { MessageButton } from "@/app/components/Chat/MessageButton";
@@ -37,6 +38,7 @@ import { Post } from "@/app/types/schema";
 // 地點工具函式
 import { formatLocationText } from "@/utils/locationUtils";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface OwnerProfile {
   username: string;
@@ -88,6 +90,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
+  const displayName = useDisplayName();
+  //* 組織設定匿名時是代號，依讀者語言顯示（#140）
+  const posterName = displayName(post?.username);
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
 
@@ -158,8 +163,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         setLikeCount(data.post.likes_count);
         likeConfirmedRef.current.count = data.post.likes_count;
 
-        if (data.post.author_public_id) {
-          fetchOwnerSidebar(data.post.author_public_id);
+        //* 組織物品的發文者是組織（#140），沒有個人頁可載入
+        const ownerId = profilePublicId(data.post.author_public_id);
+        if (ownerId) {
+          fetchOwnerSidebar(ownerId);
         }
 
         // 檢查用戶是否已按讚
@@ -379,8 +386,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   const handleAvatarClick = () => {
-    if (post?.author_public_id) {
-      router.push(`/profile/${post.author_public_id}`);
+    const ownerId = profilePublicId(post?.author_public_id);
+    if (ownerId) {
+      router.push(`/profile/${ownerId}`);
     }
   };
 
@@ -395,7 +403,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       const shareCard = new File([blob], "post.png", { type: "image/png" });
       const title = tItem("title", {
         title: post?.title ?? tItem("fallbackTitle"),
-        username: post?.username ?? t("userFallback"),
+        username: posterName ?? t("userFallback"),
         type: tItem("type", { type: post?.type ?? "other" }),
       });
       await navigator.share({
@@ -721,19 +729,19 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                       fill
                       src={post!.avatar_url!}
                       alt={t("avatarAlt", {
-                        username: post!.username ?? t("userFallback"),
+                        username: posterName ?? t("userFallback"),
                       })}
                       className="rounded-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-xl">
-                      {post.username ? post.username.charAt(0) : "?"}
+                      {posterName ? posterName.charAt(0) : "?"}
                     </div>
                   )}
                 </div>
                 <div className="ml-[18px]">
                   <h3 className="font-semibold text-gray-900">
-                    {`${post.username}`}
+                    {`${posterName}`}
                   </h3>
                 </div>
               </div>
@@ -771,7 +779,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 {post.user_id && user?.userId !== post.user_id && (
                   <MessageButton
                     recipientPublicId={post.author_public_id}
-                    recipientName={post.username || t("userFallback")}
+                    recipientName={posterName || t("userFallback")}
                     className="ml-2 h-auto border-0 p-0 text-gray-500 hover:bg-transparent hover:text-primary"
                   />
                 )}
@@ -797,7 +805,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 )}
               </div>
               {/* Lalamove 即時運費報價 */}
-              {post.lat && post.lng && <LalamoveQuotation post={post} />}
+              {/* 組織物品只能面交或自取，不開放 Lalamove（PRD 0001 §5.1） */}
+              {post.org_id == null && post.lat && post.lng && (
+                <LalamoveQuotation post={post} />
+              )}
 
               {/* 評論區 */}
               <div id="comments" className="rounded-lg bg-white shadow-sm">
@@ -808,7 +819,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
 
           {/* 右側：桌機版擁有者側欄 */}
           <PostOwnerSidebar
-            username={ownerProfile?.username || post.username}
+            username={ownerProfile?.username || posterName || ""}
             avatarUrl={ownerProfile?.avatar_url || post.avatar_url}
             contactEmail={ownerProfile?.contact_email}
             authorPublicId={post.author_public_id}

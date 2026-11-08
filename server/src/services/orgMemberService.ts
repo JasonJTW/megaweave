@@ -3,11 +3,17 @@
 //*   Org Admin    → org_role 'admin'（能管什麼）
 //*   Unit Contact → 在 org_unit_contacts 掛一或多個單位（能代表哪些單位）
 //* access_level（看得到什麼）由這兩者推導：Org Admin 或 Unit Contact → 'internal'，其餘 → 'member'
-//* 移除成員只刪 membership 本身（org_unit_contacts 由外鍵連帶刪除）；進行中 Weave 的處理在交接 ticket
+//* 移除成員刪 membership（org_unit_contacts 由外鍵連帶刪除），同一交易婉拒他已沒資格的 Requested 申請；
+//* 他經手的物品與 Approved Weave 留在單位，等 Org Admin 交接（orgHandoverService）
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import dbPool from "../utils/db";
 import { HttpError } from "../utils/httpError";
 import { withTransaction } from "../utils/transaction";
+import {
+  DeclinedWeave,
+  declineRequestsOfRemovedMember,
+  declineRequestsOnBehalfOfUnits,
+} from "./orgHandoverService";
 import {
   addMembershipByEmail,
   MembershipGrant,
@@ -126,15 +132,19 @@ async function lockMembership(
   db: Queryable,
   orgId: number,
   membershipId: number,
-): Promise<{ orgRole: OrgRole; email: string }> {
+): Promise<{ orgRole: OrgRole; email: string; userId: number }> {
   const [targets] = await db.execute<RowDataPacket[]>(
-    "SELECT m.org_role, u.email FROM org_memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? AND m.id = ? FOR UPDATE",
+    "SELECT m.org_role, m.user_id, u.email FROM org_memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? AND m.id = ? FOR UPDATE",
     [orgId, membershipId],
   );
   if (targets.length === 0) {
     throw new HttpError(404, "ORG_MEMBER_NOT_FOUND", "Member not found");
   }
-  return { orgRole: targets[0].org_role as OrgRole, email: targets[0].email };
+  return {
+    orgRole: targets[0].org_role as OrgRole,
+    email: targets[0].email,
+    userId: Number(targets[0].user_id),
+  };
 }
 
 export const orgMemberService = {
@@ -246,16 +256,21 @@ export const orgMemberService = {
 
   /**
    * 改成員的身分：Org Admin／Org Member 與窗口單位整組取代，access_level 隨之重新推導。
+   * 拿掉的窗口單位：他代表那些單位的 Requested 申請在同一交易裡婉拒，由呼叫端在 commit 後通知。
    * 把最後一位 Org Admin 降級回 ORG_LAST_ADMIN。
    */
   async updateMember(
     orgId: number,
     membershipId: number,
     identity: MemberIdentity,
-  ): Promise<OrgMember> {
+  ): Promise<{ member: OrgMember; declined: DeclinedWeave[] }> {
     const unitIds = uniqueSorted(identity.unitIds);
     return withTransaction(async (connection) => {
       const target = await lockMembership(connection, orgId, membershipId);
+      const [previous] = await connection.execute<RowDataPacket[]>(
+        "SELECT org_unit_id FROM org_unit_contacts WHERE org_id = ? AND membership_id = ? FOR UPDATE",
+        [orgId, membershipId],
+      );
       if (target.orgRole === "admin" && identity.role !== "admin") {
         await assertNotLastAdmin(connection, orgId);
       }
@@ -270,18 +285,37 @@ export const orgMemberService = {
         [orgId, membershipId],
       );
       await insertUnitContacts(connection, orgId, membershipId, unitIds);
+      //* 不再擔任窗口的單位：他代表那些單位送出的 Requested 申請自動婉拒（與移除成員一致）
+      const dropped = previous
+        .map((row) => Number(row.org_unit_id))
+        .filter((id) => !unitIds.includes(id));
+      const declined = await declineRequestsOnBehalfOfUnits(
+        connection,
+        orgId,
+        target.userId,
+        dropped,
+      );
       return {
-        id: membershipId,
-        email: target.email,
-        role: identity.role,
-        unitIds,
+        member: {
+          id: membershipId,
+          email: target.email,
+          role: identity.role,
+          unitIds,
+        },
+        declined,
       };
     });
   },
 
-  /** 移除成員身分。組織至少要留一位 Org Admin（ORG_LAST_ADMIN） */
-  async removeMember(orgId: number, membershipId: number): Promise<void> {
-    await withTransaction(async (connection) => {
+  /**
+   * 移除成員身分。組織至少要留一位 Org Admin（ORG_LAST_ADMIN）。
+   * 回傳同一交易裡自動婉拒的申請，由呼叫端在 commit 後通知
+   */
+  async removeMember(
+    orgId: number,
+    membershipId: number,
+  ): Promise<DeclinedWeave[]> {
+    return withTransaction(async (connection) => {
       const target = await lockMembership(connection, orgId, membershipId);
       if (target.orgRole === "admin") {
         await assertNotLastAdmin(connection, orgId);
@@ -290,6 +324,7 @@ export const orgMemberService = {
         "DELETE FROM org_memberships WHERE org_id = ? AND id = ?",
         [orgId, membershipId],
       );
+      return declineRequestsOfRemovedMember(connection, orgId, target.userId);
     });
   },
 };

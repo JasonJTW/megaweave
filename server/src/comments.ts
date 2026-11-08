@@ -10,6 +10,7 @@ import { HttpError } from "./utils/httpError";
 import { PostIdSchema } from "./utils/idSchemas";
 import { getUserFromCookie } from "./session";
 import { isPostVisibleTo, viewerVisibility } from "./services/postVisibility";
+import { maskOrgComments, orgSideNameFor } from "./services/orgPublisher";
 
 const router = express.Router();
 
@@ -234,10 +235,15 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
            if (parentComment.length > 0 && parentComment[0].user_id !== effectiveUserId && parentComment[0].user_id !== post.user_id) {
              const io = req.app.get("io");
              if (io) {
-                const commenterName = newComment.username || "Someone";
+                //* 經手窗口回覆組織物品下的留言：不是該組織成員的人收到的是組織名義、沒有個人寄件人（#140）
+                const orgName =
+                  post.user_id === effectiveUserId
+                    ? await orgSideNameFor(connection, post_id, parentComment[0].user_id)
+                    : null;
+                const commenterName = orgName ?? (newComment.username || "Someone");
                 await createNotification(io, {
                   recipient_id: parentComment[0].user_id,
-                  sender_id: effectiveUserId,
+                  sender_id: orgName ? null : effectiveUserId,
                   type: "COMMENT_REPLY",
                   title: "New Reply",
                   content: `${commenterName} replied to your comment`,
@@ -320,6 +326,8 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     `;
 
     const [rows] = await dbPool.execute<CommentRow[]>(query, params);
+    //* 經手窗口在組織物品下的留言以組織名義顯示（#140、ADR 0004）
+    await maskOrgComments(dbPool, postId, rows, { viewerUserId: session?.userId });
 
     // 建立樹狀結構
     const commentMap = new Map<number, CommentWithChildren>();

@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { toLocale } from "@/i18n/routing";
 import { absoluteUrl, buildMetadata, isIndexablePost } from "@/lib/seo";
+import { publisherDisplayName } from "@/lib/orgContact";
 
 type Props = {
   params: Promise<{ locale: string; id: string }>;
@@ -46,7 +47,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? t("title", {
         title: post.title,
         type: t("type", { type: post.type ?? "other" }),
-        username: post.username,
+        //* 組織設定匿名時是代號，依頁面語言顯示（#140）
+        username: publisherDisplayName(
+          post.username,
+          (await getTranslations({ locale, namespace: "Publisher" }))(
+            "anonymous",
+          ),
+        ),
       })
     : t("fallbackTitle");
   const description =

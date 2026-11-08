@@ -19,6 +19,8 @@ import type { PostType } from "./types/post";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { defaultImageStorage } from "./storage/ImageStorage";
 import { HttpError } from "./utils/httpError";
+import dbPool from "./utils/db";
+import { maskOrgPublishers } from "./services/orgPublisher";
 
 dotenv.config();
 
@@ -209,6 +211,8 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       search,
       type,
     });
+    //* 組織物品以組織名義顯示，不出現窗口個人帳號（#140、ADR 0004）
+    await maskOrgPublishers(dbPool, result.posts);
 
     res.status(200).json(result);
   } catch (error) {
@@ -263,6 +267,7 @@ router.get("/feed", async (req: Request, res: Response, next: NextFunction) => {
       mode,
       fullHydrationBaseline: benchmarkStrategy === "full-hydration",
     });
+    await maskOrgPublishers(dbPool, result.posts, { viewerUserId: userId });
     const tFeed = performance.now() - tFeedStart;
     const tTotal = performance.now() - t0;
 
@@ -422,6 +427,7 @@ router.get(
       const limit = parseInt(req.query.limit as string) || 20;
 
       const result = await postService.getViewedPosts(userId, page, limit);
+      await maskOrgPublishers(dbPool, result.posts, { viewerUserId: userId });
       res.status(200).json(result);
     } catch (error) {
       return next(error);
@@ -463,7 +469,11 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    res.status(200).json({ post });
+    //* 經手窗口本人看自己的物品時不遮（編輯、刪除按鈕依 user_id 判斷）
+    const [shown] = await maskOrgPublishers(dbPool, [post], {
+      viewerUserId: currentUserId,
+    });
+    res.status(200).json({ post: shown });
   } catch (error) {
     return next(error);
   }

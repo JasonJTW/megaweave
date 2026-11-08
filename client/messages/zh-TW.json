@@ -139,6 +139,10 @@
     "orgItemNew": {
       "title": "上架組織物品",
       "description": "單位窗口代表單位上架物品。"
+    },
+    "orgReport": {
+      "title": "組織報表",
+      "description": "組織管理員查看流通件數、各層去化比例與估算避免排放量。"
     }
   },
   "Lalamove": {
@@ -1202,7 +1206,8 @@
       "daysHint": "1 到 365 天。單位窗口可替單件物品另設。",
       "save": "儲存",
       "saved": "已更新自動升級設定。"
-    }
+    },
+    "reportLink": "查看組織報表"
   },
   "Org": {
     "title": "組織頁",
@@ -1248,7 +1253,7 @@
       "weightDefaultHint": "已帶入類別預設值，來源：{publisher}（{year}）。實際重量不同時請修改。",
       "weightRequiredHint": "這個類別沒有可引用的平均重量，請填寫實際重量。",
       "assetNumber": "財產編號（選填）",
-      "estimatedValue": "估算價值（新台幣，選填）",
+      "estimatedValue": "單件估算價值（新台幣，選填）",
       "photos": "照片（最多 {max} 張）",
       "submit": "上架",
       "submitting": "上架中…",
@@ -1312,5 +1317,90 @@
       "approved": "已核可",
       "completed": "已完成"
     }
+  },
+  "OrgReport": {
+    "title": "組織報表",
+    "subtitle": "物品在組織內流通的情形，以及估算的重量、價值與避免排放量。數字依完成交接的紀錄計算。",
+    "backToAdmin": "回組織後台",
+    "orgLabel": "組織",
+    "loading": "載入中…",
+    "loadFailed": "報表載入失敗，請稍後再試。",
+    "noOrgs": "你不是任何組織的管理員。",
+    "pieces": "{count} 件",
+    "circulationHeading": "流通",
+    "listed": "上架件數",
+    "listedItems": "共 {count} 項物品",
+    "circulated": "已流通件數",
+    "circulatedWeaves": "{count} 次完成的交接",
+    "circulationRate": "去化率",
+    "circulationRateHint": "已流通件數 ÷ 上架件數",
+    "tiersHeading": "各層去化比例",
+    "colTier": "層級",
+    "colReached": "到過這層的物品",
+    "colClaimed": "在這層被認領的件數",
+    "colRate": "占上架件數",
+    "tiersHint": "每次交接依「申請當下」物品所在的層級歸類，只算已完成的交接；各層比例相加等於去化率。",
+    "tier": {
+      "internal": "內部單位（Internal）",
+      "members": "組織成員（Members）",
+      "public": "公開（Public）"
+    },
+    "unitsHeading": "各單位統計",
+    "unitsEmpty": "還沒有單位。",
+    "colUnit": "單位",
+    "colListed": "上架件數",
+    "colGiven": "流出件數",
+    "colReceived": "代表單位認領件數",
+    "colUnitEstimated": "流出的估算避免排放量（kgCO2e）",
+    "unitsHint": "流出＝這個單位的物品完成交接的件數；代表單位認領＝窗口代表這個單位申請並完成的件數（個人申請不算進任何單位）。",
+    "emissionsHeading": "估算重量、價值與避免排放量",
+    "emissionsScope": "只計已完成交接的物品，每次交接算一次。",
+    "estimatedKg": "估算避免排放量",
+    "estimatedKgHint": "潛在值 × 取代率 R（{rate}）",
+    "potentialKg": "潛在值（R = 1）",
+    "potentialKgHint": "假設每件都取代一件新品",
+    "kgCO2e": "{value} kgCO2e",
+    "kg": "{value} 公斤",
+    "twd": "NT$ {value}",
+    "totalWeight": "估算重量",
+    "defaultWeightShare": "其中 {share} 用類別預設重量",
+    "estimatedValue": "估算價值",
+    "unvalued": "{count} 件未填估算價值，未計入",
+    "replacementRate": "取代率 R",
+    "replacementRateValue": "{rate}（{status}）",
+    "replacementRateSource": "來源",
+    "rateStatus": {
+      "assumed": "假設值，尚未以本平台問卷實測",
+      "surveyed": "問卷實測"
+    },
+    "factorTableVersion": "係數表版本",
+    "defaultWeightShareLabel": "預設重量占比",
+    "uncounted": "不計入件數（類別無係數或缺重量）",
+    "formulaHeading": "計算方法",
+    "formulaPotential": "潛在值 = 重量（公斤）× 類別新品生產排放係數（kgCO2e／公斤）",
+    "formulaEstimated": "估算避免排放量 = 潛在值 × 取代率 R",
+    "formulaFactor": "家具類係數取「材質組成 × 環境部材質係數」與「參考產品 EPD 平均」兩者較低者；電子產品用 US EPA WARM 產品係數；找不到可引用係數的類別不計入。",
+    "byCategoryHeading": "各類別",
+    "colCategory": "類別",
+    "colQuantity": "件數",
+    "colWeight": "重量（公斤）",
+    "colPotential": "潛在值（kgCO2e）",
+    "colEstimated": "估算值（kgCO2e）",
+    "factorsHeading": "排放係數與來源",
+    "colFactor": "係數（kgCO2e／公斤）",
+    "colMethod": "方法",
+    "colSources": "來源",
+    "notCounted": "不計入",
+    "method": {
+      "reference_products": "材質組成與參考產品 EPD",
+      "fixed_bom": "固定材質組成",
+      "product_factor": "產品係數",
+      "not_counted": "無可引用係數"
+    },
+    "basis": {
+      "material_bom": "採材質組成（較低）",
+      "reference_epd": "採參考產品 EPD（較低）"
+    },
+    "footnote": "本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 {version}。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。"
   }
 }

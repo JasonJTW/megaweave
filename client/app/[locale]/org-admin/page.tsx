@@ -522,6 +522,14 @@ export default function OrgAdminPage() {
             {t("manageItemsLink")}
           </Link>
         )}
+        {orgId && (
+          <Link
+            href={`/org-admin/report?org=${orgId}`}
+            className="ml-4 inline-block text-sm underline"
+          >
+            {t("reportLink")}
+          </Link>
+        )}
       </header>
 
       {loadError && (

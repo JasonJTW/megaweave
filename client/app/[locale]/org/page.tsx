@@ -19,13 +19,13 @@ import {
   useOrgItemCategories,
   useSelectedOrg,
 } from "@/lib/orgApi";
+import { orgPostsKey } from "@/lib/orgSwrKeys";
 
 function OrgPosts({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org");
   const categories = useOrgItemCategories();
-  const { data, error } = useSWR(
-    `${hostName}/api/orgs/${org.id}/posts`,
-    (url: string) => requestJson<{ posts: OrgPagePost[] }>(url),
+  const { data, error } = useSWR(orgPostsKey(hostName, org.id), (url: string) =>
+    requestJson<{ posts: OrgPagePost[] }>(url),
   );
 
   if (error)

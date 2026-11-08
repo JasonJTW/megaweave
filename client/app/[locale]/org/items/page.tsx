@@ -30,6 +30,7 @@ import {
   requestJson,
   useSelectedOrg,
 } from "@/lib/orgApi";
+import { orgItemsKey } from "@/lib/orgSwrKeys";
 
 const ALL = "all";
 
@@ -184,7 +185,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
   if (weaveStatus !== ALL) query.set("weaveStatus", weaveStatus);
   const qs = query.toString();
   const { data, error, mutate } = useSWR(
-    `${hostName}/api/orgs/${org.id}/items${qs ? `?${qs}` : ""}`,
+    orgItemsKey(hostName, org.id, qs),
     (url: string) => requestJson<{ items: OrgItem[] }>(url),
   );
 

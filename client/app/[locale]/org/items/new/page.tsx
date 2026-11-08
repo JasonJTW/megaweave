@@ -6,6 +6,7 @@
 import { FormEvent, Suspense, useState } from "react";
 import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
+import { useSWRConfig } from "swr";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import {
   useOrgItemCategories,
   useSelectedOrg,
 } from "@/lib/orgApi";
+import { isOrgListingKey } from "@/lib/orgSwrKeys";
 
 //* 與一般貼文相同（PostFormModal 的 MAX_IMAGES_COUNT、server 的 UPLOAD_IMAGE_LIMIT 預設值）
 const MAX_PHOTOS = 5;
@@ -54,6 +56,7 @@ function ItemForm({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org.form");
   const apiErrorMessage = useApiErrorMessage();
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   const categories = useOrgItemCategories();
   const { conditions } = usePost();
   const conditionText = useConditionText();
@@ -113,6 +116,8 @@ function ItemForm({ org }: { org: OrgAccess }) {
           stagingKeys,
         }),
       });
+      //* 導回組織頁前讓清單重新抓，否則 dedupe 區間內會顯示沒有新物品的舊快取
+      void mutate(isOrgListingKey(hostName, org.id));
       toast.success(t("created"));
       router.push(`/org?org=${org.id}`);
     } catch (error) {

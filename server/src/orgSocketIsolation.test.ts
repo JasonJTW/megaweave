@@ -61,7 +61,7 @@ function execute(rawSql: string, params: unknown[] = []): [unknown, unknown] {
     return [row ? [{ id: row.id, user_id: row.user_id, title: row.title }] : [], undefined];
   }
   // postVisibility.isPostVisibleTo（留言）與 weaveService.validatePost
-  if (/^SELECT (1|p\.user_id, p\.status, p\.type) FROM posts p WHERE p\.id = \?/.test(sql)) {
+  if (/^SELECT (1|p\.user_id, p\.status, p\.type, p\.org_id, p\.org_unit_id) FROM posts p WHERE p\.id = \?/.test(sql)) {
     const row = params[0] === post.id ? visiblePost(sql, params) : null;
     return [row ? [{ 1: 1, user_id: row.user_id, status: row.status, type: row.type }] : [], undefined];
   }

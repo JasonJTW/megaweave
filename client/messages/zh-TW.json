@@ -769,7 +769,10 @@
       "submit": "{type, select, wish {提供} other {接收}}",
       "submitWithCount": "{type, select, wish {提供} other {接收}}（{count}）",
       "quantityLeft": "（剩餘：{quantity}）",
-      "quantity": "數量："
+      "quantity": "數量：",
+      "actingAs": "代表",
+      "actingAsPlaceholder": "選擇代表誰",
+      "actingAsMyself": "我個人"
     }
   },
   "Notifications": {
@@ -1246,7 +1249,23 @@
       "colAsset": "財產編號",
       "colCreated": "上架時間",
       "weightKg": "{kg} 公斤",
-      "empty": "沒有符合條件的物品。"
+      "empty": "沒有符合條件的物品。",
+      "filterWeaveStatus": "申請",
+      "colRequests": "申請",
+      "viewRequests": "{count, plural, =0 {查看申請} other {# 筆待核可}}",
+      "hideRequests": "收合申請",
+      "requestsEmpty": "這件物品還沒有申請。",
+      "requestPersonal": "{name}（個人）",
+      "requestOnBehalf": "{name}（代表{unit}）",
+      "requestQuantity": "數量 {quantity}",
+      "approve": "核可",
+      "decline": "婉拒",
+      "reviewFailed": "無法更新申請，請稍後再試。"
+    },
+    "weaveStatus": {
+      "requested": "待核可",
+      "approved": "已核可",
+      "completed": "已完成"
     }
   }
 }

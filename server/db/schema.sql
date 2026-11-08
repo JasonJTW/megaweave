@@ -739,6 +739,7 @@ CREATE TABLE `weaves` (
   `post_id` bigint unsigned NOT NULL COMMENT '哪篇貼文',
   `giver_id` bigint unsigned NOT NULL COMMENT '給予者（交出物品的一方；Share 為 Post Author，Wish 為 Initiator，見 ADR 0001）',
   `receiver_id` bigint unsigned NOT NULL COMMENT '接收者（收到物品的一方；Share 為 Initiator，Wish 為 Post Author，見 ADR 0001）',
+  `receiver_org_unit_id` bigint unsigned DEFAULT NULL COMMENT '物品流向的單位（申請人送出時選擇；個人 Weave 為 NULL，見 ADR 0004）',
   `conversation_id` bigint unsigned DEFAULT NULL,
   `status` enum('approved','completed','cancelled','requested','declined','withdrawn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'requested',
   `giver_confirmed` tinyint(1) DEFAULT '0',
@@ -754,10 +755,12 @@ CREATE TABLE `weaves` (
   KEY `idx_status` (`status`),
   KEY `idx_completed_at` (`completed_at`),
   KEY `idx_conversation_id` (`conversation_id`),
+  KEY `idx_weaves_receiver_org_unit` (`receiver_org_unit_id`),
   CONSTRAINT `fk_weaves_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `conversations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_weaves_giver` FOREIGN KEY (`giver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_weaves_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_weaves_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_weaves_receiver` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_weaves_receiver_org_unit` FOREIGN KEY (`receiver_org_unit_id`) REFERENCES `org_units` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

@@ -13,6 +13,7 @@ import {
 } from "./services/orgItemCategories";
 import {
   ORG_ITEM_STATUSES,
+  ORG_ITEM_WEAVE_STATUSES,
   OrgAccess,
   orgItemService,
 } from "./services/orgItemService";
@@ -60,7 +61,10 @@ const ItemFiltersSchema = z.object({
   unitId: z.coerce.number().int().positive().optional(),
   tier: z.enum(AUDIENCE_TIERS).optional(),
   status: z.enum(ORG_ITEM_STATUSES).optional(),
+  weaveStatus: z.enum(ORG_ITEM_WEAVE_STATUSES).optional(),
 });
+
+const ItemIdSchema = z.uuid();
 
 function orgAccess(res: Response): OrgAccess {
   return res.locals.orgAccess as OrgAccess;
@@ -159,6 +163,29 @@ router.get(
         filters.data,
       );
       return res.status(200).json({ items });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/orgs/:orgId/items/:itemId/requests
+ * 後台：一件物品的申請（經手人、流向單位）；只給能管這個單位的窗口或 Org Admin
+ */
+router.get(
+  "/:orgId/items/:itemId/requests",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      if (!itemId.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid item id"));
+      }
+      const requests = await orgItemService.listItemRequests(
+        orgAccess(res),
+        itemId.data,
+      );
+      return res.status(200).json({ requests });
     } catch (error) {
       return next(error);
     }

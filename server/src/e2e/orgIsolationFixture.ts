@@ -13,6 +13,16 @@ import { seedE2eUser, type E2eUser } from "./seed";
 
 export const ORG_ISOLATION_TITLE_PREFIX = "E2E Org Isolation";
 
+/** #137：另一個單位上架的 Internal 物品，檢視者代表自己的單位申請（client/e2e/orgClaim.spec.ts） */
+export const ORG_CLAIM_TITLE = "E2E Org Claim internal";
+
+/** 「E2E Supply Unit」的窗口：申請檢視者單位的物品，讓檢視者在後台核可（只存在於 E2E 資料庫） */
+export const ORG_LISTER = {
+  email: "e2e-org-lister@megaweave.test",
+  password: "e2e-org-lister-123",
+  username: "E2E Org Lister",
+};
+
 const orgViewerSchema = z.object({
   E2E_ORG_VIEWER_EMAIL: z.email(),
   E2E_ORG_VIEWER_PASSWORD: z.string().min(8),
@@ -104,6 +114,41 @@ export async function seedOrgIsolationFixture(
       scope: vectorScopeOf({ orgId: post.org ? orgId : null, audienceTier: post.tier }),
     });
   }
+
+  // #137：「E2E Supply Unit」的窗口（不登入）上架一件 Internal 物品，檢視者（E2E Unit 窗口）可代表單位申請
+  const listerId = await seedE2eUser(mysql, ORG_LISTER);
+  const [supplyUnit] = await mysql.query<ResultSetHeader>(
+    "INSERT INTO org_units (org_id, name) VALUES (?, ?)",
+    [orgId, "E2E Supply Unit"],
+  );
+  const [listerMembership] = await mysql.query<ResultSetHeader>(
+    `INSERT INTO org_memberships (org_id, user_id, access_level, org_role)
+     VALUES (?, ?, 'internal', 'member')`,
+    [orgId, listerId],
+  );
+  await mysql.query(
+    "INSERT INTO org_unit_contacts (org_id, org_unit_id, membership_id) VALUES (?, ?, ?)",
+    [orgId, supplyUnit.insertId, listerMembership.insertId],
+  );
+  const [claimPost] = await mysql.query<ResultSetHeader>(
+    `INSERT INTO posts
+       (public_id, user_id, org_id, org_unit_id, audience_tier, title, content, type,
+        category_id, condition_level, expires_at)
+     VALUES (?, ?, ?, ?, 'internal', ?, ?, 'share', 1, 2, NULL)`,
+    [
+      randomUUID(),
+      listerId,
+      orgId,
+      supplyUnit.insertId,
+      ORG_CLAIM_TITLE,
+      "Seeded by the E2E org claim fixture",
+    ],
+  );
+  await mysql.query("INSERT INTO items (post_id, title, quantity) VALUES (?, ?, ?)", [
+    claimPost.insertId,
+    ORG_CLAIM_TITLE,
+    2,
+  ]);
 
   await mysql.query("UPDATE user_profiles SET interest_vector = ? WHERE user_id = ?", [
     vectorJson,

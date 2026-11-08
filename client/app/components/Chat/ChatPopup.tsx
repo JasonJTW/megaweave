@@ -39,7 +39,10 @@ export const ChatPopup = () => {
   const apiErrorMessage = useApiErrorMessage();
 
   // Weaving 提交邏輯：由 PostInfoCard 回調，在此執行 API 呼叫
-  const handleWeavingSubmit = async (selectedItems: SelectedWeaveItem[]) => {
+  const handleWeavingSubmit = async (
+    selectedItems: SelectedWeaveItem[],
+    actingUnitId?: number | null,
+  ) => {
     if (!currentUser) {
       toast.error(t("signInToRequest"));
       router.push(signinUrlForCurrentPage());
@@ -64,6 +67,7 @@ export const ChatPopup = () => {
           itemId: it.itemId ?? null,
           quantity: it.quantity,
         })),
+        actingUnitId,
       });
       void newWeave;
 

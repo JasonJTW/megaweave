@@ -31,6 +31,7 @@ export interface FakeOrgPostDetailRow {
 }
 
 export interface FakeItemRow {
+  id: number;
   post_id: number;
   title: string;
   quantity: number;
@@ -51,14 +52,17 @@ interface ItemTables {
   images: FakeImageRow[];
 }
 
-export interface FakeOrgItemsDb extends FakeOrgDb, ItemTables {}
+export interface FakeOrgItemsDb extends FakeOrgDb, ItemTables {
+  /** 每篇貼文的 Weave 狀態；沒有 weaves 表時為空，由 fakeOrgWeavesDb 換掉 */
+  weaveStatusesOf: (postId: number) => string[];
+}
 
 function normalize(sql: string) {
   return sql.replace(/\s+/g, " ").trim();
 }
 
 const LIST_ITEMS =
-  /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
+  /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys, \(SELECT COUNT\(\*\) FROM weaves w WHERE w\.post_id = p\.id AND w\.status = 'requested'\) AS pending_request_count FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND EXISTS \(SELECT 1 FROM weaves w WHERE w\.post_id = p\.id AND w\.status = \?\))?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
 
 export function createFakeOrgItemsDb(
   seed: Parameters<typeof createFakeOrgDb>[0] & { users: FakeUser[] },
@@ -68,6 +72,7 @@ export function createFakeOrgItemsDb(
   let snapshot: ItemTables | null = null;
   let nextPostId = 1000;
   let nextImageId = 1;
+  let nextItemId = 500;
   let clock = Date.parse("2026-11-08T00:00:00Z");
 
   function run(rawSql: unknown, rawParams: unknown): Result | null {
@@ -167,7 +172,7 @@ export function createFakeOrgItemsDb(
 
     if (/^INSERT INTO items \(post_id, title, quantity\) VALUES \(\?, \?, \?\)$/.test(sql)) {
       const [post_id, title, quantity] = params;
-      tables.items.push({ post_id: Number(post_id), title: String(title), quantity: Number(quantity) });
+      tables.items.push({ id: nextItemId++, post_id: Number(post_id), title: String(title), quantity: Number(quantity) });
       return [{ affectedRows: 1 }, []];
     }
 
@@ -186,7 +191,8 @@ export function createFakeOrgItemsDb(
       const tiers = list[1] ? (params[i++] as string[]) : null;
       const unitIds = list[2] ? (params[i++] as number[]).map(Number) : null;
       const status = list[3] ? params[i++] : null;
-      const publicId = list[4] ? params[i++] : null;
+      const weaveStatus = list[4] ? params[i++] : null;
+      const publicId = list[5] ? params[i++] : null;
       const rows = tables.posts
         .filter(
           (p) =>
@@ -195,6 +201,7 @@ export function createFakeOrgItemsDb(
             (!tiers || tiers.includes(p.audience_tier)) &&
             (!unitIds || unitIds.includes(p.org_unit_id)) &&
             (!status || p.status === status) &&
+            (!weaveStatus || db.weaveStatusesOf(p.id).includes(String(weaveStatus))) &&
             (!publicId || p.public_id === publicId),
         )
         .sort((a, b) => b.created_at.getTime() - a.created_at.getTime() || b.id - a.id)
@@ -218,6 +225,7 @@ export function createFakeOrgItemsDb(
             asset_number: d?.asset_number ?? null,
             estimated_value_twd: d?.estimated_value_twd ?? null,
             s3_keys: keys.length > 0 ? keys.join(",") : null,
+            pending_request_count: db.weaveStatusesOf(p.id).filter((s) => s === "requested").length,
           };
         });
       return [rows, []];
@@ -228,6 +236,7 @@ export function createFakeOrgItemsDb(
 
   const baseConnection = base.connection;
   const db = base as FakeOrgItemsDb;
+  db.weaveStatusesOf = () => [];
   Object.defineProperties(db, {
     posts: { get: () => tables.posts },
     details: { get: () => tables.details },

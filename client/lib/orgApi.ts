@@ -14,6 +14,14 @@ export type AudienceTier = (typeof AUDIENCE_TIERS)[number];
 export const ORG_ITEM_STATUSES = ["active", "inactive"] as const;
 export type OrgItemStatus = (typeof ORG_ITEM_STATUSES)[number];
 
+//* 後台依申請狀態篩選（#137）：有這個狀態的 Weave 的物品
+export const ORG_ITEM_WEAVE_STATUSES = [
+  "requested",
+  "approved",
+  "completed",
+] as const;
+export type OrgItemWeaveStatus = (typeof ORG_ITEM_WEAVE_STATUSES)[number];
+
 export interface OrgUnitRef {
   id: number;
   name: string;
@@ -59,6 +67,17 @@ export interface OrgItem extends OrgPagePost {
   weightIsDefault: boolean | null;
   assetNumber: string | null;
   estimatedValueTwd: number | null;
+  pendingRequestCount: number;
+}
+
+/** 後台：一件物品的申請。receiver 是經手人，receiverUnit 是流向單位（個人申請為 null） */
+export interface OrgItemRequest {
+  id: number;
+  status: OrgItemWeaveStatus;
+  createdAt: string;
+  quantity: number;
+  receiver: { name: string };
+  receiverUnit: OrgUnitRef | null;
 }
 
 export async function requestJson<T>(

@@ -769,7 +769,10 @@
       "submit": "{type, select, wish {Offer} other {Request}}",
       "submitWithCount": "{type, select, wish {Offer} other {Request}} ({count})",
       "quantityLeft": "(Left: {quantity})",
-      "quantity": "Qty:"
+      "quantity": "Qty:",
+      "actingAs": "On behalf of",
+      "actingAsPlaceholder": "Choose who you represent",
+      "actingAsMyself": "Myself"
     }
   },
   "Notifications": {
@@ -1246,7 +1249,23 @@
       "colAsset": "Asset no.",
       "colCreated": "Listed at",
       "weightKg": "{kg} kg",
-      "empty": "No items match these filters."
+      "empty": "No items match these filters.",
+      "filterWeaveStatus": "Requests",
+      "colRequests": "Requests",
+      "viewRequests": "{count, plural, =0 {View requests} one {# awaiting review} other {# awaiting review}}",
+      "hideRequests": "Hide requests",
+      "requestsEmpty": "No requests for this item yet.",
+      "requestPersonal": "{name} (personal)",
+      "requestOnBehalf": "{name} (for {unit})",
+      "requestQuantity": "Qty {quantity}",
+      "approve": "Approve",
+      "decline": "Decline",
+      "reviewFailed": "Couldn't update the request. Please try again."
+    },
+    "weaveStatus": {
+      "requested": "Awaiting review",
+      "approved": "Approved",
+      "completed": "Completed"
     }
   }
 }

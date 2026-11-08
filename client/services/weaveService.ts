@@ -14,6 +14,11 @@ interface CreateWeaveParams {
   itemId?: number | null;
   quantity?: number;
   notes?: string;
+  /**
+   * 組織物品：代表的單位 id，或 null（我個人）。只有 GET /api/weaves/acting-units 回傳單位時才送；
+   * 有選項卻省略，server 會回 INVALID_REQUEST（ADR 0004）
+   */
+  actingUnitId?: number | null;
 }
 
 export interface WeaveItem {
@@ -49,6 +54,8 @@ export interface Weave {
   receiver_id: number;
   receiver_name: string;
   receiver_avatar: string;
+  /** 物品流向的單位（ADR 0004）；個人 Weave 為 null */
+  receiver_org_unit?: { id: number; name: string } | null;
   conversation_id?: number;
   created_at: string;
   updated_at: string;
@@ -62,6 +69,7 @@ export const createWeave = async ({
   itemId,
   quantity,
   notes,
+  actingUnitId,
 }: CreateWeaveParams) => {
   try {
     // 如果傳入單個 itemId/quantity，轉換為 items 陣列傳給後端
@@ -82,6 +90,7 @@ export const createWeave = async ({
         postId,
         items: requestItems,
         notes,
+        ...(actingUnitId !== undefined && { actingUnitId }),
       }),
     });
 

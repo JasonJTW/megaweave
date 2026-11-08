@@ -20,6 +20,12 @@ import { HttpError } from "./httpError";
 import { getTranslator } from "./i18n";
 import { getAppOrigin } from "./env";
 import { viewerVisibility } from "../services/postVisibility";
+import {
+  actingUnitsFor,
+  canReviewOrgRequest,
+  resolveActingUnit,
+} from "../services/orgWeaveService";
+import type { OrgUnitRef } from "../services/orgItemService";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -57,6 +63,10 @@ export interface RequestWeaveParams {
   /** Normalised items. Pass [] when no specific items requested. */
   items: Array<{ itemId: number | null; quantity: number }>;
   notes?: string | null;
+  /**
+   * 組織貼文：申請人代表的單位（null = 我個人；省略 = client 沒問）。見 orgWeaveService.resolveActingUnit
+   */
+  actingUnitId?: number | null;
   initiator: {
     id: number;
     name: string;
@@ -88,6 +98,9 @@ interface WeaveRow extends RowDataPacket {
   receiver_id: number;
   /** Joined from posts: the Weave's Post Author (never the Initiator). */
   post_author_id: number;
+  /** Joined from posts: the owning org/unit, NULL for personal posts. */
+  post_org_id: number | null;
+  post_org_unit_id: number | null;
   status: WeaveStatus;
   giver_confirmed: boolean | number;
   receiver_confirmed: boolean | number;
@@ -95,14 +108,22 @@ interface WeaveRow extends RowDataPacket {
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
+interface ValidatedPost {
+  user_id: number;
+  status: string;
+  type: string;
+  org_id: number | null;
+  org_unit_id: number | null;
+}
+
 async function validatePost(
   postId: number,
   initiatorId: number,
-): Promise<{ user_id: number; status: string; type: string }> {
+): Promise<ValidatedPost> {
   // 能認領 = 能看到（ADR 0003）：看不到的組織貼文與不存在一樣回 404
   const visibility = await viewerVisibility(dbPool, initiatorId);
   const [rows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT p.user_id, p.status, p.type FROM posts p WHERE p.id = ? AND ${visibility.sql}`,
+    `SELECT p.user_id, p.status, p.type, p.org_id, p.org_unit_id FROM posts p WHERE p.id = ? AND ${visibility.sql}`,
     [postId, ...visibility.params],
   );
   if (rows.length === 0)
@@ -111,7 +132,14 @@ async function validatePost(
     throw new WeaveError(400, "WEAVE_OWN_POST", "Cannot weave your own post");
   if (rows[0].status !== "active")
     throw new WeaveError(400, "POST_INACTIVE", "This post is no longer active");
-  return rows[0] as { user_id: number; status: string; type: string };
+  const row = rows[0];
+  return {
+    user_id: Number(row.user_id),
+    status: row.status,
+    type: row.type,
+    org_id: row.org_id == null ? null : Number(row.org_id),
+    org_unit_id: row.org_unit_id == null ? null : Number(row.org_unit_id),
+  };
 }
 
 /**
@@ -402,19 +430,56 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
+ * 申請人在這篇貼文可以代表的單位（ADR 0004）；空陣列代表不顯示「代表誰」的選項。
+ * 看不到的貼文回 404，與送出請求一致。
+ */
+export async function listActingUnits(
+  postId: number,
+  userId: number,
+): Promise<OrgUnitRef[]> {
+  const visibility = await viewerVisibility(dbPool, userId);
+  const [rows] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT p.type, p.org_id, p.org_unit_id FROM posts p
+     WHERE p.id = ? AND p.deleted_at IS NULL AND ${visibility.sql}`,
+    [postId, ...visibility.params],
+  );
+  if (rows.length === 0)
+    throw new WeaveError(404, "POST_NOT_FOUND", "Post not found");
+  const { type, org_id: orgId, org_unit_id: orgUnitId } = rows[0];
+  if (orgId == null || orgUnitId == null || type === "wish") return [];
+  return actingUnitsFor(
+    dbPool,
+    { orgId: Number(orgId), orgUnitId: Number(orgUnitId) },
+    userId,
+  );
+}
+
+/**
  * 建立 Weave 請求：驗證 → 寫入 DB → 發通知 → 建立對話系統訊息
  */
 export async function requestWeave(
   params: RequestWeaveParams,
   io: Server | null,
 ): Promise<RequestWeaveResult> {
-  const { postId, items, notes, initiator } = params;
+  const { postId, items, notes, initiator, actingUnitId } = params;
 
   const post = await validatePost(postId, initiator.id);
   await validateItems(items, postId);
 
   const { user_id: postOwnerId, type: postType } = post;
   const isWish = postType === "wish";
+  // ADR 0004：組織物品（只會是 Share）流向申請人，記下他代表的單位；個人貼文一律 NULL
+  const receiverOrgUnitId =
+    post.org_id !== null && post.org_unit_id !== null && !isWish
+      ? resolveActingUnit(
+          await actingUnitsFor(
+            dbPool,
+            { orgId: post.org_id, orgUnitId: post.org_unit_id },
+            initiator.id,
+          ),
+          actingUnitId,
+        )
+      : resolveActingUnit([], actingUnitId);
   const giverId = isWish ? initiator.id : postOwnerId;
   const receiverId = isWish ? postOwnerId : initiator.id;
   const targetUserId = initiator.id === giverId ? receiverId : giverId;
@@ -432,9 +497,9 @@ export async function requestWeave(
 
   // Write weave + items
   const [result] = await dbPool.execute<ResultSetHeader>(
-    `INSERT INTO weaves (post_id, giver_id, receiver_id, conversation_id, status, notes)
-     VALUES (?, ?, ?, ?, 'requested', ?)`,
-    [postId, giverId, receiverId, conversationId, notes ?? null],
+    `INSERT INTO weaves (post_id, giver_id, receiver_id, receiver_org_unit_id, conversation_id, status, notes)
+     VALUES (?, ?, ?, ?, ?, 'requested', ?)`,
+    [postId, giverId, receiverId, receiverOrgUnitId, conversationId, notes ?? null],
   );
   const weaveId = result.insertId;
 
@@ -519,7 +584,7 @@ export async function approveWeave(
     await connection.beginTransaction();
 
     const [weaves] = await connection.execute<WeaveRow[]>(
-      `SELECT w.*, p.user_id AS post_author_id
+      `SELECT w.*, p.user_id AS post_author_id, p.org_id AS post_org_id, p.org_unit_id AS post_org_unit_id
        FROM weaves w JOIN posts p ON p.id = w.post_id
        WHERE w.id = ? FOR UPDATE`,
       [weaveId],
@@ -533,17 +598,36 @@ export async function approveWeave(
 
     const isGiver = weave.giver_id === userId;
     const isReceiver = weave.receiver_id === userId;
-    if (!isGiver && !isReceiver)
-      throw new WeaveError(403, "FORBIDDEN", "Unauthorized");
+    const isParty = isGiver || isReceiver;
     // Requested stage is judged by Post Author / Initiator (not Giver / Receiver).
     // The Initiator is the party who is not the Post Author.
     const isPostAuthor = weave.post_author_id === userId;
-    const isInitiator = !isPostAuthor;
+    const isInitiator = isParty && !isPostAuthor;
+    // 組織物品（ADR 0003/0004）：由所屬單位的任一窗口或 Org Admin 審核，不限上架的人；
+    // 依現在的 membership 判斷，申請人（Receiver）自己不能審核
+    const isOrgPost =
+      weave.post_org_id != null && weave.post_org_unit_id != null;
+    const canReview = isOrgPost
+      ? weave.status === "requested" &&
+        !isReceiver &&
+        (await canReviewOrgRequest(
+          connection,
+          {
+            orgId: Number(weave.post_org_id),
+            orgUnitId: Number(weave.post_org_unit_id),
+          },
+          userId,
+        ))
+      : isPostAuthor;
+    // 審核以外的動作（撤回、取消、確認交接）只屬於兩造；審核權限在下方狀態機逐一檢查
+    const isReviewAction = newStatus === "approved" || newStatus === "declined";
+    if (!isParty && !(weave.status === "requested" && isReviewAction))
+      throw new WeaveError(403, "FORBIDDEN", "Unauthorized");
 
     // ── State machine ─────────────────────────────────────────────────────────
     if (weave.status === "requested") {
       if (newStatus === "approved") {
-        if (!isPostAuthor)
+        if (!canReview)
           throw new WeaveError(
             403,
             "FORBIDDEN",
@@ -559,7 +643,7 @@ export async function approveWeave(
           [weaveId],
         );
       } else if (newStatus === "declined") {
-        if (!isPostAuthor)
+        if (!canReview)
           throw new WeaveError(
             403,
             "FORBIDDEN",
@@ -639,11 +723,12 @@ export async function approveWeave(
     connection.release();
   }
 
-  const isGiver = weave.giver_id === userId;
+  // 對方：動作者是 Receiver 就通知 Giver，否則通知 Receiver（不是兩造的審核者站在 Giver 這一側）
+  const recipientId =
+    weave.receiver_id === userId ? weave.giver_id : weave.receiver_id;
 
   if (isPartialConfirm) {
     // Partial confirm: broadcast partial state, notify, return
-    const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
     if (io) {
       try {
         const [latestRows] = await dbPool.execute<RowDataPacket[]>(
@@ -703,7 +788,6 @@ export async function approveWeave(
       [weave.post_id],
     );
     const postTitle = (details[0]?.title as string) ?? "Item";
-    const recipientId = isGiver ? weave.receiver_id : weave.giver_id;
     const items = await getWeaveItemsList(Number(weaveId), weave.post_id);
 
     // 判斷觸發的 Action 類型
@@ -770,8 +854,10 @@ export async function approveWeave(
         giver_confirmed: Boolean(latestRows[0]?.giver_confirmed),
         receiver_confirmed: Boolean(latestRows[0]?.receiver_confirmed),
       };
-      io.to(`user_${recipientId}`).emit("weave_status_updated", statusPayload);
-      io.to(`user_${userId}`).emit("weave_status_updated", statusPayload);
+      // 兩造加上動作者（審核者可能不是兩造）
+      for (const id of new Set([weave.giver_id, weave.receiver_id, userId])) {
+        io.to(`user_${id}`).emit("weave_status_updated", statusPayload);
+      }
     }
   } catch (e) {
     console.error("Weave update notification/socket failed:", e);

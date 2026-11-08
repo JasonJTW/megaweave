@@ -54,10 +54,25 @@ export interface CreateOrgItemInput {
   stagingKeys: string[];
 }
 
+/** 後台依 Weave 狀態篩選：有這個狀態的申請的物品（requested = 待核可） */
+export const ORG_ITEM_WEAVE_STATUSES = ["requested", "approved", "completed"] as const;
+export type OrgItemWeaveStatus = (typeof ORG_ITEM_WEAVE_STATUSES)[number];
+
 export interface OrgItemFilters {
   unitId?: number;
   tier?: AudienceTier;
   status?: OrgItemStatus;
+  weaveStatus?: OrgItemWeaveStatus;
+}
+
+/** 後台：一件物品的申請（#137）。receiver 是經手人，receiverUnit 是流向單位（個人申請為 null） */
+export interface OrgItemRequest {
+  id: number;
+  status: OrgItemWeaveStatus;
+  createdAt: string;
+  quantity: number;
+  receiver: { name: string };
+  receiverUnit: OrgUnitRef | null;
 }
 
 /** 後台清單的一列：含財產編號、估算價值等管理資訊 */
@@ -76,6 +91,8 @@ export interface OrgItem {
   assetNumber: string | null;
   estimatedValueTwd: number | null;
   s3Keys: string[];
+  /** 待核可（requested）的申請數 */
+  pendingRequestCount: number;
 }
 
 /** 組織頁卡片：不含財產編號與估算價值 */
@@ -187,6 +204,7 @@ function toOrgItem(row: RowDataPacket): OrgItem {
     estimatedValueTwd:
       row.estimated_value_twd === null ? null : Number(row.estimated_value_twd),
     s3Keys: row.s3_keys ? String(row.s3_keys).split(",") : [],
+    pendingRequestCount: Number(row.pending_request_count ?? 0),
   };
 }
 
@@ -194,6 +212,7 @@ interface ListQuery {
   tiers?: AudienceTier[];
   unitIds?: number[];
   status?: OrgItemStatus;
+  weaveStatus?: OrgItemWeaveStatus;
   publicId?: string;
 }
 
@@ -213,6 +232,10 @@ async function queryItems(orgId: number, filters: ListQuery): Promise<OrgItem[]>
     where += " AND p.status = ?";
     params.push(filters.status);
   }
+  if (filters.weaveStatus) {
+    where += " AND EXISTS (SELECT 1 FROM weaves w WHERE w.post_id = p.id AND w.status = ?)";
+    params.push(filters.weaveStatus);
+  }
   if (filters.publicId) {
     where += " AND p.public_id = ?";
     params.push(filters.publicId);
@@ -222,7 +245,8 @@ async function queryItems(orgId: number, filters: ListQuery): Promise<OrgItem[]>
             p.org_unit_id, u.name AS unit_name,
             d.org_category, d.quantity, d.unit_weight_kg, d.weight_is_default,
             d.asset_number, d.estimated_value_twd,
-            (SELECT GROUP_CONCAT(i.s3_key ORDER BY i.id) FROM images i WHERE i.post_id = p.id) AS s3_keys
+            (SELECT GROUP_CONCAT(i.s3_key ORDER BY i.id) FROM images i WHERE i.post_id = p.id) AS s3_keys,
+            (SELECT COUNT(*) FROM weaves w WHERE w.post_id = p.id AND w.status = 'requested') AS pending_request_count
      FROM posts p
      JOIN org_units u ON u.id = p.org_unit_id
      LEFT JOIN org_post_details d ON d.post_id = p.id
@@ -280,7 +304,53 @@ export const orgItemService = {
       unitIds,
       tiers: filters.tier ? [filters.tier] : undefined,
       status: filters.status,
+      weaveStatus: filters.weaveStatus,
     });
+  },
+
+  /**
+   * 後台：一件物品的申請，新的在前。只給能管這個單位的人（窗口或 Org Admin）看；
+   * 核可／婉拒走 PATCH /api/weaves/:id/status（orgWeaveService.canReviewOrgRequest）
+   */
+  async listItemRequests(
+    access: OrgAccess,
+    itemPublicId: string,
+  ): Promise<OrgItemRequest[]> {
+    if (access.manageableUnits.length === 0) throw unitNotManaged();
+    const [posts] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT p.id, p.org_unit_id FROM posts p
+       WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL`,
+      [access.orgId, itemPublicId],
+    );
+    if (posts.length === 0) {
+      throw new HttpError(404, "POST_NOT_FOUND", "Item not found");
+    }
+    assertManages(access, Number(posts[0].org_unit_id));
+
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT w.id, w.status, w.created_at, w.receiver_org_unit_id,
+              ru.name AS receiver_org_unit_name,
+              COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS receiver_name,
+              (SELECT COALESCE(SUM(wi.quantity), 0) FROM weave_items wi WHERE wi.weave_id = w.id) AS quantity
+       FROM weaves w
+       JOIN users u ON u.id = w.receiver_id
+       LEFT JOIN user_profiles up ON up.user_id = u.id
+       LEFT JOIN org_units ru ON ru.id = w.receiver_org_unit_id
+       WHERE w.post_id = ? AND w.status IN ('requested', 'approved', 'completed')
+       ORDER BY w.created_at DESC, w.id DESC`,
+      [posts[0].id],
+    );
+    return rows.map((row) => ({
+      id: Number(row.id),
+      status: row.status,
+      createdAt: new Date(row.created_at).toISOString(),
+      quantity: Number(row.quantity),
+      receiver: { name: String(row.receiver_name) },
+      receiverUnit:
+        row.receiver_org_unit_id == null
+          ? null
+          : { id: Number(row.receiver_org_unit_id), name: String(row.receiver_org_unit_name) },
+    }));
   },
 
   /** 代表單位上架：Share、Internal */

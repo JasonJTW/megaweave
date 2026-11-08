@@ -4,14 +4,24 @@ import Router, { Request, Response, NextFunction } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
-import { requestWeave, approveWeave } from "./utils/weaveService";
+import {
+  requestWeave,
+  approveWeave,
+  listActingUnits,
+} from "./utils/weaveService";
 import { ConnectionAcquireTimeoutError } from "./utils/acquireConnection";
 import { WeaveStatus } from "./utils/weaveService";
 import { buildWeavesFilter, WeavesListQuerySchema } from "./utils/weaveQuery";
 import { enqueueUserVectorUpdate } from "./queue/queues";
 import { HttpError } from "./utils/httpError";
+import { z } from "zod";
 import { publicSurfaceCondition } from "./services/postVisibility";
 const router = Router();
+
+const ActingUnitIdSchema = z.number().int().positive().nullable().optional();
+const ActingUnitsQuerySchema = z.object({
+  postId: z.coerce.number().int().positive(),
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +38,7 @@ export interface WeaveOutput extends RowDataPacket {
   post_id: number;
   giver_id: number;
   receiver_id: number;
+  receiver_org_unit_id: number | null;
   status: WeaveStatus;
   giver_confirmed: number;
   receiver_confirmed: number;
@@ -70,6 +81,7 @@ export interface WeaveOutput extends RowDataPacket {
   giver_avatar: string | null;
   receiver_name: string;
   receiver_avatar: string | null;
+  receiver_org_unit_name: string | null;
   s3_keys: string | null;
 }
 
@@ -112,6 +124,7 @@ export const WEAVE_QUERY_BASE = `
       giver.avatar_url AS giver_avatar,
       COALESCE(NULLIF(TRIM(r_up.custom_name), ''), receiver.username) AS receiver_name,
       receiver.avatar_url AS receiver_avatar,
+      receiver_unit.name AS receiver_org_unit_name,
       GROUP_CONCAT(img.s3_key ORDER BY img.id ASC) AS s3_keys
   FROM weaves w
   JOIN posts p ON w.post_id = p.id
@@ -122,10 +135,21 @@ export const WEAVE_QUERY_BASE = `
   LEFT JOIN user_profiles g_up ON giver.id = g_up.user_id
   JOIN users receiver ON w.receiver_id = receiver.id
   LEFT JOIN user_profiles r_up ON receiver.id = r_up.user_id
+  LEFT JOIN org_units receiver_unit ON receiver_unit.id = w.receiver_org_unit_id
   LEFT JOIN images img ON p.id = img.post_id
 `;
 
-export async function processWeaveRows(weaveRows: WeaveOutput[]) {
+export interface ProcessWeaveRowsOptions {
+  /**
+   * 是否附上流向單位（ADR 0004）。公開個人頁傳 false：單位名稱是組織內部資訊，不給組織外的人看
+   */
+  includeReceiverOrgUnit?: boolean;
+}
+
+export async function processWeaveRows(
+  weaveRows: WeaveOutput[],
+  { includeReceiverOrgUnit = true }: ProcessWeaveRowsOptions = {},
+) {
   if (weaveRows.length === 0) return [];
   const weaveIds = weaveRows.map((r) => r.id);
 
@@ -203,6 +227,14 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
       giver_avatar: row.giver_avatar,
       receiver_name: row.receiver_name,
       receiver_avatar: row.receiver_avatar,
+      // 經手人是 receiver_id；物品流向的單位（個人 Weave 為 null）
+      receiver_org_unit:
+        includeReceiverOrgUnit && row.receiver_org_unit_id != null
+          ? {
+              id: Number(row.receiver_org_unit_id),
+              name: row.receiver_org_unit_name ?? "",
+            }
+          : null,
       giver_confirmed: Boolean(row.giver_confirmed),
       receiver_confirmed: Boolean(row.receiver_confirmed),
       conversation_id: row.conversation_id ?? undefined,
@@ -222,6 +254,11 @@ router.post(
 
     if (!postId)
       return next(new HttpError(400, "INVALID_REQUEST", "Post ID is required"));
+
+    // 「代表誰」（ADR 0004）：省略、null（我個人）或單位 id；能否代表由 weaveService 判斷
+    const actingUnit = ActingUnitIdSchema.safeParse(req.body.actingUnitId);
+    if (!actingUnit.success)
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid acting unit"));
 
     // Normalise items: support array format and legacy single-item format
     interface IncomingItem {
@@ -246,6 +283,7 @@ router.post(
           postId: Number(postId),
           items,
           notes: notes ?? null,
+          actingUnitId: actingUnit.data,
           initiator: {
             id: Number(req.user!.userId),
             name: req.user?.username ?? "Someone",
@@ -296,6 +334,26 @@ router.get(
       const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
       const weaves = await processWeaveRows(weaveRows);
       return res.status(200).json({ weaves });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+// GET /acting-units?postId= - 申請時可代表的單位（ADR 0004）；空陣列 = 不顯示「代表誰」
+router.get(
+  "/acting-units",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    const query = ActingUnitsQuerySchema.safeParse(req.query);
+    if (!query.success)
+      return next(new HttpError(400, "INVALID_REQUEST", "Invalid post id"));
+    try {
+      const units = await listActingUnits(
+        query.data.postId,
+        Number(req.user!.userId),
+      );
+      return res.status(200).json({ units });
     } catch (error) {
       return next(error);
     }
@@ -383,7 +441,9 @@ router.get(
         userId,
         userId,
       ]);
-      const processed = await processWeaveRows(weaveRows);
+      const processed = await processWeaveRows(weaveRows, {
+        includeReceiverOrgUnit: false,
+      });
       return res.status(200).json({ weaves: processed });
     } catch (error) {
       return next(error);

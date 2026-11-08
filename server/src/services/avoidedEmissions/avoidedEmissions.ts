@@ -206,6 +206,11 @@ export interface ItemInput {
   quantity: number;
   /** 刊登者填的單件重量；未填時用類別預設值 */
   unitWeightKg?: number | null;
+  /**
+   * 傳入的重量是上架時帶入、未修改的類別預設值（org_post_details.weight_is_default）。
+   * 用存下的重量計算（之後係數表改預設值不會改寫舊物品），但揭露時算「預設重量」
+   */
+  weightIsDefault?: boolean;
 }
 
 export type ItemStatus = "counted" | "category_not_counted" | "weight_missing";
@@ -265,7 +270,7 @@ export function estimateItem(
   let weightSource: ItemEstimate["weightSource"] = "missing";
   if (entered !== undefined && entered !== null) {
     unitWeightKg = entered;
-    weightSource = "entered";
+    weightSource = input.weightIsDefault ? "category_default" : "entered";
   } else if (category.defaultWeight) {
     unitWeightKg = category.defaultWeight.kg;
     weightSource = "category_default";

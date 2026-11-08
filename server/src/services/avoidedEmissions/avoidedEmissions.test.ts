@@ -224,6 +224,24 @@ describe("estimateItem", () => {
     expect(result.weightKg).toBe(13.8);
   });
 
+  it("keeps a stored default weight as category_default even after the table changes", () => {
+    //* 上架時帶入、未修改的預設值：用當時存下的重量，但揭露時仍算「預設重量」
+    const result = estimateItem({
+      categoryId: "office_chair",
+      quantity: 2,
+      unitWeightKg: 12,
+      weightIsDefault: true,
+    });
+    expect(result.weightSource).toBe("category_default");
+    expect(result.weightKg).toBe(24);
+    const report = estimateReport([
+      { categoryId: "office_chair", quantity: 2, unitWeightKg: 12, weightIsDefault: true },
+      { categoryId: "office_chair", quantity: 1, unitWeightKg: 20, weightIsDefault: false },
+    ]);
+    expect(report.defaultWeightKg).toBe(24);
+    expect(report.totalWeightKg).toBe(44);
+  });
+
   it("flags a category without a default weight when none is entered", () => {
     const result = estimateItem({ categoryId: "plastic_goods", quantity: 1 });
     expect(result.status).toBe("weight_missing");

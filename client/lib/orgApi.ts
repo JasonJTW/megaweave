@@ -147,3 +147,68 @@ export function useOrgItemCategories() {
   );
   return data?.categories ?? [];
 }
+
+//* 組織報表（#143，E6-1、E6-2）：server/src/services/orgReport.ts 的 OrgReport
+//* server：`GET /api/org-admin/orgs/:orgId/report`（只有 Org Admin）
+export interface OrgReportTierStat {
+  tier: AudienceTier;
+  reachedItemCount: number;
+  weaveCount: number;
+  quantity: number;
+  rate: number | null;
+}
+
+export interface OrgReportUnitStat {
+  unit: OrgUnitRef;
+  listedItemCount: number;
+  listedQuantity: number;
+  givenQuantity: number;
+  receivedQuantity: number;
+  givenEstimatedKgCO2e: number;
+}
+
+export interface OrgReportFactor {
+  categoryId: string;
+  name: string;
+  kgCO2ePerKg: number | null;
+  method: "reference_products" | "fixed_bom" | "product_factor" | "not_counted";
+  basis: "material_bom" | "reference_epd" | null;
+  sources: { title: string; publisher: string; year: number; url: string }[];
+}
+
+export interface OrgReport {
+  listing: { itemCount: number; quantity: number };
+  circulation: { weaveCount: number; quantity: number; rate: number | null };
+  tiers: OrgReportTierStat[];
+  units: OrgReportUnitStat[];
+  value: {
+    estimatedValueTwd: number;
+    valuedQuantity: number;
+    unvaluedQuantity: number;
+  };
+  emissions: {
+    factorTableVersion: string;
+    totalWeightKg: number;
+    defaultWeightKg: number;
+    defaultWeightShare: number | null;
+    potentialKgCO2e: number;
+    estimatedKgCO2e: number;
+    replacementRate: {
+      value: number;
+      status: "assumed" | "surveyed";
+      locator: string;
+      source: { title: string; url: string };
+    };
+    countedQuantity: number;
+    uncountedQuantity: number;
+    byCategory: {
+      categoryId: string;
+      name: string;
+      quantity: number;
+      weightKg: number;
+      potentialKgCO2e: number;
+      estimatedKgCO2e: number;
+    }[];
+  };
+  factors: OrgReportFactor[];
+}

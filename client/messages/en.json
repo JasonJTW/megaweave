@@ -139,6 +139,10 @@
     "orgItemNew": {
       "title": "List an org item",
       "description": "Unit Contacts list items on behalf of their unit."
+    },
+    "orgReport": {
+      "title": "Org report",
+      "description": "Org admins see circulation, the share claimed at each tier and estimated avoided emissions."
     }
   },
   "Lalamove": {
@@ -1202,7 +1206,8 @@
       "daysHint": "1 to 365 days. Unit Contacts can set a different value for one item.",
       "save": "Save",
       "saved": "Auto Release setting updated."
-    }
+    },
+    "reportLink": "View org report"
   },
   "Org": {
     "title": "Organization",
@@ -1248,7 +1253,7 @@
       "weightDefaultHint": "Prefilled with the category default from {publisher} ({year}). Change it if the real weight differs.",
       "weightRequiredHint": "This category has no published average weight. Enter the real weight.",
       "assetNumber": "Asset number (optional)",
-      "estimatedValue": "Estimated value in TWD (optional)",
+      "estimatedValue": "Estimated value per piece in TWD (optional)",
       "photos": "Photos (up to {max})",
       "submit": "List item",
       "submitting": "Listing…",
@@ -1348,5 +1353,90 @@
       "completedUnit": "Request #{weaveId}: {unit} ({name}) received {quantity}",
       "completedPerson": "Request #{weaveId}: {name} (personal) received {quantity}"
     }
+  },
+  "OrgReport": {
+    "title": "Org report",
+    "subtitle": "How items circulate in your organisation, with estimated weight, value and avoided emissions. Numbers come from completed hand-overs.",
+    "backToAdmin": "Back to org admin",
+    "orgLabel": "Organisation",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load the report. Please try again later.",
+    "noOrgs": "You aren't an admin of any organisation.",
+    "pieces": "{count, plural, one {# piece} other {# pieces}}",
+    "circulationHeading": "Circulation",
+    "listed": "Pieces listed",
+    "listedItems": "{count, plural, one {# item} other {# items}}",
+    "circulated": "Pieces circulated",
+    "circulatedWeaves": "{count, plural, one {# completed hand-over} other {# completed hand-overs}}",
+    "circulationRate": "Circulation rate",
+    "circulationRateHint": "Pieces circulated ÷ pieces listed",
+    "tiersHeading": "Share claimed at each tier",
+    "colTier": "Tier",
+    "colReached": "Items that reached it",
+    "colClaimed": "Pieces claimed there",
+    "colRate": "Share of listed pieces",
+    "tiersHint": "Each hand-over counts at the tier the item was in when it was requested. Only completed hand-overs count; the tier shares add up to the circulation rate.",
+    "tier": {
+      "internal": "Units (Internal)",
+      "members": "Org members (Members)",
+      "public": "Public"
+    },
+    "unitsHeading": "By unit",
+    "unitsEmpty": "No units yet.",
+    "colUnit": "Unit",
+    "colListed": "Pieces listed",
+    "colGiven": "Pieces given",
+    "colReceived": "Pieces claimed for the unit",
+    "colUnitEstimated": "Avoided emissions of pieces given (kgCO2e)",
+    "unitsHint": "Given = this unit's pieces in completed hand-overs. Claimed for the unit = pieces a contact requested on the unit's behalf (personal requests count for no unit).",
+    "emissionsHeading": "Estimated weight, value and avoided emissions",
+    "emissionsScope": "Only items in completed hand-overs count, once per hand-over.",
+    "estimatedKg": "Estimated avoided emissions",
+    "estimatedKgHint": "Potential × replacement rate R ({rate})",
+    "potentialKg": "Potential (R = 1)",
+    "potentialKgHint": "If every piece replaced a new one",
+    "kgCO2e": "{value} kgCO2e",
+    "kg": "{value} kg",
+    "twd": "NT$ {value}",
+    "totalWeight": "Estimated weight",
+    "defaultWeightShare": "{share} uses the category default weight",
+    "estimatedValue": "Estimated value",
+    "unvalued": "{count, plural, one {# piece has} other {# pieces have}} no estimated value and {count, plural, one {is} other {are}} left out",
+    "replacementRate": "Replacement rate R",
+    "replacementRateValue": "{rate} ({status})",
+    "replacementRateSource": "Source",
+    "rateStatus": {
+      "assumed": "assumed, not yet measured by a survey on this platform",
+      "surveyed": "measured by survey"
+    },
+    "factorTableVersion": "Factor table version",
+    "defaultWeightShareLabel": "Default-weight share",
+    "uncounted": "Pieces not counted (no factor or no weight)",
+    "formulaHeading": "Method",
+    "formulaPotential": "Potential = weight (kg) × category production factor for a new item (kgCO2e/kg)",
+    "formulaEstimated": "Estimated avoided emissions = potential × replacement rate R",
+    "formulaFactor": "Furniture uses the lower of “material composition × MOENV material factors” and the reference products' EPD average; electronics use US EPA WARM product factors; categories without a citable factor are not counted.",
+    "byCategoryHeading": "By category",
+    "colCategory": "Category",
+    "colQuantity": "Pieces",
+    "colWeight": "Weight (kg)",
+    "colPotential": "Potential (kgCO2e)",
+    "colEstimated": "Estimated (kgCO2e)",
+    "factorsHeading": "Emission factors and sources",
+    "colFactor": "Factor (kgCO2e/kg)",
+    "colMethod": "Method",
+    "colSources": "Sources",
+    "notCounted": "Not counted",
+    "method": {
+      "reference_products": "Material composition and reference EPDs",
+      "fixed_bom": "Fixed material composition",
+      "product_factor": "Product factor",
+      "not_counted": "No citable factor"
+    },
+    "basis": {
+      "material_bom": "Material composition used (lower)",
+      "reference_epd": "Reference EPDs used (lower)"
+    },
+    "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party."
   }
 }

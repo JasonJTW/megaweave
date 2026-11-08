@@ -7,6 +7,7 @@ import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
 import { announceAutoDeclined } from "./utils/weaveService";
 import { orgHandoverService } from "./services/orgHandoverService";
+import { getOrgReport } from "./services/orgReportService";
 import { OrgIdSchema } from "./utils/idSchemas";
 import { orgNotFound, orgService, OrgSummary } from "./services/orgService";
 import { AUTO_RELEASE_MAX_DAYS } from "./services/orgAutoReleaseService";
@@ -265,6 +266,22 @@ router.delete(
         name: org.name,
       });
       return res.status(204).end();
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/org-admin/orgs/:orgId/report
+ * 組織報表（E6-1、E6-2）：流通件數、各層去化比例、各單位統計、估算重量／價值／避免排放量
+ */
+router.get(
+  "/orgs/:orgId/report",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const report = await getOrgReport(adminOrg(res).id);
+      return res.status(200).json({ report });
     } catch (error) {
       return next(error);
     }

@@ -25,6 +25,7 @@ import {
   requestJson,
   useSelectedOrg,
 } from "@/lib/orgApi";
+import { orgItemsKey } from "@/lib/orgSwrKeys";
 
 const ALL = "all";
 
@@ -77,7 +78,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
   if (status !== ALL) query.set("status", status);
   const qs = query.toString();
   const { data, error } = useSWR(
-    `${hostName}/api/orgs/${org.id}/items${qs ? `?${qs}` : ""}`,
+    orgItemsKey(hostName, org.id, qs),
     (url: string) => requestJson<{ items: OrgItem[] }>(url),
   );
 

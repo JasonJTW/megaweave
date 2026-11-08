@@ -24,6 +24,7 @@ import {
 } from "./orgTierService";
 import type { Server } from "socket.io";
 import type { AutoReleaseOverride } from "./orgAutoReleaseService";
+import { buildTimeline, findTimelinePost, TimelineEntry } from "./orgTimelineService";
 import {
   defaultUnitWeightKg,
   OrgItemCategoryId,
@@ -111,6 +112,20 @@ export interface OrgItem {
   pendingRequestCount: number;
   /** 單件 Auto Release 覆寫；override 為 null 表示跟組織設定，days 只在 auto 時有值 */
   autoRelease: { override: AutoReleaseOverride | null; days: number | null };
+}
+
+/** 去向（E9-3）：一筆完成的 Weave 把物品交給了哪個單位或個人（receiverUnit 為 null 是個人領取） */
+export interface OrgItemOutcome {
+  weaveId: number;
+  completedAt: string;
+  quantity: number;
+  receiver: { name: string };
+  receiverUnit: OrgUnitRef | null;
+}
+
+/** 後台清單（閒置清單）的一列：加上去向 */
+export interface ManagedOrgItem extends OrgItem {
+  outcomes: OrgItemOutcome[];
 }
 
 /** 組織頁卡片：不含財產編號與估算價值 */
@@ -274,6 +289,42 @@ function toOrgItem(row: RowDataPacket): OrgItem {
   };
 }
 
+/** 這些貼文完成的 Weave，依完成時間排；key 是 posts.id */
+async function queryOutcomes(postIds: number[]): Promise<Map<number, OrgItemOutcome[]>> {
+  const byPost = new Map<number, OrgItemOutcome[]>();
+  if (postIds.length === 0) return byPost;
+  //* IN (?) 需要 query() 展開陣列
+  const [rows] = await dbPool.query<RowDataPacket[]>(
+    `SELECT w.id, w.post_id, w.completed_at, w.receiver_org_unit_id,
+            ru.name AS receiver_org_unit_name,
+            COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS receiver_name,
+            (SELECT COALESCE(SUM(wi.quantity), 0) FROM weave_items wi WHERE wi.weave_id = w.id) AS quantity
+     FROM weaves w
+     JOIN users u ON u.id = w.receiver_id
+     LEFT JOIN user_profiles up ON up.user_id = u.id
+     LEFT JOIN org_units ru ON ru.id = w.receiver_org_unit_id
+     WHERE w.post_id IN (?) AND w.status = 'completed'
+     ORDER BY w.completed_at, w.id`,
+    [postIds],
+  );
+  for (const row of rows) {
+    const postId = Number(row.post_id);
+    const list = byPost.get(postId) ?? [];
+    list.push({
+      weaveId: Number(row.id),
+      completedAt: new Date(row.completed_at).toISOString(),
+      quantity: Number(row.quantity),
+      receiver: { name: String(row.receiver_name) },
+      receiverUnit:
+        row.receiver_org_unit_id == null
+          ? null
+          : { id: Number(row.receiver_org_unit_id), name: String(row.receiver_org_unit_name) },
+    });
+    byPost.set(postId, list);
+  }
+  return byPost;
+}
+
 interface ListQuery {
   tiers?: AudienceTier[];
   unitIds?: number[];
@@ -284,6 +335,14 @@ interface ListQuery {
 
 /** 組織物品清單（組織頁、後台、上架後回傳共用）；條件都是參數，不拼使用者輸入 */
 async function queryItems(orgId: number, filters: ListQuery): Promise<OrgItem[]> {
+  return (await queryItemRows(orgId, filters)).map((row) => row.item);
+}
+
+/** 同 queryItems，另附 posts.id（只在 server 用，不回給 client） */
+async function queryItemRows(
+  orgId: number,
+  filters: ListQuery,
+): Promise<{ postId: number; item: OrgItem }[]> {
   let where = "";
   const params: unknown[] = [orgId];
   if (filters.tiers) {
@@ -320,7 +379,7 @@ async function queryItems(orgId: number, filters: ListQuery): Promise<OrgItem[]>
      ORDER BY p.created_at DESC, p.id DESC LIMIT ${LIST_LIMIT}`,
     params,
   );
-  return rows.map(toOrgItem);
+  return rows.map((row) => ({ postId: Number(row.id), item: toOrgItem(row) }));
 }
 
 export const orgItemService = {
@@ -356,22 +415,30 @@ export const orgItemService = {
     );
   },
 
-  /** 後台清單：Unit Contact 只有自己單位，Org Admin 全組織 */
+  /**
+   * 後台清單（全組織閒置物品清單與去向，E3、E9-3）：Unit Contact 只有自己單位，Org Admin 全組織；
+   * 每件附上去向（完成的 Weave 交給了哪個單位或個人）
+   */
   async listManagedItems(
     access: OrgAccess,
     filters: OrgItemFilters,
-  ): Promise<OrgItem[]> {
+  ): Promise<ManagedOrgItem[]> {
     if (access.manageableUnits.length === 0) throw unitNotManaged();
     const unitIds =
       filters.unitId !== undefined
         ? [assertManages(access, filters.unitId).id]
         : access.manageableUnits.map((u) => u.id);
-    return queryItems(access.orgId, {
+    const rows = await queryItemRows(access.orgId, {
       unitIds,
       tiers: filters.tier ? [filters.tier] : undefined,
       status: filters.status,
       weaveStatus: filters.weaveStatus,
     });
+    const outcomes = await queryOutcomes(rows.map((row) => row.postId));
+    return rows.map(({ postId, item }) => ({
+      ...item,
+      outcomes: outcomes.get(postId) ?? [],
+    }));
   },
 
   /**
@@ -462,6 +529,18 @@ export const orgItemService = {
   async listItemTierEvents(access: OrgAccess, itemPublicId: string): Promise<TierEvent[]> {
     const postId = await findManagedPost(access, itemPublicId);
     return listTierEvents(dbPool, postId);
+  },
+
+  /**
+   * 後台：一件物品的流轉時間軸（E9-1），舊的在前。只給能管這個單位的窗口或 Org Admin；
+   * 已刪除的物品也查得到，紀錄不因刪除而消失
+   */
+  async listItemTimeline(access: OrgAccess, itemPublicId: string): Promise<TimelineEntry[]> {
+    if (access.manageableUnits.length === 0) throw unitNotManaged();
+    const post = await findTimelinePost(dbPool, access.orgId, itemPublicId);
+    if (!post) throw new HttpError(404, "POST_NOT_FOUND", "Item not found");
+    assertManages(access, post.orgUnitId);
+    return buildTimeline(dbPool, post);
   },
 
   /** 代表單位上架：Share、Internal */

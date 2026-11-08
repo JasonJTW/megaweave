@@ -6,6 +6,7 @@
 //* 層級（#138）：窗口可把自己單位的物品從 Internal 升到 Members；Org Admin 另可降回 Internal。
 //* 降級會自動婉拒看不到新層級的人的申請，有已核可的申請時 server 回 ORG_TIER_DEMOTION_BLOCKED
 //* 自動升級（#139）：Internal 物品可覆寫組織設定（跟組織、自訂天數、手動）；其他層級不會自動升級，不顯示
+//* 去向與時間軸（#141，E9-1、E9-3）：每件物品交給了哪個單位或個人；展開看從上架到交接完成的每一步
 import { Fragment, Suspense, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
@@ -23,10 +24,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OrgSwitcher } from "@/components/org/OrgSwitcher";
+import { ItemTimeline } from "@/components/org/ItemTimeline";
 import {
   AUDIENCE_TIERS,
   AutoReleaseOverride,
   hostName,
+  ManagedOrgItem,
   ORG_ITEM_STATUSES,
   ORG_ITEM_WEAVE_STATUSES,
   OrgAccess,
@@ -334,7 +337,14 @@ function ItemTable({ org }: { org: OrgAccess }) {
   const [tier, setTier] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [weaveStatus, setWeaveStatus] = useState(ALL);
-  const [openItemId, setOpenItemId] = useState<string | null>(null);
+  const [open, setOpen] = useState<{
+    itemId: string;
+    panel: "requests" | "timeline";
+  } | null>(null);
+  const isOpen = (itemId: string, panel: "requests" | "timeline") =>
+    open?.itemId === itemId && open.panel === panel;
+  const toggle = (itemId: string, panel: "requests" | "timeline") =>
+    setOpen(isOpen(itemId, panel) ? null : { itemId, panel });
 
   const query = new URLSearchParams();
   if (unitId !== ALL) query.set("unitId", unitId);
@@ -344,7 +354,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
   const qs = query.toString();
   const { data, error, mutate } = useSWR(
     orgItemsKey(hostName, org.id, qs),
-    (url: string) => requestJson<{ items: OrgItem[] }>(url),
+    (url: string) => requestJson<{ items: ManagedOrgItem[] }>(url),
   );
 
   return (
@@ -403,7 +413,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
       )}
       {data && data.items.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>
                 <th className="p-3">{t("manage.colTitle")}</th>
@@ -415,7 +425,11 @@ function ItemTable({ org }: { org: OrgAccess }) {
                 <th className="p-3">{t("manage.colWeight")}</th>
                 <th className="p-3">{t("manage.colAsset")}</th>
                 <th className="p-3">{t("manage.colCreated")}</th>
+                <th className="p-3">{t("manage.colOutcome")}</th>
                 <th className="p-3">{t("manage.colRequests")}</th>
+                <th className="p-3">
+                  <span className="sr-only">{t("timeline.title")}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -456,33 +470,70 @@ function ItemTable({ org }: { org: OrgAccess }) {
                         dateStyle: "medium",
                       })}
                     </td>
+                    <td className="p-3" data-testid="org-item-outcome">
+                      {item.outcomes.length === 0 ? (
+                        <span className="text-muted-foreground">
+                          {t("manage.outcomeNone")}
+                        </span>
+                      ) : (
+                        <ul className="space-y-1">
+                          {item.outcomes.map((o) => (
+                            <li key={o.weaveId}>
+                              {o.receiverUnit
+                                ? t("manage.outcomeUnit", {
+                                    unit: o.receiverUnit.name,
+                                    quantity: o.quantity,
+                                  })
+                                : t("manage.outcomePerson", {
+                                    name: o.receiver.name,
+                                    quantity: o.quantity,
+                                  })}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
                     <td className="p-3">
                       <Button
                         size="sm"
                         variant={
                           item.pendingRequestCount > 0 ? "default" : "ghost"
                         }
-                        aria-expanded={openItemId === item.id}
-                        onClick={() =>
-                          setOpenItemId(openItemId === item.id ? null : item.id)
-                        }
+                        aria-expanded={isOpen(item.id, "requests")}
+                        onClick={() => toggle(item.id, "requests")}
                       >
-                        {openItemId === item.id
+                        {isOpen(item.id, "requests")
                           ? t("manage.hideRequests")
                           : t("manage.viewRequests", {
                               count: item.pendingRequestCount,
                             })}
                       </Button>
                     </td>
+                    <td className="p-3">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-expanded={isOpen(item.id, "timeline")}
+                        onClick={() => toggle(item.id, "timeline")}
+                      >
+                        {isOpen(item.id, "timeline")
+                          ? t("manage.hideTimeline")
+                          : t("manage.viewTimeline")}
+                      </Button>
+                    </td>
                   </tr>
-                  {openItemId === item.id && (
+                  {open?.itemId === item.id && (
                     <tr className="bg-muted/30">
-                      <td colSpan={10} className="p-3">
-                        <ItemRequests
-                          org={org}
-                          item={item}
-                          onReviewed={() => void mutate()}
-                        />
+                      <td colSpan={12} className="p-3">
+                        {open.panel === "requests" ? (
+                          <ItemRequests
+                            org={org}
+                            item={item}
+                            onReviewed={() => void mutate()}
+                          />
+                        ) : (
+                          <ItemTimeline orgId={org.id} itemId={item.id} />
+                        )}
                       </td>
                     </tr>
                   )}

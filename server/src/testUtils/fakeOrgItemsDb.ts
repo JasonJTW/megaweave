@@ -58,11 +58,17 @@ interface ItemTables {
 export interface FakeOrgItemsDb extends FakeOrgDb, ItemTables {
   /** 每篇貼文的 Weave 狀態；沒有 weaves 表時為空，由 fakeOrgWeavesDb 換掉 */
   weaveStatusesOf: (postId: number) => string[];
+  /** 所有假資料表共用的時鐘：每次呼叫前進 1 秒，跨表的事件才排得出先後 */
+  tick: () => Date;
 }
 
 function normalize(sql: string) {
   return sql.replace(/\s+/g, " ").trim();
 }
+
+//* 後台清單的去向（orgItemService.queryOutcomes）；沒有 weaves 表時是空的，由 fakeOrgWeavesDb 回答
+export const OUTCOMES_SQL =
+  "SELECT w.id, w.post_id, w.completed_at, w.receiver_org_unit_id, ru.name AS receiver_org_unit_name, COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS receiver_name, (SELECT COALESCE(SUM(wi.quantity), 0) FROM weave_items wi WHERE wi.weave_id = w.id) AS quantity FROM weaves w JOIN users u ON u.id = w.receiver_id LEFT JOIN user_profiles up ON up.user_id = u.id LEFT JOIN org_units ru ON ru.id = w.receiver_org_unit_id WHERE w.post_id IN (?) AND w.status = 'completed' ORDER BY w.completed_at, w.id";
 
 const LIST_ITEMS =
   /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, d\.auto_release_override, d\.auto_release_days, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys, \(SELECT COUNT\(\*\) FROM weaves w WHERE w\.post_id = p\.id AND w\.status = 'requested'\) AS pending_request_count FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND EXISTS \(SELECT 1 FROM weaves w WHERE w\.post_id = p\.id AND w\.status = \?\))?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
@@ -77,6 +83,7 @@ export function createFakeOrgItemsDb(
   let nextImageId = 1;
   let nextItemId = 500;
   let clock = Date.parse("2026-11-08T00:00:00Z");
+  const tick = () => new Date((clock += 1000));
 
   function run(rawSql: unknown, rawParams: unknown): Result | null {
     const sql = normalize(String(rawSql));
@@ -150,7 +157,7 @@ export function createFakeOrgItemsDb(
         type: "share",
         category_id: Number(category_id),
         condition_level: Number(condition_level),
-        created_at: new Date((clock += 1000)),
+        created_at: tick(),
         deleted_at: null,
       };
       tables.posts.push(row);
@@ -188,6 +195,8 @@ export function createFakeOrgItemsDb(
       }
       return [{ affectedRows: values.length }, []];
     }
+
+    if (sql === OUTCOMES_SQL) return [[], []];
 
     const list = sql.match(LIST_ITEMS);
     if (list) {
@@ -244,6 +253,7 @@ export function createFakeOrgItemsDb(
   const baseConnection = base.connection;
   const db = base as FakeOrgItemsDb;
   db.weaveStatusesOf = () => [];
+  db.tick = tick;
   Object.defineProperties(db, {
     posts: { get: () => tables.posts },
     details: { get: () => tables.details },

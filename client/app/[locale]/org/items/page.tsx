@@ -3,9 +3,11 @@
 //* 組織物品管理（PRD 0001 §5.1 E3-2、E9-3）：Unit Contact 看自己負責單位的物品，
 //* Org Admin 看全組織，可依單位、層級、狀態、申請篩選。範圍由 server 決定，這裡只送篩選條件。
 //* 申請（#137）：所屬單位的任一窗口或 Org Admin 都能在這裡核可／婉拒，不限上架的人
+//* 層級（#138）：窗口可把自己單位的物品從 Internal 升到 Members；Org Admin 另可降回 Internal。
+//* 降級會自動婉拒看不到新層級的人的申請，有已核可的申請時 server 回 ORG_TIER_DEMOTION_BLOCKED
 import { Fragment, Suspense, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import toast from "react-hot-toast";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Link } from "@/i18n/navigation";
@@ -30,7 +32,7 @@ import {
   requestJson,
   useSelectedOrg,
 } from "@/lib/orgApi";
-import { orgItemsKey } from "@/lib/orgSwrKeys";
+import { isOrgListingKey, orgItemsKey } from "@/lib/orgSwrKeys";
 
 const ALL = "all";
 
@@ -169,6 +171,55 @@ function ItemRequests({
   );
 }
 
+/** 這個人在這一列能做的層級變更；Public 走待公開流程（#140），這裡不提供 */
+function tierActionFor(org: OrgAccess, item: OrgItem) {
+  if (item.audienceTier === "internal") return "members" as const;
+  if (item.audienceTier === "members" && org.isAdmin)
+    return "internal" as const;
+  return null;
+}
+
+function TierAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
+  const t = useTranslations("Org.manage");
+  const apiErrorMessage = useApiErrorMessage();
+  const { mutate } = useSWRConfig();
+  const [busy, setBusy] = useState(false);
+  const target = tierActionFor(org, item);
+  if (!target) return null;
+
+  async function change() {
+    if (
+      target === "internal" &&
+      !window.confirm(t("demoteConfirm", { title: item.title }))
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await requestJson(
+        `${hostName}/api/orgs/${org.id}/items/${item.id}/tier`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ tier: target }),
+        },
+      );
+      //* 組織頁與所有篩選組合的清單都要重抓（SWR dedupe，見 orgSwrKeys）
+      await mutate(isOrgListingKey(hostName, org.id));
+      toast.success(target === "members" ? t("promoted") : t("demoted"));
+    } catch (err) {
+      toast.error(apiErrorMessage(err, t("tierChangeFailed")));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button size="sm" variant="outline" disabled={busy} onClick={change}>
+      {target === "members" ? t("promoteToMembers") : t("demoteToInternal")}
+    </Button>
+  );
+}
+
 function ItemTable({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org");
   const format = useFormatter();
@@ -270,9 +321,12 @@ function ItemTable({ org }: { org: OrgAccess }) {
                     </td>
                     <td className="p-3">{item.unit.name}</td>
                     <td className="p-3">
-                      <Badge variant="secondary">
-                        {t(`tier.${item.audienceTier}`)}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">
+                          {t(`tier.${item.audienceTier}`)}
+                        </Badge>
+                        <TierAction org={org} item={item} />
+                      </div>
                     </td>
                     <td className="p-3">{t(`status.${item.status}`)}</td>
                     <td className="p-3">{item.quantity ?? "—"}</td>

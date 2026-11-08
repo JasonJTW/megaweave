@@ -192,6 +192,58 @@ router.get(
   },
 );
 
+const TierChangeSchema = z.object({ tier: z.enum(AUDIENCE_TIERS) });
+
+/**
+ * PATCH /api/orgs/:orgId/items/:itemId/tier
+ * 改物品層級：Unit Contact 只能把自己單位的物品升到 Members，Org Admin 可升降；Public 走 #140
+ */
+router.patch(
+  "/:orgId/items/:itemId/tier",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      const body = TierChangeSchema.safeParse(req.body ?? {});
+      if (!itemId.success || !body.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid tier change"));
+      }
+      const item = await orgItemService.changeItemTier(
+        orgAccess(res),
+        req.user!.userId,
+        itemId.data,
+        body.data.tier,
+        res.locals.io ?? null,
+      );
+      return res.status(200).json({ item });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/orgs/:orgId/items/:itemId/tier-events
+ * 物品的層級紀錄；只給能管這個單位的窗口或 Org Admin
+ */
+router.get(
+  "/:orgId/items/:itemId/tier-events",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      if (!itemId.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid item id"));
+      }
+      const events = await orgItemService.listItemTierEvents(
+        orgAccess(res),
+        itemId.data,
+      );
+      return res.status(200).json({ events });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
 /**
  * POST /api/orgs/:orgId/items
  * 代表單位上架 Share，上架後在 Internal；type、層級與付款方式都不由 client 決定

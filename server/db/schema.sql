@@ -479,6 +479,28 @@ CREATE TABLE `org_post_details` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_post_tier_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `post_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned NOT NULL,
+  `from_tier` enum('internal','members','public') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `to_tier` enum('internal','members','public') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_type` enum('user','system') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_user_id` bigint unsigned DEFAULT NULL COMMENT '操作者；系統操作（自動升級）為 NULL',
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_post_tier_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_post_tier_events_org` (`org_id`,`created_at`),
+  KEY `idx_org_post_tier_events_actor` (`actor_user_id`),
+  CONSTRAINT `fk_org_post_tier_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_post_tier_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_org_post_tier_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`),
+  CONSTRAINT `org_post_tier_events_chk_actor` CHECK (((`actor_type` = 'system') = (`actor_user_id` is null))),
+  CONSTRAINT `org_post_tier_events_chk_change` CHECK ((`from_tier` <> `to_tier`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `org_unit_contacts` (
   `org_id` bigint unsigned NOT NULL,
   `org_unit_id` bigint unsigned NOT NULL,

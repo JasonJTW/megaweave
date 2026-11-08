@@ -1075,6 +1075,8 @@
     "ORG_LAST_ADMIN": "組織至少要有一位組織管理員，請先指定另一位再移除。",
     "ORG_UNIT_NOT_MANAGED": "你不是這個單位的窗口，無法代表它上架或管理物品。",
     "ORG_ITEM_DELIVERY_UNAVAILABLE": "組織物品只能面交或自取，不提供付款與配送。",
+    "ORG_TIER_NOT_ALLOWED": "你無法把這件物品移到這個層級。",
+    "ORG_TIER_DEMOTION_BLOCKED": "這件物品已有核可或完成的申請，不能降級。",
     "WEAVE_OWN_POST": "不能和自己的貼文交織。",
     "POST_INACTIVE": "這則貼文已經結束了。",
     "ITEM_UNAVAILABLE": "有物品已經沒有了，請重新選擇。",
@@ -1260,7 +1262,13 @@
       "requestQuantity": "數量 {quantity}",
       "approve": "核可",
       "decline": "婉拒",
-      "reviewFailed": "無法更新申請，請稍後再試。"
+      "reviewFailed": "無法更新申請，請稍後再試。",
+      "promoteToMembers": "升到組織成員",
+      "demoteToInternal": "降回內部單位",
+      "demoteConfirm": "要把「{title}」降回內部單位嗎？組織成員的待核可申請會自動婉拒並通知對方。",
+      "promoted": "已升到組織成員，組織成員現在看得到這件物品。",
+      "demoted": "已降回內部單位。",
+      "tierChangeFailed": "無法變更層級，請稍後再試。"
     },
     "weaveStatus": {
       "requested": "待核可",

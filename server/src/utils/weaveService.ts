@@ -430,6 +430,52 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
+ * 組織物品降級後自動婉拒的請求（#138）：通知申請人（Receiver），並把新狀態推給兩造。
+ * 已 commit 之後呼叫；與手動婉拒同一份通知與 Email。
+ * @param actorName 通知裡的婉拒者，由呼叫端決定（組織物品用組織名稱）
+ * @param actorUserId 操作者；系統操作為 null，通知的 sender 改記 Giver
+ */
+export async function notifyWeavesAutoDeclined(params: {
+  io: Server | null;
+  postId: number;
+  actorName: string;
+  actorUserId: number | null;
+  weaves: { weaveId: number; giverId: number; receiverId: number }[];
+}): Promise<void> {
+  const { io, postId, actorName, actorUserId, weaves } = params;
+  const [details] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT p.title FROM posts p WHERE p.id = ?`,
+    [postId],
+  );
+  const postTitle = (details[0]?.title as string) ?? "Item";
+  for (const weave of weaves) {
+    const items = await getWeaveItemsList(weave.weaveId, postId);
+    await notifyWeaveStatusChange({
+      io,
+      weaveId: weave.weaveId,
+      recipientId: weave.receiverId,
+      senderId: actorUserId ?? weave.giverId,
+      actorName,
+      postTitle,
+      action: "declined",
+      items,
+      recipientRole: "receiver",
+    });
+    if (io) {
+      const payload = {
+        weaveId: weave.weaveId,
+        status: "declined",
+        giver_confirmed: false,
+        receiver_confirmed: false,
+      };
+      for (const id of new Set([weave.giverId, weave.receiverId])) {
+        io.to(`user_${id}`).emit("weave_status_updated", payload);
+      }
+    }
+  }
+}
+
+/**
  * 申請人在這篇貼文可以代表的單位（ADR 0004）；空陣列代表不顯示「代表誰」的選項。
  * 看不到的貼文回 404，與送出請求一致。
  */

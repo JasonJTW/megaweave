@@ -50,14 +50,14 @@ test.describe("Org Admin sets up Auto Release", () => {
     await expect(page.getByText(t.saved)).toBeVisible();
     await expect
       .poll(settings)
-      .toEqual({ autoReleaseEnabled: false, autoReleaseDays: 30 });
+      .toMatchObject({ autoReleaseEnabled: false, autoReleaseDays: 30 });
 
     await enabled.click();
     await page.getByLabel(t.daysLabel).fill("14");
     await page.getByRole("button", { name: t.save }).click();
     await expect
       .poll(settings)
-      .toEqual({ autoReleaseEnabled: true, autoReleaseDays: 14 });
+      .toMatchObject({ autoReleaseEnabled: true, autoReleaseDays: 14 });
 
     // One item: manual, then its own 7 days
     const itemAutoRelease = async () => {

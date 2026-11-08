@@ -5,6 +5,8 @@ import Router, { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
+import { announceAutoDeclined } from "./utils/weaveService";
+import { orgHandoverService } from "./services/orgHandoverService";
 import { OrgIdSchema } from "./utils/idSchemas";
 import {
   AdminOrg,
@@ -35,6 +37,13 @@ const MemberIdSchema = z.coerce.number().int().positive();
 const UpdateMemberSchema = z.object({
   role: z.enum(MEMBER_ROLES),
   unitIds: z.array(z.number().int().positive()).max(100),
+});
+
+//* 交接：交出的人、單位、接手的人都由 client 從待交接清單與窗口選單帶入 → INVALID_REQUEST
+const HandoverSchema = z.object({
+  fromUserId: z.string().min(1).max(36),
+  unitId: z.number().int().positive(),
+  toMemberId: z.number().int().positive(),
 });
 
 function adminOrg(res: Response): AdminOrg {
@@ -181,7 +190,8 @@ router.patch(
 
 /**
  * DELETE /api/org-admin/orgs/:orgId/members/:memberId
- * 移除成員身分（帳號本身保留）；組織至少要留一位 Org Admin
+ * 移除成員身分（帳號本身保留）；組織至少要留一位 Org Admin。
+ * 他已沒資格的 Requested 申請自動婉拒並通知；經手的物品與 Approved Weave 留給交接
  */
 router.delete(
   "/orgs/:orgId/members/:memberId",
@@ -191,8 +201,56 @@ router.delete(
       if (!memberId.success) {
         return next(new HttpError(400, "INVALID_REQUEST", "Invalid member id"));
       }
-      await orgMemberService.removeMember(adminOrg(res).id, memberId.data);
+      const org = adminOrg(res);
+      const declined = await orgMemberService.removeMember(
+        org.id,
+        memberId.data,
+      );
+      await announceAutoDeclined(res.locals.io ?? null, declined, {
+        id: req.user!.userId,
+        name: org.name,
+      });
       return res.status(204).end();
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/org-admin/orgs/:orgId/handovers
+ * 待交接：還經手著某單位物品、但已不是該單位窗口（離職或異動）的人，依單位列出
+ */
+router.get(
+  "/orgs/:orgId/handovers",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const handovers = await orgHandoverService.listPending(adminOrg(res).id);
+      return res.status(200).json({ handovers });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/org-admin/orgs/:orgId/handovers
+ * 把某人在某單位經手的物品與進行中的 Weave 轉給該單位另一位窗口（E8-1）
+ */
+router.post(
+  "/orgs/:orgId/handovers",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const input = HandoverSchema.safeParse(req.body ?? {});
+      if (!input.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid handover"));
+      }
+      const result = await orgHandoverService.handOver(
+        adminOrg(res).id,
+        input.data,
+        req.user!.userId,
+      );
+      return res.status(200).json(result);
     } catch (error) {
       return next(error);
     }

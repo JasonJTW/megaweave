@@ -429,6 +429,58 @@ async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** 系統代為婉拒的 Weave（例如移除成員、#138 的降級） */
+export interface AutoDeclinedWeave {
+  id: number;
+  postId: number;
+  giverId: number;
+  receiverId: number;
+}
+
+/**
+ * 交易 commit 後通知系統代為婉拒的申請：申請人（Receiver）收到 declined 通知與 Email，
+ * 兩造的畫面收到 weave_status_updated。`actorName` 用組織名稱，不曝光操作的管理員。失敗只記 log。
+ */
+export async function announceAutoDeclined(
+  io: Server | null,
+  weaves: readonly AutoDeclinedWeave[],
+  actor: { id: number; name: string },
+): Promise<void> {
+  for (const weave of weaves) {
+    try {
+      const [details] = await dbPool.execute<RowDataPacket[]>(
+        `SELECT p.title FROM posts p WHERE p.id = ?`,
+        [weave.postId],
+      );
+      const postTitle = (details[0]?.title as string) ?? "Item";
+      await notifyWeaveStatusChange({
+        io,
+        weaveId: weave.id,
+        recipientId: weave.receiverId,
+        senderId: actor.id,
+        actorName: actor.name,
+        postTitle,
+        action: "declined",
+        items: await getWeaveItemsList(weave.id, weave.postId),
+        recipientRole: "receiver",
+      });
+      if (io) {
+        const payload = {
+          weaveId: weave.id,
+          status: "declined",
+          giver_confirmed: false,
+          receiver_confirmed: false,
+        };
+        for (const id of new Set([weave.giverId, weave.receiverId])) {
+          io.to(`user_${id}`).emit("weave_status_updated", payload);
+        }
+      }
+    } catch (error) {
+      console.error("[announceAutoDeclined] Notification failed:", error);
+    }
+  }
+}
+
 /**
  * 申請人在這篇貼文可以代表的單位（ADR 0004）；空陣列代表不顯示「代表誰」的選項。
  * 看不到的貼文回 404，與送出請求一致。

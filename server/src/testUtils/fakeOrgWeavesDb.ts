@@ -232,7 +232,25 @@ export function createFakeOrgWeavesDb(
       return [{ affectedRows: weave ? 1 : 0 }, []];
     }
 
+    //* 確認交接（approveWeave 的 completed）
+    const confirm = sql.match(/^UPDATE weaves SET (giver|receiver)_confirmed = 1 WHERE id = \?$/);
+    if (confirm) {
+      const weave = weaveById(params[0]);
+      if (weave) weave[`${confirm[1] as "giver" | "receiver"}_confirmed`] = 1;
+      return [{ affectedRows: weave ? 1 : 0 }, []];
+    }
+
+    if (sql === "UPDATE weaves SET status = 'completed', completed_at = NOW() WHERE id = ?") {
+      const weave = weaveById(params[0]);
+      if (weave) {
+        weave.status = "completed";
+        weave.completed_at = new Date((clock += 1000));
+      }
+      return [{ affectedRows: weave ? 1 : 0 }, []];
+    }
+
     if (
+      sql === "SELECT giver_confirmed, receiver_confirmed FROM weaves WHERE id = ?" ||
       sql === "SELECT status, giver_confirmed, receiver_confirmed FROM weaves WHERE id = ?" ||
       sql === "SELECT status FROM weaves WHERE id = ?"
     ) {

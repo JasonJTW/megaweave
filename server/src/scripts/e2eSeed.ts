@@ -5,6 +5,7 @@ import { openAppStores } from "../isolation/appStores";
 import { assertIsolatedMysql } from "../isolation/dataStoreGuard";
 import { resetAndSeedE2e, resolveE2eUser } from "../e2e/seed";
 import { resolveOrgViewer, seedOrgIsolationFixture } from "../e2e/orgIsolationFixture";
+import { seedOrgHandoverFixture } from "../e2e/orgHandoverFixture";
 import { processCalculateHotScore } from "../queue/jobs/hotScore";
 
 async function main(): Promise<void> {
@@ -22,9 +23,10 @@ async function main(): Promise<void> {
     await queueRedis.connect();
     await resetAndSeedE2e(stores, queueRedis, user);
     await seedOrgIsolationFixture(stores.mysql, stores.vectorRedis, orgViewer);
+    await seedOrgHandoverFixture(stores.mysql);
     // 建好 feed:trending，讓熱門排行路徑讀到 fixture（與排程 job 相同邏輯）
     await processCalculateHotScore();
-    console.log(`✅ E2E environment reset; seeded ${user.email} and the org isolation fixture`);
+    console.log(`✅ E2E environment reset; seeded ${user.email} and the org isolation and handover fixtures`);
   } finally {
     queueRedis.disconnect();
     await stores.close();

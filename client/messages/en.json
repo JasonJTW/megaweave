@@ -1075,6 +1075,7 @@
     "ORG_LAST_ADMIN": "An organization needs at least one Org Admin. Add another one before removing this one.",
     "ORG_UNIT_NOT_MANAGED": "You are not a Unit Contact of this unit, so you can't list or manage its items.",
     "ORG_ITEM_DELIVERY_UNAVAILABLE": "Org items are pickup only. Payment and delivery aren't available.",
+    "ORG_HANDOVER_TARGET_IS_REQUESTER": "The new contact has a request open on one of these items. Settle that request first, or pick another contact.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1166,7 +1167,7 @@
     "addMember": "Add member",
     "memberAdded": "Member added.",
     "remove": "Remove",
-    "removeConfirm": "Remove {email} from this organization? Their account stays.",
+    "removeConfirm": "Remove {email} from the organization? Their account stays. Pending requests they no longer qualify for are declined automatically, and approved ones are kept. You can hand the items they handled to another contact under \"Pending handovers\".",
     "memberRemoved": "Member removed.",
     "you": "You",
     "saving": "Saving…",
@@ -1176,7 +1177,20 @@
     "save": "Save",
     "cancel": "Cancel",
     "memberUpdated": "Member updated.",
-    "manageItemsLink": "Manage org items"
+    "manageItemsLink": "Manage org items",
+    "handover": {
+      "heading": "Pending handovers",
+      "hint": "These people have left the organization or no longer contact for the unit, but the items and open requests they handled stay with the unit. Hand them to another contact of the same unit, who then takes over the conversations and handoffs. Finished records keep the original handler.",
+      "empty": "Nothing is waiting for a handover.",
+      "leftOrg": "Left the organization",
+      "summary": "{unit}: {items} items, {weaves} open requests",
+      "noCandidates": "{unit} has no other contact yet. Assign one first.",
+      "targetLabel": "Who takes over {email}'s items in {unit}",
+      "targetPlaceholder": "Choose the new contact",
+      "submit": "Hand over",
+      "submitting": "Handing over…",
+      "done": "Handed over {items} items and {weaves} requests."
+    }
   },
   "Org": {
     "title": "Organization",

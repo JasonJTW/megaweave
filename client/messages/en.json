@@ -1282,12 +1282,48 @@
       "demoteConfirm": "Move “{title}” back to Internal? Pending requests from Org Members will be declined automatically and they will be notified.",
       "promoted": "Released to Members. Org Members can see this item now.",
       "demoted": "Moved back to Internal.",
-      "tierChangeFailed": "Couldn't change the tier. Please try again later."
+      "tierChangeFailed": "Couldn't change the tier. Please try again later.",
+      "colOutcome": "Went to",
+      "outcomeNone": "Not handed over yet",
+      "outcomeUnit": "{unit} × {quantity}",
+      "outcomePerson": "{name} (personal) × {quantity}",
+      "viewTimeline": "Timeline",
+      "hideTimeline": "Hide timeline"
     },
     "weaveStatus": {
       "requested": "Awaiting review",
       "approved": "Approved",
       "completed": "Completed"
+    },
+    "timeline": {
+      "title": "Item timeline",
+      "empty": "No records.",
+      "system": "System",
+      "unknownActor": "Unknown",
+      "kind": {
+        "listed": "Listed",
+        "tier_changed": "Tier changed",
+        "handed_over": "Handler changed",
+        "requested": "Requested",
+        "approved": "Approved",
+        "declined": "Declined",
+        "withdrawn": "Request withdrawn",
+        "cancelled": "Cancelled",
+        "confirmed": "Hand-over confirmed",
+        "completed": "Handed over",
+        "deleted": "Item deleted",
+        "other": "Other record"
+      },
+      "listedDetail": "{unit}",
+      "assetNumber": "Asset number {asset}",
+      "tierDetail": "{from} → {to}",
+      "handoverItem": "Item handler {from} → {to}",
+      "handoverWeave": "Handler of request #{weaveId} {from} → {to}",
+      "requestPersonal": "Request #{weaveId}: personal, quantity {quantity}",
+      "requestOnBehalf": "Request #{weaveId}: on behalf of {unit}, quantity {quantity}",
+      "weaveStep": "Request #{weaveId}",
+      "completedUnit": "Request #{weaveId}: {unit} ({name}) received {quantity}",
+      "completedPerson": "Request #{weaveId}: {name} (personal) received {quantity}"
     }
   }
 }

@@ -245,6 +245,30 @@ router.get(
 );
 
 /**
+ * GET /api/orgs/:orgId/items/:itemId/timeline
+ * 物品流轉時間軸（上架、層級、交接、申請、核可、完成），每一步有操作者與時間；
+ * 只給能管這個單位的窗口或 Org Admin。紀錄只能讀，沒有修改或刪除的路由
+ */
+router.get(
+  "/:orgId/items/:itemId/timeline",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      if (!itemId.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid item id"));
+      }
+      const timeline = await orgItemService.listItemTimeline(
+        orgAccess(res),
+        itemId.data,
+      );
+      return res.status(200).json({ timeline });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
  * POST /api/orgs/:orgId/items
  * 代表單位上架 Share，上架後在 Internal；type、層級與付款方式都不由 client 決定
  */

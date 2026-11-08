@@ -555,6 +555,27 @@ CREATE TABLE `org_units` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_weave_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `weave_id` bigint unsigned NOT NULL,
+  `post_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned NOT NULL,
+  `action` enum('approved','declined','withdrawn','cancelled','confirmed','completed') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actor_user_id` bigint unsigned DEFAULT NULL COMMENT '操作者；系統自動婉拒為 NULL',
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_weave_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_weave_events_org` (`org_id`,`created_at`),
+  KEY `idx_org_weave_events_weave` (`weave_id`),
+  KEY `idx_org_weave_events_actor` (`actor_user_id`),
+  CONSTRAINT `fk_org_weave_events_weave` FOREIGN KEY (`weave_id`) REFERENCES `weaves` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_weave_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_weave_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_org_weave_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `organizations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `public_id` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,

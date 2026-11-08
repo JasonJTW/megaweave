@@ -26,6 +26,10 @@ import {
   resolveActingUnit,
 } from "../services/orgWeaveService";
 import type { OrgUnitRef } from "../services/orgItemService";
+import {
+  OrgWeaveEventAction,
+  recordOrgWeaveEvents,
+} from "../services/orgWeaveEvents";
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -678,6 +682,8 @@ export async function approveWeave(
       throw new WeaveError(403, "FORBIDDEN", "Unauthorized");
 
     // ── State machine ─────────────────────────────────────────────────────────
+    // 組織物品的流轉紀錄（#141）：這次的狀態改變由誰做，與改變同一個交易
+    let orgEventAction: OrgWeaveEventAction | null = null;
     if (weave.status === "requested") {
       if (newStatus === "approved") {
         if (!canReview)
@@ -695,6 +701,7 @@ export async function approveWeave(
           `UPDATE weaves SET status = 'approved' WHERE id = ?`,
           [weaveId],
         );
+        orgEventAction = "approved";
       } else if (newStatus === "declined") {
         if (!canReview)
           throw new WeaveError(
@@ -706,6 +713,7 @@ export async function approveWeave(
           `UPDATE weaves SET status = 'declined' WHERE id = ?`,
           [weaveId],
         );
+        orgEventAction = "declined";
       } else if (newStatus === "withdrawn") {
         if (!isInitiator)
           throw new WeaveError(403, "FORBIDDEN", "Only initiator can withdraw");
@@ -713,6 +721,7 @@ export async function approveWeave(
           `UPDATE weaves SET status = 'withdrawn' WHERE id = ?`,
           [weaveId],
         );
+        orgEventAction = "withdrawn";
       } else {
         throw new WeaveError(
           400,
@@ -726,6 +735,7 @@ export async function approveWeave(
           `UPDATE weaves SET status = 'cancelled' WHERE id = ?`,
           [weaveId],
         );
+        orgEventAction = "cancelled";
       } else if (newStatus === "completed") {
         const confirmField = isGiver ? "giver_confirmed" : "receiver_confirmed";
         await connection.execute(
@@ -747,6 +757,7 @@ export async function approveWeave(
             `UPDATE weaves SET status = 'completed', completed_at = NOW() WHERE id = ?`,
             [weaveId],
           );
+          orgEventAction = "completed";
         } else {
           // 單邊確認不扣庫存，先做軟檢查提早告知庫存不足
           await validateItems(
@@ -755,6 +766,7 @@ export async function approveWeave(
             connection,
           );
           isPartialConfirm = true;
+          orgEventAction = "confirmed";
         }
       } else {
         throw new WeaveError(
@@ -763,6 +775,18 @@ export async function approveWeave(
           "Invalid status transition",
         );
       }
+    }
+
+    if (isOrgPost && orgEventAction) {
+      await recordOrgWeaveEvents(connection, [
+        {
+          weaveId: Number(weaveId),
+          postId: Number(weave.post_id),
+          orgId: Number(weave.post_org_id),
+          action: orgEventAction,
+          actorUserId: userId,
+        },
+      ]);
     }
 
     await connection.commit();

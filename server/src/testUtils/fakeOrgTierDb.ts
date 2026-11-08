@@ -31,7 +31,6 @@ export function createFakeOrgTierDb(
   //* posts（含 audience_tier）的還原由 fakeOrgItemsDb 負責，這裡只存事件表
   let snapshot: FakeTierEventRow[] | null = null;
   let nextEventId = 1;
-  let clock = Date.parse("2026-11-10T00:00:00Z");
 
   const postById = (id: unknown) => base.posts.find((p) => p.id === Number(id));
 
@@ -73,7 +72,7 @@ export function createFakeOrgTierDb(
         to_tier: String(to_tier),
         actor_type: actor_type as "user" | "system",
         actor_user_id: actor_user_id == null ? null : Number(actor_user_id),
-        created_at: new Date((clock += 1000)),
+        created_at: base.tick(),
       });
       return [{ insertId: nextEventId - 1, affectedRows: 1 }, []];
     }

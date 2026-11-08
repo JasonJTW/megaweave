@@ -12,6 +12,7 @@ export interface FakeHandoverEventRow {
   from_user_id: number;
   to_user_id: number;
   operator_user_id: number;
+  created_at: Date;
 }
 
 type Result = [unknown, unknown];
@@ -34,10 +35,12 @@ const LIST_PENDING_SQL =
 
 const OPEN = ["requested", "approved"];
 
-export function createFakeOrgHandoverDb(
+/** `createBase` 讓別的層（例如 fakeOrgTierDb）墊在下面，一次測交接與層級變更 */
+export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWeavesDb>(
   seed: Parameters<typeof createFakeOrgWeavesDb>[0],
-): FakeOrgHandoverDb {
-  const base = createFakeOrgWeavesDb(seed);
+  createBase: (seed: Parameters<typeof createFakeOrgWeavesDb>[0]) => Base = createFakeOrgWeavesDb as never,
+): FakeOrgHandoverDb & Base {
+  const base = createBase(seed);
   let events: FakeHandoverEventRow[] = [];
   let snapshot: FakeHandoverEventRow[] | null = null;
   let nextEventId = 1;
@@ -225,6 +228,7 @@ export function createFakeOrgHandoverDb(
           from_user_id: Number(from),
           to_user_id: Number(to),
           operator_user_id: Number(operator),
+          created_at: base.tick(),
         });
       }
       return [{ affectedRows: rows.length }, []];
@@ -243,7 +247,7 @@ export function createFakeOrgHandoverDb(
   }
 
   const baseConnection = base.connection;
-  const db = base as FakeOrgHandoverDb;
+  const db = base as FakeOrgHandoverDb & Base;
   Object.defineProperty(db, "handoverEvents", { get: () => events });
   db.connection = {
     ...baseConnection,

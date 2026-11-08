@@ -1282,12 +1282,48 @@
       "demoteConfirm": "要把「{title}」降回內部單位嗎？組織成員的待核可申請會自動婉拒並通知對方。",
       "promoted": "已升到組織成員，組織成員現在看得到這件物品。",
       "demoted": "已降回內部單位。",
-      "tierChangeFailed": "無法變更層級，請稍後再試。"
+      "tierChangeFailed": "無法變更層級，請稍後再試。",
+      "colOutcome": "去向",
+      "outcomeNone": "尚未交出",
+      "outcomeUnit": "{unit} × {quantity}",
+      "outcomePerson": "{name}（個人）× {quantity}",
+      "viewTimeline": "時間軸",
+      "hideTimeline": "收合時間軸"
     },
     "weaveStatus": {
       "requested": "待核可",
       "approved": "已核可",
       "completed": "已完成"
+    },
+    "timeline": {
+      "title": "流轉時間軸",
+      "empty": "沒有紀錄。",
+      "system": "系統",
+      "unknownActor": "操作者不明",
+      "kind": {
+        "listed": "上架",
+        "tier_changed": "層級變更",
+        "handed_over": "交接經手人",
+        "requested": "申請",
+        "approved": "核可",
+        "declined": "婉拒",
+        "withdrawn": "撤回申請",
+        "cancelled": "取消",
+        "confirmed": "確認交接",
+        "completed": "交接完成",
+        "deleted": "刪除物品",
+        "other": "其他紀錄"
+      },
+      "listedDetail": "{unit}",
+      "assetNumber": "財產編號 {asset}",
+      "tierDetail": "{from} → {to}",
+      "handoverItem": "物品經手人 {from} → {to}",
+      "handoverWeave": "申請 #{weaveId} 的經手人 {from} → {to}",
+      "requestPersonal": "申請 #{weaveId}：個人，數量 {quantity}",
+      "requestOnBehalf": "申請 #{weaveId}：代表{unit}，數量 {quantity}",
+      "weaveStep": "申請 #{weaveId}",
+      "completedUnit": "申請 #{weaveId}：{unit}（{name}）領取 {quantity} 件",
+      "completedPerson": "申請 #{weaveId}：{name}（個人）領取 {quantity} 件"
     }
   }
 }

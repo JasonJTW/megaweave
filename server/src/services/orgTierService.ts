@@ -11,6 +11,7 @@ import { HttpError } from "../utils/httpError";
 import { getVectorRedisClient } from "../utils/redis";
 import { announceAutoDeclined } from "../utils/weaveService";
 import { syncPostVectorScope } from "./postVectorScope";
+import { recordOrgWeaveEvents } from "./orgWeaveEvents";
 import {
   AUDIENCE_TIERS,
   AudienceTier,
@@ -128,6 +129,17 @@ export async function changePostTier(
     await connection.query(
       "UPDATE weaves SET status = 'declined' WHERE id IN (?) AND status = 'requested'",
       [declined.map((d) => d.weaveId)],
+    );
+    //* 流轉紀錄（#141）：系統婉拒，操作者留空；層級變更本身另有紀錄與操作者
+    await recordOrgWeaveEvents(
+      connection,
+      declined.map((d) => ({
+        weaveId: d.weaveId,
+        postId,
+        orgId,
+        action: "declined" as const,
+        actorUserId: null,
+      })),
     );
   }
 

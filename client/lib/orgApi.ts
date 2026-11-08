@@ -70,6 +70,31 @@ export interface OrgItem extends OrgPagePost {
   pendingRequestCount: number;
 }
 
+/** 去向（E9-3）：完成的 Weave 交給了哪個單位或個人（receiverUnit 為 null 是個人領取） */
+export interface OrgItemOutcome {
+  weaveId: number;
+  completedAt: string;
+  quantity: number;
+  receiver: { name: string };
+  receiverUnit: OrgUnitRef | null;
+}
+
+/** 後台清單（閒置清單）的一列 */
+export interface ManagedOrgItem extends OrgItem {
+  outcomes: OrgItemOutcome[];
+}
+
+/**
+ * 物品流轉時間軸的一步（E9-1，server: orgTimelineService）。
+ * kind 之外的欄位依 kind 而不同；不認得的 kind（之後新增的紀錄）仍以通用格式顯示，所以這裡不列舉
+ */
+export interface OrgTimelineEntry {
+  kind: string;
+  at: string;
+  actor: { type: "user"; name: string } | { type: "system" } | null;
+  [detail: string]: unknown;
+}
+
 /** 後台：一件物品的申請。receiver 是經手人，receiverUnit 是流向單位（個人申請為 null） */
 export interface OrgItemRequest {
   id: number;

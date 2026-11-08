@@ -1,7 +1,7 @@
 //* 測試用的記憶體 MySQL：在 fakeOrgItemsDb（組織、單位、成員、組織貼文、items）之上加 weaves、weave_items，
 //* 只認得 weaveService／orgWeaveService／weaves 路由送出的語句；不認得的交給下一層，最底層丟錯
 //* 可見性條件用 fakePostVisibility 依綁定參數判斷（與 postVisibleIn 的參數順序相同）
-import { createFakeOrgItemsDb, FakeOrgItemsDb } from "./fakeOrgItemsDb";
+import { createFakeOrgItemsDb, FakeOrgItemsDb, OUTCOMES_SQL } from "./fakeOrgItemsDb";
 import { fakePostVisible, MEMBERSHIP_SQL } from "./fakePostVisibility";
 
 export interface FakeWeaveRow {
@@ -28,9 +28,21 @@ export interface FakeWeaveItemRow {
 
 type Result = [unknown, unknown];
 
+/** org_weave_events（#141）：組織物品 Weave 的每次狀態改變與操作者 */
+export interface FakeWeaveEventRow {
+  id: number;
+  weave_id: number;
+  post_id: number;
+  org_id: number;
+  action: string;
+  actor_user_id: number | null;
+  created_at: Date;
+}
+
 interface WeaveTables {
   weaves: FakeWeaveRow[];
   weaveItems: FakeWeaveItemRow[];
+  weaveEvents: FakeWeaveEventRow[];
 }
 
 export interface FakeOrgWeavesDb extends FakeOrgItemsDb, WeaveTables {}
@@ -43,11 +55,11 @@ export function createFakeOrgWeavesDb(
   seed: Parameters<typeof createFakeOrgItemsDb>[0],
 ): FakeOrgWeavesDb {
   const base = createFakeOrgItemsDb(seed);
-  const tables: WeaveTables = { weaves: [], weaveItems: [] };
+  const tables: WeaveTables = { weaves: [], weaveItems: [], weaveEvents: [] };
+  let nextWeaveEventId = 1;
   let snapshot: WeaveTables | null = null;
   let nextWeaveId = 1;
   let nextWeaveItemId = 1;
-  let clock = Date.parse("2026-11-09T00:00:00Z");
 
   const postById = (id: unknown) => base.posts.find((p) => p.id === Number(id));
   const weaveById = (id: unknown) => tables.weaves.find((w) => w.id === Number(id));
@@ -157,7 +169,7 @@ export function createFakeOrgWeavesDb(
         receiver_confirmed: 0,
         notes: (notes as string | null) ?? null,
         completed_at: null,
-        created_at: new Date((clock += 1000)),
+        created_at: base.tick(),
       };
       tables.weaves.push(row);
       return [{ insertId: row.id, affectedRows: 1 }, []];
@@ -244,7 +256,7 @@ export function createFakeOrgWeavesDb(
       const weave = weaveById(params[0]);
       if (weave) {
         weave.status = "completed";
-        weave.completed_at = new Date((clock += 1000));
+        weave.completed_at = base.tick();
       }
       return [{ affectedRows: weave ? 1 : 0 }, []];
     }
@@ -350,6 +362,45 @@ export function createFakeOrgWeavesDb(
       return [rows, []];
     }
 
+    if (sql === OUTCOMES_SQL) {
+      const ids = (params[0] as unknown[]).map(Number);
+      const rows = tables.weaves
+        .filter((w) => ids.includes(w.post_id) && w.status === "completed")
+        .sort((a, b) => a.completed_at!.getTime() - b.completed_at!.getTime() || a.id - b.id)
+        .map((w) => ({
+          id: w.id,
+          post_id: w.post_id,
+          completed_at: w.completed_at,
+          receiver_org_unit_id: w.receiver_org_unit_id,
+          receiver_org_unit_name:
+            base.units.find((u) => u.id === w.receiver_org_unit_id)?.name ?? null,
+          receiver_name: `user-${w.receiver_id}`,
+          quantity: tables.weaveItems
+            .filter((wi) => wi.weave_id === w.id)
+            .reduce((sum, wi) => sum + wi.quantity, 0),
+        }));
+      return [rows, []];
+    }
+
+    if (
+      sql ===
+      "INSERT INTO org_weave_events (weave_id, post_id, org_id, action, actor_user_id) VALUES ?"
+    ) {
+      const rows = params[0] as unknown[][];
+      for (const [weave_id, post_id, org_id, action, actor] of rows) {
+        tables.weaveEvents.push({
+          id: nextWeaveEventId++,
+          weave_id: Number(weave_id),
+          post_id: Number(post_id),
+          org_id: Number(org_id),
+          action: String(action),
+          actor_user_id: actor == null ? null : Number(actor),
+          created_at: base.tick(),
+        });
+      }
+      return [{ affectedRows: rows.length }, []];
+    }
+
     return null;
   }
 
@@ -360,6 +411,7 @@ export function createFakeOrgWeavesDb(
   Object.defineProperties(db, {
     weaves: { get: () => tables.weaves },
     weaveItems: { get: () => tables.weaveItems },
+    weaveEvents: { get: () => tables.weaveEvents },
   });
   db.connection = {
     ...baseConnection,
@@ -369,6 +421,7 @@ export function createFakeOrgWeavesDb(
       snapshot = {
         weaves: tables.weaves.map((r) => ({ ...r })),
         weaveItems: tables.weaveItems.map((r) => ({ ...r })),
+        weaveEvents: tables.weaveEvents.map((r) => ({ ...r })),
       };
       await baseConnection.beginTransaction();
     },

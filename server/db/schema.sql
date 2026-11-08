@@ -495,11 +495,15 @@ CREATE TABLE `org_post_details` (
   `weight_is_default` tinyint(1) NOT NULL DEFAULT '0',
   `asset_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `estimated_value_twd` int unsigned DEFAULT NULL,
+  `auto_release_override` enum('auto','manual') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `auto_release_days` smallint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`post_id`),
   KEY `idx_org_post_details_category` (`org_category`),
   CONSTRAINT `fk_org_post_details_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `org_post_details_chk_auto_release` CHECK (((`auto_release_days` is not null) = (`auto_release_override` <=> 'auto'))),
+  CONSTRAINT `org_post_details_chk_auto_release_days` CHECK (((`auto_release_days` is null) or (`auto_release_days` between 1 and 365))),
   CONSTRAINT `org_post_details_chk_quantity` CHECK ((`quantity` >= 1)),
   CONSTRAINT `org_post_details_chk_weight` CHECK ((`unit_weight_kg` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

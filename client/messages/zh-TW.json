@@ -1192,6 +1192,16 @@
       "submit": "轉交",
       "submitting": "轉交中…",
       "done": "已轉交 {items} 件物品、{weaves} 筆申請。"
+    },
+    "settings": {
+      "heading": "自動升級",
+      "hint": "內部單位的物品無人申請累計達設定天數，就自動升到組織成員。有人申請期間暫停計時，婉拒或撤回後繼續累計；有已核可的申請時不升級。公開一律由組織管理員手動。",
+      "enabledLabel": "自動升到組織成員",
+      "manualHint": "目前為手動：物品只會由窗口或組織管理員升級。",
+      "daysLabel": "無人申請天數",
+      "daysHint": "1 到 365 天。單位窗口可替單件物品另設。",
+      "save": "儲存",
+      "saved": "已更新自動升級設定。"
     }
   },
   "Org": {
@@ -1282,7 +1292,20 @@
       "demoteConfirm": "要把「{title}」降回內部單位嗎？組織成員的待核可申請會自動婉拒並通知對方。",
       "promoted": "已升到組織成員，組織成員現在看得到這件物品。",
       "demoted": "已降回內部單位。",
-      "tierChangeFailed": "無法變更層級，請稍後再試。"
+      "tierChangeFailed": "無法變更層級，請稍後再試。",
+      "colAutoRelease": "自動升級",
+      "autoReleaseLabel": "「{title}」的自動升級",
+      "autoReleaseDaysLabel": "「{title}」的無人申請天數",
+      "autoReleaseFollowOrg": "跟組織設定（{setting}）",
+      "autoReleaseOrgAuto": "{days} 天",
+      "autoReleaseOrgManual": "手動",
+      "autoReleaseAuto": "自訂天數",
+      "autoReleaseManual": "手動",
+      "autoReleaseDays": "天",
+      "autoReleaseSave": "儲存",
+      "autoReleaseSaved": "已更新這件物品的自動升級設定。",
+      "autoReleaseFailed": "無法更新自動升級設定，請稍後再試。",
+      "autoReleaseNotInternal": "—"
     },
     "weaveStatus": {
       "requested": "待核可",

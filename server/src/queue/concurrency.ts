@@ -16,6 +16,8 @@ export const WORKER_CONCURRENCY = {
   // 退款打金流 API，序列化處理避免同一筆付款併發退款
   "delivery-refund": 1,
   "delivery-dispatch-check": 2,
+  // 每件物品各自一個交易，序列化即可；同時跑兩個 job 也只會讓第二個在鎖上等，不會重複升級
+  "org-auto-release": 1,
 } as const;
 
 /** 單一 post-image job 內同時處理的圖片數（每篇貼文最多 5 張） */

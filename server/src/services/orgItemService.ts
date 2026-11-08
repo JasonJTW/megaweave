@@ -23,6 +23,7 @@ import {
   TierEvent,
 } from "./orgTierService";
 import type { Server } from "socket.io";
+import type { AutoReleaseOverride } from "./orgAutoReleaseService";
 import {
   defaultUnitWeightKg,
   OrgItemCategoryId,
@@ -46,7 +47,15 @@ export interface OrgAccess {
   isAdmin: boolean;
   /** 可代表上架、可在後台管理的單位 */
   manageableUnits: OrgUnitRef[];
+  /** 組織的 Auto Release 設定（#139）；單件可覆寫 */
+  autoRelease: { enabled: boolean; days: number };
 }
+
+/** 單件 Auto Release 覆寫（#139）：org = 跟組織設定；auto 帶天數；manual = 不自動升級 */
+export type ItemAutoReleaseInput =
+  | { mode: "org" }
+  | { mode: "manual" }
+  | { mode: "auto"; days: number };
 
 export interface CreateOrgItemInput {
   unitId: number;
@@ -100,6 +109,8 @@ export interface OrgItem {
   s3Keys: string[];
   /** 待核可（requested）的申請數 */
   pendingRequestCount: number;
+  /** 單件 Auto Release 覆寫；override 為 null 表示跟組織設定，days 只在 auto 時有值 */
+  autoRelease: { override: AutoReleaseOverride | null; days: number | null };
 }
 
 /** 組織頁卡片：不含財產編號與估算價值 */
@@ -122,6 +133,8 @@ interface MembershipRow extends RowDataPacket {
   id: number;
   public_id: string;
   name: string;
+  auto_release_enabled: boolean | number;
+  auto_release_days: number;
   membership_id: number;
   access_level: AccessLevel;
   org_role: OrgRole;
@@ -132,7 +145,7 @@ async function loadAccesses(
   orgPublicId?: string,
 ): Promise<OrgAccess[]> {
   const [rows] = await dbPool.query<MembershipRow[]>(
-    `SELECT o.id, o.public_id, o.name, m.id AS membership_id, m.access_level, m.org_role
+    `SELECT o.id, o.public_id, o.name, o.auto_release_enabled, o.auto_release_days, m.id AS membership_id, m.access_level, m.org_role
      FROM org_memberships m JOIN organizations o ON o.id = m.org_id
      WHERE m.user_id = ?${orgPublicId ? " AND o.public_id = ?" : ""}
      ORDER BY o.name`,
@@ -168,6 +181,10 @@ async function loadAccesses(
         accessLevel: row.access_level,
         isAdmin,
         manageableUnits,
+        autoRelease: {
+          enabled: Boolean(Number(row.auto_release_enabled)),
+          days: Number(row.auto_release_days),
+        },
       };
     }),
   );
@@ -250,6 +267,10 @@ function toOrgItem(row: RowDataPacket): OrgItem {
       row.estimated_value_twd === null ? null : Number(row.estimated_value_twd),
     s3Keys: row.s3_keys ? String(row.s3_keys).split(",") : [],
     pendingRequestCount: Number(row.pending_request_count ?? 0),
+    autoRelease: {
+      override: row.auto_release_override ?? null,
+      days: row.auto_release_days == null ? null : Number(row.auto_release_days),
+    },
   };
 }
 
@@ -289,7 +310,7 @@ async function queryItems(orgId: number, filters: ListQuery): Promise<OrgItem[]>
     `SELECT p.id, p.public_id, p.title, p.type, p.audience_tier, p.status, p.created_at,
             p.org_unit_id, u.name AS unit_name,
             d.org_category, d.quantity, d.unit_weight_kg, d.weight_is_default,
-            d.asset_number, d.estimated_value_twd,
+            d.asset_number, d.estimated_value_twd, d.auto_release_override, d.auto_release_days,
             (SELECT GROUP_CONCAT(i.s3_key ORDER BY i.id) FROM images i WHERE i.post_id = p.id) AS s3_keys,
             (SELECT COUNT(*) FROM weaves w WHERE w.post_id = p.id AND w.status = 'requested') AS pending_request_count
      FROM posts p
@@ -411,6 +432,28 @@ export const orgItemService = {
       }),
     );
     await afterTierChange(result, { io, actorName: access.name, actorUserId: userId });
+    const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
+    return item;
+  },
+
+  /**
+   * 後台：單件 Auto Release 覆寫（#139）。該單位的窗口或 Org Admin 可設；
+   * 只影響 Internal → Members 的自動升級，其他層級存著也不會動作
+   */
+  async setItemAutoRelease(
+    access: OrgAccess,
+    itemPublicId: string,
+    input: ItemAutoReleaseInput,
+  ): Promise<OrgItem> {
+    const postId = await findManagedPost(access, itemPublicId);
+    await dbPool.execute(
+      "UPDATE org_post_details SET auto_release_override = ?, auto_release_days = ? WHERE post_id = ?",
+      [
+        input.mode === "org" ? null : input.mode,
+        input.mode === "auto" ? input.days : null,
+        postId,
+      ],
+    );
     const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
     return item;
   },

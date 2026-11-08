@@ -11,7 +11,9 @@ import {
   listOrgItemCategories,
   ORG_ITEM_CATEGORY_IDS,
 } from "./services/orgItemCategories";
+import { AUTO_RELEASE_MAX_DAYS } from "./services/orgAutoReleaseService";
 import {
+  ItemAutoReleaseInput,
   ORG_ITEM_STATUSES,
   ORG_ITEM_WEAVE_STATUSES,
   OrgAccess,
@@ -77,6 +79,7 @@ function accessView(access: OrgAccess) {
     accessLevel: access.accessLevel,
     isAdmin: access.isAdmin,
     manageableUnits: access.manageableUnits,
+    autoRelease: access.autoRelease,
   };
 }
 
@@ -214,6 +217,43 @@ router.patch(
         body.data.tier,
         res.locals.io ?? null,
       );
+      return res.status(200).json({ item });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+//* 模式是選單（client bug → INVALID_REQUEST），天數是使用者打字（VALIDATION_FAILED）
+const AutoReleaseModeSchema = z.object({ mode: z.enum(["org", "auto", "manual"]) });
+const AutoReleaseDaysSchema = z.object({
+  days: z.number({ error: "Days is required" }).int().min(1).max(AUTO_RELEASE_MAX_DAYS),
+});
+
+/**
+ * PATCH /api/orgs/:orgId/items/:itemId/auto-release
+ * 單件 Auto Release 覆寫（#139）body `{ mode: 'org' | 'manual' }` 或 `{ mode: 'auto', days }`；
+ * 只給能管這個單位的窗口或 Org Admin
+ */
+router.patch(
+  "/:orgId/items/:itemId/auto-release",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body ?? {};
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      const mode = AutoReleaseModeSchema.safeParse(body);
+      if (!itemId.success || !mode.success || (mode.data.mode !== "auto" && body.days !== undefined)) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid auto release setting"));
+      }
+      let input: ItemAutoReleaseInput;
+      if (mode.data.mode === "auto") {
+        const days = AutoReleaseDaysSchema.safeParse(body);
+        if (!days.success) return next(days.error);
+        input = { mode: "auto", days: days.data.days };
+      } else {
+        input = { mode: mode.data.mode };
+      }
+      const item = await orgItemService.setItemAutoRelease(orgAccess(res), itemId.data, input);
       return res.status(200).json({ item });
     } catch (error) {
       return next(error);

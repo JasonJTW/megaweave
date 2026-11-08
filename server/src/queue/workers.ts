@@ -23,9 +23,11 @@ import {
   DeliveryRefundJobData,
 } from "./jobs/deliveryRefund";
 import { processDeliveryDispatchCheck } from "./jobs/deliveryDispatchCheck";
+import { processOrgAutoRelease } from "./jobs/orgAutoRelease";
 import {
   initUserVectorFlushCron,
   initDeliveryReconcileCron,
+  initOrgAutoReleaseCron,
   DeliveryDispatchCheckJobData,
 } from "./queues";
 import { WORKER_CONCURRENCY } from "./concurrency";
@@ -331,6 +333,34 @@ export async function startWorkers(): Promise<void> {
     );
   });
 
+  // ─── Org Auto Release Worker (#139，每小時把到期的 Internal 物品升到 Members) ───
+  const orgAutoReleaseWorker = new Worker(
+    "org-auto-release",
+    async (job: Job) => {
+      if (job.name === "release-org-items") {
+        return await processOrgAutoRelease(job);
+      }
+    },
+    { connection: bullmqConnection, concurrency: WORKER_CONCURRENCY["org-auto-release"] },
+  );
+
+  orgAutoReleaseWorker.on("completed", (job, result) => {
+    const res = result as { released?: number } | undefined;
+    if (res && (res.released ?? 0) > 0) {
+      console.log(
+        `🎉 [org-auto-release] Job ${formatJobId(job.id)} finished at ${formatDateTime()} (Released: ${res.released})`,
+      );
+    }
+  });
+
+  orgAutoReleaseWorker.on("failed", (job, err) => {
+    console.error(
+      `❌ [org-auto-release] Job ${formatJobId(job?.id)} failed at ${formatDateTime()}: ${err.message}`,
+    );
+  });
+
+  await initOrgAutoReleaseCron();
+
   activeWorkers = [
     postImageWorker,
     emailWorker,
@@ -341,6 +371,7 @@ export async function startWorkers(): Promise<void> {
     deliveryReconcileWorker,
     deliveryRefundWorker,
     deliveryDispatchCheckWorker,
+    orgAutoReleaseWorker,
   ];
 
   console.log("🚀 All workers started");

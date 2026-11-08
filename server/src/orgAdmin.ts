@@ -8,6 +8,8 @@ import { HttpError } from "./utils/httpError";
 import { announceAutoDeclined } from "./utils/weaveService";
 import { orgHandoverService } from "./services/orgHandoverService";
 import { OrgIdSchema } from "./utils/idSchemas";
+import { orgNotFound, orgService, OrgSummary } from "./services/orgService";
+import { AUTO_RELEASE_MAX_DAYS } from "./services/orgAutoReleaseService";
 import {
   AdminOrg,
   MEMBER_ROLES,
@@ -45,6 +47,22 @@ const HandoverSchema = z.object({
   unitId: z.number().int().positive(),
   toMemberId: z.number().int().positive(),
 });
+
+//* 組織設定（#139）：Org Admin 只能改 Auto Release；名稱、公開層顯示、演示組織由 Platform Admin 管（admin.ts）
+//* 開關與天數都是使用者在表單輸入 → VALIDATION_FAILED
+const OrgSettingsSchema = z
+  .object({
+    autoReleaseEnabled: z.boolean(),
+    autoReleaseDays: z.number().int().min(1).max(AUTO_RELEASE_MAX_DAYS),
+  })
+  .partial();
+
+function settingsView(org: OrgSummary) {
+  return {
+    autoReleaseEnabled: org.autoReleaseEnabled,
+    autoReleaseDays: org.autoReleaseDays,
+  };
+}
 
 function adminOrg(res: Response): AdminOrg {
   return res.locals.adminOrg as AdminOrg;
@@ -107,6 +125,42 @@ router.get(
         units,
         members,
       });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/org-admin/orgs/:orgId/settings
+ * 組織的 Auto Release 設定
+ */
+router.get(
+  "/orgs/:orgId/settings",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const org = await orgService.getOrganization(adminOrg(res).publicId);
+      if (!org) return next(orgNotFound());
+      return res.status(200).json({ settings: settingsView(org) });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * PATCH /api/org-admin/orgs/:orgId/settings
+ * 改 Auto Release：自動（天數）或手動；只更新有傳入的欄位
+ */
+router.patch(
+  "/orgs/:orgId/settings",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = OrgSettingsSchema.safeParse(req.body ?? {});
+      if (!parsed.success) return next(parsed.error);
+      const org = await orgService.updateOrganization(adminOrg(res).publicId, parsed.data);
+      if (!org) return next(orgNotFound());
+      return res.status(200).json({ settings: settingsView(org) });
     } catch (error) {
       return next(error);
     }

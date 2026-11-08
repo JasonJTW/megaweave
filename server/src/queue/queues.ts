@@ -360,6 +360,31 @@ export async function enqueueDispatchCheck(
   );
 }
 
+//* ─── Org Auto Release Queue（#139）────────────────────────────────────────
+
+export const orgAutoReleaseQueue = new Queue("org-auto-release", {
+  connection: bullmqConnection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 10000 },
+    removeOnComplete: { count: 50 },
+    removeOnFail: { count: 50 },
+  },
+});
+
+/**
+ * 啟動 Auto Release 排程（每小時整點）：Internal 物品無人申請達設定天數就升到 Members。
+ * 天數以天計，每小時檢查一次就夠；不提供手動觸發（PRD 0001 §5.1：驗證用手動升級）
+ */
+export async function initOrgAutoReleaseCron(): Promise<void> {
+  await orgAutoReleaseQueue.upsertJobScheduler(
+    "cron-org-auto-release",
+    { pattern: "0 * * * *" },
+    { name: "release-org-items" },
+  );
+  console.log("⏱️ Org Auto Release Cron Scheduler initialized (runs hourly)");
+}
+
 /** 關閉本模組建立的所有 Queue 連線；供只作為 producer 的短期程序（例如 benchmark runner）結束時使用 */
 export async function closeQueues(): Promise<void> {
   await Promise.all(
@@ -373,6 +398,7 @@ export async function closeQueues(): Promise<void> {
       deliveryReconcileQueue,
       deliveryRefundQueue,
       deliveryDispatchCheckQueue,
+      orgAutoReleaseQueue,
     ].map((queue) => queue.close()),
   );
 }

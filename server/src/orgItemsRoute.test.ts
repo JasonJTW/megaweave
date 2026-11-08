@@ -187,6 +187,7 @@ describe("GET /api/orgs", () => {
         accessLevel: "internal",
         isAdmin: false,
         manageableUnits: [{ id: GENERAL_AFFAIRS, name: "總務部" }],
+        autoRelease: { enabled: true, days: 30 },
       },
     ]);
   });

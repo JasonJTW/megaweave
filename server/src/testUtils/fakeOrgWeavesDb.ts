@@ -17,6 +17,8 @@ export interface FakeWeaveRow {
   notes: string | null;
   completed_at: Date | null;
   created_at: Date;
+  /** ON UPDATE CURRENT_TIMESTAMP：Auto Release 以它當結束申請的時間（#139） */
+  updated_at?: Date;
 }
 
 export interface FakeWeaveItemRow {
@@ -159,6 +161,7 @@ export function createFakeOrgWeavesDb(
         completed_at: null,
         created_at: new Date((clock += 1000)),
       };
+      row.updated_at = row.created_at;
       tables.weaves.push(row);
       return [{ insertId: row.id, affectedRows: 1 }, []];
     }
@@ -228,7 +231,10 @@ export function createFakeOrgWeavesDb(
     const setStatus = sql.match(/^UPDATE weaves SET status = '(\w+)' WHERE id = \?$/);
     if (setStatus) {
       const weave = weaveById(params[0]);
-      if (weave) weave.status = setStatus[1];
+      if (weave) {
+        weave.status = setStatus[1];
+        weave.updated_at = new Date((clock += 1000));
+      }
       return [{ affectedRows: weave ? 1 : 0 }, []];
     }
 

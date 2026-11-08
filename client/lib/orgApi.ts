@@ -33,7 +33,11 @@ export interface OrgAccess {
   accessLevel: "internal" | "member";
   isAdmin: boolean;
   manageableUnits: OrgUnitRef[];
+  /** 組織的 Auto Release 設定（#139）；單件可覆寫 */
+  autoRelease: { enabled: boolean; days: number };
 }
+
+export type AutoReleaseOverride = "auto" | "manual";
 
 export interface OrgItemCategory {
   id: string;
@@ -68,6 +72,8 @@ export interface OrgItem extends OrgPagePost {
   assetNumber: string | null;
   estimatedValueTwd: number | null;
   pendingRequestCount: number;
+  /** 單件覆寫；override 為 null 表示跟組織設定，days 只在 auto 時有值 */
+  autoRelease: { override: AutoReleaseOverride | null; days: number | null };
 }
 
 /** 後台：一件物品的申請。receiver 是經手人，receiverUnit 是流向單位（個人申請為 null） */

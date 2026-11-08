@@ -5,6 +5,7 @@
 //* 申請（#137）：所屬單位的任一窗口或 Org Admin 都能在這裡核可／婉拒，不限上架的人
 //* 層級（#138）：窗口可把自己單位的物品從 Internal 升到 Members；Org Admin 另可降回 Internal。
 //* 降級會自動婉拒看不到新層級的人的申請，有已核可的申請時 server 回 ORG_TIER_DEMOTION_BLOCKED
+//* 自動升級（#139）：Internal 物品可覆寫組織設定（跟組織、自訂天數、手動）；其他層級不會自動升級，不顯示
 import { Fragment, Suspense, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
@@ -13,6 +14,7 @@ import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Link } from "@/i18n/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -23,6 +25,7 @@ import {
 import { OrgSwitcher } from "@/components/org/OrgSwitcher";
 import {
   AUDIENCE_TIERS,
+  AutoReleaseOverride,
   hostName,
   ORG_ITEM_STATUSES,
   ORG_ITEM_WEAVE_STATUSES,
@@ -220,6 +223,110 @@ function TierAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
   );
 }
 
+type AutoReleaseMode = "org" | AutoReleaseOverride;
+
+/** 單件自動升級覆寫：選單 + 自訂天數；只出現在 Internal 物品（只有 Internal → Members 會自動） */
+function AutoReleaseControl({ org, item }: { org: OrgAccess; item: OrgItem }) {
+  const t = useTranslations("Org.manage");
+  const apiErrorMessage = useApiErrorMessage();
+  const { mutate } = useSWRConfig();
+  const saved: AutoReleaseMode = item.autoRelease.override ?? "org";
+  const [mode, setMode] = useState<AutoReleaseMode>(saved);
+  const [days, setDays] = useState(
+    String(item.autoRelease.days ?? org.autoRelease.days),
+  );
+  const [busy, setBusy] = useState(false);
+
+  if (item.audienceTier !== "internal") {
+    return <span>{t("autoReleaseNotInternal")}</span>;
+  }
+
+  const orgSetting = org.autoRelease.enabled
+    ? t("autoReleaseOrgAuto", { days: org.autoRelease.days })
+    : t("autoReleaseOrgManual");
+  const dirty =
+    mode !== saved ||
+    (mode === "auto" && Number(days) !== item.autoRelease.days);
+
+  async function save(next: AutoReleaseMode) {
+    setBusy(true);
+    try {
+      await requestJson(
+        `${hostName}/api/orgs/${org.id}/items/${item.id}/auto-release`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(
+            next === "auto"
+              ? { mode: next, days: Number(days) }
+              : { mode: next },
+          ),
+        },
+      );
+      await mutate(isOrgListingKey(hostName, org.id));
+      toast.success(t("autoReleaseSaved"));
+    } catch (err) {
+      toast.error(apiErrorMessage(err, t("autoReleaseFailed")));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select
+        value={mode}
+        onValueChange={(value) => {
+          const next = value as AutoReleaseMode;
+          setMode(next);
+          //* 跟組織、手動不需要天數，選了就存；自訂天數等使用者填完按儲存
+          if (next !== "auto" && next !== saved) void save(next);
+        }}
+        disabled={busy}
+      >
+        <SelectTrigger
+          className="h-8 w-44"
+          aria-label={t("autoReleaseLabel", { title: item.title })}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="org">
+            {t("autoReleaseFollowOrg", { setting: orgSetting })}
+          </SelectItem>
+          <SelectItem value="auto">{t("autoReleaseAuto")}</SelectItem>
+          <SelectItem value="manual">{t("autoReleaseManual")}</SelectItem>
+        </SelectContent>
+      </Select>
+      {mode === "auto" && (
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save("auto");
+          }}
+        >
+          <Input
+            type="number"
+            min={1}
+            max={365}
+            required
+            className="h-8 w-20"
+            aria-label={t("autoReleaseDaysLabel", { title: item.title })}
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+          />
+          <span className="text-muted-foreground">{t("autoReleaseDays")}</span>
+          {dirty && (
+            <Button type="submit" size="sm" variant="outline" disabled={busy}>
+              {t("autoReleaseSave")}
+            </Button>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
 function ItemTable({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org");
   const format = useFormatter();
@@ -296,12 +403,13 @@ function ItemTable({ org }: { org: OrgAccess }) {
       )}
       {data && data.items.length > 0 && (
         <div className="overflow-x-auto rounded-md border">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>
                 <th className="p-3">{t("manage.colTitle")}</th>
                 <th className="p-3">{t("manage.colUnit")}</th>
                 <th className="p-3">{t("manage.colTier")}</th>
+                <th className="p-3">{t("manage.colAutoRelease")}</th>
                 <th className="p-3">{t("manage.colStatus")}</th>
                 <th className="p-3">{t("manage.colQuantity")}</th>
                 <th className="p-3">{t("manage.colWeight")}</th>
@@ -327,6 +435,13 @@ function ItemTable({ org }: { org: OrgAccess }) {
                         </Badge>
                         <TierAction org={org} item={item} />
                       </div>
+                    </td>
+                    <td className="p-3">
+                      <AutoReleaseControl
+                        key={`${item.audienceTier}:${item.autoRelease.override}:${item.autoRelease.days}`}
+                        org={org}
+                        item={item}
+                      />
                     </td>
                     <td className="p-3">{t(`status.${item.status}`)}</td>
                     <td className="p-3">{item.quantity ?? "—"}</td>
@@ -362,7 +477,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
                   </tr>
                   {openItemId === item.id && (
                     <tr className="bg-muted/30">
-                      <td colSpan={9} className="p-3">
+                      <td colSpan={10} className="p-3">
                         <ItemRequests
                           org={org}
                           item={item}

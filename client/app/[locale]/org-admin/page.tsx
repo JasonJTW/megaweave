@@ -4,6 +4,7 @@
 //* 頁面守門：middleware 只確認已登入；是否為該組織的 Org Admin（或 Platform Admin）由 server 判斷（不是就回 ORG_NOT_FOUND）
 //* 身分：`role` 是 Org Admin 或 Org Member；`unitIds` 是擔任 Unit Contact 的單位，兩者可並存（ADR 0004）
 //* 交接（E8-1）：窗口離職或異動後，他經手的物品與進行中的 Weave 在「待交接」轉給同單位另一位窗口
+//* 自動升級（#139）：組織層級的開關與天數；單件覆寫在 /org/items
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -305,6 +307,110 @@ function HandoverCard({
               );
             })}
           </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface OrgSettings {
+  autoReleaseEnabled: boolean;
+  autoReleaseDays: number;
+}
+
+/** 組織的自動升級設定：自動（天數）或手動 */
+function AutoReleaseCard({ orgUrl }: { orgUrl: string }) {
+  const t = useTranslations("OrgAdmin.settings");
+  const errorMessage = useApiErrorMessage();
+  const { data, error, mutate } = useSWR(`${orgUrl}/settings`, (url: string) =>
+    requestJson<{ settings: OrgSettings }>(url),
+  );
+  const [draft, setDraft] = useState<{ enabled: boolean; days: string } | null>(
+    null,
+  );
+  const [saving, setSaving] = useState(false);
+  const { mutate: revalidate } = useSWRConfig();
+
+  const settings = data?.settings;
+  const enabled = draft?.enabled ?? settings?.autoReleaseEnabled ?? true;
+  const days = draft?.days ?? String(settings?.autoReleaseDays ?? 30);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const result = await requestJson<{ settings: OrgSettings }>(
+        `${orgUrl}/settings`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(
+            enabled
+              ? { autoReleaseEnabled: true, autoReleaseDays: Number(days) }
+              : { autoReleaseEnabled: false },
+          ),
+        },
+      );
+      await mutate(result, { revalidate: false });
+      setDraft(null);
+      //* /org/items 的「跟組織設定」標示來自 GET /api/orgs
+      await revalidate(
+        (key) =>
+          typeof key === "string" && key.startsWith(`${hostName}/api/orgs`),
+      );
+      toast.success(t("saved"));
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("heading")}</CardTitle>
+        <p className="text-sm text-muted-foreground">{t("hint")}</p>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <p className="text-sm text-destructive">{errorMessage(error)}</p>
+        )}
+        {settings && (
+          <form className="space-y-4" onSubmit={save}>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="org-auto-release-enabled"
+                checked={enabled}
+                onCheckedChange={(checked) =>
+                  setDraft({ enabled: checked, days })
+                }
+              />
+              <Label htmlFor="org-auto-release-enabled">
+                {t("enabledLabel")}
+              </Label>
+            </div>
+            {enabled ? (
+              <div className="space-y-2">
+                <Label htmlFor="org-auto-release-days">{t("daysLabel")}</Label>
+                <Input
+                  id="org-auto-release-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  required
+                  className="w-32"
+                  value={days}
+                  onChange={(e) => setDraft({ enabled, days: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">{t("daysHint")}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("manualHint")}</p>
+            )}
+            <Button type="submit" disabled={saving || draft === null}>
+              {t("save")}
+            </Button>
+          </form>
         )}
       </CardContent>
     </Card>
@@ -625,6 +731,8 @@ export default function OrgAdminPage() {
               )}
             </CardContent>
           </Card>
+
+          <AutoReleaseCard key={orgUrl} orgUrl={orgUrl!} />
 
           <HandoverCard
             orgUrl={orgUrl!}

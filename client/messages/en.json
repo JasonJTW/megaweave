@@ -1192,6 +1192,16 @@
       "submit": "Hand over",
       "submitting": "Handing over…",
       "done": "Handed over {items} items and {weaves} requests."
+    },
+    "settings": {
+      "heading": "Auto Release",
+      "hint": "An Internal item that nobody requests for the set number of days is released to Members automatically. The timer pauses while a request is pending and resumes after it is declined or withdrawn. An item with an approved request is never released. Public is always manual.",
+      "enabledLabel": "Release to Members automatically",
+      "manualHint": "Manual: only Unit Contacts and Org Admins release items.",
+      "daysLabel": "Days without requests",
+      "daysHint": "1 to 365 days. Unit Contacts can set a different value for one item.",
+      "save": "Save",
+      "saved": "Auto Release setting updated."
     }
   },
   "Org": {
@@ -1282,7 +1292,20 @@
       "demoteConfirm": "Move “{title}” back to Internal? Pending requests from Org Members will be declined automatically and they will be notified.",
       "promoted": "Released to Members. Org Members can see this item now.",
       "demoted": "Moved back to Internal.",
-      "tierChangeFailed": "Couldn't change the tier. Please try again later."
+      "tierChangeFailed": "Couldn't change the tier. Please try again later.",
+      "colAutoRelease": "Auto Release",
+      "autoReleaseLabel": "Auto Release for “{title}”",
+      "autoReleaseDaysLabel": "Days without requests for “{title}”",
+      "autoReleaseFollowOrg": "Org setting ({setting})",
+      "autoReleaseOrgAuto": "{days, plural, one {# day} other {# days}}",
+      "autoReleaseOrgManual": "manual",
+      "autoReleaseAuto": "Custom days",
+      "autoReleaseManual": "Manual",
+      "autoReleaseDays": "days",
+      "autoReleaseSave": "Save",
+      "autoReleaseSaved": "Auto Release updated for this item.",
+      "autoReleaseFailed": "Couldn't update Auto Release. Please try again later.",
+      "autoReleaseNotInternal": "—"
     },
     "weaveStatus": {
       "requested": "Awaiting review",

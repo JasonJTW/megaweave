@@ -28,6 +28,9 @@ export interface FakeOrgPostDetailRow {
   weight_is_default: number;
   asset_number: string | null;
   estimated_value_twd: number | null;
+  /** 單件 Auto Release 覆寫（#139）；null = 跟組織設定 */
+  auto_release_override?: "auto" | "manual" | null;
+  auto_release_days?: number | null;
 }
 
 export interface FakeItemRow {
@@ -62,7 +65,7 @@ function normalize(sql: string) {
 }
 
 const LIST_ITEMS =
-  /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys, \(SELECT COUNT\(\*\) FROM weaves w WHERE w\.post_id = p\.id AND w\.status = 'requested'\) AS pending_request_count FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND EXISTS \(SELECT 1 FROM weaves w WHERE w\.post_id = p\.id AND w\.status = \?\))?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
+  /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, d\.auto_release_override, d\.auto_release_days, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys, \(SELECT COUNT\(\*\) FROM weaves w WHERE w\.post_id = p\.id AND w\.status = 'requested'\) AS pending_request_count FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND EXISTS \(SELECT 1 FROM weaves w WHERE w\.post_id = p\.id AND w\.status = \?\))?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
 
 export function createFakeOrgItemsDb(
   seed: Parameters<typeof createFakeOrgDb>[0] & { users: FakeUser[] },
@@ -80,7 +83,7 @@ export function createFakeOrgItemsDb(
     const params = (rawParams ?? []) as unknown[];
 
     const memberships = sql.match(
-      /^SELECT o\.id, o\.public_id, o\.name, m\.id AS membership_id, m\.access_level, m\.org_role FROM org_memberships m JOIN organizations o ON o\.id = m\.org_id WHERE m\.user_id = \?( AND o\.public_id = \?)? ORDER BY o\.name$/,
+      /^SELECT o\.id, o\.public_id, o\.name, o\.auto_release_enabled, o\.auto_release_days, m\.id AS membership_id, m\.access_level, m\.org_role FROM org_memberships m JOIN organizations o ON o\.id = m\.org_id WHERE m\.user_id = \?( AND o\.public_id = \?)? ORDER BY o\.name$/,
     );
     if (memberships) {
       const rows = base.memberships
@@ -92,6 +95,8 @@ export function createFakeOrgItemsDb(
           id: o.id,
           public_id: o.public_id,
           name: o.name,
+          auto_release_enabled: o.auto_release_enabled ? 1 : 0,
+          auto_release_days: o.auto_release_days,
           membership_id: m.id,
           access_level: m.access_level,
           org_role: m.org_role,
@@ -224,6 +229,8 @@ export function createFakeOrgItemsDb(
             weight_is_default: d?.weight_is_default ?? null,
             asset_number: d?.asset_number ?? null,
             estimated_value_twd: d?.estimated_value_twd ?? null,
+            auto_release_override: d?.auto_release_override ?? null,
+            auto_release_days: d?.auto_release_days ?? null,
             s3_keys: keys.length > 0 ? keys.join(",") : null,
             pending_request_count: db.weaveStatusesOf(p.id).filter((s) => s === "requested").length,
           };

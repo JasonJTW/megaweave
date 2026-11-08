@@ -100,6 +100,11 @@ function setupDb(
       ];
     return [[]];
   });
+  //* 通知前查貼文是不是組織物品（#140 組織名義）：這裡都是個人貼文
+  (dbPool.query as jest.Mock).mockImplementation(async (sql: string) => {
+    if (sql.includes("FROM posts")) return [[{ org_id: null, org_unit_id: null }]];
+    return [[]];
+  });
   (dbPool.execute as jest.Mock).mockImplementation(async (sql: string) => {
     if (sql.includes("FROM posts")) return [[{ title: "Crib" }]];
     if (sql.includes("FROM users"))

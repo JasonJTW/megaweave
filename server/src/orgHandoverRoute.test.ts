@@ -372,7 +372,10 @@ describe("POST /api/org-admin/orgs/:orgId/handovers: handing items to another co
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ items: 1, weaves: 1 });
-    expect(messageService.getConversationId).toHaveBeenLastCalledWith(GA_CONTACT_2, IT_CONTACT);
+    expect(messageService.getConversationId).toHaveBeenLastCalledWith(GA_CONTACT_2, IT_CONTACT, {
+      orgId: 10,
+      orgUserId: GA_CONTACT_2,
+    });
     expect(weaveRow(weaveId)).toMatchObject({
       giver_id: GA_CONTACT_2,
       receiver_id: IT_CONTACT,

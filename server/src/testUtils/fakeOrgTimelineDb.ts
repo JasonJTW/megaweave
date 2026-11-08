@@ -27,6 +27,10 @@ const WEAVE_EVENTS_SQL =
 const HANDOVERS_SQL =
   "SELECT weave_id, from_user_id, to_user_id, operator_user_id, created_at FROM org_handover_events WHERE post_id = ? ORDER BY created_at, id";
 
+//* 待公開紀錄（#140）；這一層沒有那張表，回空陣列，由 fakeOrgPendingPublicDb 回答
+export const PENDING_EVENTS_SQL =
+  "SELECT e.action, e.asset_disposal_confirmed, e.created_at, COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS actor_name FROM org_pending_public_events e JOIN users u ON u.id = e.actor_user_id LEFT JOIN user_profiles up ON up.user_id = u.id WHERE e.post_id = ? ORDER BY e.created_at, e.id";
+
 export function createFakeOrgTimelineDb(
   seed: Parameters<typeof createFakeOrgTierDb>[0],
 ): FakeOrgTimelineDb {
@@ -35,6 +39,8 @@ export function createFakeOrgTimelineDb(
   function run(rawSql: unknown, rawParams: unknown): Result | null {
     const sql = normalize(String(rawSql));
     const params = (rawParams ?? []) as unknown[];
+
+    if (sql === PENDING_EVENTS_SQL) return [[], []];
 
     if (sql === TIMELINE_POST_SQL) {
       const rows = base.posts

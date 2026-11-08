@@ -1,6 +1,7 @@
 //* item/id/page.tsx
 "use client";
 import { useFormatter, useTranslations } from "next-intl";
+import { profilePublicId } from "@/lib/orgContact";
 import { useRouter } from "@/i18n/navigation";
 import { useCategoryName, usePostConditionName } from "@/i18n/referenceNames";
 import { MessageButton } from "@/app/components/Chat/MessageButton";
@@ -158,8 +159,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         setLikeCount(data.post.likes_count);
         likeConfirmedRef.current.count = data.post.likes_count;
 
-        if (data.post.author_public_id) {
-          fetchOwnerSidebar(data.post.author_public_id);
+        //* 組織物品的發文者是組織（#140），沒有個人頁可載入
+        const ownerId = profilePublicId(data.post.author_public_id);
+        if (ownerId) {
+          fetchOwnerSidebar(ownerId);
         }
 
         // 檢查用戶是否已按讚
@@ -379,8 +382,9 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   };
 
   const handleAvatarClick = () => {
-    if (post?.author_public_id) {
-      router.push(`/profile/${post.author_public_id}`);
+    const ownerId = profilePublicId(post?.author_public_id);
+    if (ownerId) {
+      router.push(`/profile/${ownerId}`);
     }
   };
 

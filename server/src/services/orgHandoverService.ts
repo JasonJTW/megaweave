@@ -226,9 +226,11 @@ export const orgHandoverService = {
 
     for (const weave of moved.weaves) {
       try {
+        //* 組織對話（#140）：新窗口與申請人的組織對話，民眾看到的仍是組織名義
         const conversationId = await messageService.getConversationId(
           moved.toUserId,
           weave.receiverId,
+          { orgId, orgUserId: moved.toUserId },
         );
         //* giver_id 條件：commit 後若又被交接給別人，不蓋掉較新的對話
         await dbPool.execute(

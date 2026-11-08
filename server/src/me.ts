@@ -58,7 +58,10 @@ router.get(
             `SELECT
             w.*,
             p.id AS post_id_original,
+            p.public_id AS post_public_id,
             p.user_id AS post_user_id,
+            p.org_id AS post_org_id,
+            p.org_unit_id AS post_org_unit_id,
             p.title AS post_title,
             p.content AS post_content,
             p.type AS post_type,
@@ -113,7 +116,10 @@ router.get(
       const profile = (profileRows[0] as RowDataPacket[])[0] ?? {};
       const stats = (statsRows[0] as RowDataPacket[])[0] ?? null;
       const posts = postsRows[0] as RowDataPacket[];
-      const weaves = await processWeaveRows(weaveRows[0] as WeaveOutput[]);
+      //* 領取組織物品的人看到的 Giver 是組織名義（#140、ADR 0004）
+      const weaves = await processWeaveRows(weaveRows[0] as WeaveOutput[], {
+        viewerUserId: userId,
+      });
       const member = (memberRows[0] as RowDataPacket[])[0] ?? null;
 
       return res.status(200).json({

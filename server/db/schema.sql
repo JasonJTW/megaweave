@@ -240,18 +240,25 @@ CREATE TABLE `conversations` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `user1_id` bigint unsigned NOT NULL,
   `user2_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned DEFAULT NULL,
+  `org_user_id` bigint unsigned DEFAULT NULL,
+  `org_key` bigint unsigned GENERATED ALWAYS AS (ifnull(`org_id`,0)) STORED,
   `last_message_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `last_message_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_conversation_users` (`user1_id`,`user2_id`),
+  UNIQUE KEY `idx_conversation_users_org` (`user1_id`,`user2_id`,`org_key`),
+  KEY `idx_conversations_org` (`org_id`),
   KEY `idx_last_message_at` (`last_message_at`),
   KEY `fk_conv_user2` (`user2_id`),
   KEY `last_message_id` (`last_message_id`),
   CONSTRAINT `fk_conv_last_message` FOREIGN KEY (`last_message_id`) REFERENCES `messages` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_conv_user1` FOREIGN KEY (`user1_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_conv_user2` FOREIGN KEY (`user2_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_conv_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_conv_org_user` FOREIGN KEY (`org_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `check_conv_org_user` CHECK (((`org_id` is null) = (`org_user_id` is null))),
   CONSTRAINT `check_user_order` CHECK ((`user1_id` < `user2_id`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -497,12 +504,17 @@ CREATE TABLE `org_post_details` (
   `estimated_value_twd` int unsigned DEFAULT NULL,
   `auto_release_override` enum('auto','manual') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `auto_release_days` smallint unsigned DEFAULT NULL,
+  `pending_public_due_at` datetime(3) DEFAULT NULL,
+  `pending_public_by` bigint unsigned DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`post_id`),
   KEY `idx_org_post_details_category` (`org_category`),
+  KEY `idx_org_post_details_pending_public` (`pending_public_due_at`),
+  CONSTRAINT `fk_org_post_details_pending_public_by` FOREIGN KEY (`pending_public_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_org_post_details_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
   CONSTRAINT `org_post_details_chk_auto_release` CHECK (((`auto_release_days` is not null) = (`auto_release_override` <=> 'auto'))),
+  CONSTRAINT `org_post_details_chk_pending_public` CHECK (((`pending_public_due_at` is null) = (`pending_public_by` is null))),
   CONSTRAINT `org_post_details_chk_auto_release_days` CHECK (((`auto_release_days` is null) or (`auto_release_days` between 1 and 365))),
   CONSTRAINT `org_post_details_chk_quantity` CHECK ((`quantity` >= 1)),
   CONSTRAINT `org_post_details_chk_weight` CHECK ((`unit_weight_kg` > 0))
@@ -510,6 +522,23 @@ CREATE TABLE `org_post_details` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_pending_public_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `post_id` bigint unsigned NOT NULL,
+  `org_id` bigint unsigned NOT NULL,
+  `action` enum('started','cancelled','skipped') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `asset_disposal_confirmed` tinyint(1) NOT NULL DEFAULT '0',
+  `actor_user_id` bigint unsigned NOT NULL,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_pending_public_events_post` (`post_id`,`created_at`),
+  KEY `idx_org_pending_public_events_org` (`org_id`,`created_at`),
+  KEY `idx_org_pending_public_events_actor` (`actor_user_id`),
+  CONSTRAINT `fk_org_pending_public_events_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_org_pending_public_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
+  CONSTRAINT `fk_org_pending_public_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `org_post_tier_events` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `post_id` bigint unsigned NOT NULL,

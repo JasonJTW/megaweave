@@ -9,6 +9,7 @@ import type { Queryable } from "./orgService";
 import type { OrgUnitRef } from "./orgItemService";
 import type { AudienceTier } from "./postVisibility";
 import { listTierEvents } from "./orgTierService";
+import { listPendingPublicEvents } from "./orgPendingPublicService";
 import type { OrgWeaveEventAction } from "./orgWeaveEvents";
 
 /** 操作者：使用者（顯示名稱），或系統（自動升級、自動婉拒） */
@@ -64,6 +65,12 @@ export interface HandedOverEntry extends TimelineEntryBase {
   weaveId: number | null;
 }
 
+/** 待公開期（#140）：送出（含財產處分確認）、取消、演示組織跳過；正式公開另有 tier_changed */
+export interface PendingPublicEntry extends TimelineEntryBase {
+  kind: "public_pending_started" | "public_pending_cancelled" | "public_pending_skipped";
+  assetDisposalConfirmed: boolean;
+}
+
 /** 物品被刪除（軟刪除，紀錄仍在）；沒存誰刪的，操作者為 null */
 export interface DeletedEntry extends TimelineEntryBase {
   kind: "deleted";
@@ -74,6 +81,7 @@ export type TimelineEntry =
   | DeletedEntry
   | HandedOverEntry
   | TierChangedEntry
+  | PendingPublicEntry
   | RequestedEntry
   | WeaveStepEntry
   | CompletedEntry;
@@ -217,6 +225,7 @@ export async function buildTimeline(
   const listerId =
     handovers.find((h) => h.weaveId === null)?.fromUserId ?? post.handlerId;
   const tierEvents = await listTierEvents(db, post.id);
+  const pendingEvents = await listPendingPublicEvents(db, post.id);
   const weaves = await loadWeaves(db, post.id);
   const weaveEvents = await loadWeaveEvents(db, post.id);
 
@@ -264,6 +273,14 @@ export async function buildTimeline(
             : { type: "user", name: e.actor.name ?? "" },
         fromTier: e.fromTier,
         toTier: e.toTier,
+      }),
+    ),
+    ...pendingEvents.map(
+      (e): PendingPublicEntry => ({
+        kind: `public_pending_${e.action}`,
+        at: e.createdAt.toISOString(),
+        actor: { type: "user", name: e.actorName },
+        assetDisposalConfirmed: e.assetDisposalConfirmed,
       }),
     ),
     ...handovers.map(

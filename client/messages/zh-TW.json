@@ -1082,6 +1082,10 @@
     "ORG_HANDOVER_TARGET_IS_REQUESTER": "新窗口對其中一件物品有進行中的申請，請先處理該申請，或改選其他窗口。",
     "ORG_TIER_NOT_ALLOWED": "你無法把這件物品移到這個層級。",
     "ORG_TIER_DEMOTION_BLOCKED": "這件物品已有核可或完成的申請，不能降級。",
+    "ORG_ASSET_DISPOSAL_UNCONFIRMED": "這件物品有財產編號，請先確認已完成報廢／處分程序再公開。",
+    "ORG_ITEM_PENDING_PUBLIC": "這件物品正在待公開，請先取消再改層級。",
+    "ORG_PENDING_PUBLIC_NOT_PENDING": "這件物品已不在待公開狀態，可能已經公開，請重新整理。",
+    "ORG_PENDING_PUBLIC_SKIP_NOT_ALLOWED": "只有演示組織可以跳過待公開期。",
     "WEAVE_OWN_POST": "不能和自己的貼文交織。",
     "POST_INACTIVE": "這則貼文已經結束了。",
     "ITEM_UNAVAILABLE": "有物品已經沒有了，請重新選擇。",
@@ -1316,7 +1320,24 @@
       "outcomeUnit": "{unit} × {quantity}",
       "outcomePerson": "{name}（個人）× {quantity}",
       "viewTimeline": "時間軸",
-      "hideTimeline": "收合時間軸"
+      "hideTimeline": "收合時間軸",
+      "makePublic": "公開",
+      "publicConfirmTitle": "要把「{title}」公開嗎？",
+      "publicConfirmBody": "10 分鐘後所有人都能在首頁、搜尋與熱門看到這件物品，以組織名義顯示。這段期間可以取消。",
+      "publicConfirmAsset": "財產編號：{asset}",
+      "publicConfirmDisposal": "已完成報廢／處分程序",
+      "publicConfirmSubmit": "送出待公開",
+      "publicConfirmCancel": "先不要",
+      "pendingPublic": "待公開，{time} 後公開",
+      "pendingPublicDue": "即將公開",
+      "cancelPendingPublic": "取消公開",
+      "skipPendingPublic": "跳過等待，立即公開",
+      "pendingPublicStarted": "已送出，10 分鐘後公開。",
+      "pendingPublicCancelled": "已取消，物品維持原層級。",
+      "publishedNow": "已公開。",
+      "demoteFromPublic": "降回組織成員",
+      "demoteFromPublicConfirm": "要把「{title}」從公開降回組織成員嗎？首頁、搜尋與熱門將看不到它，非成員的待核可申請會自動婉拒並通知對方。已被分享出去的預覽無法收回。",
+      "demotedFromPublic": "已降回組織成員，公開頁面看不到這件物品了。"
     },
     "weaveStatus": {
       "requested": "待核可",
@@ -1340,7 +1361,10 @@
         "confirmed": "確認交接",
         "completed": "交接完成",
         "deleted": "刪除物品",
-        "other": "其他紀錄"
+        "other": "其他紀錄",
+        "public_pending_started": "送出待公開",
+        "public_pending_cancelled": "取消待公開",
+        "public_pending_skipped": "跳過待公開期"
       },
       "listedDetail": "{unit}",
       "assetNumber": "財產編號 {asset}",
@@ -1351,7 +1375,8 @@
       "requestOnBehalf": "申請 #{weaveId}：代表{unit}，數量 {quantity}",
       "weaveStep": "申請 #{weaveId}",
       "completedUnit": "申請 #{weaveId}：{unit}（{name}）領取 {quantity} 件",
-      "completedPerson": "申請 #{weaveId}：{name}（個人）領取 {quantity} 件"
+      "completedPerson": "申請 #{weaveId}：{name}（個人）領取 {quantity} 件",
+      "pendingPublicConfirmed": "已確認完成報廢／處分程序"
     }
   },
   "OrgReport": {

@@ -1,5 +1,6 @@
 import { Link, useRouter } from "@/i18n/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { profilePublicId } from "@/lib/orgContact";
 import { useFormatter, useTranslations } from "next-intl";
 import { Message } from "@/app/types/schema";
 import { useMessages, useChatSocket } from "@/hooks/useChat";
@@ -144,8 +145,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   ]);
 
   const handleAvatarClick = () => {
-    if (otherUser?.public_id) {
-      router.push(`/profile/${otherUser.public_id}`);
+    //* 組織對話的對方是 `org-conv:` 代號（#140），沒有個人頁
+    const profileId = profilePublicId(otherUser?.public_id);
+    if (profileId) {
+      router.push(`/profile/${profileId}`);
     }
   };
 

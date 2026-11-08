@@ -35,6 +35,8 @@ export interface OrgAccess {
   manageableUnits: OrgUnitRef[];
   /** 組織的 Auto Release 設定（#139）；單件可覆寫 */
   autoRelease: { enabled: boolean; days: number };
+  /** 演示組織（#140）：管理員可跳過 10 分鐘待公開期 */
+  isDemo: boolean;
 }
 
 export type AutoReleaseOverride = "auto" | "manual";
@@ -74,6 +76,8 @@ export interface OrgItem extends OrgPagePost {
   pendingRequestCount: number;
   /** 單件覆寫；override 為 null 表示跟組織設定，days 只在 auto 時有值 */
   autoRelease: { override: AutoReleaseOverride | null; days: number | null };
+  /** 待公開期（#140）：到 dueAt 才正式升到 Public；沒有待公開為 null */
+  pendingPublic: { dueAt: string } | null;
 }
 
 /** 去向（E9-3）：完成的 Weave 交給了哪個單位或個人（receiverUnit 為 null 是個人領取） */

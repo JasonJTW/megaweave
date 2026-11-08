@@ -1,6 +1,7 @@
 // components/Comment/CommentItem.tsx
 "use client";
 import { useRouter } from "@/i18n/navigation";
+import { profilePublicId } from "@/lib/orgContact";
 
 import React, { useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -40,8 +41,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
   // 🔥 新增：點擊頭像前往 profile 頁面
   const handleAvatarClick = () => {
-    if (comment.public_id) {
-      router.push(`/profile/${comment.public_id}`);
+    //* 窗口在組織物品下的留言以組織名義顯示（#140），沒有個人頁
+    const profileId = profilePublicId(comment.public_id);
+    if (profileId) {
+      router.push(`/profile/${profileId}`);
     } else {
       console.warn("User public_id not available");
     }

@@ -308,6 +308,13 @@ export function createFakeOrgWeavesDb(
                 post_title: post.title,
                 post_type: post.type,
                 post_org_id: post.org_id,
+                post_org_unit_id: post.org_unit_id,
+                post_author_public_id: `u-${post.user_id}`,
+                post_author_username: `user-${post.user_id}`,
+                post_author_avatar: `https://cdn/avatar-${post.user_id}.png`,
+                giver_name: `user-${weave.giver_id}`,
+                giver_avatar: `https://cdn/avatar-${weave.giver_id}.png`,
+                receiver_name: `user-${weave.receiver_id}`,
                 receiver_org_unit_name:
                   base.units.find((u) => u.id === weave.receiver_org_unit_id)?.name ?? null,
                 s3_keys: null,

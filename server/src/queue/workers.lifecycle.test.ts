@@ -18,6 +18,7 @@ jest.mock("./queues", () => ({
   initUserVectorFlushCron: jest.fn().mockResolvedValue(undefined),
   initDeliveryReconcileCron: jest.fn().mockResolvedValue(undefined),
   initOrgAutoReleaseCron: jest.fn().mockResolvedValue(undefined),
+  initOrgPendingPublicCron: jest.fn().mockResolvedValue(undefined),
 }));
 
 interface MockBullMQWorker {
@@ -38,7 +39,7 @@ describe("Worker Lifecycle & Graceful Shutdown (Slice 2)", () => {
     await startWorkers();
     const workers = getActiveWorkers() as unknown as MockBullMQWorker[];
 
-    expect(workers.length).toBe(10);
+    expect(workers.length).toBe(11);
     const workerNames = workers.map((w) => w.name);
     expect(workerNames).toContain("post-image");
     expect(workerNames).toContain("email");
@@ -50,12 +51,13 @@ describe("Worker Lifecycle & Graceful Shutdown (Slice 2)", () => {
     expect(workerNames).toContain("delivery-refund");
     expect(workerNames).toContain("delivery-dispatch-check");
     expect(workerNames).toContain("org-auto-release");
+    expect(workerNames).toContain("org-pending-public");
   });
 
   it("should gracefully close all workers on stopWorkers() and empty active workers", async () => {
     await startWorkers();
     const workers = getActiveWorkers() as unknown as MockBullMQWorker[];
-    expect(workers.length).toBe(10);
+    expect(workers.length).toBe(11);
 
     const closeMocks = workers.map((w) => w.close);
 

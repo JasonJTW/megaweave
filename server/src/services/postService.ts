@@ -526,7 +526,7 @@ export class PostService {
     };
   }
 
-  /** 取得特定使用者的貼文（公開介面：只含個人貼文與 Public 組織貼文） */
+  /** 取得特定使用者的貼文（公開介面：只含個人貼文；組織物品屬於組織，列出來會曝光窗口，#140） */
   async getUserPosts(userId: number): Promise<RowDataPacket[]> {
     const postsQuery = `
       SELECT 
@@ -546,7 +546,7 @@ export class PostService {
       LEFT JOIN conditions cond ON p.condition_level = cond.level
       LEFT JOIN locations l ON p.location_id = l.id
       LEFT JOIN images i ON p.id = i.post_id
-      WHERE p.user_id = ? AND p.deleted_at IS NULL AND ${publicSurfaceCondition("p")}
+      WHERE p.user_id = ? AND p.org_id IS NULL AND p.deleted_at IS NULL AND ${publicSurfaceCondition("p")}
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `;

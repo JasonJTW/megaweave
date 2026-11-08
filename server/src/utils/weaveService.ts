@@ -20,6 +20,8 @@ import { HttpError } from "./httpError";
 import { getTranslator } from "./i18n";
 import { getAppOrigin } from "./env";
 import { viewerVisibility } from "../services/postVisibility";
+import { orgSideNameFor } from "../services/orgPublisher";
+import { loadConversationMask, presentMessage } from "../services/orgConversation";
 import {
   actingUnitsFor,
   canReviewOrgRequest,
@@ -371,8 +373,10 @@ async function getWeaveItemsList(
 interface NotifyWeaveStatusParams {
   io: Server | null;
   weaveId: number;
+  /** 組織物品的組織方以組織名義通知不是成員的人（#140、ADR 0004） */
+  postId: number;
   recipientId: number;
-  senderId: number;
+  senderId: number | null;
   actorName: string;
   postTitle: string;
   action: WeaveActionType;
@@ -384,17 +388,16 @@ interface NotifyWeaveStatusParams {
  * 統一派發站內通知 (Socket + DB) 與 站外 Email (BullMQ Queue)
  */
 async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
-  const {
-    io,
-    weaveId,
-    recipientId,
-    senderId,
-    actorName,
-    postTitle,
-    action,
-    items,
-    recipientRole,
-  } = params;
+  const { io, weaveId, postId, recipientId, postTitle, action, items, recipientRole } = params;
+  let { senderId, actorName } = params;
+  //* 組織物品：組織方（窗口、管理員、系統）通知不是該組織成員的人時，以組織名義、不記個人寄件人
+  if (senderId !== recipientId) {
+    const orgName = await orgSideNameFor(dbPool, postId, recipientId);
+    if (orgName !== null) {
+      actorName = orgName;
+      senderId = null;
+    }
+  }
 
   const copy = getWeaveNoticeCopy(action, actorName, postTitle);
 
@@ -461,6 +464,7 @@ export async function announceAutoDeclined(
       await notifyWeaveStatusChange({
         io,
         weaveId: weave.id,
+        postId: weave.postId,
         recipientId: weave.receiverId,
         senderId: actor.id ?? weave.giverId,
         actorName: actor.name,
@@ -544,9 +548,11 @@ export async function requestWeave(
   // Get conversationId first to store in weaves table
   let conversationId: number | null = null;
   try {
+    //* 組織物品開組織對話（#140、ADR 0004）：由經手窗口接收，民眾看到的是組織名義，且不會併進兩人的個人對話
     conversationId = await messageService.getConversationId(
       initiator.id,
       targetUserId,
+      post.org_id !== null ? { orgId: post.org_id, orgUserId: postOwnerId } : undefined,
     );
   } catch (e) {
     console.error("[requestWeave] Failed to get conversationId:", e);
@@ -580,6 +586,7 @@ export async function requestWeave(
     await notifyWeaveStatusChange({
       io,
       weaveId: Number(weaveId),
+      postId,
       recipientId: targetUserId,
       senderId: initiator.id,
       actorName: initiator.name,
@@ -612,10 +619,12 @@ export async function requestWeave(
         meta,
       );
       if (io) {
-        const dto = messageService.toMessageDTO(sysMsg, initiator.publicId);
-        const payload = { ...dto, conversation_id: conversationId };
-        io.to(`user_${targetUserId}`).emit("new_message", payload);
-        io.to(`user_${initiator.id}`).emit("new_message", payload);
+        //* 系統訊息的 metadata 帶發文者 public_id：組織對話依各自的視角遮蔽（#140）
+        for (const viewerId of [targetUserId, initiator.id]) {
+          const mask = await loadConversationMask(dbPool, viewerId, conversationId);
+          const dto = messageService.toMessageDTO(presentMessage(sysMsg, mask), initiator.publicId);
+          io.to(`user_${viewerId}`).emit("new_message", { ...dto, conversation_id: conversationId });
+        }
       }
     } catch (e) {
       console.error("[requestWeave] System message failed:", e);
@@ -841,6 +850,7 @@ export async function approveWeave(
       notifyWeaveStatusChange({
         io,
         weaveId: Number(weaveId),
+        postId: weave.post_id,
         recipientId,
         senderId: userId,
         actorName,
@@ -894,6 +904,7 @@ export async function approveWeave(
       await notifyWeaveStatusChange({
         io,
         weaveId: Number(weaveId),
+        postId: weave.post_id,
         recipientId,
         senderId: userId,
         actorName,
@@ -908,6 +919,7 @@ export async function approveWeave(
         await notifyWeaveStatusChange({
           io,
           weaveId: Number(weaveId),
+          postId: weave.post_id,
           recipientId: userId,
           senderId: userId,
           actorName,

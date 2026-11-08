@@ -2,7 +2,10 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
-import { getPostDistance, buildLocationDisplayParts } from "@/utils/locationUtils";
+import {
+  getPostDistance,
+  buildLocationDisplayParts,
+} from "@/utils/locationUtils";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -233,7 +236,13 @@ function PostCardInner({
               )}
 
               <div className="absolute bottom-0 left-0 flex w-full flex-row justify-between px-3 py-3">
-                <Avatar size="sm" className="ring-[3px] ring-white">
+                {/* 發文者名稱：組織物品是組織名義（#140） */}
+                <Avatar
+                  size="sm"
+                  className="ring-[3px] ring-white"
+                  title={post.username ?? undefined}
+                  aria-label={post.username ?? undefined}
+                >
                   <AvatarImage src={post.avatar_url} />
                   <AvatarFallback>
                     {post.username?.charAt(0).toUpperCase()}

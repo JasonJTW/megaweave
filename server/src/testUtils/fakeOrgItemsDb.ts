@@ -31,6 +31,9 @@ export interface FakeOrgPostDetailRow {
   /** 單件 Auto Release 覆寫（#139）；null = 跟組織設定 */
   auto_release_override?: "auto" | "manual" | null;
   auto_release_days?: number | null;
+  /** 待公開期（#140） */
+  pending_public_due_at?: Date | null;
+  pending_public_by?: number | null;
 }
 
 export interface FakeItemRow {
@@ -71,7 +74,7 @@ export const OUTCOMES_SQL =
   "SELECT w.id, w.post_id, w.completed_at, w.receiver_org_unit_id, ru.name AS receiver_org_unit_name, COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS receiver_name, (SELECT COALESCE(SUM(wi.quantity), 0) FROM weave_items wi WHERE wi.weave_id = w.id) AS quantity FROM weaves w JOIN users u ON u.id = w.receiver_id LEFT JOIN user_profiles up ON up.user_id = u.id LEFT JOIN org_units ru ON ru.id = w.receiver_org_unit_id WHERE w.post_id IN (?) AND w.status = 'completed' ORDER BY w.completed_at, w.id";
 
 const LIST_ITEMS =
-  /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, d\.auto_release_override, d\.auto_release_days, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys, \(SELECT COUNT\(\*\) FROM weaves w WHERE w\.post_id = p\.id AND w\.status = 'requested'\) AS pending_request_count FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND EXISTS \(SELECT 1 FROM weaves w WHERE w\.post_id = p\.id AND w\.status = \?\))?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
+  /^SELECT p\.id, p\.public_id, p\.title, p\.type, p\.audience_tier, p\.status, p\.created_at, p\.org_unit_id, u\.name AS unit_name, d\.org_category, d\.quantity, d\.unit_weight_kg, d\.weight_is_default, d\.asset_number, d\.estimated_value_twd, d\.auto_release_override, d\.auto_release_days, d\.pending_public_due_at, \(SELECT GROUP_CONCAT\(i\.s3_key ORDER BY i\.id\) FROM images i WHERE i\.post_id = p\.id\) AS s3_keys, \(SELECT COUNT\(\*\) FROM weaves w WHERE w\.post_id = p\.id AND w\.status = 'requested'\) AS pending_request_count FROM posts p JOIN org_units u ON u\.id = p\.org_unit_id LEFT JOIN org_post_details d ON d\.post_id = p\.id WHERE p\.org_id = \? AND p\.deleted_at IS NULL( AND p\.audience_tier IN \(\?\))?( AND p\.org_unit_id IN \(\?\))?( AND p\.status = \?)?( AND EXISTS \(SELECT 1 FROM weaves w WHERE w\.post_id = p\.id AND w\.status = \?\))?( AND p\.public_id = \?)? ORDER BY p\.created_at DESC, p\.id DESC LIMIT \d+$/;
 
 export function createFakeOrgItemsDb(
   seed: Parameters<typeof createFakeOrgDb>[0] & { users: FakeUser[] },
@@ -90,7 +93,7 @@ export function createFakeOrgItemsDb(
     const params = (rawParams ?? []) as unknown[];
 
     const memberships = sql.match(
-      /^SELECT o\.id, o\.public_id, o\.name, o\.auto_release_enabled, o\.auto_release_days, m\.id AS membership_id, m\.access_level, m\.org_role FROM org_memberships m JOIN organizations o ON o\.id = m\.org_id WHERE m\.user_id = \?( AND o\.public_id = \?)? ORDER BY o\.name$/,
+      /^SELECT o\.id, o\.public_id, o\.name, o\.auto_release_enabled, o\.auto_release_days, o\.is_demo, m\.id AS membership_id, m\.access_level, m\.org_role FROM org_memberships m JOIN organizations o ON o\.id = m\.org_id WHERE m\.user_id = \?( AND o\.public_id = \?)? ORDER BY o\.name$/,
     );
     if (memberships) {
       const rows = base.memberships
@@ -104,6 +107,7 @@ export function createFakeOrgItemsDb(
           name: o.name,
           auto_release_enabled: o.auto_release_enabled ? 1 : 0,
           auto_release_days: o.auto_release_days,
+          is_demo: o.is_demo ? 1 : 0,
           membership_id: m.id,
           access_level: m.access_level,
           org_role: m.org_role,
@@ -198,6 +202,70 @@ export function createFakeOrgItemsDb(
 
     if (sql === OUTCOMES_SQL) return [[], []];
 
+    //* 發文者顯示（#140，orgPublisher）
+    if (sql === "SELECT id, name, publisher_display FROM organizations WHERE id IN (?)") {
+      const ids = (params[0] as number[]).map(Number);
+      const rows = base.organizations
+        .filter((o) => ids.includes(o.id))
+        .map((o) => ({ id: o.id, name: o.name, publisher_display: o.publisher_display }));
+      return [rows, []];
+    }
+    if (sql === "SELECT id, name FROM org_units WHERE id IN (?)") {
+      const ids = (params[0] as number[]).map(Number);
+      return [base.units.filter((u) => ids.includes(u.id)).map((u) => ({ id: u.id, name: u.name })), []];
+    }
+    if (sql === "SELECT 1 FROM org_memberships WHERE org_id = ? AND user_id = ? LIMIT 1") {
+      const hit = base.memberships.some(
+        (m) => m.org_id === Number(params[0]) && m.user_id === Number(params[1]),
+      );
+      return [hit ? [{ 1: 1 }] : [], []];
+    }
+    if (sql === "SELECT org_id FROM org_memberships WHERE user_id = ? AND org_id IN (?)") {
+      const ids = (params[1] as number[]).map(Number);
+      const rows = base.memberships
+        .filter((m) => m.user_id === Number(params[0]) && ids.includes(m.org_id))
+        .map((m) => ({ org_id: m.org_id }));
+      return [rows, []];
+    }
+    if (sql === "SELECT org_id, org_unit_id FROM posts WHERE id = ?") {
+      const p = tables.posts.find((x) => x.id === Number(params[0]));
+      return [p ? [{ org_id: p.org_id, org_unit_id: p.org_unit_id }] : [], []];
+    }
+
+    //* 待公開（#140，orgPendingPublicService）
+    if (
+      sql ===
+      "SELECT p.id, p.org_unit_id, p.audience_tier, d.post_id AS details_post_id, d.asset_number, d.pending_public_due_at, d.pending_public_by FROM posts p LEFT JOIN org_post_details d ON d.post_id = p.id WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL FOR UPDATE"
+    ) {
+      const rows = tables.posts
+        .filter((p) => p.org_id === params[0] && p.public_id === params[1] && p.deleted_at === null)
+        .map((p) => {
+          const d = tables.details.find((x) => x.post_id === p.id);
+          return {
+            id: p.id,
+            org_unit_id: p.org_unit_id,
+            audience_tier: p.audience_tier,
+            details_post_id: d ? d.post_id : null,
+            asset_number: d?.asset_number ?? null,
+            pending_public_due_at: d?.pending_public_due_at ?? null,
+            pending_public_by: d?.pending_public_by ?? null,
+          };
+        });
+      return [rows, []];
+    }
+
+    if (
+      sql ===
+      "UPDATE org_post_details SET pending_public_due_at = ?, pending_public_by = ? WHERE post_id = ?"
+    ) {
+      const d = tables.details.find((x) => x.post_id === Number(params[2]));
+      if (d) {
+        d.pending_public_due_at = (params[0] as Date | null) ?? null;
+        d.pending_public_by = params[1] == null ? null : Number(params[1]);
+      }
+      return [{ affectedRows: d ? 1 : 0 }, []];
+    }
+
     const list = sql.match(LIST_ITEMS);
     if (list) {
       let i = 0;
@@ -240,6 +308,7 @@ export function createFakeOrgItemsDb(
             estimated_value_twd: d?.estimated_value_twd ?? null,
             auto_release_override: d?.auto_release_override ?? null,
             auto_release_days: d?.auto_release_days ?? null,
+            pending_public_due_at: d?.pending_public_due_at ?? null,
             s3_keys: keys.length > 0 ? keys.join(",") : null,
             pending_request_count: db.weaveStatusesOf(p.id).filter((s) => s === "requested").length,
           };

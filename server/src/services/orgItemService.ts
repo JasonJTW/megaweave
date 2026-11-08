@@ -24,6 +24,13 @@ import {
 } from "./orgTierService";
 import type { Server } from "socket.io";
 import type { AutoReleaseOverride } from "./orgAutoReleaseService";
+import {
+  cancelPendingPublic,
+  itemPendingPublic,
+  lockPendingRow,
+  skipPendingPublic,
+  startPendingPublic,
+} from "./orgPendingPublicService";
 import { buildTimeline, findTimelinePost, TimelineEntry } from "./orgTimelineService";
 import {
   defaultUnitWeightKg,
@@ -50,6 +57,8 @@ export interface OrgAccess {
   manageableUnits: OrgUnitRef[];
   /** 組織的 Auto Release 設定（#139）；單件可覆寫 */
   autoRelease: { enabled: boolean; days: number };
+  /** 演示組織（#140）：管理員可跳過 10 分鐘待公開期 */
+  isDemo: boolean;
 }
 
 /** 單件 Auto Release 覆寫（#139）：org = 跟組織設定；auto 帶天數；manual = 不自動升級 */
@@ -112,6 +121,8 @@ export interface OrgItem {
   pendingRequestCount: number;
   /** 單件 Auto Release 覆寫；override 為 null 表示跟組織設定，days 只在 auto 時有值 */
   autoRelease: { override: AutoReleaseOverride | null; days: number | null };
+  /** 待公開期（#140）：到 dueAt 才正式升到 Public；沒有待公開為 null */
+  pendingPublic: { dueAt: string } | null;
 }
 
 /** 去向（E9-3）：一筆完成的 Weave 把物品交給了哪個單位或個人（receiverUnit 為 null 是個人領取） */
@@ -150,6 +161,7 @@ interface MembershipRow extends RowDataPacket {
   name: string;
   auto_release_enabled: boolean | number;
   auto_release_days: number;
+  is_demo: boolean | number;
   membership_id: number;
   access_level: AccessLevel;
   org_role: OrgRole;
@@ -160,7 +172,7 @@ async function loadAccesses(
   orgPublicId?: string,
 ): Promise<OrgAccess[]> {
   const [rows] = await dbPool.query<MembershipRow[]>(
-    `SELECT o.id, o.public_id, o.name, o.auto_release_enabled, o.auto_release_days, m.id AS membership_id, m.access_level, m.org_role
+    `SELECT o.id, o.public_id, o.name, o.auto_release_enabled, o.auto_release_days, o.is_demo, m.id AS membership_id, m.access_level, m.org_role
      FROM org_memberships m JOIN organizations o ON o.id = m.org_id
      WHERE m.user_id = ?${orgPublicId ? " AND o.public_id = ?" : ""}
      ORDER BY o.name`,
@@ -200,6 +212,7 @@ async function loadAccesses(
           enabled: Boolean(Number(row.auto_release_enabled)),
           days: Number(row.auto_release_days),
         },
+        isDemo: Boolean(Number(row.is_demo)),
       };
     }),
   );
@@ -229,7 +242,8 @@ export function tierNotAllowed() {
 
 /**
  * 誰能改成哪一層（PRD 0001 §5.1）：Unit Contact 只能把自己單位的物品從 Internal 升到 Members；
- * Org Admin 可在 Internal／Members 之間升降任何單位的物品。升到 Public 走待公開流程（#140），這裡一律拒絕。
+ * Org Admin 可升降任何單位的物品，含從 Public 降級。升到 Public 一律走待公開流程（#140，
+ * orgPendingPublicService），這裡拒絕。
  */
 function assertTierChangeAllowed(
   access: OrgAccess,
@@ -286,6 +300,9 @@ function toOrgItem(row: RowDataPacket): OrgItem {
       override: row.auto_release_override ?? null,
       days: row.auto_release_days == null ? null : Number(row.auto_release_days),
     },
+    pendingPublic: row.pending_public_due_at
+      ? { dueAt: new Date(row.pending_public_due_at).toISOString() }
+      : null,
   };
 }
 
@@ -369,7 +386,7 @@ async function queryItemRows(
     `SELECT p.id, p.public_id, p.title, p.type, p.audience_tier, p.status, p.created_at,
             p.org_unit_id, u.name AS unit_name,
             d.org_category, d.quantity, d.unit_weight_kg, d.weight_is_default,
-            d.asset_number, d.estimated_value_twd, d.auto_release_override, d.auto_release_days,
+            d.asset_number, d.estimated_value_twd, d.auto_release_override, d.auto_release_days, d.pending_public_due_at,
             (SELECT GROUP_CONCAT(i.s3_key ORDER BY i.id) FROM images i WHERE i.post_id = p.id) AS s3_keys,
             (SELECT COUNT(*) FROM weaves w WHERE w.post_id = p.id AND w.status = 'requested') AS pending_request_count
      FROM posts p
@@ -489,15 +506,21 @@ export const orgItemService = {
     io: Server | null,
   ): Promise<OrgItem> {
     if (access.manageableUnits.length === 0) throw unitNotManaged();
-    const result = await withTransaction((connection) =>
-      changePostTier(connection, {
+    const result = await withTransaction(async (connection) => {
+      //* 待公開期間不能改層級，要先取消（否則時間到時會從新的層級直接公開）
+      const pending = await lockPendingRow(connection, access.orgId, itemPublicId);
+      if (pending.dueAt) {
+        assertManages(access, pending.orgUnitId);
+        throw itemPendingPublic();
+      }
+      return changePostTier(connection, {
         orgId: access.orgId,
         postPublicId: itemPublicId,
         toTier,
         actor: { type: "user", userId },
         authorize: (post) => assertTierChangeAllowed(access, post, toTier),
-      }),
-    );
+      });
+    });
     await afterTierChange(result, { io, actorName: access.name, actorUserId: userId });
     const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
     return item;
@@ -521,6 +544,43 @@ export const orgItemService = {
         postId,
       ],
     );
+    const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
+    return item;
+  },
+
+  /**
+   * 後台：Org Admin 把物品送進待公開（#140）。有財產編號的要帶 assetDisposalConfirmed: true
+   */
+  async startPendingPublic(
+    access: OrgAccess,
+    userId: number,
+    itemPublicId: string,
+    input: { assetDisposalConfirmed: boolean },
+  ): Promise<OrgItem> {
+    await startPendingPublic(access, userId, itemPublicId, input);
+    const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
+    return item;
+  },
+
+  /** 後台：取消待公開，維持原層級 */
+  async cancelPendingPublic(
+    access: OrgAccess,
+    userId: number,
+    itemPublicId: string,
+  ): Promise<OrgItem> {
+    await cancelPendingPublic(access, userId, itemPublicId);
+    const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
+    return item;
+  },
+
+  /** 後台：演示組織的管理員跳過待公開期，立即公開 */
+  async skipPendingPublic(
+    access: OrgAccess,
+    userId: number,
+    itemPublicId: string,
+    io: Server | null,
+  ): Promise<OrgItem> {
+    await skipPendingPublic(access, userId, itemPublicId, io);
     const [item] = await queryItems(access.orgId, { publicId: itemPublicId });
     return item;
   },

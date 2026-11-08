@@ -121,7 +121,7 @@ function getGeoMultiplier(distKm: number, mode?: string): number {
 // ─── 貼文詳細資料 Hydration (MySQL Batch Query) ───────────────────────────────
 
 const POST_COLUMNS_SQL = `
-    p.id, p.public_id, p.user_id, p.title, p.content, p.type, p.status, p.tags, 
+    p.id, p.public_id, p.user_id, p.org_id, p.org_unit_id, p.title, p.content, p.type, p.status, p.tags, 
     p.category_id, p.condition_level, p.expires_at, p.view_count, 
     p.likes_count, p.hot_score, p.created_at, p.updated_at, p.deleted_at, p.location_id,
     COALESCE(NULLIF(TRIM(up.custom_name), ''), u.username) AS username,

@@ -385,6 +385,31 @@ export async function initOrgAutoReleaseCron(): Promise<void> {
   console.log("⏱️ Org Auto Release Cron Scheduler initialized (runs hourly)");
 }
 
+//* ─── Org Pending Public Queue（#140）──────────────────────────────────────
+
+export const orgPendingPublicQueue = new Queue("org-pending-public", {
+  connection: bullmqConnection,
+  defaultJobOptions: {
+    attempts: 2,
+    backoff: { type: "exponential", delay: 10000 },
+    removeOnComplete: { count: 50 },
+    removeOnFail: { count: 50 },
+  },
+});
+
+/**
+ * 啟動待公開排程（每分鐘）：10 分鐘待公開期已到的組織物品升到 Public。
+ * 最多晚一分鐘生效；待公開期間物品維持原層級，晚一點公開不會洩漏任何東西
+ */
+export async function initOrgPendingPublicCron(): Promise<void> {
+  await orgPendingPublicQueue.upsertJobScheduler(
+    "cron-org-pending-public",
+    { pattern: "* * * * *" },
+    { name: "publish-pending-org-items" },
+  );
+  console.log("⏱️ Org Pending Public Cron Scheduler initialized (runs every minute)");
+}
+
 /** 關閉本模組建立的所有 Queue 連線；供只作為 producer 的短期程序（例如 benchmark runner）結束時使用 */
 export async function closeQueues(): Promise<void> {
   await Promise.all(
@@ -399,6 +424,7 @@ export async function closeQueues(): Promise<void> {
       deliveryRefundQueue,
       deliveryDispatchCheckQueue,
       orgAutoReleaseQueue,
+      orgPendingPublicQueue,
     ].map((queue) => queue.close()),
   );
 }

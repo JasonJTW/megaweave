@@ -2,7 +2,7 @@
 
 //* 物品流轉時間軸（PRD 0001 §5.1 E9-1）：上架、層級變更、交接、申請、核可、交接完成，每一步有操作者與時間。
 //* server 組好順序（orgTimelineService）；這裡只負責顯示。不認得的 kind（之後新增的紀錄，例如 #140 的待公開）
-//* 仍顯示時間、操作者與 kind 本身，不必改這裡就看得到
+//* 仍顯示時間、操作者與 kind 本身，不必改這裡就看得到。#140 的待公開（送出、取消、跳過）已有標籤
 import { useFormatter, useTranslations } from "next-intl";
 import useSWR from "swr";
 import { hostName, OrgTimelineEntry, requestJson } from "@/lib/orgApi";
@@ -19,6 +19,9 @@ const KNOWN_KINDS = [
   "confirmed",
   "completed",
   "deleted",
+  "public_pending_started",
+  "public_pending_cancelled",
+  "public_pending_skipped",
 ] as const;
 type KnownKind = (typeof KNOWN_KINDS)[number];
 
@@ -90,6 +93,10 @@ function useDetail() {
       case "cancelled":
       case "confirmed":
         return t("timeline.weaveStep", { weaveId });
+      case "public_pending_started":
+        return entry.assetDisposalConfirmed === true
+          ? t("timeline.pendingPublicConfirmed")
+          : null;
       default:
         return null;
     }

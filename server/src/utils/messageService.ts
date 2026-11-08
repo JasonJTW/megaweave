@@ -5,6 +5,10 @@ export interface Conversation {
   id: number;
   user1_id: number;
   user2_id: number;
+  /** 組織對話（#140、ADR 0004）：關於哪個組織的物品；個人對話為 null */
+  org_id?: number | null;
+  /** 組織對話的組織方（經手窗口），不是組織成員的人看到的是組織名義 */
+  org_user_id?: number | null;
   last_message_id?: number | null;
   last_message_at: Date;
   created_at: Date;
@@ -48,14 +52,19 @@ export type MessageDTO = Omit<Message, 'sender_id'>;
 
 export const messageService = {
   // 1. Get or Create Conversation
-  getConversationId: async (userA: number, userB: number): Promise<number> => {
+  //    org：組織物品的對話（#140、ADR 0004）與兩人的個人對話分開，一個組織一個對話
+  getConversationId: async (
+    userA: number,
+    userB: number,
+    org?: { orgId: number; orgUserId: number },
+  ): Promise<number> => {
     // Try to find existing
     const user1 = Math.min(userA, userB);
     const user2 = Math.max(userA, userB);
 
     const [rows] = await dbPool.execute<RowDataPacket[]>(
-      "SELECT id FROM conversations WHERE user1_id = ? AND user2_id = ?",
-      [user1, user2]
+      "SELECT id FROM conversations WHERE user1_id = ? AND user2_id = ? AND org_key = ?",
+      [user1, user2, org?.orgId ?? 0]
     );
 
     if (rows.length > 0) {
@@ -68,8 +77,8 @@ export const messageService = {
         await connection.beginTransaction();
         
         const [result] = await connection.execute<ResultSetHeader>(
-            "INSERT INTO conversations (user1_id, user2_id) VALUES (?, ?)",
-            [user1, user2]
+            "INSERT INTO conversations (user1_id, user2_id, org_id, org_user_id) VALUES (?, ?, ?, ?)",
+            [user1, user2, org?.orgId ?? null, org?.orgUserId ?? null]
         );
         const conversationId = result.insertId;
 
@@ -312,7 +321,7 @@ export const messageService = {
 
   // 10. DTO Mappers
   toConversationDTO: (conv: Conversation): ConversationDTO => {
-    const { user1_id: _u1, user2_id: _u2, other_user_id: _ou, ...dto } = conv;
+    const { user1_id: _u1, user2_id: _u2, other_user_id: _ou, org_user_id: _org, ...dto } = conv;
     return dto as ConversationDTO;
   },
 

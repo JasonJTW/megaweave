@@ -1082,6 +1082,10 @@
     "ORG_HANDOVER_TARGET_IS_REQUESTER": "The new contact has a request open on one of these items. Settle that request first, or pick another contact.",
     "ORG_TIER_NOT_ALLOWED": "You can't move this item to that tier.",
     "ORG_TIER_DEMOTION_BLOCKED": "This item already has an approved or completed request, so it can't be moved down.",
+    "ORG_ASSET_DISPOSAL_UNCONFIRMED": "This item has an asset number. Confirm its scrapping or disposal is done before making it public.",
+    "ORG_ITEM_PENDING_PUBLIC": "This item is about to go public. Cancel that first to change its tier.",
+    "ORG_PENDING_PUBLIC_NOT_PENDING": "This item is no longer waiting to go public. It may already be public. Refresh the page.",
+    "ORG_PENDING_PUBLIC_SKIP_NOT_ALLOWED": "Only demo organizations can skip the waiting period.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1316,7 +1320,24 @@
       "outcomeUnit": "{unit} × {quantity}",
       "outcomePerson": "{name} (personal) × {quantity}",
       "viewTimeline": "Timeline",
-      "hideTimeline": "Hide timeline"
+      "hideTimeline": "Hide timeline",
+      "makePublic": "Make public",
+      "publicConfirmTitle": "Make “{title}” public?",
+      "publicConfirmBody": "In 10 minutes everyone can see this item on the home feed, in search and in trending, shown under the organization's name. You can cancel until then.",
+      "publicConfirmAsset": "Asset number: {asset}",
+      "publicConfirmDisposal": "Scrapping or disposal is done",
+      "publicConfirmSubmit": "Start pending public",
+      "publicConfirmCancel": "Not now",
+      "pendingPublic": "Going public in {time}",
+      "pendingPublicDue": "Going public now",
+      "cancelPendingPublic": "Cancel",
+      "skipPendingPublic": "Skip the wait and publish now",
+      "pendingPublicStarted": "Sent. It goes public in 10 minutes.",
+      "pendingPublicCancelled": "Cancelled. The item stays in its tier.",
+      "publishedNow": "Published.",
+      "demoteFromPublic": "Move back to org members",
+      "demoteFromPublicConfirm": "Move “{title}” from public back to org members? It disappears from the home feed, search and trending, and pending requests from non-members are declined with a notice. Previews already shared can't be taken back.",
+      "demotedFromPublic": "Moved back to org members. Public pages no longer show it."
     },
     "weaveStatus": {
       "requested": "Awaiting review",
@@ -1340,7 +1361,10 @@
         "confirmed": "Hand-over confirmed",
         "completed": "Handed over",
         "deleted": "Item deleted",
-        "other": "Other record"
+        "other": "Other record",
+        "public_pending_started": "Sent to pending public",
+        "public_pending_cancelled": "Pending public cancelled",
+        "public_pending_skipped": "Pending period skipped"
       },
       "listedDetail": "{unit}",
       "assetNumber": "Asset number {asset}",
@@ -1351,7 +1375,8 @@
       "requestOnBehalf": "Request #{weaveId}: on behalf of {unit}, quantity {quantity}",
       "weaveStep": "Request #{weaveId}",
       "completedUnit": "Request #{weaveId}: {unit} ({name}) received {quantity}",
-      "completedPerson": "Request #{weaveId}: {name} (personal) received {quantity}"
+      "completedPerson": "Request #{weaveId}: {name} (personal) received {quantity}",
+      "pendingPublicConfirmed": "Scrapping or disposal confirmed"
     }
   },
   "OrgReport": {

@@ -11,6 +11,7 @@ import { HttpError } from "../utils/httpError";
 import { getVectorRedisClient } from "../utils/redis";
 import { announceAutoDeclined } from "../utils/weaveService";
 import { syncPostVectorScope } from "./postVectorScope";
+import { syncPublicTrending } from "./publicTrending";
 import { recordOrgWeaveEvents } from "./orgWeaveEvents";
 import {
   AUDIENCE_TIERS,
@@ -165,6 +166,12 @@ export async function afterTierChange(
     await syncPostVectorScope(dbPool, getVectorRedisClient(), result.postId);
   } catch (error) {
     console.error("Vector scope sync failed after tier change:", error);
+  }
+  try {
+    //* 熱門排行只收 Public（#140）：升到 Public 加入、從 Public 降級移除
+    await syncPublicTrending(result.postId, result.fromTier, result.toTier);
+  } catch (error) {
+    console.error("Trending sync failed after tier change:", error);
   }
   if (result.declined.length > 0) {
     await announceAutoDeclined(

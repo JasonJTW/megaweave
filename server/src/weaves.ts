@@ -16,6 +16,7 @@ import { enqueueUserVectorUpdate } from "./queue/queues";
 import { HttpError } from "./utils/httpError";
 import { z } from "zod";
 import { publicSurfaceCondition } from "./services/postVisibility";
+import { maskOrgPublishers } from "./services/orgPublisher";
 const router = Router();
 
 const ActingUnitIdSchema = z.number().int().positive().nullable().optional();
@@ -77,6 +78,7 @@ export interface WeaveOutput extends RowDataPacket {
   post_updated_at: Date;
   post_comment_count: number;
   post_org_id: number | null;
+  post_org_unit_id?: number | null;
   giver_name: string;
   giver_avatar: string | null;
   receiver_name: string;
@@ -120,6 +122,7 @@ export const WEAVE_QUERY_BASE = `
       p.updated_at AS post_updated_at,
       p.comment_count AS post_comment_count,
       p.org_id AS post_org_id,
+      p.org_unit_id AS post_org_unit_id,
       COALESCE(NULLIF(TRIM(g_up.custom_name), ''), giver.username) AS giver_name,
       giver.avatar_url AS giver_avatar,
       COALESCE(NULLIF(TRIM(r_up.custom_name), ''), receiver.username) AS receiver_name,
@@ -144,11 +147,26 @@ export interface ProcessWeaveRowsOptions {
    * 是否附上流向單位（ADR 0004）。公開個人頁傳 false：單位名稱是組織內部資訊，不給組織外的人看
    */
   includeReceiverOrgUnit?: boolean;
+  /**
+   * 看這些 Weave 的人；組織物品的 Giver 與發文者對不是該組織成員的人以組織名義顯示（#140、ADR 0004）。
+   * 省略（公開個人頁）= 一律遮蔽
+   */
+  viewerUserId?: number;
+}
+
+/** 檢視者是哪些組織的成員（只查這批 Weave 涉及的組織） */
+async function memberOrgIds(viewerUserId: number | undefined, orgIds: number[]): Promise<Set<number>> {
+  if (viewerUserId === undefined || orgIds.length === 0) return new Set();
+  const [rows] = await dbPool.query<RowDataPacket[]>(
+    "SELECT org_id FROM org_memberships WHERE user_id = ? AND org_id IN (?)",
+    [viewerUserId, orgIds],
+  );
+  return new Set(rows.map((row) => Number(row.org_id)));
 }
 
 export async function processWeaveRows(
   weaveRows: WeaveOutput[],
-  { includeReceiverOrgUnit = true }: ProcessWeaveRowsOptions = {},
+  { includeReceiverOrgUnit = true, viewerUserId }: ProcessWeaveRowsOptions = {},
 ) {
   if (weaveRows.length === 0) return [];
   const weaveIds = weaveRows.map((r) => r.id);
@@ -167,7 +185,14 @@ export async function processWeaveRows(
     itemsMap[item.weave_id].push(item);
   });
 
-  return weaveRows.map((row) => {
+  const orgIds = [
+    ...new Set(weaveRows.flatMap((r) => (r.post_org_id == null ? [] : [Number(r.post_org_id)]))),
+  ];
+  const memberOf = await memberOrgIds(viewerUserId, orgIds);
+  const masked = (row: WeaveOutput) =>
+    row.post_org_id != null && !memberOf.has(Number(row.post_org_id));
+
+  const output = weaveRows.map((row) => {
     const post = {
       id: row.post_id_original,
       public_id: row.post_public_id,
@@ -202,6 +227,7 @@ export async function processWeaveRows(
       comment_count: row.post_comment_count,
       // 組織物品不開放 ECPay／Lalamove（PRD 0001 §5.1），client 依此隱藏運費報價
       org_id: row.post_org_id ?? null,
+      org_unit_id: row.post_org_unit_id ?? null,
       s3_keys: row.s3_keys ?? "",
     };
 
@@ -241,6 +267,21 @@ export async function processWeaveRows(
       post,
     };
   });
+
+  //* 組織物品的 Giver 就是經手窗口（組織只發 Share）：和發文者一起換成組織名義
+  const maskedOutput = output.filter((_, i) => masked(weaveRows[i]));
+  await maskOrgPublishers(
+    dbPool,
+    maskedOutput.map((w) => w.post),
+  );
+  for (const weave of maskedOutput) {
+    Object.assign(weave, {
+      giver_name: weave.post.username,
+      giver_avatar: null,
+      giver_id: null,
+    });
+  }
+  return output;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -332,7 +373,7 @@ router.get(
 
       const query = `${WEAVE_QUERY_BASE} ${whereClause} GROUP BY w.id ORDER BY w.created_at DESC`;
       const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, params);
-      const weaves = await processWeaveRows(weaveRows);
+      const weaves = await processWeaveRows(weaveRows, { viewerUserId: userId });
       return res.status(200).json({ weaves });
     } catch (error) {
       return next(error);
@@ -376,7 +417,7 @@ router.get(
       ]);
       if (weaveRows.length === 0)
         return next(new HttpError(404, "WEAVE_NOT_FOUND", "Weave not found"));
-      const processed = await processWeaveRows(weaveRows);
+      const processed = await processWeaveRows(weaveRows, { viewerUserId: userId });
       return res.status(200).json({ weave: processed[0] });
     } catch (error) {
       return next(error);
@@ -435,9 +476,11 @@ router.get(
         return next(new HttpError(404, "USER_NOT_FOUND", "User not found"));
 
       const userId = userRows[0].id as number;
-      // 公開個人頁：只列個人貼文與 Public 組織貼文的交換（ADR 0003）
-      const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) AND ${publicSurfaceCondition("p")} GROUP BY w.id ORDER BY w.created_at DESC`;
+      // 公開個人頁：只列個人貼文與 Public 組織貼文的交換（ADR 0003）；
+      // 以窗口身分交出組織物品的不列（#140、ADR 0004：會曝光經手的人），領取組織物品的照列，Giver 以組織名義顯示
+      const query = `${WEAVE_QUERY_BASE} WHERE (w.giver_id = ? OR w.receiver_id = ?) AND ${publicSurfaceCondition("p")} AND NOT (p.org_id IS NOT NULL AND w.giver_id = ?) GROUP BY w.id ORDER BY w.created_at DESC`;
       const [weaveRows] = await dbPool.execute<WeaveOutput[]>(query, [
+        userId,
         userId,
         userId,
       ]);

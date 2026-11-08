@@ -6,6 +6,7 @@
 //* 層級（#138）：窗口可把自己單位的物品從 Internal 升到 Members；Org Admin 另可降回 Internal。
 //* 降級會自動婉拒看不到新層級的人的申請，有已核可的申請時 server 回 ORG_TIER_DEMOTION_BLOCKED
 //* 自動升級（#139）：Internal 物品可覆寫組織設定（跟組織、自訂天數、手動）；其他層級不會自動升級，不顯示
+//* 公開（#140）：Org Admin 送出 10 分鐘待公開（有財產編號要確認處分）、可取消；演示組織可跳過；可從 Public 降回
 //* 去向與時間軸（#141，E9-1、E9-3）：每件物品交給了哪個單位或個人；展開看從上架到交接完成的每一步
 import { Fragment, Suspense, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { OrgSwitcher } from "@/components/org/OrgSwitcher";
 import { ItemTimeline } from "@/components/org/ItemTimeline";
+import { PublicAction } from "@/components/org/PublicAction";
 import {
   AUDIENCE_TIERS,
   AutoReleaseOverride,
@@ -177,8 +179,10 @@ function ItemRequests({
   );
 }
 
-/** 這個人在這一列能做的層級變更；Public 走待公開流程（#140），這裡不提供 */
+/** 這個人在這一列能做的層級變更；Public 的升降與待公開期在 PublicAction（#140） */
 function tierActionFor(org: OrgAccess, item: OrgItem) {
+  //* 待公開期間不能改層級（server 回 ORG_ITEM_PENDING_PUBLIC），要先取消
+  if (item.pendingPublic) return null;
   if (item.audienceTier === "internal") return "members" as const;
   if (item.audienceTier === "members" && org.isAdmin)
     return "internal" as const;
@@ -448,6 +452,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
                           {t(`tier.${item.audienceTier}`)}
                         </Badge>
                         <TierAction org={org} item={item} />
+                        <PublicAction org={org} item={item} />
                       </div>
                     </td>
                     <td className="p-3">

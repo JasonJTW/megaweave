@@ -80,6 +80,7 @@ function accessView(access: OrgAccess) {
     isAdmin: access.isAdmin,
     manageableUnits: access.manageableUnits,
     autoRelease: access.autoRelease,
+    isDemo: access.isDemo,
   };
 }
 
@@ -199,7 +200,8 @@ const TierChangeSchema = z.object({ tier: z.enum(AUDIENCE_TIERS) });
 
 /**
  * PATCH /api/orgs/:orgId/items/:itemId/tier
- * 改物品層級：Unit Contact 只能把自己單位的物品升到 Members，Org Admin 可升降；Public 走 #140
+ * 改物品層級：Unit Contact 只能把自己單位的物品升到 Members，Org Admin 可升降（含從 Public 降級）；
+ * 升到 Public 走 pending-public
  */
 router.patch(
   "/:orgId/items/:itemId/tier",
@@ -215,6 +217,87 @@ router.patch(
         req.user!.userId,
         itemId.data,
         body.data.tier,
+        res.locals.io ?? null,
+      );
+      return res.status(200).json({ item });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+//* 確認框的勾選是 client 帶入的布林值，格式錯 → INVALID_REQUEST
+const PendingPublicSchema = z.object({
+  assetDisposalConfirmed: z.boolean().default(false),
+});
+
+/**
+ * POST /api/orgs/:orgId/items/:itemId/pending-public
+ * Org Admin 把物品送進 10 分鐘待公開期（#140）。有財產編號的要帶 `assetDisposalConfirmed: true`，
+ * 否則 400 ORG_ASSET_DISPOSAL_UNCONFIRMED；Unit Contact → 403 ORG_TIER_NOT_ALLOWED
+ */
+router.post(
+  "/:orgId/items/:itemId/pending-public",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      const body = PendingPublicSchema.safeParse(req.body ?? {});
+      if (!itemId.success || !body.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid pending public request"));
+      }
+      const item = await orgItemService.startPendingPublic(
+        orgAccess(res),
+        req.user!.userId,
+        itemId.data,
+        body.data,
+      );
+      return res.status(200).json({ item });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * DELETE /api/orgs/:orgId/items/:itemId/pending-public
+ * 取消待公開，維持原層級並留下紀錄；已經公開 → 409 ORG_PENDING_PUBLIC_NOT_PENDING
+ */
+router.delete(
+  "/:orgId/items/:itemId/pending-public",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      if (!itemId.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid item id"));
+      }
+      const item = await orgItemService.cancelPendingPublic(
+        orgAccess(res),
+        req.user!.userId,
+        itemId.data,
+      );
+      return res.status(200).json({ item });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/orgs/:orgId/items/:itemId/pending-public/skip
+ * 只有演示組織的管理員能跳過待公開期、立即公開；其他組織 → 403 ORG_PENDING_PUBLIC_SKIP_NOT_ALLOWED
+ */
+router.post(
+  "/:orgId/items/:itemId/pending-public/skip",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      if (!itemId.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid item id"));
+      }
+      const item = await orgItemService.skipPendingPublic(
+        orgAccess(res),
+        req.user!.userId,
+        itemId.data,
         res.locals.io ?? null,
       );
       return res.status(200).json({ item });

@@ -797,7 +797,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
                 )}
               </div>
               {/* Lalamove 即時運費報價 */}
-              {post.lat && post.lng && <LalamoveQuotation post={post} />}
+              {/* 組織物品只能面交或自取，不開放 Lalamove（PRD 0001 §5.1） */}
+              {post.org_id == null && post.lat && post.lng && (
+                <LalamoveQuotation post={post} />
+              )}
 
               {/* 評論區 */}
               <div id="comments" className="rounded-lg bg-white shadow-sm">

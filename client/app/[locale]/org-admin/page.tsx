@@ -23,6 +23,7 @@ import {
 import { ApiError } from "@/lib/apiError";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { useUser } from "@/app/contexts/UserContext";
+import { Link } from "@/i18n/navigation";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -250,6 +251,14 @@ export default function OrgAdminPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
+        {orgId && (
+          <Link
+            href={`/org/items?org=${orgId}`}
+            className="inline-block text-sm underline"
+          >
+            {t("manageItemsLink")}
+          </Link>
+        )}
       </header>
 
       {loadError && (

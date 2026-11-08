@@ -21,6 +21,7 @@ import lalamoveAPI from "./lalamove";
 import paymentAPI from "./payments";
 import adminAPI from "./admin";
 import orgAdminAPI from "./orgAdmin";
+import orgItemsAPI from "./orgItems";
 
 router.use("/signup", signupAPI);
 router.use("/signin", signinAPI);
@@ -43,5 +44,6 @@ router.use("/lalamove", lalamoveAPI);
 router.use("/payments", paymentAPI);
 router.use("/admin", adminAPI);
 router.use("/org-admin", orgAdminAPI);
+router.use("/orgs", orgItemsAPI);
 
 export default router;

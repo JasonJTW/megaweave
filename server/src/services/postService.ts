@@ -3,6 +3,7 @@ import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { PoolConnection } from "mysql2/promise";
 import { randomUUID } from "crypto";
 import dbPool from "../utils/db";
+import { HttpError } from "../utils/httpError";
 import { shouldIncrementView } from "../utils/viewCounter";
 import {
   enqueuePostUploadImages,
@@ -650,6 +651,11 @@ export class PostService {
     const postId = existing.id;
     if (existing.user_id !== userId && userRole !== "admin") {
       throw new Error("FORBIDDEN");
+    }
+
+    // 組織物品只能是 Share（PRD 0001 §5.1）；編輯表單送出別的類型是 client bug
+    if (existing.org_id != null && incoming.type !== undefined && incoming.type !== "share") {
+      throw new HttpError(400, "INVALID_REQUEST", "Org items can only be shares");
     }
 
     if (incoming.categoryId !== undefined) {

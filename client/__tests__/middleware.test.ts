@@ -159,6 +159,8 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
         "/delivery/order-1",
         "/notifications",
         "/org-admin",
+        "/org",
+        "/org/items/new",
       ];
 
       for (const path of protectedPaths) {

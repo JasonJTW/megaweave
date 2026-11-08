@@ -31,6 +31,8 @@ export const ERROR_CODES = [
 
   //* 組織
   "ORG_LAST_ADMIN",
+  "ORG_UNIT_NOT_MANAGED",
+  "ORG_ITEM_DELIVERY_UNAVAILABLE",
 
   //* Weave
   "WEAVE_OWN_POST",

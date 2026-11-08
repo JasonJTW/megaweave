@@ -460,6 +460,25 @@ CREATE TABLE `org_memberships` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `org_post_details` (
+  `post_id` bigint unsigned NOT NULL,
+  `org_category` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantity` int unsigned NOT NULL,
+  `unit_weight_kg` decimal(10,3) NOT NULL,
+  `weight_is_default` tinyint(1) NOT NULL DEFAULT '0',
+  `asset_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estimated_value_twd` int unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`post_id`),
+  KEY `idx_org_post_details_category` (`org_category`),
+  CONSTRAINT `fk_org_post_details_post` FOREIGN KEY (`post_id`) REFERENCES `posts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `org_post_details_chk_quantity` CHECK ((`quantity` >= 1)),
+  CONSTRAINT `org_post_details_chk_weight` CHECK ((`unit_weight_kg` > 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `org_unit_contacts` (
   `org_id` bigint unsigned NOT NULL,
   `org_unit_id` bigint unsigned NOT NULL,

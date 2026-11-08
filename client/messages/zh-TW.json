@@ -127,6 +127,18 @@
     "orgAdmin": {
       "title": "組織後台",
       "description": "組織管理員管理單位與成員。"
+    },
+    "org": {
+      "title": "組織頁",
+      "description": "查看你所屬組織內部釋出的物品。"
+    },
+    "orgItems": {
+      "title": "組織物品管理",
+      "description": "單位窗口與組織管理員管理組織物品。"
+    },
+    "orgItemNew": {
+      "title": "上架組織物品",
+      "description": "單位窗口代表單位上架物品。"
     }
   },
   "Lalamove": {
@@ -1058,6 +1070,8 @@
     "ORG_NOT_FOUND": "找不到這個組織。",
     "ORG_MEMBER_NOT_FOUND": "找不到這位成員，可能已被移除。",
     "ORG_LAST_ADMIN": "組織至少要有一位組織管理員，請先指定另一位再移除。",
+    "ORG_UNIT_NOT_MANAGED": "你不是這個單位的窗口，無法代表它上架或管理物品。",
+    "ORG_ITEM_DELIVERY_UNAVAILABLE": "組織物品只能面交或自取，不提供付款與配送。",
     "WEAVE_OWN_POST": "不能和自己的貼文交織。",
     "POST_INACTIVE": "這則貼文已經結束了。",
     "ITEM_UNAVAILABLE": "有物品已經沒有了，請重新選擇。",
@@ -1158,6 +1172,81 @@
     "edit": "編輯",
     "save": "儲存",
     "cancel": "取消",
-    "memberUpdated": "已更新成員。"
+    "memberUpdated": "已更新成員。",
+    "manageItemsLink": "管理組織物品"
+  },
+  "Org": {
+    "title": "組織頁",
+    "subtitle": "這裡只有組織內部看得到的物品，不會出現在首頁與搜尋。",
+    "orgLabel": "組織",
+    "noOrgs": "你目前不屬於任何組織。",
+    "loadFailed": "無法載入組織資料。",
+    "loading": "載入中…",
+    "listItem": "上架物品",
+    "manageItems": "管理物品",
+    "backToOrg": "回組織頁",
+    "empty": "目前沒有你看得到的物品。",
+    "unitLabel": "單位",
+    "quantity": "{count} 件",
+    "tier": {
+      "internal": "內部單位",
+      "members": "組織成員",
+      "public": "公開"
+    },
+    "status": {
+      "active": "上架中",
+      "inactive": "已下架"
+    },
+    "access": {
+      "internal": "內部人員",
+      "member": "組織成員"
+    },
+    "form": {
+      "title": "上架組織物品",
+      "subtitle": "物品屬於單位，不屬於你個人。上架後先開放給組織內部單位（Internal），只能免費面交或自取。",
+      "unit": "代表單位",
+      "unitPlaceholder": "選擇單位",
+      "noUnits": "你不是任何單位的窗口，無法上架物品。",
+      "category": "物品類別",
+      "categoryPlaceholder": "選擇類別",
+      "itemTitle": "物品名稱",
+      "content": "說明",
+      "contentPlaceholder": "狀況、尺寸、取件地點等",
+      "condition": "物品狀況",
+      "conditionPlaceholder": "選擇狀況",
+      "quantity": "數量",
+      "unitWeight": "單件重量（公斤）",
+      "weightDefaultHint": "已帶入類別預設值，來源：{publisher}（{year}）。實際重量不同時請修改。",
+      "weightRequiredHint": "這個類別沒有可引用的平均重量，請填寫實際重量。",
+      "assetNumber": "財產編號（選填）",
+      "estimatedValue": "估算價值（新台幣，選填）",
+      "photos": "照片（最多 {max} 張）",
+      "submit": "上架",
+      "submitting": "上架中…",
+      "created": "已上架，目前開放給組織內部單位。",
+      "createFailed": "上架失敗，請稍後再試。",
+      "missingSelection": "請選擇單位、類別與物品狀況。",
+      "tooManyPhotos": "照片最多 {max} 張。"
+    },
+    "manage": {
+      "title": "組織物品管理",
+      "subtitleAdmin": "全組織的物品，可依單位、層級、狀態篩選。",
+      "subtitleContact": "你負責單位的物品。",
+      "noUnits": "你不是任何單位的窗口，也不是組織管理員。",
+      "filterUnit": "單位",
+      "filterTier": "層級",
+      "filterStatus": "狀態",
+      "all": "全部",
+      "colTitle": "物品",
+      "colUnit": "單位",
+      "colTier": "層級",
+      "colStatus": "狀態",
+      "colQuantity": "數量",
+      "colWeight": "單件重量",
+      "colAsset": "財產編號",
+      "colCreated": "上架時間",
+      "weightKg": "{kg} 公斤",
+      "empty": "沒有符合條件的物品。"
+    }
   }
 }

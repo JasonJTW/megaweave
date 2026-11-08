@@ -249,6 +249,7 @@ const WeavingCard = ({
     isInChatWindow,
     status: currentStatus,
     hasPost: Boolean(quotationPost),
+    isOrgItem: quotationPost?.org_id != null,
   });
 
   // ── Render ────────────────────────────────────────────────────────────────

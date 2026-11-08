@@ -127,6 +127,18 @@
     "orgAdmin": {
       "title": "Organization admin",
       "description": "Org Admins manage units and members."
+    },
+    "org": {
+      "title": "Organization",
+      "description": "Items released inside your organization."
+    },
+    "orgItems": {
+      "title": "Manage org items",
+      "description": "Unit Contacts and Org Admins manage org items."
+    },
+    "orgItemNew": {
+      "title": "List an org item",
+      "description": "Unit Contacts list items on behalf of their unit."
     }
   },
   "Lalamove": {
@@ -1058,6 +1070,8 @@
     "ORG_NOT_FOUND": "This organization couldn't be found.",
     "ORG_MEMBER_NOT_FOUND": "This member couldn't be found. They may have been removed already.",
     "ORG_LAST_ADMIN": "An organization needs at least one Org Admin. Add another one before removing this one.",
+    "ORG_UNIT_NOT_MANAGED": "You are not a Unit Contact of this unit, so you can't list or manage its items.",
+    "ORG_ITEM_DELIVERY_UNAVAILABLE": "Org items are pickup only. Payment and delivery aren't available.",
     "WEAVE_OWN_POST": "You can't weave with your own post.",
     "POST_INACTIVE": "This post is no longer active.",
     "ITEM_UNAVAILABLE": "Some of the items are no longer available. Please choose again.",
@@ -1158,6 +1172,81 @@
     "edit": "Edit",
     "save": "Save",
     "cancel": "Cancel",
-    "memberUpdated": "Member updated."
+    "memberUpdated": "Member updated.",
+    "manageItemsLink": "Manage org items"
+  },
+  "Org": {
+    "title": "Organization",
+    "subtitle": "Only people inside the organization see these items. They never appear in the home feed or search.",
+    "orgLabel": "Organization",
+    "noOrgs": "You don't belong to any organization yet.",
+    "loadFailed": "Couldn't load the organization.",
+    "loading": "Loading…",
+    "listItem": "List an item",
+    "manageItems": "Manage items",
+    "backToOrg": "Back to the org page",
+    "empty": "There are no items you can see yet.",
+    "unitLabel": "Unit",
+    "quantity": "{count, plural, one {# item} other {# items}}",
+    "tier": {
+      "internal": "Internal",
+      "members": "Members",
+      "public": "Public"
+    },
+    "status": {
+      "active": "Listed",
+      "inactive": "Unlisted"
+    },
+    "access": {
+      "internal": "Internal",
+      "member": "Member"
+    },
+    "form": {
+      "title": "List an org item",
+      "subtitle": "The item belongs to the unit, not to you. It opens to the org's units first (Internal) and is free pickup only.",
+      "unit": "Listing for",
+      "unitPlaceholder": "Choose a unit",
+      "noUnits": "You aren't a Unit Contact of any unit, so you can't list items.",
+      "category": "Category",
+      "categoryPlaceholder": "Choose a category",
+      "itemTitle": "Item name",
+      "content": "Description",
+      "contentPlaceholder": "Condition, size, pickup place…",
+      "condition": "Condition",
+      "conditionPlaceholder": "Choose a condition",
+      "quantity": "Quantity",
+      "unitWeight": "Weight per item (kg)",
+      "weightDefaultHint": "Prefilled with the category default from {publisher} ({year}). Change it if the real weight differs.",
+      "weightRequiredHint": "This category has no published average weight. Enter the real weight.",
+      "assetNumber": "Asset number (optional)",
+      "estimatedValue": "Estimated value in TWD (optional)",
+      "photos": "Photos (up to {max})",
+      "submit": "List item",
+      "submitting": "Listing…",
+      "created": "Listed. The org's units can see it now.",
+      "createFailed": "Couldn't list the item. Try again later.",
+      "missingSelection": "Choose a unit, a category and a condition.",
+      "tooManyPhotos": "You can add up to {max} photos."
+    },
+    "manage": {
+      "title": "Manage org items",
+      "subtitleAdmin": "Every item in the org. Filter by unit, tier and status.",
+      "subtitleContact": "Items of the units you represent.",
+      "noUnits": "You aren't a Unit Contact or an Org Admin.",
+      "filterUnit": "Unit",
+      "filterTier": "Tier",
+      "filterStatus": "Status",
+      "all": "All",
+      "colTitle": "Item",
+      "colUnit": "Unit",
+      "colTier": "Tier",
+      "colStatus": "Status",
+      "colQuantity": "Qty",
+      "colWeight": "Weight per item",
+      "colAsset": "Asset no.",
+      "colCreated": "Listed at",
+      "weightKg": "{kg} kg",
+      "empty": "No items match these filters."
+    }
   }
 }

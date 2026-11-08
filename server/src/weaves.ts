@@ -65,6 +65,7 @@ export interface WeaveOutput extends RowDataPacket {
   post_created_at: Date;
   post_updated_at: Date;
   post_comment_count: number;
+  post_org_id: number | null;
   giver_name: string;
   giver_avatar: string | null;
   receiver_name: string;
@@ -106,6 +107,7 @@ export const WEAVE_QUERY_BASE = `
       p.created_at AS post_created_at,
       p.updated_at AS post_updated_at,
       p.comment_count AS post_comment_count,
+      p.org_id AS post_org_id,
       COALESCE(NULLIF(TRIM(g_up.custom_name), ''), giver.username) AS giver_name,
       giver.avatar_url AS giver_avatar,
       COALESCE(NULLIF(TRIM(r_up.custom_name), ''), receiver.username) AS receiver_name,
@@ -174,6 +176,8 @@ export async function processWeaveRows(weaveRows: WeaveOutput[]) {
       created_at: row.post_created_at,
       updated_at: row.post_updated_at,
       comment_count: row.post_comment_count,
+      // 組織物品不開放 ECPay／Lalamove（PRD 0001 §5.1），client 依此隱藏運費報價
+      org_id: row.post_org_id ?? null,
       s3_keys: row.s3_keys ?? "",
     };
 

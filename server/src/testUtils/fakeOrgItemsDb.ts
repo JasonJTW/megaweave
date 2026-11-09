@@ -135,11 +135,12 @@ export function createFakeOrgItemsDb(
       return [rows, []];
     }
 
-    if (/^SELECT id, name FROM org_units WHERE org_id = \? ORDER BY name$/.test(sql)) {
+    if (/^SELECT id, name, org_id FROM org_units WHERE org_id IN \(\?\) ORDER BY name$/.test(sql)) {
+      const orgIds = (params[0] as number[]).map(Number);
       const rows = base.units
-        .filter((u) => u.org_id === params[0])
+        .filter((u) => orgIds.includes(u.org_id))
         .sort((a, b) => (a.name < b.name ? -1 : 1))
-        .map((u) => ({ id: u.id, name: u.name }));
+        .map((u) => ({ id: u.id, name: u.name, org_id: u.org_id }));
       return [rows, []];
     }
 

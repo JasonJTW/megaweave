@@ -202,37 +202,51 @@ async function loadAccesses(
     contactUnits.set(membershipId, units);
   }
 
-  return Promise.all(
-    rows.map(async (row) => {
-      const isPlatformAdmin = Boolean(Number(row.is_platform_admin));
-      const isAdmin = row.org_role === "admin" || isPlatformAdmin;
-      const manageableUnits = isAdmin
-        ? await listUnits(Number(row.id))
-        : (contactUnits.get(Number(row.membership_id)) ?? []);
-      return {
-        orgId: Number(row.id),
-        publicId: row.public_id,
-        name: row.name,
-        accessLevel: isPlatformAdmin ? "internal" : row.access_level!,
-        isPlatformAdmin,
-        isAdmin,
-        manageableUnits,
-        autoRelease: {
-          enabled: Boolean(Number(row.auto_release_enabled)),
-          days: Number(row.auto_release_days),
-        },
-        isDemo: Boolean(Number(row.is_demo)),
-      };
-    }),
+  const isAdminRow = (row: MembershipRow) =>
+    row.org_role === "admin" || Boolean(Number(row.is_platform_admin));
+  //* Org Admin 能管全部單位：所有管理的組織一次查完，Platform Admin 有很多組織時也只多一次查詢
+  const unitsByOrg = await listUnitsByOrg(
+    rows.filter(isAdminRow).map((row) => Number(row.id)),
   );
+
+  return rows.map((row) => {
+    const isPlatformAdmin = Boolean(Number(row.is_platform_admin));
+    const isAdmin = isAdminRow(row);
+    const manageableUnits = isAdmin
+      ? (unitsByOrg.get(Number(row.id)) ?? [])
+      : (contactUnits.get(Number(row.membership_id)) ?? []);
+    return {
+      orgId: Number(row.id),
+      publicId: row.public_id,
+      name: row.name,
+      accessLevel: isPlatformAdmin ? "internal" : row.access_level!,
+      isPlatformAdmin,
+      isAdmin,
+      manageableUnits,
+      autoRelease: {
+        enabled: Boolean(Number(row.auto_release_enabled)),
+        days: Number(row.auto_release_days),
+      },
+      isDemo: Boolean(Number(row.is_demo)),
+    };
+  });
 }
 
-async function listUnits(orgId: number): Promise<OrgUnitRef[]> {
+/** 這些組織各自的全部單位，依名稱排序。IN (?) 需要 query() 展開陣列，空陣列就不查 */
+async function listUnitsByOrg(orgIds: number[]): Promise<Map<number, OrgUnitRef[]>> {
+  const byOrg = new Map<number, OrgUnitRef[]>();
+  if (orgIds.length === 0) return byOrg;
   const [rows] = await dbPool.query<RowDataPacket[]>(
-    "SELECT id, name FROM org_units WHERE org_id = ? ORDER BY name",
-    [orgId],
+    "SELECT id, name, org_id FROM org_units WHERE org_id IN (?) ORDER BY name",
+    [orgIds],
   );
-  return rows.map((row) => ({ id: Number(row.id), name: String(row.name) }));
+  for (const row of rows) {
+    const orgId = Number(row.org_id);
+    const units = byOrg.get(orgId) ?? [];
+    units.push({ id: Number(row.id), name: String(row.name) });
+    byOrg.set(orgId, units);
+  }
+  return byOrg;
 }
 
 /** 檢視者在這個組織看得到的層級：membership 的 Internal／Members，加上 Public */

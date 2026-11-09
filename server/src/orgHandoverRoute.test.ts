@@ -94,6 +94,7 @@ const IT_CONTACT = 3; //* 資訊部窗口，代表資訊部申請
 const ORG_MEMBER = 4;
 const GA_CONTACT_2 = 7; //* 總務部的另一位窗口，接手的人
 const ADMIN_IT_CONTACT = 8; //* Org Admin 兼資訊部窗口
+const PLATFORM_ADMIN = 9; //* 全站 role = admin，不是這個組織的成員
 
 const MEMBERSHIP = {
   [ORG_ADMIN]: 101,
@@ -220,9 +221,14 @@ beforeEach(() => {
     ORG_MEMBER,
     GA_CONTACT_2,
     ADMIN_IT_CONTACT,
+    PLATFORM_ADMIN,
   ];
   fakeDb = createFakeOrgHandoverDb({
-    users: userIds.map((id) => ({ id, email: `user${id}@example.com` })),
+    users: userIds.map((id) => ({
+      id,
+      email: `user${id}@example.com`,
+      ...(id === PLATFORM_ADMIN ? { role: "admin" } : {}),
+    })),
     organizations: [
       {
         id: 10,
@@ -418,6 +424,19 @@ describe("GET /api/org-admin/orgs/:orgId/handovers: who still handles items they
     await listItem(ADMIN_IT_CONTACT, GENERAL_AFFAIRS);
 
     expect(await pending()).toEqual([]);
+  });
+
+  it("leaves out items a Platform Admin listed, though they are not a member (ADR 0003)", async () => {
+    await listItem(PLATFORM_ADMIN, GENERAL_AFFAIRS);
+    await listItem();
+    await removeMember(GA_CONTACT);
+
+    expect(await pending()).toEqual([
+      expect.objectContaining({
+        user: expect.objectContaining({ id: publicIdOf(GA_CONTACT) }),
+        itemCount: 1,
+      }),
+    ]);
   });
 
   it("is only for Org Admins", async () => {

@@ -93,12 +93,17 @@ export function createFakeOrgItemsDb(
     const params = (rawParams ?? []) as unknown[];
 
     const memberships = sql.match(
-      /^SELECT o\.id, o\.public_id, o\.name, o\.auto_release_enabled, o\.auto_release_days, o\.is_demo, m\.id AS membership_id, m\.access_level, m\.org_role FROM org_memberships m JOIN organizations o ON o\.id = m\.org_id WHERE m\.user_id = \?( AND o\.public_id = \?)? ORDER BY o\.name$/,
+      /^SELECT o\.id, o\.public_id, o\.name, o\.auto_release_enabled, o\.auto_release_days, o\.is_demo, m\.id AS membership_id, m\.access_level, m\.org_role, u\.role = 'admin' AS is_platform_admin FROM organizations o JOIN users u ON u\.id = \? LEFT JOIN org_memberships m ON m\.org_id = o\.id AND m\.user_id = u\.id WHERE \(m\.id IS NOT NULL OR u\.role = 'admin'\)( AND o\.public_id = \?)? ORDER BY o\.name$/,
     );
     if (memberships) {
-      const rows = base.memberships
-        .filter((m) => m.user_id === params[0])
-        .map((m) => ({ m, o: base.organizations.find((o) => o.id === m.org_id)! }))
+      const user = base.users.find((u) => u.id === params[0]);
+      const isPlatformAdmin = user?.role === "admin";
+      const rows = (user ? base.organizations : [])
+        .map((o) => ({
+          o,
+          m: base.memberships.find((m) => m.user_id === params[0] && m.org_id === o.id),
+        }))
+        .filter(({ m }) => m || isPlatformAdmin)
         .filter(({ o }) => !memberships[1] || o.public_id === params[1])
         .sort((a, b) => (a.o.name < b.o.name ? -1 : 1))
         .map(({ m, o }) => ({
@@ -108,9 +113,10 @@ export function createFakeOrgItemsDb(
           auto_release_enabled: o.auto_release_enabled ? 1 : 0,
           auto_release_days: o.auto_release_days,
           is_demo: o.is_demo ? 1 : 0,
-          membership_id: m.id,
-          access_level: m.access_level,
-          org_role: m.org_role,
+          membership_id: m?.id ?? null,
+          access_level: m?.access_level ?? null,
+          org_role: m?.org_role ?? null,
+          is_platform_admin: isPlatformAdmin ? 1 : 0,
         }));
       return [rows, []];
     }
@@ -129,11 +135,12 @@ export function createFakeOrgItemsDb(
       return [rows, []];
     }
 
-    if (/^SELECT id, name FROM org_units WHERE org_id = \? ORDER BY name$/.test(sql)) {
+    if (/^SELECT id, name, org_id FROM org_units WHERE org_id IN \(\?\) ORDER BY name$/.test(sql)) {
+      const orgIds = (params[0] as number[]).map(Number);
       const rows = base.units
-        .filter((u) => u.org_id === params[0])
+        .filter((u) => orgIds.includes(u.org_id))
         .sort((a, b) => (a.name < b.name ? -1 : 1))
-        .map((u) => ({ id: u.id, name: u.name }));
+        .map((u) => ({ id: u.id, name: u.name, org_id: u.org_id }));
       return [rows, []];
     }
 

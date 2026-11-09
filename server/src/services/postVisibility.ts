@@ -89,6 +89,13 @@ export function postVisibleIn(scope: ViewerScope, alias = "p"): SqlFragment {
 export type SqlExecutor = Pick<Pool, "execute"> | Pick<PoolConnection, "execute">;
 
 /**
+ * 檢視者的成員資格；Platform Admin（users.role = 'admin'）在每個組織另有一列 Internal（ADR 0003，2026-11-09）。
+ * 角色從 users 讀而不是 session：呼叫端傳入的不一定是登入者（私訊收件人、Weave 接收者）。
+ */
+export const VIEWER_MEMBERSHIPS_SQL =
+  "SELECT org_id, access_level FROM org_memberships WHERE user_id = ? UNION ALL SELECT o.id AS org_id, 'internal' AS access_level FROM organizations o JOIN users u ON u.id = ? AND u.role = 'admin'";
+
+/**
  * 從 org_memberships 載入檢視者的可見範圍。未登入（或沒有成員資格）只看得到 Public。
  * 單篇貼文的讀取路徑透過 viewerVisibility 呼叫這裡，再把條件拼進查貼文的 SQL，
  * 查不到就回 404（ADR 0003：不回 403，不洩漏物品存在）。
@@ -98,16 +105,20 @@ export async function loadViewerScope(
   userId: number | null | undefined,
 ): Promise<ViewerScope> {
   if (!userId) return PUBLIC_SCOPE;
-  const [rows] = await db.execute<RowDataPacket[]>(
-    "SELECT org_id, access_level FROM org_memberships WHERE user_id = ?",
-    [userId],
-  );
+  const [rows] = await db.execute<RowDataPacket[]>(VIEWER_MEMBERSHIPS_SQL, [
+    userId,
+    userId,
+  ]);
   if (rows.length === 0) return PUBLIC_SCOPE;
+  //* Platform Admin 同時是某組織的 Org Member 時同一組織有兩列，取看得最多的 Internal
+  const byOrg = new Map<number, AccessLevel>();
+  for (const row of rows) {
+    const orgId = Number(row.org_id);
+    const level = row.access_level as AccessLevel;
+    if (byOrg.get(orgId) !== "internal") byOrg.set(orgId, level);
+  }
   return scopeFromMemberships(
-    rows.map((row) => ({
-      orgId: Number(row.org_id),
-      accessLevel: row.access_level as AccessLevel,
-    })),
+    [...byOrg].map(([orgId, accessLevel]) => ({ orgId, accessLevel })),
   );
 }
 

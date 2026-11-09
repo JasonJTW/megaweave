@@ -5,7 +5,8 @@
 //* 身分：`role` 是 Org Admin 或 Org Member；`unitIds` 是擔任 Unit Contact 的單位，兩者可並存（ADR 0004）
 //* 交接（E8-1）：窗口離職或異動後，他經手的物品與進行中的 Weave 在「待交接」轉給同單位另一位窗口
 //* 自動升級（#139）：組織層級的開關與天數；單件覆寫在 /org/items
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import toast from "react-hot-toast";
@@ -28,6 +29,7 @@ import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { useUser } from "@/app/contexts/UserContext";
 import { Link } from "@/i18n/navigation";
+import { pickOrg } from "@/lib/orgAdminRules";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -487,11 +489,15 @@ function AutoReleaseCard({ orgUrl }: { orgUrl: string }) {
   );
 }
 
-export default function OrgAdminPage() {
+function OrgAdminContent() {
   const t = useTranslations("OrgAdmin");
   const errorMessage = useApiErrorMessage();
   const { user } = useUser();
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  //* 從 /admin/orgs、組織頁帶 `?org=` 進來時先選那個組織
+  const searchParams = useSearchParams();
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(
+    searchParams.get("org"),
+  );
   const [unitName, setUnitName] = useState("");
   const [memberForm, setMemberForm] = useState<MemberForm>(EMPTY_MEMBER_FORM);
   const [editing, setEditing] = useState<{
@@ -505,7 +511,9 @@ export default function OrgAdminPage() {
     `${hostName}/api/org-admin/orgs`,
     (url) => requestJson<{ orgs: OrgOption[] }>(url),
   );
-  const orgId = selectedOrgId ?? orgList?.orgs[0]?.id ?? null;
+  const orgs = orgList?.orgs ?? [];
+  const currentOrg = pickOrg(orgs, selectedOrgId);
+  const orgId = currentOrg?.id ?? null;
   const orgUrl = orgId ? `${hostName}/api/org-admin/orgs/${orgId}` : null;
   const {
     data: overview,
@@ -583,6 +591,9 @@ export default function OrgAdminPage() {
     <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
+        {currentOrg && (
+          <p className="text-lg font-semibold">{currentOrg.name}</p>
+        )}
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         {orgId && (
           <Link
@@ -821,5 +832,13 @@ export default function OrgAdminPage() {
         </>
       )}
     </main>
+  );
+}
+
+export default function OrgAdminPage() {
+  return (
+    <Suspense>
+      <OrgAdminContent />
+    </Suspense>
   );
 }

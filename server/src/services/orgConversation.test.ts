@@ -7,6 +7,7 @@ import {
   presentMessage,
   resolveContactToken,
 } from "./orgConversation";
+import { VIEWER_MEMBERSHIPS_SQL } from "./postVisibility";
 
 const CONTACT = 2;
 const COLLEAGUE = 3;
@@ -27,7 +28,7 @@ function fakeDb() {
       const ids = params[1] as number[];
       return [memberships.filter((m) => m.user_id === params[0] && ids.includes(m.org_id)), []];
     }
-    if (sql === "SELECT org_id, access_level FROM org_memberships WHERE user_id = ?") {
+    if (sql === VIEWER_MEMBERSHIPS_SQL) {
       return [
         memberships
           .filter((m) => m.user_id === params[0])

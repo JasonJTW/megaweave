@@ -12,6 +12,7 @@ import {
   GUEST_ONLY_ROUTES,
   ADMIN_ROUTES,
   PUBLIC_ROUTES,
+  config,
 } from "../middleware";
 import { splitLocalePrefix } from "../i18n/routing";
 import { EN_PROMPT_DISMISSED_COOKIE } from "../i18n/languagePrompt";
@@ -461,5 +462,28 @@ describe("Middleware Route Guard & Route Taxonomy", () => {
       assert.equal(getSafeReturnTo("/en/signup?x=1", "/en"), "/en");
       assert.equal(getSafeReturnTo("/en/messages"), "/en/messages");
     });
+  });
+});
+
+describe("middleware matcher", () => {
+  //* Next 以 path-to-regexp 解析 matcher；這裡的 pattern 只用了 regex 語法，可直接當 RegExp 比對
+  const matcher = new RegExp(`^${config.matcher[0]}$`);
+
+  it("skips static files in public/, including .ico icons other than favicon.ico", () => {
+    for (const path of [
+      "/favicon.ico",
+      "/favicon2.ico",
+      "/favicon-32x32.png",
+      "/manifest.json",
+      "/robots.txt",
+    ]) {
+      assert.equal(matcher.test(path), false, path);
+    }
+  });
+
+  it("still runs on pages", () => {
+    for (const path of ["/", "/user", "/en/user", "/org-admin"]) {
+      assert.equal(matcher.test(path), true, path);
+    }
   });
 });

@@ -74,6 +74,10 @@ export function createFakeOrgWeavesDb(
       const rows = base.memberships
         .filter((m) => m.user_id === params[0])
         .map((m) => ({ org_id: m.org_id, access_level: m.access_level }));
+      //* UNION 段：Platform Admin 在每個組織另有一列 Internal
+      if (base.users.some((u) => u.id === params[1] && u.role === "admin")) {
+        rows.push(...base.organizations.map((o) => ({ org_id: o.id, access_level: "internal" as const })));
+      }
       return [rows, []];
     }
 
@@ -132,9 +136,12 @@ export function createFakeOrgWeavesDb(
 
     if (
       sql ===
-      "SELECT 1 FROM org_memberships m WHERE m.org_id = ? AND m.user_id = ? AND (m.org_role = 'admin' OR EXISTS (SELECT 1 FROM org_unit_contacts c WHERE c.membership_id = m.id AND c.org_unit_id = ?)) LIMIT 1"
+      "SELECT 1 FROM org_memberships m WHERE m.org_id = ? AND m.user_id = ? AND (m.org_role = 'admin' OR EXISTS (SELECT 1 FROM org_unit_contacts c WHERE c.membership_id = m.id AND c.org_unit_id = ?)) UNION ALL SELECT 1 FROM users u WHERE u.id = ? AND u.role = 'admin' LIMIT 1"
     ) {
       const [orgId, userId, unitId] = params;
+      if (base.users.some((u) => u.id === userId && u.role === "admin")) {
+        return [[{ 1: 1 }], []];
+      }
       const membership = base.memberships.find(
         (m) => m.org_id === orgId && m.user_id === userId,
       );

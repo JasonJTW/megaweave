@@ -5,6 +5,7 @@
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { ApiError } from "@/lib/apiError";
+import { pickOrg } from "@/lib/orgAdminRules";
 
 export const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -31,7 +32,10 @@ export interface OrgAccess {
   id: string;
   name: string;
   accessLevel: "internal" | "member";
+  /** Org Admin，或在每個組織都等同 Org Admin 的 Platform Admin（ADR 0003） */
   isAdmin: boolean;
+  /** 全站 Platform Admin；不一定是這個組織的成員 */
+  isPlatformAdmin: boolean;
   manageableUnits: OrgUnitRef[];
   /** 組織的 Auto Release 設定（#139）；單件可覆寫 */
   autoRelease: { enabled: boolean; days: number };
@@ -139,8 +143,23 @@ export function useSelectedOrg() {
   );
   const wanted = searchParams.get("org");
   const orgs = data?.orgs ?? [];
-  const org = orgs.find((o) => o.id === wanted) ?? orgs[0] ?? null;
+  const org = pickOrg(orgs, wanted);
   return { orgs, org, error, isLoading };
+}
+
+/**
+ * Navbar 的組織入口：有組織可管就到組織後台，只是成員就到組織頁，都沒有就不顯示。
+ * 和 useSelectedOrg 共用 `/api/orgs` 的 SWR key，不會多打一次
+ */
+export function useOrgNav(signedIn: boolean) {
+  const { data } = useSWR(signedIn ? `${hostName}/api/orgs` : null, (url) =>
+    requestJson<{ orgs: OrgAccess[] }>(url),
+  );
+  const orgs = data?.orgs ?? [];
+  return {
+    isMember: orgs.length > 0,
+    isOrgAdmin: orgs.some((o) => o.isAdmin),
+  };
 }
 
 export function useOrgItemCategories() {

@@ -6,6 +6,8 @@
 export interface FakeUser {
   id: number;
   email: string;
+  /** users.role；"admin" 是 Platform Admin */
+  role?: string;
 }
 
 export interface FakeOrgRow {

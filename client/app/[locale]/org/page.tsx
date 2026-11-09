@@ -101,6 +101,13 @@ function OrgPageContent() {
         <>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <OrgSwitcher orgs={orgs} org={org} basePath="/org" />
+            {org.isAdmin && org.manageableUnits.length === 0 && (
+              <Button asChild variant="outline">
+                <Link href={`/org-admin?org=${org.id}`}>
+                  {t("goToOrgAdmin")}
+                </Link>
+              </Button>
+            )}
             {org.manageableUnits.length > 0 && (
               <div className="flex gap-2">
                 <Button asChild>

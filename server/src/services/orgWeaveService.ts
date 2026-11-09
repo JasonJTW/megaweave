@@ -62,7 +62,10 @@ export function resolveActingUnit(
   return requested;
 }
 
-/** 能否核可／婉拒這篇組織貼文的申請：所屬單位的窗口或 Org Admin（申請人本人由呼叫端排除） */
+/**
+ * 能否核可／婉拒這篇組織貼文的申請：所屬單位的窗口、Org Admin，或 Platform Admin（ADR 0003，
+ * 在每個組織都等同 Org Admin）；申請人本人由呼叫端排除
+ */
 export async function canReviewOrgRequest(
   db: SqlExecutor,
   owner: OrgPostOwner,
@@ -74,8 +77,10 @@ export async function canReviewOrgRequest(
        AND (m.org_role = 'admin'
             OR EXISTS (SELECT 1 FROM org_unit_contacts c
                        WHERE c.membership_id = m.id AND c.org_unit_id = ?))
+     UNION ALL
+     SELECT 1 FROM users u WHERE u.id = ? AND u.role = 'admin'
      LIMIT 1`,
-    [owner.orgId, userId, owner.orgUnitId],
+    [owner.orgId, userId, owner.orgUnitId, userId],
   );
   return rows.length > 0;
 }

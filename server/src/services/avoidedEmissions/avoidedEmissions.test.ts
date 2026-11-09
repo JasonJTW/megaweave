@@ -9,6 +9,7 @@ import {
   MATERIAL_IDS,
   PRODUCT_FACTORS,
   PRODUCT_FACTOR_IDS,
+  REFERENCE_PRODUCTS,
   SOURCES,
   UNU_WEIGHT_YEAR,
 } from "./factorTable";
@@ -149,11 +150,19 @@ describe("factor derivation", () => {
   it("takes the lower of the material BOM and the reference EPD average", () => {
     const chair = getProductionFactor("office_chair");
     expect(chair.basis).toBe("material_bom");
-    expect(chair.kgCO2ePerKg).toBeCloseTo(4.122, 3);
+    expect(chair.kgCO2ePerKg).toBeCloseTo(3.441, 3);
     expect(chair.referenceEpdKgCO2ePerKg).toBeCloseTo(
-      (74.1 + 58.0 + 142 + 79.4) / (13.787 + 20.63 + 19.0 + 20.03),
+      (74.1 + 58.0 + 142 + 79.4 + 76.8 + 105.3 + 88.3 + 81.9 + 99.7) /
+        (13.787 + 20.63 + 19.0 + 20.03 + 17.77 + 17.033 + 15.34 + 14.9 + 19.71),
       10,
     );
+    // 九份參考產品的材質表加總要接近各自宣告的重量（抄錄錯誤的防呆）
+    for (const product of REFERENCE_PRODUCTS.office_chair) {
+      const bomMass = product.components.reduce((sum, c) => sum + c.amount, 0);
+      expect(Math.abs(bomMass - product.declaredMassKg)).toBeLessThan(
+        product.declaredMassKg * 0.01,
+      );
+    }
 
     const desk = getProductionFactor("desk_table");
     expect(desk.basis).toBe("reference_epd");

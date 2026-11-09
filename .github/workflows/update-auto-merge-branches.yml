@@ -1,0 +1,45 @@
+name: Update auto-merge branches
+
+# The `main` ruleset requires a PR to be up to date with main before it merges, so every PR is
+# verified on top of the latest main. Merge queues need an org-owned repo, so instead, whenever
+# main moves, this merges main into each open PR that has auto-merge enabled. The push comes
+# from AUTO_UPDATE_TOKEN (a fine-grained PAT; scripts/setup-repo.sh says how to make it): a push
+# made with GITHUB_TOKEN would not start the required checks again, and auto-merge would stall.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: update-auto-merge-branches
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Merge main into auto-merge PRs that are behind
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_UPDATE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::AUTO_UPDATE_TOKEN is not set; auto-merge PRs that fall behind main need a manual Update branch."
+            exit 0
+          fi
+          owner="${GH_REPO%%/*}"
+          # Same-repo, non-draft PRs with auto-merge on; fork branches are not ours to push to
+          prs=$(gh pr list --state open --limit 100 \
+            --json number,isDraft,autoMergeRequest,headRepositoryOwner \
+            --jq ".[] | select(.autoMergeRequest != null and .isDraft == false and .headRepositoryOwner.login == \"$owner\") | .number")
+          for pr in $prs; do
+            # update-branch is a no-op for a PR that already contains main
+            if gh pr update-branch "$pr"; then
+              echo "Updated #$pr"
+            else
+              echo "::warning::Could not update #$pr (likely a merge conflict); it needs a manual update."
+            fi
+          done

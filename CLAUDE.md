@@ -47,6 +47,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 - Changes reach `main` only through a PR. The `main` ruleset requires `E2E (Playwright)`, `Claude Code Review` and `Claude Security Review` to pass; a Claude review fails the check when it posts a blocking finding (`docs/agents/*.md` define blocking). Only merge commits are allowed.
 - The ruleset and merge settings live on GitHub, not in git: `npm run setup:repo` applies `scripts/main-ruleset.json` (needs `gh` with admin rights; safe to re-run). If you add or rename a required job, update that file and re-run it.
 - After opening a PR, enable auto-merge: `gh pr merge --auto --merge <PR>`. GitHub merges it once the required checks pass. Skip this for draft PRs, or when the user says to hold the merge.
+- The ruleset requires a PR to be up to date with `main`, so it is verified on the latest `main` before merging. When `main` moves, `update-auto-merge-branches.yml` merges it into every auto-merge PR (pushing with the `AUTO_UPDATE_TOKEN` PAT so the checks run again). A PR that conflicts with `main` needs a manual merge.
 - If auto-merge stalls on a failing check, fix the failure and push. Never merge manually past a red check.
 
 ## Project Structure

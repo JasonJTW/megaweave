@@ -3,7 +3,7 @@ name: Update auto-merge branches
 # The `main` ruleset requires a PR to be up to date with main before it merges, so every PR is
 # verified on top of the latest main. Merge queues need an org-owned repo, so instead, whenever
 # main moves, this merges main into each open PR that has auto-merge enabled. The push comes
-# from AUTO_UPDATE_TOKEN (a fine-grained PAT; scripts/setup-repo.sh says how to make it): a push
+# from AUTO_UPDATE_TOKEN (a fine-grained PAT; see ADR 0006 and scripts/setup-repo.sh): a push
 # made with GITHUB_TOKEN would not start the required checks again, and auto-merge would stall.
 on:
   push:

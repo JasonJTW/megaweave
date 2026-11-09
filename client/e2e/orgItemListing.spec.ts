@@ -1,3 +1,4 @@
+import path from "path";
 import { request as playwrightRequest } from "@playwright/test";
 import { test, expect } from "./fixtures/base";
 import { API_URL, AUTH_FILE } from "./fixtures/auth";
@@ -8,6 +9,7 @@ import { API_URL, AUTH_FILE } from "./fixtures/auth";
 // The Unit Contact is the seeded org viewer (server/src/e2e/orgIsolationFixture.ts):
 // the contact of "E2E Unit" in "E2E Org". The outsider is the default E2E user,
 // who belongs to no org.
+const SAMPLE_IMAGE = path.join(__dirname, "fixtures/files/sample.jpg");
 const viewer = {
   email: process.env.E2E_ORG_VIEWER_EMAIL ?? "",
   password: process.env.E2E_ORG_VIEWER_PASSWORD ?? "",
@@ -55,6 +57,24 @@ test.describe("Unit Contact lists an org item", () => {
     await page.getByRole("option").first().click();
     await page.getByLabel("數量").fill("2");
     await page.getByLabel("財產編號（選填）").fill("E2E-ASSET-001");
+
+    // Photos: picks accumulate with a preview each, cap at 5 with a toast, and can be removed
+    const photoInput = page.locator("#org-item-photos");
+    const previews = page.getByRole("img", { name: /^照片 \d+：sample\.jpg$/ });
+    await photoInput.setInputFiles([SAMPLE_IMAGE, SAMPLE_IMAGE]);
+    await expect(previews).toHaveCount(2);
+    await photoInput.setInputFiles([SAMPLE_IMAGE, SAMPLE_IMAGE]);
+    await expect(previews).toHaveCount(4);
+    await photoInput.setInputFiles([SAMPLE_IMAGE, SAMPLE_IMAGE, SAMPLE_IMAGE]);
+    await expect(page.getByText("照片最多 5 張。")).toBeVisible();
+    await expect(previews).toHaveCount(5);
+    await expect(page.getByText("選擇照片（5/5）")).toBeVisible();
+    await expect(photoInput).toBeDisabled();
+    await page.getByRole("button", { name: "移除照片 3" }).click();
+    await expect(previews).toHaveCount(4);
+    await expect(page.getByText("選擇照片（4/5）")).toBeVisible();
+    await expect(photoInput).toBeEnabled();
+
     await page.getByRole("button", { name: "上架", exact: true }).click();
 
     // Back on the org page, the new item is there and marked Internal

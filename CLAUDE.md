@@ -18,7 +18,7 @@
 - **Database**: Parameterized raw SQL queries via `mysql2/promise` with transactions for multi-step mutations. Never interpolate untrusted values directly into SQL strings.
 
 ## Architecture Decisions
-- **ADRs** (`docs/adr/`, vocabulary in `CONTEXT.md`) record deliberate choices that look like bugs. Before changing or reviewing code that touches a decision's subject (weave giver/receiver, locale routing, org membership and audience tier), read the matching ADR.
+- **ADRs** (`docs/adr/`, vocabulary in `CONTEXT.md`) record deliberate choices that look like bugs. Before changing or reviewing code that touches a decision's subject (weave giver/receiver, locale routing, org membership and audience tier, the `main` merge policy), read the matching ADR.
 
 ## Review Standards
 The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/security-review.md`. Read them before reviewing a change; touching routes, auth, webhooks, secrets or workflows also needs the security one.

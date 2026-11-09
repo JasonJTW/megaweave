@@ -10,8 +10,7 @@
  */
 
 import express from "express";
-import type { Response } from "supertest";
-import { request } from "./testUtils/testApi";
+import { request, type Response } from "./testUtils/testApi";
 import orgItemsRouter from "./orgItems";
 import * as sessionModule from "./session";
 import * as queues from "./queue/queues";

@@ -1,6 +1,12 @@
 // PostCard.tsx 重點改寫
 "use client";
 import { Badge } from "@/components/ui/badge";
+import {
+  imageRetryReducer,
+  initialImageRetry,
+  isWaitingToRetry,
+  retryDelayMs,
+} from "@/utils/imageRetry";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import {
   getPostDistance,
@@ -27,72 +33,35 @@ import SeekBadgeIcon from "../icons/WishBadgeIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDisplayName } from "@/hooks/useDisplayName";
 
-// ─── Image Retry Hook (Exponential Backoff) ───────────────────────────────────
-const MAX_RETRIES = 4; // 最多重試 4 次
-const BASE_DELAY_MS = 2000; // 初始等待 2 秒，後續 4s → 8s → 16s
-
-type ImageStatus = "idle" | "retrying" | "failed";
-
+// ─── Image Retry Hook (Exponential Backoff, see utils/imageRetry) ─────────────
 function useImageWithRetry(
   primarySrc: string | undefined,
   fallbackSrc: string | undefined,
 ) {
-  const [src, setSrc] = React.useState(primarySrc);
-  const [status, setStatus] = React.useState<ImageStatus>("idle");
-  const retryCountRef = React.useRef(0);
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isFallbackRef = React.useRef(false); // 標記是否已切換到 fallback URL
+  const [state, dispatch] = React.useReducer(
+    imageRetryReducer,
+    initialImageRetry(primarySrc, fallbackSrc),
+  );
 
   // 當 primarySrc 變更（例如切換貼文）時，重置所有狀態
   React.useEffect(() => {
-    retryCountRef.current = 0;
-    isFallbackRef.current = false;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setSrc(primarySrc);
-    setStatus("idle");
-  }, [primarySrc]);
-
-  const onError = React.useCallback(() => {
-    // fallback URL 也載入失敗 → 真正的最終失敗，顯示 X 佔位符
-    if (isFallbackRef.current) {
-      setStatus("failed");
-      return;
-    }
-
-    if (retryCountRef.current < MAX_RETRIES) {
-      const attempt = retryCountRef.current + 1;
-      const delay = BASE_DELAY_MS * Math.pow(2, retryCountRef.current); // 指數退避
-      retryCountRef.current = attempt;
-      setStatus("retrying"); // 顯示 shimmer
-
-      timerRef.current = setTimeout(() => {
-        // 強制 Next/Image 重新請求：在 src 末尾附加 ?retry=<n> 使 URL 不同
-        setSrc(`${primarySrc}?retry=${attempt}`);
-        setStatus("idle");
-      }, delay);
-    } else {
-      // 重試耗盡 → 切換到 fallback original URL（繞過 CloudFront thumbnail lambda）
-      if (fallbackSrc) {
-        isFallbackRef.current = true;
-        setSrc(fallbackSrc);
-        setStatus("retrying");
-      } else {
-        setStatus("failed");
-      }
-    }
+    dispatch({ type: "reset", primarySrc, fallbackSrc });
   }, [primarySrc, fallbackSrc]);
 
-  // 清理計時器，防止 unmount 後 setState
-  React.useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
-  );
+  // 等待退避時間後重試縮圖；unmount 或狀態改變時清除計時器
+  const waiting = isWaitingToRetry(state);
+  const delay = retryDelayMs(state);
+  React.useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => dispatch({ type: "retry" }), delay);
+    return () => clearTimeout(timer);
+  }, [waiting, delay]);
 
-  return { src, status, onError };
+  const onError = React.useCallback(() => dispatch({ type: "error" }), []);
+  const onLoad = React.useCallback(() => dispatch({ type: "load" }), []);
+
+  return { src: state.src, status: state.status, onError, onLoad };
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface PostCardProps {
   post: Post;
@@ -136,6 +105,7 @@ function PostCardInner({
     src: imageSrc,
     status: imageStatus,
     onError: handleImageError,
+    onLoad: handleImageLoad,
   } = useImageWithRetry(primarySrc, fallbackSrc);
 
   const t = useTranslations("PostCard");
@@ -223,6 +193,7 @@ function PostCardInner({
                     className={`h-auto w-full object-cover sm:absolute sm:inset-0 sm:!h-full sm:!w-full ${isExpired && "opacity-70 brightness-105 contrast-50"}`}
                     priority={!!isFirstVisible}
                     onError={handleImageError}
+                    onLoad={handleImageLoad}
                   />
                 </>
               )}

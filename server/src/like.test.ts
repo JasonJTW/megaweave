@@ -1,6 +1,6 @@
 // like.test.ts
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import likeRouter from "./like";
 import { createNotification } from "./utils/notificationService";
 import { enqueueUserVectorUpdate } from "./queue/queues";

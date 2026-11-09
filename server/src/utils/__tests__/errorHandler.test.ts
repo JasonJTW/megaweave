@@ -1,6 +1,6 @@
 import express from "express";
 import { z } from "zod";
-import request from "supertest";
+import { request } from "../../testUtils/testApi";
 import { errorMiddleware } from "../errorHandler";
 import { HttpError } from "../httpError";
 

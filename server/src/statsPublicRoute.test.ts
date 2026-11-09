@@ -4,7 +4,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import statsRouter from "./stats";
 import { errorMiddleware } from "./utils/errorHandler";
 import { fakeOnPublicSurface, POSTS_BY_TIER } from "./testUtils/fakePostVisibility";

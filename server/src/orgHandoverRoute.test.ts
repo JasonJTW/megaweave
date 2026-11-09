@@ -9,7 +9,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import orgAdminRouter from "./orgAdmin";
 import orgItemsRouter from "./orgItems";
 import weavesRouter from "./weaves";

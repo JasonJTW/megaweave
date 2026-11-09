@@ -9,7 +9,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import likeRouter from "./like";
 import commentsRouter from "./comments";
 import weavesRouter from "./weaves";

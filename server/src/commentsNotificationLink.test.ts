@@ -5,7 +5,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import commentsRouter from "./comments";
 import dbPool from "./utils/db";
 import { createNotification } from "./utils/notificationService";

@@ -11,7 +11,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import postsRouter from "./posts";
 import { postService } from "./services/postService";
 import * as sessionModule from "./session";

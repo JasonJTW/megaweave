@@ -11,7 +11,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import orgAdminRouter from "./orgAdmin";
 import orgItemsRouter from "./orgItems";
 import * as sessionModule from "./session";

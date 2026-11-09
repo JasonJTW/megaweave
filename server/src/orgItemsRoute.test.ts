@@ -10,7 +10,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request, type Response } from "./testUtils/testApi";
 import orgItemsRouter from "./orgItems";
 import * as sessionModule from "./session";
 import * as queues from "./queue/queues";
@@ -439,7 +439,7 @@ describe("GET /api/orgs/:orgId/items (back office)", () => {
       .expect(201);
   });
 
-  function titles(res: request.Response): string[] {
+  function titles(res: Response): string[] {
     return res.body.items.map((i: { title: string }) => i.title).sort();
   }
 

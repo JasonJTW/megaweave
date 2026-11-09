@@ -3,8 +3,9 @@
 //* 上架組織物品（PRD 0001 §5.1 E2-1、E3-1、E4-1、E6-2）
 //* 物品屬於單位：窗口有多個單位時先選單位。類別帶預設單件重量（避免排放量係數表，ADR 0005），
 //* 沒有預設值的類別（如塑膠製品）重量必填。只能是 Share，上架後在 Internal，不開放付款與配送。
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { ImagePlus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -51,6 +52,24 @@ interface FormState {
 
 function toNumber(value: string): number | undefined {
   return value.trim() === "" ? undefined : Number(value);
+}
+
+//* 本機預覽：每個檔案一個 object URL，卸載或換檔時釋放
+function PhotoThumbnail({ file, alt }: { file: File; alt: string }) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  return (
+    <div className="aspect-square overflow-hidden rounded-lg border bg-muted">
+      {url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={alt} className="h-full w-full object-cover" />
+      )}
+    </div>
+  );
 }
 
 function ItemForm({ org }: { org: OrgAccess }) {
@@ -295,25 +314,60 @@ function ItemForm({ org }: { org: OrgAccess }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="org-item-photos">
+            <p className="text-sm font-medium leading-none">
               {t("photos", { max: MAX_PHOTOS })}
-            </Label>
-            <Input
+            </p>
+            {/* 原生檔案欄位在每次選完後會清空（顯示「未選擇檔案」），改用按鈕顯示已選張數 */}
+            <label
+              htmlFor="org-item-photos"
+              aria-disabled={photos.length >= MAX_PHOTOS}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-primary-30 px-4 py-2 text-sm font-medium has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+            >
+              <ImagePlus className="h-4 w-4" />
+              {t("choosePhotos", { count: photos.length, max: MAX_PHOTOS })}
+            </label>
+            <input
               id="org-item-photos"
               type="file"
               accept="image/*"
               multiple
+              className="sr-only"
+              disabled={photos.length >= MAX_PHOTOS}
               onChange={(e) => {
+                //* 每次選的照片累加上去；清空 input 讓同一張可以移除後再選
                 const files = Array.from(e.target.files ?? []);
-                if (files.length > MAX_PHOTOS) {
+                e.target.value = "";
+                if (photos.length + files.length > MAX_PHOTOS) {
                   toast.error(t("tooManyPhotos", { max: MAX_PHOTOS }));
-                  e.target.value = "";
-                  setPhotos([]);
-                  return;
                 }
-                setPhotos(files);
+                setPhotos((prev) => [...prev, ...files].slice(0, MAX_PHOTOS));
               }}
             />
+            {photos.length > 0 && (
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {photos.map((file, index) => (
+                  <li
+                    key={`${file.name}-${file.lastModified}-${index}`}
+                    className="relative"
+                  >
+                    <PhotoThumbnail
+                      file={file}
+                      alt={t("photoAlt", { index: index + 1, name: file.name })}
+                    />
+                    <button
+                      type="button"
+                      aria-label={t("removePhoto", { index: index + 1 })}
+                      className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                      onClick={() =>
+                        setPhotos((prev) => prev.filter((_, i) => i !== index))
+                      }
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <Button

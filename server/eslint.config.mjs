@@ -49,4 +49,22 @@ export default defineConfig([
       ],
     },
   },
+  {
+    // supertest 綁 `::` 卻連 127.0.0.1，本機其他程式能搶走請求（#147）
+    files: ["src/**/*.ts"],
+    ignores: ["src/testUtils/testApi.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "supertest",
+              message: "Use request() from src/testUtils/testApi, which binds 127.0.0.1 (#147).",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

@@ -10,7 +10,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import orgItemsRouter from "./orgItems";
 import weavesRouter from "./weaves";
 import * as sessionModule from "./session";

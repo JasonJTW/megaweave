@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test",
+    "test:e2e": "../scripts/e2e-lock.sh playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test": "tsx --test __tests__/*.test.ts"
   },

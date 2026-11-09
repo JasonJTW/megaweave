@@ -99,13 +99,17 @@ for (const { locale, home, messages, heading } of LOCALES) {
         page.getByRole("button", { name: messages.PostDetail.edit }),
       ).toBeVisible();
 
-      // The worker moves the photo out of staging asynchronously
+      // The worker moves the photo out of staging asynchronously; under load the queue
+      // can take longer than the default 5s
       await expect
-        .poll(async () => {
-          const res = await request.get(`${API_URL}/api/posts/${publicId}`);
-          const { post } = await res.json();
-          return post.images.map((image: { s3_key: string }) => image.s3_key);
-        })
+        .poll(
+          async () => {
+            const res = await request.get(`${API_URL}/api/posts/${publicId}`);
+            const { post } = await res.json();
+            return post.images.map((image: { s3_key: string }) => image.s3_key);
+          },
+          { timeout: 20_000 },
+        )
         .toEqual([expect.stringMatching(/^posts\/.+\.webp$/)]);
     });
   });

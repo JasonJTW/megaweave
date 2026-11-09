@@ -26,7 +26,7 @@ const ALL = "all";
 
 function PostCardSkeleton() {
   return (
-    <li aria-hidden className="overflow-hidden rounded-lg border">
+    <li aria-hidden className="overflow-hidden rounded-2xl bg-white">
       <div className="aspect-[4/3] bg-muted" />
       <div className="space-y-2 p-4">
         <div className="h-4 w-3/4 rounded bg-muted" />
@@ -137,9 +137,9 @@ function OrgPosts({ org }: { org: OrgAccess }) {
             <li key={post.id}>
               <Link
                 href={`/item/${post.id}`}
-                className="group block h-full overflow-hidden rounded-lg border bg-white transition-colors hover:border-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group block h-full overflow-hidden rounded-2xl bg-white transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
-                <div className="relative aspect-[4/3] overflow-hidden bg-primary-5">
+                <div className="relative aspect-[4/3] overflow-hidden bg-primary-15">
                   {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -154,7 +154,7 @@ function OrgPosts({ org }: { org: OrgAccess }) {
                   )}
                 </div>
                 <div className="space-y-1.5 p-4">
-                  <h2 className="line-clamp-2 font-medium leading-snug group-hover:underline group-hover:underline-offset-4">
+                  <h2 className="line-clamp-2 text-lg font-bold leading-snug text-megaweave-forest-dark group-hover:underline group-hover:underline-offset-4">
                     {post.title}
                   </h2>
                   <p className="text-sm text-muted-foreground">

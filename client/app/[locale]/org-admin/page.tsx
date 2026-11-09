@@ -110,10 +110,14 @@ function SettingsSection({
   children: ReactNode;
 }) {
   return (
-    <section className="grid gap-4 border-t py-8 first:border-t-0 first:pt-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
+    <section className="grid gap-4 border-t border-primary-15 py-10 first:border-t-0 first:pt-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
       <div className="space-y-2">
-        <h2 className="font-semibold">{title}</h2>
-        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+        <h2 className="text-xl font-bold tracking-tight text-megaweave-forest-dark">
+          {title}
+        </h2>
+        {hint && (
+          <p className="text-base leading-relaxed text-dark/70">{hint}</p>
+        )}
         {aside}
       </div>
       <div className="min-w-0">{children}</div>
@@ -277,7 +281,7 @@ function HandoverSection({
       {error && <OrgNotice tone="error">{errorMessage(error)}</OrgNotice>}
       {data && count === 0 && <OrgNotice>{t("empty")}</OrgNotice>}
       {data && count > 0 && (
-        <ul className="divide-y rounded-lg border border-amber-200 bg-amber-50/40">
+        <ul className="divide-y divide-amber-200 rounded-2xl border border-amber-200 bg-amber-50">
           {data.handovers.map((handover) => {
             const key = handoverKey(handover);
             const candidates = members.filter(
@@ -416,7 +420,7 @@ function PublisherDisplaySection({
     <SettingsSection title={t("heading")} hint={t("hint")}>
       {error && <OrgNotice tone="error">{errorMessage(error)}</OrgNotice>}
       {current && (
-        <div className="space-y-4 rounded-lg border p-5">
+        <div className="space-y-4 rounded-2xl bg-white p-5">
           <div className="space-y-2">
             <Label htmlFor="org-publisher-display">{t("label")}</Label>
             <Select
@@ -500,7 +504,7 @@ function AutoReleaseSection({ orgUrl }: { orgUrl: string }) {
     <SettingsSection title={t("heading")} hint={t("hint")}>
       {error && <OrgNotice tone="error">{errorMessage(error)}</OrgNotice>}
       {settings && (
-        <form className="space-y-4 rounded-lg border p-5" onSubmit={save}>
+        <form className="space-y-4 rounded-2xl bg-white p-5" onSubmit={save}>
           <div className="flex items-center justify-between gap-4">
             <Label htmlFor="org-auto-release-enabled">
               {t("enabledLabel")}
@@ -712,7 +716,7 @@ function OrgAdminContent() {
             <div className="space-y-4">
               {adding && (
                 <form
-                  className="space-y-4 rounded-lg border border-primary-30 bg-primary-5 p-5"
+                  className="space-y-4 rounded-2xl border border-primary-30 bg-white p-5"
                   onSubmit={handleAddMember}
                 >
                   <div className="space-y-2">
@@ -772,7 +776,7 @@ function OrgAdminContent() {
               {overview.members.length === 0 ? (
                 <OrgNotice>{t("membersEmpty")}</OrgNotice>
               ) : (
-                <div className="overflow-hidden rounded-lg border">
+                <div className="overflow-hidden rounded-2xl bg-white">
                   <div
                     aria-hidden
                     className="hidden grid-cols-[minmax(0,2fr)_112px_minmax(0,1fr)_128px] gap-4 border-b px-4 py-2.5 text-xs text-muted-foreground md:grid"
@@ -909,7 +913,7 @@ function OrgAdminContent() {
             title={t("unitsHeading")}
             hint={t("unitsSectionHint")}
           >
-            <div className="space-y-4 rounded-lg border p-5">
+            <div className="space-y-4 rounded-2xl bg-white p-5">
               {overview.units.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   {t("unitsEmpty")}

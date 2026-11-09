@@ -142,7 +142,7 @@ function OrgAdminsEditor({
         <p className="text-sm text-muted-foreground">{t("adminsEmpty")}</p>
       )}
       {admins.length > 0 && (
-        <ul className="divide-y rounded-lg border bg-white">
+        <ul className="divide-y divide-primary-15 rounded-2xl bg-white">
           {admins.map((admin) => (
             <li
               key={admin.id}
@@ -279,7 +279,7 @@ export default function AdminOrgsPage() {
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
         <section className="min-w-0 space-y-3">
-          <h2 className="flex items-baseline gap-2 font-semibold">
+          <h2 className="flex items-baseline gap-2 text-xl font-bold tracking-tight text-megaweave-forest-dark">
             {t("listHeading")}
             {data && (
               <span className="text-sm font-normal tabular-nums text-muted-foreground">
@@ -296,7 +296,7 @@ export default function AdminOrgsPage() {
             <OrgNotice>{t("empty")}</OrgNotice>
           )}
           {data && data.orgs.length > 0 && (
-            <ul className="divide-y rounded-lg border bg-white">
+            <ul className="divide-y divide-primary-15 rounded-2xl bg-white">
               {data.orgs.map((org) => {
                 const editing = editingId === org.id;
                 return (
@@ -402,13 +402,13 @@ export default function AdminOrgsPage() {
         <form
           ref={formRef}
           className={cn(
-            "scroll-mt-6 space-y-5 rounded-lg border bg-white p-5 lg:sticky lg:top-6",
+            "scroll-mt-6 space-y-5 rounded-2xl bg-white p-5 lg:sticky lg:top-6",
             editingId && "border-primary-50 ring-1 ring-primary-30",
           )}
           onSubmit={handleSubmit}
         >
           <div className="space-y-1">
-            <h2 className="font-semibold">
+            <h2 className="text-xl font-bold tracking-tight text-megaweave-forest-dark">
               {editingId ? t("editHeading") : t("createHeading")}
             </h2>
             {editingName && (

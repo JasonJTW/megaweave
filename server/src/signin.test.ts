@@ -1,6 +1,6 @@
 // signin.test.ts
 import express, { NextFunction, Request, Response } from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import dbPool from "./utils/db";
 import { createUserSession } from "./session";
 import { generateSalt, hashPassword } from "./passwordHasher";

@@ -7,7 +7,7 @@
  */
 
 import express from "express";
-import request from "supertest";
+import { request } from "./testUtils/testApi";
 import messagesRouter from "./messages";
 import { messageService } from "./utils/messageService";
 import { defaultImageStorage } from "./storage/ImageStorage";

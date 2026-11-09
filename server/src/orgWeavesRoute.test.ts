@@ -129,7 +129,7 @@ async function requestAs(
   signInAs(userId);
   return api()
     .post("/api/weaves")
-    .send({ postId, items: [{ itemId: null, quantity: 1 }], ...extra });
+    .send({ postId, items: [{ itemId: fakeDb.items.find((i) => i.post_id === postId)!.id, quantity: 1 }], ...extra });
 }
 
 function weaveRow(weaveId: number) {
@@ -216,6 +216,47 @@ describe("POST /api/weaves on an Internal org item: who may request", () => {
       receiver_org_unit_id: IT_DEPT,
       status: "requested",
     });
+  });
+});
+
+describe("POST /api/weaves on an org item: items and quantities", () => {
+  //* 組織物品要記下品項與數量、交接時扣庫存，不接受「整篇貼文」申請
+  it.each([
+    ["the whole post", { items: [{ itemId: null, quantity: 1 }] }],
+    ["no items at all", { items: [] }],
+  ])("rejects a request for %s with 400 INVALID_REQUEST and writes nothing", async (_what, body) => {
+    const { postId } = await listInternalItem();
+    signInAs(IT_CONTACT);
+    const res = await api()
+      .post("/api/weaves")
+      .send({ postId, ...body, actingUnitId: IT_DEPT });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_REQUEST");
+    expect(fakeDb.weaves).toHaveLength(0);
+  });
+
+  it("takes the handed-over pieces out of the item's stock", async () => {
+    const { postId, itemId } = await listInternalItem();
+    signInAs(IT_CONTACT);
+    const res = await api()
+      .post("/api/weaves")
+      .send({ postId, items: [{ itemId, quantity: 2 }], actingUnitId: IT_DEPT });
+    expect(res.status).toBe(201);
+    const weaveId = res.body.weaveId as number;
+
+    for (const [userId, status] of [
+      [GA_CONTACT, "approved"],
+      [GA_CONTACT, "completed"],
+      [IT_CONTACT, "completed"],
+    ] as const) {
+      signInAs(userId);
+      const step = await api().patch(`/api/weaves/${weaveId}/status`).send({ status });
+      expect(step.status).toBe(200);
+    }
+
+    expect(weaveRow(weaveId).status).toBe("completed");
+    expect(fakeDb.items.find((i) => i.id === itemId)!.quantity).toBe(MONITOR.quantity - 2);
   });
 });
 

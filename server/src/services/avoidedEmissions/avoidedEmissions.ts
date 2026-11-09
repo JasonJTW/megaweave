@@ -1,7 +1,7 @@
 // server/src/services/avoidedEmissions/avoidedEmissions.ts
 // 二手物再使用的避免排放量估算（純函式，無 I/O）。
 //
-//   潛在值（1:1 取代）  P = 重量 kg × 類別生產係數 EF (kgCO2e/kg)
+//   理想值（1:1 取代）  P = 重量 kg × 類別生產係數 EF (kgCO2e/kg)
 //   估算值（含取代率）  A = P × 取代率 R
 //
 // EF：家具類 = min(材質組成 × 環境部材質係數, 參考產品 EPD 的 A1–A3 平均)；

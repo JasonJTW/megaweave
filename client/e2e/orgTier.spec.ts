@@ -77,9 +77,14 @@ test.describe("Unit Contact releases an item to Members", () => {
         `${API_URL}/api/posts/${released!.id}`,
       );
       expect(detail.ok(), await detail.text()).toBeTruthy();
-      const { post } = (await detail.json()) as { post: { id: number } };
+      const { post } = (await detail.json()) as {
+        post: { id: number; items: Array<{ id: number }> };
+      };
       const sent = await memberApi.post(`${API_URL}/api/weaves`, {
-        data: { postId: post.id, items: [{ itemId: null, quantity: 1 }] },
+        data: {
+          postId: post.id,
+          items: [{ itemId: post.items[0].id, quantity: 1 }],
+        },
       });
       expect(sent.status(), await sent.text()).toBe(201);
 

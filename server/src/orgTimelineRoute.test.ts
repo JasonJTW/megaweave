@@ -118,7 +118,8 @@ const MONITOR = {
   title: "27 吋螢幕",
   content: "汰換下來，功能正常",
   orgCategory: "display",
-  quantity: 5,
+  //* 每次申請 2 件、交接會扣庫存：要夠兩次交接加一筆進行中的申請
+  quantity: 6,
   unitWeightKg: 5,
   conditionLevel: 2,
   assetNumber: "A-0001",
@@ -276,7 +277,7 @@ async function requestAs(userId: number, postId: number, actingUnitId?: number |
   signInAs(userId);
   const res = await api()
     .post("/api/weaves")
-    .send({ postId, items: [{ itemId: null, quantity: 2 }], actingUnitId });
+    .send({ postId, items: [{ itemId: fakeDb.items.find((i) => i.post_id === postId)!.id, quantity: 2 }], actingUnitId });
   expect(res.status).toBe(201);
   return res.body.weaveId as number;
 }

@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Button } from "@/components/ui/button";
 import { hostName, OrgAccess, OrgItem, requestJson } from "@/lib/orgApi";
+import { compactButton } from "@/components/org/OrgShell";
 import { isOrgListingKey } from "@/lib/orgSwrKeys";
 
 function useRemaining(dueAt: string | null): number | null {
@@ -76,13 +77,14 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
         className="flex flex-wrap items-center gap-2"
         data-testid="org-pending-public"
       >
-        <span className="text-sm text-amber-700">
+        <span className="inline-flex h-6 items-center whitespace-nowrap rounded-full bg-amber-50 px-2.5 text-xs font-medium tabular-nums text-amber-900 ring-1 ring-inset ring-amber-200">
           {remaining && remaining > 0
             ? t("pendingPublic", { time: formatRemaining(remaining) })
             : t("pendingPublicDue")}
         </span>
         <Button
           size="sm"
+          className={compactButton}
           variant="outline"
           disabled={busy}
           onClick={() =>
@@ -98,6 +100,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
         {org.isDemo && (
           <Button
             size="sm"
+            className={compactButton}
             disabled={busy}
             onClick={() =>
               run(
@@ -118,6 +121,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
     return (
       <Button
         size="sm"
+        className={compactButton}
         variant="outline"
         disabled={busy}
         onClick={() => {
@@ -141,6 +145,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
     return (
       <Button
         size="sm"
+        className={compactButton}
         variant="outline"
         disabled={busy}
         onClick={() => setConfirming(true)}
@@ -155,7 +160,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
     <div
       role="group"
       aria-label={t("publicConfirmTitle", { title: item.title })}
-      className="w-72 space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm"
+      className="w-72 space-y-2 whitespace-normal rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm"
     >
       <p className="font-semibold">
         {t("publicConfirmTitle", { title: item.title })}
@@ -163,9 +168,9 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
       {item.assetNumber && (
         <p>{t("publicConfirmAsset", { asset: item.assetNumber })}</p>
       )}
-      <p className="text-gray-600">{t("publicConfirmBody")}</p>
+      <p className="text-amber-900/80">{t("publicConfirmBody")}</p>
       {needsDisposal && (
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 font-medium">
           <input
             type="checkbox"
             checked={disposalConfirmed}
@@ -174,9 +179,10 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
           {t("publicConfirmDisposal")}
         </label>
       )}
-      <div className="flex gap-2">
+      <div className="flex gap-2 pt-1">
         <Button
           size="sm"
+          className={compactButton}
           disabled={busy || (needsDisposal && !disposalConfirmed)}
           onClick={async () => {
             const ok = await run(
@@ -196,6 +202,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
         </Button>
         <Button
           size="sm"
+          className={compactButton}
           variant="ghost"
           disabled={busy}
           onClick={() => setConfirming(false)}

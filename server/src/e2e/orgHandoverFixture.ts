@@ -118,9 +118,11 @@ export async function seedOrgHandoverFixture(mysql: Pool): Promise<void> {
      VALUES (?, ?, ?, ?, ?, 'approved')`,
     [item, leaver, requester, receivingUnit.insertId, await conversationOf(mysql, leaver, requester)],
   );
-  await mysql.query("INSERT INTO weave_items (weave_id, item_id, quantity) VALUES (?, NULL, 1)", [
-    approved.insertId,
-  ]);
+  // 組織物品的申請一定指定品項（requestWeave）
+  await mysql.query(
+    "INSERT INTO weave_items (weave_id, item_id, quantity) SELECT ?, id, 1 FROM items WHERE post_id = ?",
+    [approved.insertId, item],
+  );
 
   const receivingItem = await listItem(
     mysql,
@@ -134,7 +136,8 @@ export async function seedOrgHandoverFixture(mysql: Pool): Promise<void> {
      VALUES (?, ?, ?, ?, 'requested')`,
     [receivingItem, requester, leaver, handoverUnit.insertId],
   );
-  await mysql.query("INSERT INTO weave_items (weave_id, item_id, quantity) VALUES (?, NULL, 1)", [
-    pending.insertId,
-  ]);
+  await mysql.query(
+    "INSERT INTO weave_items (weave_id, item_id, quantity) SELECT ?, id, 1 FROM items WHERE post_id = ?",
+    [pending.insertId, receivingItem],
+  );
 }

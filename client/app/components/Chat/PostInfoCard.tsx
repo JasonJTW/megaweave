@@ -121,8 +121,10 @@ const PostInfoCard: React.FC<PostInfoCardProps> = ({
     );
   };
 
+  //* 組織物品一定要指定品項與數量（要扣庫存、留紀錄），沒選到任何有庫存的品項就不能送出整篇貼文
+  const isOrgPost = post.org_id != null;
   const isSubmitDisabled =
-    (draft.mode === "custom" && selectedCount === 0) ||
+    ((draft.mode === "custom" || isOrgPost) && selectedCount === 0) ||
     actingUnitsLoading ||
     (hasActingChoice && actingAs === "");
   const selectedLabel = getDraftSelectedCount(draft);

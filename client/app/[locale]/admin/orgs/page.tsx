@@ -3,7 +3,7 @@
 //* Platform Admin 開通組織（PRD 0001 §5.1）
 //* 頁面守門：middleware 的 ADMIN_ROUTES（cookie，僅外觀）；真正的權限由 server `requireRole("admin")` 把關
 //* 管理員增減：Platform Admin 在每個組織都等同 Org Admin（ADR 0003），沿用 `/api/org-admin` 的成員 API
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import toast from "react-hot-toast";
@@ -11,8 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -24,6 +22,8 @@ import { ApiError } from "@/lib/apiError";
 import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Link } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
+import { compactButton, OrgNotice } from "@/components/org/OrgShell";
 import {
   addAdminRequest,
   demoteAdminRequest,
@@ -132,7 +132,7 @@ function OrgAdminsEditor({
   }
 
   return (
-    <div className="space-y-3 border-t pt-3">
+    <div className="space-y-3 rounded-lg bg-primary-5 p-4">
       {error && (
         <p className="text-sm text-destructive">
           {errorMessage(error, t("adminsLoadFailed"))}
@@ -142,17 +142,21 @@ function OrgAdminsEditor({
         <p className="text-sm text-muted-foreground">{t("adminsEmpty")}</p>
       )}
       {admins.length > 0 && (
-        <ul className="space-y-2">
+        <ul className="divide-y rounded-lg border bg-white">
           {admins.map((admin) => (
             <li
               key={admin.id}
-              className="flex items-center justify-between gap-2"
+              className="flex items-center justify-between gap-2 px-3 py-2"
             >
               <span className="truncate text-sm">{admin.email}</span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className={cn(
+                  compactButton,
+                  "border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive",
+                )}
                 disabled={busy}
                 onClick={() => handleRemove(admin)}
               >
@@ -170,6 +174,7 @@ function OrgAdminsEditor({
           <Label htmlFor={`org-${orgId}-add-admin`}>{t("addAdminLabel")}</Label>
           <Input
             id={`org-${orgId}-add-admin`}
+            className="bg-white"
             type="email"
             required
             value={email}
@@ -177,7 +182,11 @@ function OrgAdminsEditor({
           />
           <p className="text-xs text-muted-foreground">{t("addAdminHint")}</p>
         </div>
-        <Button type="submit" disabled={busy || !data}>
+        <Button
+          type="submit"
+          className="sm:mb-5 sm:w-auto"
+          disabled={busy || !data}
+        >
           {busy ? t("saving") : t("addAdmin")}
         </Button>
       </form>
@@ -192,6 +201,8 @@ export default function AdminOrgsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adminsOpenId, setAdminsOpenId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   const { data, error, mutate } = useSWR(`${hostName}/api/admin/orgs`, (url) =>
     requestJson<{ orgs: Org[] }>(url),
@@ -211,6 +222,9 @@ export default function AdminOrgsPage() {
       autoReleaseDays: String(org.autoReleaseDays),
       orgAdminEmail: "",
     });
+    //* 表單在右欄（手機在清單下方）：帶到表單並聚焦名稱
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    nameRef.current?.focus({ preventScroll: true });
   }
 
   function resetForm() {
@@ -254,91 +268,227 @@ export default function AdminOrgsPage() {
     }
   }
 
+  const editingName = data?.orgs.find((o) => o.id === editingId)?.name;
+
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+    <main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+      <header className="mb-6 space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {editingId ? t("editHeading") : t("createHeading")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="org-name">{t("nameLabel")}</Label>
-              <Input
-                id="org-name"
-                required
-                maxLength={100}
-                placeholder={t("namePlaceholder")}
-                value={form.name}
-                onChange={(e) => update("name", e.target.value)}
-              />
-            </div>
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="min-w-0 space-y-3">
+          <h2 className="flex items-baseline gap-2 font-semibold">
+            {t("listHeading")}
+            {data && (
+              <span className="text-sm font-normal tabular-nums text-muted-foreground">
+                {data.orgs.length}
+              </span>
+            )}
+          </h2>
+          {error && (
+            <OrgNotice tone="error">
+              {errorMessage(error, t("loadFailed"))}
+            </OrgNotice>
+          )}
+          {data && data.orgs.length === 0 && (
+            <OrgNotice>{t("empty")}</OrgNotice>
+          )}
+          {data && data.orgs.length > 0 && (
+            <ul className="divide-y rounded-lg border bg-white">
+              {data.orgs.map((org) => {
+                const editing = editingId === org.id;
+                return (
+                  <li
+                    key={org.id}
+                    className={cn(
+                      "space-y-3 p-4 transition-colors",
+                      editing && "bg-primary-5",
+                    )}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{org.name}</span>
+                          {org.isDemo && (
+                            <span className="inline-flex h-6 items-center rounded-full bg-amber-50 px-2.5 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-200">
+                              {t("demoBadge")}
+                            </span>
+                          )}
+                          {editing && (
+                            <span className="text-xs text-primary">
+                              {t("editingNow")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t(`publisherDisplay.${org.publisherDisplay}`)}
+                          {" · "}
+                          {org.autoReleaseEnabled
+                            ? t("autoReleaseOn", { days: org.autoReleaseDays })
+                            : t("autoReleaseOff")}
+                        </p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {t("orgAdminsLabel")}：
+                          {org.orgAdmins.length > 0 ? (
+                            <span className="text-foreground">
+                              {org.orgAdmins
+                                .map((admin) => admin.email)
+                                .join("、")}
+                            </span>
+                          ) : (
+                            <span className="text-amber-900">
+                              {t("noAdmins")}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className={compactButton}
+                        >
+                          <Link href={`/org-admin?org=${org.id}`}>
+                            {t("openOrgAdmin")}
+                          </Link>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            compactButton,
+                            adminsOpenId === org.id && "bg-primary-15",
+                          )}
+                          aria-expanded={adminsOpenId === org.id}
+                          onClick={() =>
+                            setAdminsOpenId(
+                              adminsOpenId === org.id ? null : org.id,
+                            )
+                          }
+                        >
+                          {adminsOpenId === org.id
+                            ? t("hideAdmins")
+                            : t("manageAdmins")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={compactButton}
+                          disabled={editing}
+                          onClick={() => startEdit(org)}
+                        >
+                          {t("edit")}
+                        </Button>
+                      </div>
+                    </div>
+                    {adminsOpenId === org.id && (
+                      <OrgAdminsEditor
+                        orgId={org.id}
+                        onChanged={() => mutate()}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="org-publisher-display">
-                {t("publisherDisplayLabel")}
-              </Label>
-              <Select
-                value={form.publisherDisplay}
-                onValueChange={(value) =>
-                  update("publisherDisplay", value as PublisherDisplay)
-                }
+        <form
+          ref={formRef}
+          className={cn(
+            "scroll-mt-6 space-y-5 rounded-lg border bg-white p-5 lg:sticky lg:top-6",
+            editingId && "border-primary-50 ring-1 ring-primary-30",
+          )}
+          onSubmit={handleSubmit}
+        >
+          <div className="space-y-1">
+            <h2 className="font-semibold">
+              {editingId ? t("editHeading") : t("createHeading")}
+            </h2>
+            {editingName && (
+              <p className="text-sm text-muted-foreground">{editingName}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="org-name">{t("nameLabel")}</Label>
+            <Input
+              id="org-name"
+              ref={nameRef}
+              required
+              maxLength={100}
+              placeholder={t("namePlaceholder")}
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="org-publisher-display">
+              {t("publisherDisplayLabel")}
+            </Label>
+            <Select
+              value={form.publisherDisplay}
+              onValueChange={(value) =>
+                update("publisherDisplay", value as PublisherDisplay)
+              }
+            >
+              <SelectTrigger
+                id="org-publisher-display"
+                className="h-[38px] text-base"
               >
-                <SelectTrigger id="org-publisher-display">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PUBLISHER_DISPLAYS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {t(`publisherDisplay.${option}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {t("publisherDisplayHint")}
-              </p>
-            </div>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PUBLISHER_DISPLAYS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {t(`publisherDisplay.${option}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t("publisherDisplayHint")}
+            </p>
+          </div>
 
+          <div className="flex items-start justify-between gap-4 border-t pt-4">
+            <div className="space-y-1">
+              <Label htmlFor="org-is-demo">{t("isDemoLabel")}</Label>
+              <p className="text-xs text-muted-foreground">{t("isDemoHint")}</p>
+            </div>
+            <Switch
+              id="org-is-demo"
+              checked={form.isDemo}
+              onCheckedChange={(checked) => update("isDemo", checked)}
+            />
+          </div>
+
+          <div className="space-y-3 border-t pt-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <Label htmlFor="org-is-demo">{t("isDemoLabel")}</Label>
+                <Label htmlFor="org-auto-release">
+                  {t("autoReleaseLabel")}
+                </Label>
                 <p className="text-xs text-muted-foreground">
-                  {t("isDemoHint")}
+                  {t("autoReleaseHint")}
                 </p>
               </div>
               <Switch
-                id="org-is-demo"
-                checked={form.isDemo}
-                onCheckedChange={(checked) => update("isDemo", checked)}
+                id="org-auto-release"
+                checked={form.autoReleaseEnabled}
+                onCheckedChange={(checked) =>
+                  update("autoReleaseEnabled", checked)
+                }
               />
             </div>
-
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="org-auto-release">
-                    {t("autoReleaseLabel")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t("autoReleaseHint")}
-                  </p>
-                </div>
-                <Switch
-                  id="org-auto-release"
-                  checked={form.autoReleaseEnabled}
-                  onCheckedChange={(checked) =>
-                    update("autoReleaseEnabled", checked)
-                  }
-                />
-              </div>
+            {form.autoReleaseEnabled && (
               <div className="flex items-center gap-2">
                 <Label htmlFor="org-auto-release-days">
                   {t("autoReleaseDaysLabel")}
@@ -350,114 +500,48 @@ export default function AdminOrgsPage() {
                   max={365}
                   step={1}
                   required
-                  className="w-24"
+                  clearable={false}
+                  className="w-24 tabular-nums"
                   value={form.autoReleaseDays}
                   onChange={(e) => update("autoReleaseDays", e.target.value)}
                 />
               </div>
-            </div>
-
-            {!editingId && (
-              <div className="space-y-2">
-                <Label htmlFor="org-admin-email">
-                  {t("orgAdminEmailLabel")}
-                </Label>
-                <Input
-                  id="org-admin-email"
-                  type="email"
-                  required
-                  value={form.orgAdminEmail}
-                  onChange={(e) => update("orgAdminEmail", e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("orgAdminEmailHint")}
-                </p>
-              </div>
             )}
+          </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? t("saving") : editingId ? t("save") : t("create")}
-              </Button>
-              {editingId && (
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  {t("cancel")}
-                </Button>
-              )}
+          {!editingId && (
+            <div className="space-y-2 border-t pt-4">
+              <Label htmlFor="org-admin-email">{t("orgAdminEmailLabel")}</Label>
+              <Input
+                id="org-admin-email"
+                type="email"
+                required
+                value={form.orgAdminEmail}
+                onChange={(e) => update("orgAdminEmail", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("orgAdminEmailHint")}
+              </p>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          )}
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">{t("listHeading")}</h2>
-        {error && (
-          <p className="text-sm text-destructive">
-            {errorMessage(error, t("loadFailed"))}
-          </p>
-        )}
-        {data && data.orgs.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t("empty")}</p>
-        )}
-        <ul className="space-y-2">
-          {data?.orgs.map((org) => (
-            <li key={org.id} className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{org.name}</span>
-                    {org.isDemo && (
-                      <Badge variant="secondary">{t("demoBadge")}</Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {t(`publisherDisplay.${org.publisherDisplay}`)}
-                    {" · "}
-                    {org.autoReleaseEnabled
-                      ? t("autoReleaseOn", { days: org.autoReleaseDays })
-                      : t("autoReleaseOff")}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {t("orgAdminsLabel")}：
-                    {org.orgAdmins.map((admin) => admin.email).join("、")}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/org-admin?org=${org.id}`}>
-                      {t("openOrgAdmin")}
-                    </Link>
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    aria-expanded={adminsOpenId === org.id}
-                    onClick={() =>
-                      setAdminsOpenId(adminsOpenId === org.id ? null : org.id)
-                    }
-                  >
-                    {adminsOpenId === org.id
-                      ? t("hideAdmins")
-                      : t("manageAdmins")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => startEdit(org)}
-                  >
-                    {t("edit")}
-                  </Button>
-                </div>
-              </div>
-              {adminsOpenId === org.id && (
-                <OrgAdminsEditor orgId={org.id} onChanged={() => mutate()} />
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+          <div className="flex justify-end gap-2 border-t pt-4">
+            {editingId && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-auto"
+                onClick={resetForm}
+              >
+                {t("cancel")}
+              </Button>
+            )}
+            <Button type="submit" className="w-auto" disabled={submitting}>
+              {submitting ? t("saving") : editingId ? t("save") : t("create")}
+            </Button>
+          </div>
+        </form>
+      </div>
     </main>
   );
 }

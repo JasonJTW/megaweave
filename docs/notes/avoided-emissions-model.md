@@ -1,9 +1,9 @@
-# MegaWeaving 避免排放量估算模型（v2026-11-08）
+# MegaWeaving 避免排放量估算模型（v2026-11-09）
 
 > **用途**：E6-2「估算減碳量（CO2e）」報表（GitHub #136、#143；PRD 0001 §E6-2、§5.1）的計算方法、係數來源與方法學論證。研究背景見 [avoided-emissions-reuse-research.md](avoided-emissions-reuse-research.md)。
 > **實作**：`server/src/services/avoidedEmissions/`（`factorTable.ts` 係數表、`avoidedEmissions.ts` 計算、`avoidedEmissions.test.ts` 26 項單元測試）；`server/src/scripts/checkEmissionFactors.ts` 對照環境部 API。
 > **原始資料快照**：`docs/notes/data/moenv-cfp-p-02-2026-11-08.json`（環境部 CFP_P_02 全表 1,188 筆）、`docs/notes/data/epa-warm-v16-exhibit-1-1-excerpt-2026-11-08.csv`（WARM v16 Exhibit 1-1 摘錄）、`docs/notes/data/unu-ewaste-guidelines-ed3-annex6-average-weights-2026-11-08.csv`（UNU 指引第 3 版每台平均重量）與同版 UNU-KEY 定義表。EPD 與其他 PDF 只存在 session scratchpad，數值逐筆抄進 `factorTable.ts` 並註明表號。
-> **係數表版本**：`FACTOR_TABLE_VERSION = "2026-11-08"`，每筆報表結果都帶這個版本號。
+> **係數表版本**：`FACTOR_TABLE_VERSION = "2026-11-09"`，每筆報表結果都帶這個版本號。2026-11-09 版把辦公椅參考產品從 4 份擴充為 9 份（新增 5 份亞洲製造或平價品牌 EPD，§4.4），辦公椅係數 4.122 → 3.441。
 
 ---
 
@@ -37,7 +37,7 @@ R_c   取代率：這件二手品實際取代一件新品生產的比例。預�
 
 | 類別 | EF_c (kgCO2e/kg) | EF 依據 | 預設重量 (kg) | 理想值 P | 估算值 A (R=0.5) |
 |---|---|---|---|---|---|
-| 辦公椅 | 4.122 | 材質法（EPD 平均 4.813） | 13.8 | 56.9 | 28.4 |
+| 辦公椅 | 3.441 | 材質法（EPD 平均 5.092） | 13.8 | 47.5 | 23.7 |
 | 辦公桌／會議桌 | 1.604 | EPD（材質法 1.971） | 37.4 | 60.0 | 30.0 |
 | 木質櫃架 | 1.120 | 100% 木質板材 | 11 | 12.3 | 6.2 |
 | 金屬櫃架 | 2.476 | 材質法（EPD 平均 3.043） | 16 | 39.6 | 19.8 |
@@ -58,14 +58,14 @@ R_c   取代率：這件二手品實際取代一件新品生產的比例。預�
 
 | 類別 | 件數 | 重量 (kg) | 理想值 (kgCO2e) | 估算值 (kgCO2e) |
 |---|---|---|---|---|
-| 辦公椅 | 20 | 276.0 | 1,137.6 | 568.8 |
+| 辦公椅 | 20 | 276.0 | 949.6 | 474.8 |
 | 辦公桌／會議桌 | 10 | 374.0 | 600.0 | 300.0 |
 | 金屬櫃架 | 5 | 200.0 | 495.2 | 247.6 |
 | 筆電／平板 | 8 | 12.8 | 420.9 | 210.4 |
 | 螢幕／電視 | 6 | 49.2 | 1,311.9 | 656.0 |
 | 書籍與紙本 | 50 | 25.0 | 34.4 | 17.2 |
 | 小家電（不計入） | 2 | 6.0 | 0 | 0 |
-| **合計** | 101 | **943.0**（其中預設重量 724.2） | **4,000.0** | **2,000.0** |
+| **合計** | 101 | **943.0**（其中預設重量 724.2） | **3,812.0** | **1,906.0** |
 
 報表應同時揭露：預設重量占總重 77%、2 件小家電未計入。
 
@@ -131,7 +131,27 @@ R_c   取代率：這件二手品實際取代一件新品生產的比例。預�
 
 ### 4.4 家具參考產品（EPD）
 
-元件重量逐筆抄自各 EPD 的材質表；`factorTable.ts` 的 `REFERENCE_PRODUCTS` 保留原始標籤。無台灣係數的元件（玻纖、再生 PET、羊毛、粉體塗料、其他）計 0 但保留在總重中，會拉低係數（偏保守）。
+**什麼是 EPD**：環境產品宣告（Environmental Product Declaration），是廠商依 ISO 14025 對單一產品做生命週期評估（LCA），由獨立第三方查證後公開的文件。同類產品依同一份產品類別規則（PCR，例如 BIFMA PCR for Seating、EN 15804 + c-PCR-021 Furniture）計算，通常 5 年有效。結果分階段列出：A1–A3 是原料取得、運輸到廠、製造（搖籃到大門），之後是 A4 運送、B 使用、C 廢棄、D 回收效益。本模型從 EPD 取兩樣東西：**材質表**（推算平均產品的材質比例，乘環境部係數）與 **A1–A3 GWP**（封頂值）。只取 A1–A3，因為再使用避免的就是一件新品的生產。
+
+元件重量逐筆抄自各 EPD 的材質表；`factorTable.ts` 的 `REFERENCE_PRODUCTS` 保留原始標籤。無台灣係數的元件（玻纖、再生料、羊毛、未揭露纖維種類的布料、粉體塗料、膠、其他）計 0 但保留在總重中，會拉低係數（偏保守）。
+
+**辦公椅納入條件**（2026-11-09 起；沒有任何方法學指定參考產品，eBay × Anthesis 與 IVL 只要求「代表性產品」，以下是本模型自訂的條件）：
+1. 第三方查證、在 2026-11-09 仍有效的 EPD（NSF、EPD International、EPD-Norge 等 ISO 14025 計畫）。
+2. 一般辦公任務椅，不含高腳椅（stool）、休閒椅、會議椅。
+3. 同一個配置同時揭露材質表（kg）與 A1–A3 GWP，兩者對得起來。
+4. 一份 EPD 只取一個配置：EPD 標明「most representative」的配置優先；否則取最輕、A1–A3 最低的任務椅配置（避免同一產品重複加權，也偏保守）。
+5. 為了接近台灣市場，2026-11-09 增補的樣本限亞洲製造或平價品牌。
+
+**搜尋範圍與排除**（2026-11-09）：
+- 台灣：環境部「台灣產品碳足跡資訊」（`cfp_p_01`，938 筆有效碳標籤）與 CFP_P_02 係數庫（1,188 筆）都沒有椅子或家具產品；環境部也沒有辦公家具的碳足跡產品類別規則（只有竹製家具 23-015），廠商無規則可申請碳標籤。逐家查過的台灣主流品牌：
+  - Ergohuman（聯友椅業，廣東生產）：Elite、Project Mirus、Project Ergohuman 三款有 SGS 依 ISO 14067 查證的搖籃到大門碳足跡聲明，但 kgCO2e 未公開，官網註明向業務索取（<https://www.comfort.global/ergohuman-environmental-product-declarations>）。產品頁公開材質比例（Elite G2 鋁合金 61%），若納入，辦公椅係數會上升。不是 ISO 14025 EPD，目前不符條件 1。
+  - 震旦家具：只有公司層級碳足跡核算與 DNV 碳中和證書，沒有單一產品數字。
+  - 大將作、Backbone、歐德、吉加吉：沒有找到 EPD 或碳足跡。
+- 台灣常見的日韓品牌與代工：Okamura、SIDIZ 沒有公開 EPD；永藝（中國代工）2025 永續報告揭露兩款辦公椅做過 ISO 14067 查證，未列數字；《人民日報》2024-02-17 報導的杭州人體工學椅 63.59 kgCO2e 沒有廠商、重量與材質，無法使用。
+- Atwoka（中國，EPD-IES-0017624）：只公布五款中「worst case」的一組結果，沒說是哪一款，材質表與 GWP 對不起來，違反條件 3。
+- Steelcase Think、Personality Plus 的 stool 配置：違反條件 2；Think 的馬來西亞配置：同一產品已取印度配置（條件 4）。
+- Haworth Very、Zody、Soji 的亞太版（EPD-IES-0013323、0006186、0013322）：符合條件但尚未逐份核對，Haworth 亞太已有 Aloha Active 一份，留待下一版。
+- IKEA MARKUS、FLINTAN 等平價椅：找不到公開 EPD。
 
 | 類別 | 產品（EPD 編號） | 重量 kg | EPD A1–A3 kgCO2e | EPD 取值位置 |
 |---|---|---|---|---|
@@ -139,9 +159,16 @@ R_c   取代率：這件二手品實際取代一件新品生產的比例。預�
 | 辦公椅 | Herman Miller Aeron 鋁椅腳（NSF EPD10431，2022） | 20.63 | 58.0 | CML 表 GWP A1-A3 |
 | 辦公椅 | Haworth Soji 歐洲製（EPD-IES-0012459:006，2025） | 19.0 | 142 | EN 15804+A2 表 GWP-GHG A1-A3（grid） |
 | 辦公椅 | Kinnarps Task Chair 6240（NEPD-3617-2541-EN，2022） | 20.03 | 79.4 | Key environmental indicators A1-A3 |
+| 辦公椅 | Steelcase Personality Plus 任務椅 APAC，印度製（NSF EPD11108，2025） | 17.77 | 76.8 | Task chair configuration：Materials acquisition 64.3 + Production 12.5（GWP excl. biogenic） |
+| 辦公椅 | Steelcase Think APAC 任務椅，印度製（NSF EPD11087，2025） | 17.033 | 105.3 | India configuration：Materials acquisition 86.0 + Production 19.3 |
+| 辦公椅 | Haworth Aloha Active 網背，上海／清奈製（EPD-IES-0013321:003，2025） | 15.34 | 88.3 | IPCC AR6 GWP excl biogenic：Material Acquisition 70.4 + Production 17.9 |
+| 辦公椅 | KOKUYO No. 16 Chair，印度製（EPD-IES-0015164:002，2026） | 14.9 | 81.9 | GWP-GHG A1-A3 |
+| 辦公椅 | Almachair ATLANTA，中國廣東代工（EPD-IES-0026478:001，2025） | 19.71 | 99.7 | GWP-GHG A1-A3 |
 | 辦公桌 | Haworth YourPlace Core 1600×800 固定高度（EPD-IES-0015450:003，2025） | 37.4 | 60.0 | EN 15804+A2 表 GWP-GHG A1-A3（grid） |
 | 金屬櫃架 | Bisley Glide 拉門鋼櫃最小尺寸（S-P-01613，2019，已過期 2024-08-28） | 31 | 88.1 | GWP fossil：Upstream 77.2 + Core 10.9 |
 | 金屬櫃架 | Bisley Note 活動櫃最小尺寸（S-P-01616，2019，已過期 2024-08-28） | 16 | 54.94 | GWP fossil：Upstream 45.2 + Core 9.74 |
+
+材質對應的兩個判斷：KOKUYO「Nylon + glass fibre」6 kg 未揭露玻纖比例，比照 Kinnarps PAGF30 以 70/30 拆分、玻纖部分不計；ATLANTA 的「PCR PA」1.2 kg 是再生尼龍，比照 Aeron 的 Recycled PET 不套原生係數。
 
 沒有找到固定高度辦公桌以外的 EPD 時，不採用升降桌 EPD（Steelcase Migration Intro、Kinnarps Series P 都含馬達與加厚鋼架，與台灣常見的 OA 桌不同）。
 
@@ -151,7 +178,7 @@ R_c   取代率：這件二手品實際取代一件新品生產的比例。預�
 
 | 類別 | 預設 kg | 來源與位置 |
 |---|---|---|
-| 辦公椅 | 13.8 | 四份辦公椅 EPD 中最輕者（Steelcase Series 1，13.787） |
+| 辦公椅 | 13.8 | 九份辦公椅 EPD 中最輕者（Steelcase Series 1，13.787） |
 | 辦公桌／會議桌 | 37.4 | Haworth YourPlace Core EPD |
 | 木質櫃架 | 11 | CRA 2020 §6「Other Home Furniture under 15kg」平均 11 kg（FRN 2009），兩級中較輕者 |
 | 金屬櫃架 | 16 | Bisley Note 活動櫃 EPD 最小尺寸 |
@@ -195,18 +222,24 @@ UNU 2012 → 2024 換版對預設值的影響：桌機 8.8 → 6.26、手機 0.1
 
 | 產品 | EPD A1–A3 /kg | 本產品材質法 /kg | 材質法 ÷ EPD | 類別係數 ÷ EPD |
 |---|---|---|---|---|
-| Steelcase Series 1 | 5.37 | 3.23 | 0.60 | 0.77 |
-| Herman Miller Aeron | 2.81 | 6.35 | **2.26** | **1.47** |
-| Haworth Soji | 7.47 | 3.49 | 0.47 | 0.55 |
-| Kinnarps 6240 | 3.96 | 3.04 | 0.77 | 1.04 |
+| Steelcase Series 1 | 5.37 | 3.23 | 0.60 | 0.64 |
+| Herman Miller Aeron | 2.81 | 6.35 | **2.26** | **1.22** |
+| Haworth Soji | 7.47 | 3.49 | 0.47 | 0.46 |
+| Kinnarps 6240 | 3.96 | 3.04 | 0.77 | 0.87 |
+| Steelcase Personality Plus APAC | 4.32 | 2.81 | 0.65 | 0.80 |
+| Steelcase Think APAC（印度） | 6.18 | 3.73 | 0.60 | 0.56 |
+| Haworth Aloha Active AP | 5.76 | 2.90 | 0.50 | 0.60 |
+| KOKUYO No. 16 | 5.50 | 2.33 | 0.42 | 0.63 |
+| Almachair ATLANTA | 5.06 | 2.49 | 0.49 | 0.68 |
 | Haworth YourPlace（桌） | 1.60 | 1.97 | **1.23** | 1.00 |
 | Bisley Glide（鋼櫃） | 2.84 | 2.47 | 0.87 | 0.87 |
 | Bisley Note（活動櫃） | 3.43 | 2.49 | 0.72 | 0.72 |
 
 解讀：
-- **材質法通常偏低**（0.47–0.87），因為環境部係數只到原料出廠，不含成型、組裝、塗裝與廠內能耗。這是預期中的保守偏差。
+- **材質法通常偏低**（0.42–0.87），因為環境部係數只到原料出廠，不含成型、組裝、塗裝與廠內能耗。這是預期中的保守偏差。
 - **兩個反例**：Aeron 51% 是高再生料壓鑄鋁，套原生鋁錠 9.85 就高估 2.26 倍；YourPlace 的纖維板含 80% 再生料、鋼材 51% 再生料，歐洲材料比台灣 MDF、鋼捲係數低。
-- 因此家具類係數取 **min（材質法, EPD 質量加權平均）**。辦公椅 4.122 < 4.813，金屬櫃 2.476 < 3.043，維持材質法；辦公桌 1.971 > 1.604，改用 EPD。封頂後，類別係數仍高於 Aeron（1.47 倍，高再生鋁）與 Kinnarps 6240（1.04 倍），但比四份椅子 EPD 的質量加權平均低 14%。
+- 因此家具類係數取 **min（材質法, EPD 質量加權平均）**。辦公椅 3.441 < 5.092，金屬櫃 2.476 < 3.043，維持材質法；辦公桌 1.971 > 1.604，改用 EPD。辦公椅類別係數只高於 Aeron（1.22 倍，高再生鋁），比九份椅子 EPD 的質量加權平均低 32%。
+- **2026-11-09 擴充樣本的影響**：五張新增椅子都是塑膠椅腳，鋁占平均辦公椅重量從 20.6% 降到 11.3%，材質法 4.122 → 3.441；它們在中國、印度製造，電網排放較高，EPD 每公斤 4.32–6.18，加權平均 4.813 → 5.092。兩個方向相反，材質法與 EPD 的差距拉大，表示環境部材質係數（只到原料出廠）對亞洲製造的椅子更保守。
 - **獨立文獻對照**：沙發本模型 1.553 kgCO2e/kg，CRA 2020 為 166.3 kgCO2e ÷ 37.7 kg = 4.41；書本模型 1.377，CRA 為 1.6 ÷ 0.5 = 3.2；衣物本模型 4.42（纖維級），CRA 一般衣物 13.9 ÷ 0.5 = 27.8。三者都明顯低於 CRA，屬保守端。
 
 ---
@@ -243,14 +276,14 @@ UNU 2012 → 2024 換版對預設值的影響：桌機 8.8 → 6.26、手機 0.1
 1. **再使用是延後處置，不是避免處置**。釋出的這件物品最終仍會被丟棄；真正被避免的是「那件沒被買的新品」日後的處置，量是 R × 處置排放，不是 1 × 處置排放。
 2. **正負號依材質而變**。WARM v16 Exhibit 1-1 的焚化係數：MDF −0.58、Dimensional Lumber −0.58（生質碳＋能源回收信用），Mixed Plastics +1.26、PP +1.29 MTCO2E/short ton。木製家具若計處置，避免排放反而變少；塑膠則變多。
 3. **台灣沒有逐材質處置係數**。環境部資料庫有焚化廠「廢棄物焚化處理服務」（臺南永康 327、城西 333、苗栗 340、岡山 360 kgCO2e/公噸，2017–2020），是混合垃圾每公噸的平均值，不分材質。研究筆記 §9 待確認 #2 的「台灣處置係數」由此找到，但口徑不適合逐材質計算。
-4. 量級：用永康 0.327 kgCO2e/kg × R 0.5 × 辦公椅 13.8 kg = 2.26 kgCO2e，只占估算值 28.4 的 7.9%。排除它影響不大，且避免正負號爭議。
+4. 量級：用永康 0.327 kgCO2e/kg × R 0.5 × 辦公椅 13.8 kg = 2.26 kgCO2e，只占估算值 23.7 的 9.5%。排除它影響不大，且避免正負號爭議。
 
 ### 6.5 為什麼 v1 不扣運輸排放
 
 - PRD §5.1：組織物品不開放 Lalamove，只能面交或自取，平台沒有里程資料。
 - WRAP 2011 p.10：direct reuse（含免費交換網路）「assumed to come free of collection burdens, as it is difficult to apportion journeys made, principally by householders」，有先例。
 - Internal 與 Members 層的交接大多在同一組織內，往返距離接近零。
-- **風險要揭露**：環境部 自用小客車(汽油) 0.115 kgCO2e/延人公里（交通部運研所 2014）。10 公里汽車往返 = 1.15 kgCO2e，占辦公椅估算值的 4%，但是一本書估算值（0.34）的 3.3 倍。小物品專程開車取件是淨排放。報表註腳要寫明「未扣除面交往返交通」。
+- **風險要揭露**：環境部 自用小客車(汽油) 0.115 kgCO2e/延人公里（交通部運研所 2014）。10 公里汽車往返 = 1.15 kgCO2e，占辦公椅估算值的 4.8%，但是一本書估算值（0.34）的 3.3 倍。小物品專程開車取件是淨排放。報表註腳要寫明「未扣除面交往返交通」。
 - 之後一般 Share 若用 Lalamove，`server/src/services/lalamove.ts` 已解析報價回傳的 `distance`，可再加 T = 實際里程 × 車種係數。
 
 ### 6.6 為什麼台灣材質係數優先，電子產品例外
@@ -277,19 +310,19 @@ WBCSD 2023 §5.5.4：避免排放不做價值鏈分攤（「no allocation of avo
 
 ---
 
-## 7. 敏感度分析（以一張預設重量辦公椅為例，估算值基準 28.44 kgCO2e）
+## 7. 敏感度分析（以一張預設重量辦公椅為例，估算值基準 23.74 kgCO2e）
 
 | 變動 | 估算值 kgCO2e | 相對基準 |
 |---|---|---|
-| R = 0.25（eBay 2023 綜合值，二手來源） | 14.22 | −50% |
-| R = 0.40（Vinted 2023） | 22.75 | −20% |
-| **R = 0.50（預設）** | **28.44** | — |
-| R = 0.646（WRAP 2025 P2P 轉售） | 36.74 | +29% |
-| R = 1（理想值） | 56.88 | +100% |
-| 二手壽命只有新品一半（DEFRA 2011） | 14.22 | −50% |
-| 鋁全部改用再生鋁錠 0.7（椅子 BOM 鋁占 20.6%，係數 4.122 → 2.239） | 15.45 | −46% |
-| 計入處置信用（永康焚化 0.327 kgCO2e/kg × R） | 30.70 | +8% |
-| 扣 10 km 汽車往返 | 27.29 | −4% |
+| R = 0.25（eBay 2023 綜合值，二手來源） | 11.87 | −50% |
+| R = 0.40（Vinted 2023） | 18.99 | −20% |
+| **R = 0.50（預設）** | **23.74** | — |
+| R = 0.646（WRAP 2025 P2P 轉售） | 30.67 | +29% |
+| R = 1（理想值） | 47.48 | +100% |
+| 二手壽命只有新品一半（DEFRA 2011） | 11.87 | −50% |
+| 鋁全部改用再生鋁錠 0.7（椅子 BOM 鋁占 11.3%，係數 3.441 → 2.409） | 16.62 | −30% |
+| 計入處置信用（永康焚化 0.327 kgCO2e/kg × R） | 26.00 | +10% |
+| 扣 10 km 汽車往返 | 22.59 | −5% |
 
 其他類別：
 - 金屬櫃鋼材改用中鋼冷軋鋼捲 2.94：係數 2.476 → 2.907，仍低於 EPD 平均 3.043。
@@ -301,7 +334,7 @@ WBCSD 2023 §5.5.4：避免排放不做價值鏈分攤（「no allocation of avo
 
 報表頁與日後 CSV 註腳建議原文：
 
-> 本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 2026-11-08。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。
+> 本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 2026-11-09。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。
 
 | WBCSD 原則 | 本模型落點 |
 |---|---|
@@ -335,6 +368,8 @@ WBCSD 2023 §5.5.4：避免排放不做價值鏈分攤（「no allocation of avo
 
 ## 10. 限制與待辦
 
+0. **辦公椅缺台灣品牌樣本**（§4.4）：台灣品牌只走 ISO 14067 產品碳足跡，不做 EPD。待決定是否把納入條件 1 放寬為「EPD，或第三方依 ISO 14067 查證的搖籃到大門碳足跡（須同時有重量與材質表）」，並向聯友椅業（Ergohuman）、震旦索取查證聲明。
+
 1. **取代率尚未實測**：要在 Weave 完成流程加一題問卷（§6.2），每類累積 100 份後改用實測值，並把 `FACTOR_TABLE_VERSION` 升版。
 2. **環境部係數偏舊**：鋼、鋁、PA6 都是 2013 年公告；鋁用原生值對高再生料產品偏高（§5、§7）。`check:emission-factors` 會在有較新年度時提出警告。
 3. **Bisley 兩份 EPD 已過期**（2024-08-28）。數值仍是當時查證的結果，可作封頂參考；之後找到有效的鋼櫃 EPD 應替換。
@@ -362,6 +397,11 @@ WBCSD 2023 §5.5.4：避免排放不做價值鏈分攤（「no allocation of avo
 - Herman Miller Aeron Chair Aluminum Base EPD（NSF EPD10431），<https://info.nsf.org/Certified/Sustain/ProdCert/EPD10431.pdf>
 - Haworth Soji Task Seating EPD（EPD-IES-0012459:006），<https://www.haworth.com/content/dam/digital/eu/docs/products/haworth/chairs/soji/soji_sustain_epd_eu-en_2025.pdf>
 - Kinnarps Task Chair 6000/8000 6240 EPD（NEPD-3617-2541-EN），<https://www.epd-global.com/getfile.php/13223146-1741754522/EPDer/M%C3%B8bler/Sittem%C3%B8bler/NEPD-3617-2541_6000-8000-series---Task-chair-6240-with-wool-fabric-and-plastic-starbase.pdf>
+- Steelcase Personality Plus APAC EPD（NSF EPD11108），<https://info.nsf.org/Certified/Sustain/ProdCert/EPD11108.pdf>
+- Steelcase Think Americas & APAC EPD（NSF EPD11087），<https://info.nsf.org/Certified/Sustain/ProdCert/EPD11087.pdf>
+- Haworth Aloha Active Mesh-Back Task Seating Asia-Pacific EPD（EPD-IES-0013321:003），<https://www.haworth.com/content/dam/digital/ap/docs/products/haworth/seating/aloha-active/sustainability/aloha_active_sustain_epd-ap_en_2024.pdf>
+- KOKUYO No. 16 Chair EPD（EPD-IES-0015164:002），<https://www.environdec.com/library/epd15164>
+- Almachair Office Chair ATLANTA EPD（EPD-IES-0026478:001），<https://www.environdec.com/library/epd26478>
 - Haworth YourPlace Core Rectangular Desk EPD（EPD-IES-0015450:003），<https://www.environdec.com/library/epd15450>
 - Bisley Glide Sliding-door Unit EPD（S-P-01613），<https://www.bisley.com/site/assets/files/38292/s-p-01613_epd_bisley_sliding_door_storage_units.pdf>
 - Bisley Storage Pedestals EPD（S-P-01616），<https://cdn3.evostore.io/documents/bisley_ireland/s_p_01616_epd_bisley_storage_pedestals_1.pdf>

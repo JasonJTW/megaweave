@@ -6,7 +6,7 @@
 // 改任何數字都要：更新 FACTOR_TABLE_VERSION、更新方法學文件的係數表、跑單元測試。
 // 環境部係數可用 `npm run check:emission-factors` 對照開放資料 API 是否有更新。
 
-export const FACTOR_TABLE_VERSION = "2026-11-08";
+export const FACTOR_TABLE_VERSION = "2026-11-09";
 
 // ---------------------------------------------------------------------------
 // 來源
@@ -22,6 +22,11 @@ export const SOURCE_IDS = [
   "epd-hm-aeron",
   "epd-haworth-soji",
   "epd-kinnarps-6240",
+  "epd-steelcase-personality-plus-apac",
+  "epd-steelcase-think-apac",
+  "epd-haworth-aloha-active-ap",
+  "epd-kokuyo-no16",
+  "epd-almachair-atlanta",
   "epd-haworth-yourplace",
   "epd-bisley-glide",
   "epd-bisley-note-pedestal",
@@ -116,6 +121,51 @@ export const SOURCES: Record<SourceId, Source> = {
     year: 2022,
     url: "https://www.epd-global.com/getfile.php/13223146-1741754522/EPDer/M%C3%B8bler/Sittem%C3%B8bler/NEPD-3617-2541_6000-8000-series---Task-chair-6240-with-wool-fabric-and-plastic-starbase.pdf",
     retrievedAt: "2026-11-08",
+  },
+  "epd-steelcase-personality-plus-apac": {
+    id: "epd-steelcase-personality-plus-apac",
+    title:
+      "Environmental Product Declaration: Steelcase Personality Plus, APAC (EPD11108)",
+    publisher: "Steelcase / NSF International",
+    year: 2025,
+    url: "https://info.nsf.org/Certified/Sustain/ProdCert/EPD11108.pdf",
+    retrievedAt: "2026-11-09",
+  },
+  "epd-steelcase-think-apac": {
+    id: "epd-steelcase-think-apac",
+    title:
+      "Environmental Product Declaration: Steelcase Think, Americas & APAC (EPD11087)",
+    publisher: "Steelcase / NSF International",
+    year: 2025,
+    url: "https://info.nsf.org/Certified/Sustain/ProdCert/EPD11087.pdf",
+    retrievedAt: "2026-11-09",
+  },
+  "epd-haworth-aloha-active-ap": {
+    id: "epd-haworth-aloha-active-ap",
+    title:
+      "Environmental Product Declaration: Aloha Active Mesh-Back Task Seating, Asia-Pacific (EPD-IES-0013321:003)",
+    publisher: "Haworth / EPD International",
+    year: 2025,
+    url: "https://www.haworth.com/content/dam/digital/ap/docs/products/haworth/seating/aloha-active/sustainability/aloha_active_sustain_epd-ap_en_2024.pdf",
+    retrievedAt: "2026-11-09",
+  },
+  "epd-kokuyo-no16": {
+    id: "epd-kokuyo-no16",
+    title:
+      "Environmental Product Declaration: No. 16 Chair (EPD-IES-0015164:002)",
+    publisher: "KOKUYO Workplace India / EPD International",
+    year: 2026,
+    url: "https://www.environdec.com/library/epd15164",
+    retrievedAt: "2026-11-09",
+  },
+  "epd-almachair-atlanta": {
+    id: "epd-almachair-atlanta",
+    title:
+      "Environmental Product Declaration: Office Chair ATLANTA (EPD-IES-0026478:001)",
+    publisher: "Almachair / EPD International",
+    year: 2025,
+    url: "https://www.environdec.com/library/epd26478",
+    retrievedAt: "2026-11-09",
   },
   "epd-haworth-yourplace": {
     id: "epd-haworth-yourplace",
@@ -539,6 +589,136 @@ const KINNARPS_6240: ReferenceProduct = {
   ],
 };
 
+// 以下五張是亞洲製造或平價品牌，讓樣本接近台灣辦公室常見的塑膠椅腳、網背椅。
+// 納入條件見 docs/notes/avoided-emissions-model.md §4.4。一份 EPD 只取一個任務椅配置。
+
+const PERSONALITY_PLUS_APAC: ReferenceProduct = {
+  sourceId: "epd-steelcase-personality-plus-apac",
+  productName:
+    "Steelcase Personality Plus（PUA100，APAC 印度 Pune 製，網背、塑膠椅腳）",
+  locator: "Task chair configuration：Product composition 表（總重 17.77 kg）",
+  declaredMassKg: 17.77,
+  a1a3KgCO2e: 76.8,
+  a1a3Locator:
+    "Task chair configuration：GWP excl. biogenic，Materials acquisition 6.43E+01 + Production process 1.25E+01",
+  components: [
+    { label: "Nylon", material: "polyamide", amount: 5.57 },
+    { label: "Polypropylene", material: "polypropylene", amount: 1.86 },
+    { label: "Steel", material: "steel", amount: 9.05 },
+    { label: "Foam", material: "plastic_unspecified", amount: 0.76 },
+    { label: "ABS", material: "plastic_unspecified", amount: 0.17 },
+    // 未揭露纖維種類，不套聚酯係數
+    { label: "Fabric", material: null, amount: 0.04 },
+    { label: "POM", material: "plastic_unspecified", amount: 0.33 },
+    { label: "Other plastics", material: "plastic_unspecified", amount: 0.01 },
+  ],
+};
+
+// EPD 另有印度、馬來西亞兩個 APAC 任務椅配置；取較輕且 A1–A3 較低的印度配置
+const THINK_APAC: ReferenceProduct = {
+  sourceId: "epd-steelcase-think-apac",
+  productName:
+    "Steelcase Think（APAC 任務椅，印度 Pune 製，3D 織網背、塑膠椅腳）",
+  locator:
+    "APAC Task Chair India configuration：Product composition 表（總重 17.033 kg）",
+  declaredMassKg: 17.033,
+  a1a3KgCO2e: 105.3,
+  a1a3Locator:
+    "India configuration：GWP excl. biogenic，Materials acquisition 8.60E+01 + Production process 1.93E+01",
+  components: [
+    { label: "Nylon (PA6 and PA66)", material: "polyamide", amount: 6.802 },
+    { label: "Steel", material: "steel", amount: 5.577 },
+    { label: "Aluminum", material: "aluminium", amount: 1.785 },
+    { label: "Polypropylene (PP)", material: "polypropylene", amount: 1.377 },
+    {
+      label: "Polyurethane (PU)",
+      material: "plastic_unspecified",
+      amount: 0.811,
+    },
+    {
+      label: "Polyoxymethylene (POM)",
+      material: "plastic_unspecified",
+      amount: 0.232,
+    },
+    { label: "Polyester Fabric", material: "polyester_fibre", amount: 0.272 },
+    { label: "Other", material: null, amount: 0.176 },
+  ],
+};
+
+const ALOHA_ACTIVE_AP: ReferenceProduct = {
+  sourceId: "epd-haworth-aloha-active-ap",
+  productName: "Haworth Aloha Active 網背（亞太，上海浦東／清奈製，塑膠椅腳）",
+  locator: "Material composition 表（總重 15.34 kg）",
+  declaredMassKg: 15.34,
+  a1a3KgCO2e: 88.3,
+  a1a3Locator:
+    "IPCC AR6 GWP excl biogenic：Material Acquisition 7.04E+01 + Production 1.79E+01（兩廠產量加權）",
+  components: [
+    { label: "Nylon PA6", material: "polyamide", amount: 6.29 },
+    { label: "Steel", material: "steel", amount: 5.22 },
+    { label: "Polypropylene", material: "polypropylene", amount: 2.83 },
+    { label: "Polyurethane", material: "plastic_unspecified", amount: 0.72 },
+    { label: "Polyethylene", material: "plastic_unspecified", amount: 0.17 },
+    { label: "Other", material: null, amount: 0.1 },
+  ],
+};
+
+const KOKUYO_NO16: ReferenceProduct = {
+  sourceId: "epd-kokuyo-no16",
+  productName: "KOKUYO No. 16 Chair（印度製，網背、尼龍椅腳）",
+  locator: "Content information 表（總重 14.9 kg）",
+  declaredMassKg: 14.9,
+  a1a3KgCO2e: 81.9,
+  a1a3Locator: "GWP-GHG A1-A3 8.19E+01",
+  components: [
+    {
+      label: "Plastic components",
+      material: "plastic_unspecified",
+      amount: 2.14,
+    },
+    // EPD 未揭露玻纖比例，比照 Kinnarps PAGF30 以 70/30 拆分，玻纖部分不計
+    {
+      label: "Nylon + glass fibre（70% 聚醯胺）",
+      material: "polyamide",
+      amount: 4.2,
+    },
+    {
+      label: "Nylon + glass fibre（30% 玻璃纖維）",
+      material: null,
+      amount: 1.8,
+    },
+    { label: "Steel Parts", material: "steel", amount: 4.98 },
+    { label: "Particle board", material: "wood_panel", amount: 1.82 },
+  ],
+};
+
+const ATLANTA: ReferenceProduct = {
+  sourceId: "epd-almachair-atlanta",
+  productName:
+    "Almachair ATLANTA（中國廣東 Unite Seating 代工，泡棉椅背、塑膠椅腳）",
+  locator: "Content declaration 表（總重 19.71 kg）",
+  declaredMassKg: 19.71,
+  a1a3KgCO2e: 99.7,
+  a1a3Locator: "GWP-GHG A1-A3 9.97E+01",
+  components: [
+    { label: "Al", material: "aluminium", amount: 0.96 },
+    { label: "Steel", material: "steel", amount: 7.69 },
+    { label: "Glue", material: null, amount: 0.05 },
+    { label: "Dacron", material: "polyester_fibre", amount: 0.39 },
+    { label: "ABS", material: "plastic_unspecified", amount: 0.01 },
+    { label: "PA", material: "polyamide", amount: 1.97 },
+    // 再生料，比照 Aeron 的 Recycled PET 不套原生係數
+    { label: "PCR PA", material: null, amount: 1.2 },
+    { label: "PE", material: "plastic_unspecified", amount: 0.06 },
+    { label: "POM", material: "plastic_unspecified", amount: 0.18 },
+    { label: "PP", material: "polypropylene", amount: 2.71 },
+    { label: "PU", material: "plastic_unspecified", amount: 1.57 },
+    { label: "PVC", material: "plastic_unspecified", amount: 0.1 },
+    { label: "Fiberglass", material: null, amount: 0.91 },
+    { label: "Wood", material: "wood_panel", amount: 1.92 },
+  ],
+};
+
 const YOURPLACE: ReferenceProduct = {
   sourceId: "epd-haworth-yourplace",
   productName:
@@ -603,7 +783,17 @@ const BISLEY_NOTE: ReferenceProduct = {
 };
 
 export const REFERENCE_PRODUCTS = {
-  office_chair: [SERIES_1, AERON, SOJI, KINNARPS_6240],
+  office_chair: [
+    SERIES_1,
+    AERON,
+    SOJI,
+    KINNARPS_6240,
+    PERSONALITY_PLUS_APAC,
+    THINK_APAC,
+    ALOHA_ACTIVE_AP,
+    KOKUYO_NO16,
+    ATLANTA,
+  ],
   desk_table: [YOURPLACE],
   steel_storage: [BISLEY_GLIDE, BISLEY_NOTE],
 } as const;
@@ -683,7 +873,7 @@ export const CATEGORIES: Record<CategoryId, CategoryProfile> = {
     defaultWeight: {
       kg: 13.8,
       sourceId: "epd-steelcase-series1",
-      locator: "四份辦公椅 EPD 中最輕者（13.787 kg）",
+      locator: "九份辦公椅 EPD 中最輕者（13.787 kg）",
     },
   },
   desk_table: {

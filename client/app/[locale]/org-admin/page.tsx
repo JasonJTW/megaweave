@@ -664,7 +664,7 @@ function OrgAdminContent() {
                 className="flex flex-col gap-2 sm:flex-row sm:items-end"
                 onSubmit={handleAddUnit}
               >
-                <div className="flex-1 space-y-2">
+                <div className="min-w-0 flex-1 space-y-2">
                   <Label htmlFor="org-unit-name">{t("unitNameLabel")}</Label>
                   <Input
                     id="org-unit-name"
@@ -675,7 +675,11 @@ function OrgAdminContent() {
                     onChange={(e) => setUnitName(e.target.value)}
                   />
                 </div>
-                <Button type="submit" disabled={submitting}>
+                <Button
+                  type="submit"
+                  className="sm:w-auto sm:shrink-0"
+                  disabled={submitting}
+                >
                   {submitting ? t("saving") : t("addUnit")}
                 </Button>
               </form>

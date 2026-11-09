@@ -140,8 +140,10 @@ export const config = {
      * - api (API routes)
      * - monitoring (Sentry tunnel route)
      * - _next/static, _next/image (static files / images)
-     * - static assets (.svg, .png, .jpg, .json, etc.)
+     * - static assets (.svg, .png, .ico, .jpg, .json, etc.)
+     *   `.ico` matters: without it /favicon2.ico is treated as a page, gets a locale
+     *   rewrite and returns 404
      */
-    "/((?!api|monitoring|_next/static|_next/image|favicon.ico|manifest.json|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|json|txt)$).*)",
+    "/((?!api|monitoring|_next/static|_next/image|favicon.ico|manifest.json|sitemap.xml|robots.txt|.*\\.(?:svg|png|ico|jpg|jpeg|gif|webp|woff|woff2|json|txt)$).*)",
   ],
 };

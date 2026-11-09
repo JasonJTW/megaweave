@@ -136,7 +136,7 @@ async function requestAs(userId: number, postId: number, extra: Record<string, u
   signInAs(userId);
   return api()
     .post("/api/weaves")
-    .send({ postId, items: [{ itemId: null, quantity: 1 }], ...extra });
+    .send({ postId, items: [{ itemId: fakeDb.items.find((i) => i.post_id === postId)!.id, quantity: 1 }], ...extra });
 }
 
 async function orgPageTitlesFor(userId: number) {

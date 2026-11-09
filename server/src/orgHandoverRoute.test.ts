@@ -179,7 +179,7 @@ async function requestAs(
   signInAs(userId);
   const res = await api()
     .post("/api/weaves")
-    .send({ postId, items: [{ itemId: null, quantity: 1 }], ...extra });
+    .send({ postId, items: [{ itemId: fakeDb.items.find((i) => i.post_id === postId)!.id, quantity: 1 }], ...extra });
   expect(res.status).toBe(201);
   return res.body.weaveId as number;
 }

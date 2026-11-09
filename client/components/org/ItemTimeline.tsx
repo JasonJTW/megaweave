@@ -133,7 +133,7 @@ export function ItemTimeline({
   return (
     <section aria-label={t("timeline.title")} className="space-y-2">
       <h3 className="text-sm font-semibold">{t("timeline.title")}</h3>
-      <ol className="space-y-2 border-l pl-4">
+      <ol className="ml-1 space-y-3 border-l border-primary-30">
         {data.timeline.map((entry, index) => {
           const detail = detailOf(entry);
           const actor =
@@ -146,7 +146,7 @@ export function ItemTimeline({
             <li
               key={`${entry.kind}-${entry.at}-${index}`}
               data-kind={entry.kind}
-              className="text-sm"
+              className="relative pl-5 text-sm before:absolute before:-left-[5px] before:top-1.5 before:h-2 before:w-2 before:rounded-full before:bg-primary-50 last:before:bg-primary"
             >
               <div className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-medium">
@@ -154,15 +154,20 @@ export function ItemTimeline({
                     ? t(`timeline.kind.${entry.kind}`)
                     : `${t("timeline.kind.other")}（${entry.kind}）`}
                 </span>
-                <span>{actor}</span>
-                <time dateTime={entry.at} className="text-muted-foreground">
+                <span className="text-muted-foreground">{actor}</span>
+                <time
+                  dateTime={entry.at}
+                  className="text-xs tabular-nums text-muted-foreground"
+                >
                   {format.dateTime(new Date(entry.at), {
                     dateStyle: "medium",
                     timeStyle: "short",
                   })}
                 </time>
               </div>
-              {detail && <p className="text-muted-foreground">{detail}</p>}
+              {detail && (
+                <p className="mt-0.5 text-muted-foreground">{detail}</p>
+              )}
             </li>
           );
         })}

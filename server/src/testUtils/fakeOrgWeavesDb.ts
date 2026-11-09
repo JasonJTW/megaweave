@@ -173,6 +173,22 @@ export function createFakeOrgWeavesDb(
       return [rows, []];
     }
 
+    //* deductInventory：鎖住品項列後比對、再扣庫存
+    if (/^SELECT id, title, quantity FROM items WHERE id IN \((\?, )*\?\) ORDER BY id FOR UPDATE$/.test(sql)) {
+      const ids = params.map(Number);
+      const rows = base.items
+        .filter((i) => ids.includes(i.id))
+        .sort((a, b) => a.id - b.id)
+        .map((i) => ({ id: i.id, title: i.title, quantity: i.quantity }));
+      return [rows, []];
+    }
+
+    if (sql === "UPDATE items SET quantity = quantity - ? WHERE id = ?") {
+      const item = base.items.find((i) => i.id === Number(params[1]));
+      if (item) item.quantity -= Number(params[0]);
+      return [{ affectedRows: item ? 1 : 0 }, []];
+    }
+
     if (sql === "SELECT quantity, title FROM items WHERE id = ? AND post_id = ?") {
       const rows = base.items
         .filter((i) => i.id === Number(params[0]) && i.post_id === Number(params[1]))

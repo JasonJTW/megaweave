@@ -25,6 +25,8 @@ function post(id: number, over: Partial<ReportInput["posts"][number]> = {}) {
     unitWeightKg: 30,
     weightIsDefault: false,
     estimatedValueTwd: null,
+    onShelf: true,
+    stockQuantity: null,
     ...over,
   };
 }
@@ -157,6 +159,56 @@ describe("buildOrgReport: weight, value and avoided emissions (E6-2)", () => {
     expect(report.emissions.uncountedQuantity).toBe(1);
     expect(report.emissions.countedQuantity).toBe(0);
     expect(report.emissions.defaultWeightShare).toBeNull();
+  });
+
+  it("estimates the unrealized figure from what is still on the shelf, without adding it to the total", () => {
+    const steel = getProductionFactor("steel_storage").kgCO2ePerKg!;
+    const report = buildOrgReport(
+      input({
+        posts: [
+          //* 4 件交出 1 件：剩 3 件 × 30 kg
+          post(10, { quantity: 4, unitWeightKg: 30 }),
+          //* 全部交出：不算
+          post(11, { quantity: 2, unitWeightKg: 30 }),
+          //* 已停用或下架：不算
+          post(12, { quantity: 5, unitWeightKg: 30, onShelf: false }),
+          //* 類別無係數：算件數、列為不計入
+          post(13, { orgCategory: "small_appliance", quantity: 2, unitWeightKg: 3 }),
+          //* 沒有物品資料的舊貼文：當 1 件、不計入
+          post(14, { orgCategory: null, quantity: null, unitWeightKg: null, weightIsDefault: null }),
+        ],
+        weaves: [
+          { weaveId: 1, postId: 10, quantity: 1, createdAt: t("02T00:00:00"), receiverUnitId: null },
+          { weaveId: 2, postId: 11, quantity: 2, createdAt: t("02T00:00:00"), receiverUnitId: null },
+        ],
+      }),
+    );
+    const e = report.emissions;
+    expect(e.unrealized.quantity).toBe(3 + 2 + 1);
+    expect(e.unrealized.uncountedQuantity).toBe(2 + 1);
+    expect(e.unrealized.estimatedKgCO2e).toBeCloseTo(90 * steel * 0.5, 10);
+    //* 已實現的數字只有完成的 3 件
+    expect(e.estimatedKgCO2e).toBeCloseTo(90 * steel * 0.5, 10);
+  });
+
+  it("takes the smaller of the live stock and listed minus handed over", () => {
+    const steel = getProductionFactor("steel_storage").kgCO2ePerKg!;
+    const report = buildOrgReport(
+      input({
+        posts: [
+          //* 庫存比較少：剩 2 件
+          post(10, { quantity: 4, unitWeightKg: 30, stockQuantity: 2 }),
+          //* 舊的「整篇貼文」Weave 沒扣庫存：庫存還是 3，但已交出 1 件，剩 2 件
+          post(11, { quantity: 3, unitWeightKg: 30, stockQuantity: 3 }),
+        ],
+        weaves: [
+          { weaveId: 1, postId: 10, quantity: 1, createdAt: t("02T00:00:00"), receiverUnitId: null },
+          { weaveId: 2, postId: 11, quantity: 1, createdAt: t("02T00:00:00"), receiverUnitId: null },
+        ],
+      }),
+    );
+    expect(report.emissions.unrealized.quantity).toBe(4);
+    expect(report.emissions.unrealized.estimatedKgCO2e).toBeCloseTo(120 * steel * 0.5, 10);
   });
 
   it("lists every category factor with its cited sources", () => {

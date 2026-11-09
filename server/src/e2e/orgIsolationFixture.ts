@@ -116,6 +116,14 @@ export async function seedOrgIsolationFixture(
         vectorJson,
       ],
     );
+    // 組織物品一定要按品項申請（requestWeave），跟上架 API 一樣建一個品項
+    if (post.org) {
+      await mysql.query("INSERT INTO items (post_id, title, quantity) VALUES (?, ?, ?)", [
+        result.insertId,
+        `${ORG_ISOLATION_TITLE_PREFIX} ${post.label}`,
+        1,
+      ]);
+    }
     // 與 postEmbedding job 相同的索引格式（含 scope TAG）。非公開貼文照樣進索引：隔離要在讀取端成立
     await vectorRedis.hSet(`post:${result.insertId}`, {
       v: toFloat32Buffer(vector),

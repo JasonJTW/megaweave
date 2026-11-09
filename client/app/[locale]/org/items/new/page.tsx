@@ -3,8 +3,14 @@
 //* 上架組織物品（PRD 0001 §5.1 E2-1、E3-1、E4-1、E6-2）
 //* 物品屬於單位：窗口有多個單位時先選單位。類別帶預設單件重量（避免排放量係數表，ADR 0005），
 //* 沒有預設值的類別（如塑膠製品）重量必填。只能是 Share，上架後在 Internal，不開放付款與配送。
-import { FormEvent, Suspense, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import {
+  FormEvent,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { ImagePlus, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
@@ -12,7 +18,6 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -24,7 +29,7 @@ import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { usePost } from "@/app/contexts/PostContext";
 import { useConditionText } from "@/i18n/referenceNames";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
-import { OrgSwitcher } from "@/components/org/OrgSwitcher";
+import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
 import { NoUnitsNotice } from "@/components/org/NoUnitsNotice";
 import {
   hostName,
@@ -63,7 +68,7 @@ function PhotoThumbnail({ file, alt }: { file: File; alt: string }) {
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
   return (
-    <div className="aspect-square overflow-hidden rounded-lg border bg-muted">
+    <div className="aspect-square overflow-hidden rounded-lg bg-muted">
       {url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt={alt} className="h-full w-full object-cover" />
@@ -74,6 +79,7 @@ function PhotoThumbnail({ file, alt }: { file: File; alt: string }) {
 
 function ItemForm({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org.form");
+  const format = useFormatter();
   const apiErrorMessage = useApiErrorMessage();
   const router = useRouter();
   const { mutate } = useSWRConfig();
@@ -150,21 +156,30 @@ function ItemForm({ org }: { org: OrgAccess }) {
     return <NoUnitsNotice org={org} notContactMessage={t("noUnits")} />;
   }
 
+  const quantity = Number(form.quantity);
+  const unitWeight = Number(form.unitWeightKg);
+  const totalKg =
+    form.quantity.trim() !== "" &&
+    form.unitWeightKg.trim() !== "" &&
+    quantity > 0 &&
+    unitWeight > 0
+      ? quantity * unitWeight
+      : null;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("title")}</CardTitle>
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={submit} className="space-y-5">
+    <form
+      onSubmit={submit}
+      className="divide-y overflow-hidden rounded-lg border bg-white"
+    >
+      <FormSection title={t("sectionBasics")} hint={t("sectionBasicsHint")}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="org-item-unit">{t("unit")}</Label>
             <Select
               value={form.unitId}
               onValueChange={(unitId) => set({ unitId })}
             >
-              <SelectTrigger id="org-item-unit">
+              <SelectTrigger id="org-item-unit" className={fieldSelect}>
                 <SelectValue placeholder={t("unitPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
@@ -178,57 +193,12 @@ function ItemForm({ org }: { org: OrgAccess }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="org-item-category">{t("category")}</Label>
-            <Select value={form.orgCategory} onValueChange={chooseCategory}>
-              <SelectTrigger id="org-item-category">
-                <SelectValue placeholder={t("categoryPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {category && (
-              <p className="text-xs text-muted-foreground">
-                {category.examples}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="org-item-title">{t("itemTitle")}</Label>
-            <Input
-              id="org-item-title"
-              required
-              maxLength={60}
-              value={form.title}
-              onChange={(e) => set({ title: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="org-item-content">{t("content")}</Label>
-            <textarea
-              id="org-item-content"
-              maxLength={1000}
-              rows={4}
-              placeholder={t("contentPlaceholder")}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={form.content}
-              onChange={(e) => set({ content: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="org-item-condition">{t("condition")}</Label>
             <Select
               value={form.conditionLevel}
               onValueChange={(conditionLevel) => set({ conditionLevel })}
             >
-              <SelectTrigger id="org-item-condition">
+              <SelectTrigger id="org-item-condition" className={fieldSelect}>
                 <SelectValue placeholder={t("conditionPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
@@ -240,90 +210,184 @@ function ItemForm({ org }: { org: OrgAccess }) {
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="org-item-quantity">{t("quantity")}</Label>
-              <Input
-                id="org-item-quantity"
-                type="number"
-                inputMode="numeric"
-                required
-                min={1}
-                step={1}
-                value={form.quantity}
-                onChange={(e) => set({ quantity: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-item-weight">{t("unitWeight")}</Label>
-              <Input
-                id="org-item-weight"
-                type="number"
-                inputMode="decimal"
-                required
-                min={0.001}
-                step="any"
-                value={form.unitWeightKg}
-                onChange={(e) => set({ unitWeightKg: e.target.value })}
-              />
-              {category && (
-                <p className="text-xs text-muted-foreground">
-                  {category.defaultWeightSource ? (
-                    <a
-                      href={category.defaultWeightSource.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline"
-                    >
-                      {t("weightDefaultHint", {
-                        publisher: category.defaultWeightSource.publisher,
-                        year: category.defaultWeightSource.year,
-                      })}
-                    </a>
-                  ) : (
-                    t("weightRequiredHint")
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="org-item-category">{t("category")}</Label>
+          <Select value={form.orgCategory} onValueChange={chooseCategory}>
+            <SelectTrigger id="org-item-category" className={fieldSelect}>
+              <SelectValue placeholder={t("categoryPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {category && (
+            <p className="text-xs text-muted-foreground">{category.examples}</p>
+          )}
+        </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="org-item-asset">{t("assetNumber")}</Label>
-              <Input
-                id="org-item-asset"
-                maxLength={100}
-                value={form.assetNumber}
-                onChange={(e) => set({ assetNumber: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="org-item-value">{t("estimatedValue")}</Label>
-              <Input
-                id="org-item-value"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                step={1}
-                value={form.estimatedValueTwd}
-                onChange={(e) => set({ estimatedValueTwd: e.target.value })}
-              />
-            </div>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="org-item-title">{t("itemTitle")}</Label>
+          <Input
+            id="org-item-title"
+            required
+            maxLength={60}
+            value={form.title}
+            onChange={(e) => set({ title: e.target.value })}
+          />
+        </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="org-item-content">{t("content")}</Label>
+          <textarea
+            id="org-item-content"
+            maxLength={1000}
+            rows={4}
+            placeholder={t("contentPlaceholder")}
+            className="w-full rounded-2xl border border-primary-30 bg-white px-3 py-2 text-sm placeholder:text-primary-75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            value={form.content}
+            onChange={(e) => set({ content: e.target.value })}
+          />
+        </div>
+      </FormSection>
+
+      <FormSection title={t("sectionAmount")} hint={t("sectionAmountHint")}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <p className="text-sm font-medium leading-none">
-              {t("photos", { max: MAX_PHOTOS })}
-            </p>
-            {/* 原生檔案欄位在每次選完後會清空（顯示「未選擇檔案」），改用按鈕顯示已選張數 */}
+            <Label htmlFor="org-item-quantity">{t("quantity")}</Label>
+            <Input
+              id="org-item-quantity"
+              type="number"
+              inputMode="numeric"
+              required
+              clearable={false}
+              min={1}
+              step={1}
+              className="tabular-nums"
+              value={form.quantity}
+              onChange={(e) => set({ quantity: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org-item-weight">{t("unitWeight")}</Label>
+            <Input
+              id="org-item-weight"
+              type="number"
+              inputMode="decimal"
+              required
+              clearable={false}
+              min={0.001}
+              step="any"
+              className="tabular-nums"
+              value={form.unitWeightKg}
+              onChange={(e) => set({ unitWeightKg: e.target.value })}
+            />
+          </div>
+        </div>
+        {category && (
+          <p className="text-xs text-muted-foreground">
+            {category.defaultWeightSource ? (
+              <a
+                href={category.defaultWeightSource.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                {t("weightDefaultHint", {
+                  publisher: category.defaultWeightSource.publisher,
+                  year: category.defaultWeightSource.year,
+                })}
+              </a>
+            ) : (
+              t("weightRequiredHint")
+            )}
+          </p>
+        )}
+        <p
+          className="rounded-lg bg-primary-5 px-3 py-2 text-sm tabular-nums"
+          aria-live="polite"
+        >
+          {totalKg === null
+            ? t("totalWeightEmpty")
+            : t("totalWeight", {
+                kg: format.number(totalKg, { maximumFractionDigits: 1 }),
+              })}
+        </p>
+      </FormSection>
+
+      <FormSection title={t("sectionAsset")} hint={t("sectionAssetHint")}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="org-item-asset">{t("assetNumber")}</Label>
+            <Input
+              id="org-item-asset"
+              maxLength={100}
+              className="font-mono"
+              value={form.assetNumber}
+              onChange={(e) => set({ assetNumber: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="org-item-value">{t("estimatedValue")}</Label>
+            <Input
+              id="org-item-value"
+              type="number"
+              inputMode="numeric"
+              clearable={false}
+              min={0}
+              step={1}
+              className="tabular-nums"
+              value={form.estimatedValueTwd}
+              onChange={(e) => set({ estimatedValueTwd: e.target.value })}
+            />
+          </div>
+        </div>
+      </FormSection>
+
+      <FormSection
+        title={t("photos", { max: MAX_PHOTOS })}
+        hint={t("sectionPhotosHint")}
+      >
+        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {photos.map((file, index) => (
+            <li
+              key={`${file.name}-${file.lastModified}-${index}`}
+              className="relative"
+            >
+              <PhotoThumbnail
+                file={file}
+                alt={t("photoAlt", { index: index + 1, name: file.name })}
+              />
+              {index === 0 && (
+                <span className="absolute bottom-1 left-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium">
+                  {t("cover")}
+                </span>
+              )}
+              <button
+                type="button"
+                aria-label={t("removePhoto", { index: index + 1 })}
+                className="absolute right-1 top-1 rounded-full bg-black/60 p-1.5 text-white transition-colors hover:bg-black/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                onClick={() =>
+                  setPhotos((prev) => prev.filter((_, i) => i !== index))
+                }
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+          <li>
+            {/* 原生檔案欄位在每次選完後會清空（顯示「未選擇檔案」），改用格子顯示已選張數 */}
             <label
               htmlFor="org-item-photos"
               aria-disabled={photos.length >= MAX_PHOTOS}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-primary-30 px-4 py-2 text-sm font-medium has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary-50 px-2 text-center text-xs font-medium text-primary transition-colors hover:bg-primary-5 has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring aria-disabled:cursor-not-allowed aria-disabled:border-border aria-disabled:text-muted-foreground aria-disabled:hover:bg-transparent"
             >
-              <ImagePlus className="h-4 w-4" />
+              <ImagePlus className="h-5 w-5" />
               {t("choosePhotos", { count: photos.length, max: MAX_PHOTOS })}
             </label>
             <input
@@ -343,43 +407,41 @@ function ItemForm({ org }: { org: OrgAccess }) {
                 setPhotos((prev) => [...prev, ...files].slice(0, MAX_PHOTOS));
               }}
             />
-            {photos.length > 0 && (
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                {photos.map((file, index) => (
-                  <li
-                    key={`${file.name}-${file.lastModified}-${index}`}
-                    className="relative"
-                  >
-                    <PhotoThumbnail
-                      file={file}
-                      alt={t("photoAlt", { index: index + 1, name: file.name })}
-                    />
-                    <button
-                      type="button"
-                      aria-label={t("removePhoto", { index: index + 1 })}
-                      className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
-                      onClick={() =>
-                        setPhotos((prev) => prev.filter((_, i) => i !== index))
-                      }
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          </li>
+        </ul>
+      </FormSection>
 
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="w-full sm:w-auto"
-          >
-            {submitting ? t("submitting") : t("submit")}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+      <div className="flex flex-col-reverse gap-2 bg-primary-5 px-5 py-4 sm:flex-row sm:items-center sm:justify-end lg:px-6">
+        <Button asChild variant="outline" className="sm:w-auto">
+          <Link href={`/org/items?org=${org.id}`}>{t("cancel")}</Link>
+        </Button>
+        <Button type="submit" disabled={submitting} className="sm:w-auto">
+          {submitting ? t("submitting") : t("submit")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+const fieldSelect = "h-[38px] text-base";
+
+function FormSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid gap-4 p-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:p-6">
+      <div className="space-y-1">
+        <h2 className="font-semibold">{title}</h2>
+        <p className="text-sm text-muted-foreground">{hint}</p>
+      </div>
+      <div className="max-w-2xl space-y-4">{children}</div>
+    </section>
   );
 }
 
@@ -387,27 +449,29 @@ function NewOrgItemContent() {
   const t = useTranslations("Org");
   const { orgs, org, error, isLoading } = useSelectedOrg();
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
-      <Link
-        href={org ? `/org?org=${org.id}` : "/org"}
-        className="text-sm underline"
-      >
-        {t("backToOrg")}
-      </Link>
-      {error && <p className="text-sm text-destructive">{t("loadFailed")}</p>}
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">{t("loading")}</p>
-      )}
+    <OrgShell
+      orgs={orgs}
+      org={org}
+      switchPath="/org/items/new"
+      tabs={
+        org
+          ? orgTabs({
+              isAdmin: org.isAdmin,
+              canManage: org.manageableUnits.length > 0,
+            })
+          : []
+      }
+      current="manage"
+      title={t("form.title")}
+      subtitle={t("form.subtitle")}
+    >
+      {error && <OrgNotice tone="error">{t("loadFailed")}</OrgNotice>}
+      {isLoading && <OrgNotice>{t("loading")}</OrgNotice>}
       {!isLoading && !error && orgs.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t("noOrgs")}</p>
+        <OrgNotice>{t("noOrgs")}</OrgNotice>
       )}
-      {org && (
-        <>
-          <OrgSwitcher orgs={orgs} org={org} basePath="/org/items/new" />
-          <ItemForm key={org.id} org={org} />
-        </>
-      )}
-    </div>
+      {org && <ItemForm key={org.id} org={org} />}
+    </OrgShell>
   );
 }
 

@@ -1176,12 +1176,13 @@
     "adminAdded": "已設為組織管理員。",
     "adminRemoved": "已移除組織管理員身分。",
     "adminsEmpty": "這個組織目前沒有管理員。",
-    "adminsLoadFailed": "無法載入組織管理員。"
+    "adminsLoadFailed": "無法載入組織管理員。",
+    "editingNow": "編輯中",
+    "noAdmins": "尚未指定"
   },
   "OrgAdmin": {
     "title": "組織後台",
     "subtitle": "管理單位與成員。成員只能用已註冊帳號的 Email 加入。",
-    "orgLabel": "組織",
     "noOrgs": "你目前沒有可管理的組織。",
     "loadFailed": "無法載入組織資料。",
     "unitsHeading": "單位",
@@ -1218,7 +1219,6 @@
     "save": "儲存",
     "cancel": "取消",
     "memberUpdated": "已更新成員。",
-    "manageItemsLink": "管理組織物品",
     "handover": {
       "heading": "待交接",
       "hint": "已離開組織或不再擔任該單位窗口的人，經手的物品與進行中的申請還在單位裡。轉給同單位另一位窗口後，之後的對話與交接由新窗口處理；已結束的紀錄保留原經手人。",
@@ -1230,7 +1230,8 @@
       "targetPlaceholder": "選擇接手的窗口",
       "submit": "轉交",
       "submitting": "轉交中…",
-      "done": "已轉交 {items} 件物品、{weaves} 筆申請。"
+      "done": "已轉交 {items} 件物品、{weaves} 筆申請。",
+      "headingCount": "待交接（{count}）"
     },
     "settings": {
       "heading": "自動升級",
@@ -1240,9 +1241,9 @@
       "daysLabel": "無人申請天數",
       "daysHint": "1 到 365 天。單位窗口可替單件物品另設。",
       "save": "儲存",
-      "saved": "已更新自動升級設定。"
+      "saved": "已更新自動升級設定。",
+      "unsaved": "尚未儲存"
     },
-    "reportLink": "查看組織報表",
     "publisherDisplay": {
       "heading": "公開層顯示方式",
       "hint": "物品升到公開層後，發文者對外顯示的名稱；不會出現窗口的個人帳號。",
@@ -1252,8 +1253,15 @@
         "org_unit": "組織＋單位",
         "anonymous": "匿名"
       },
-      "saved": "已更新公開層顯示方式。"
-    }
+      "saved": "已更新公開層顯示方式。",
+      "preview": "公開物品會顯示為",
+      "sampleUnit": "單位名稱"
+    },
+    "loading": "載入中…",
+    "membersHint": "{count} 位成員。組織管理員管理整個組織；單位窗口代表單位上架物品、核可申請。",
+    "unitsSectionHint": "物品屬於單位。單位要有窗口，才能上架物品與核可申請。",
+    "unitNoContact": "還沒有窗口",
+    "unitContacts": "{count} 位窗口"
   },
   "Org": {
     "title": "組織頁",
@@ -1263,8 +1271,6 @@
     "loadFailed": "無法載入組織資料。",
     "loading": "載入中…",
     "listItem": "上架物品",
-    "manageItems": "管理物品",
-    "backToOrg": "回組織頁",
     "empty": "目前沒有你看得到的物品。",
     "unitLabel": "單位",
     "quantity": "{count} 件",
@@ -1309,7 +1315,18 @@
       "created": "已上架，目前開放給組織內部單位。",
       "createFailed": "上架失敗，請稍後再試。",
       "missingSelection": "請選擇單位、類別與物品狀況。",
-      "tooManyPhotos": "照片最多 {max} 張。"
+      "tooManyPhotos": "照片最多 {max} 張。",
+      "sectionBasics": "物品資料",
+      "sectionBasicsHint": "名稱、類別與狀況會顯示在物品頁上。",
+      "sectionAmount": "數量與重量",
+      "sectionAmountHint": "重量用來估算組織報表的避免排放量。",
+      "sectionAsset": "財產資訊",
+      "sectionAssetHint": "有財產編號的物品，公開前要確認已完成報廢／處分程序。",
+      "sectionPhotosHint": "第一張是封面。",
+      "totalWeight": "合計約 {kg} 公斤",
+      "totalWeightEmpty": "填好數量與單件重量後，這裡會顯示合計重量。",
+      "cancel": "取消",
+      "cover": "封面"
     },
     "manage": {
       "title": "組織物品管理",
@@ -1321,14 +1338,9 @@
       "filterStatus": "狀態",
       "all": "全部",
       "colTitle": "物品",
-      "colUnit": "單位",
       "colTier": "層級",
-      "colStatus": "狀態",
       "colQuantity": "數量",
-      "colWeight": "單件重量",
-      "colAsset": "財產編號",
       "colCreated": "上架時間",
-      "weightKg": "{kg} 公斤",
       "empty": "沒有符合條件的物品。",
       "filterWeaveStatus": "申請",
       "colRequests": "申請",
@@ -1382,7 +1394,14 @@
       "publishedNow": "已公開。",
       "demoteFromPublic": "降回組織成員",
       "demoteFromPublicConfirm": "要把「{title}」從公開降回組織成員嗎？首頁、搜尋與熱門將看不到它，非成員的待核可申請會自動婉拒並通知對方。已被分享出去的預覽無法收回。",
-      "demotedFromPublic": "已降回組織成員，公開頁面看不到這件物品了。"
+      "demotedFromPublic": "已降回組織成員，公開頁面看不到這件物品了。",
+      "perPieceKg": "每件 {kg} 公斤",
+      "requestsTitle": "申請",
+      "count": "{count} 件物品",
+      "pendingTotal": "{count} 筆待核可",
+      "clearFilters": "清除篩選",
+      "emptyAll": "還沒有物品。上架後會出現在這裡。",
+      "colActions": "操作"
     },
     "weaveStatus": {
       "requested": "待核可",
@@ -1424,13 +1443,22 @@
       "pendingPublicConfirmed": "已確認完成報廢／處分程序"
     },
     "noUnitsYet": "{org} 還沒有任何單位，要先新增單位才能上架與管理物品。",
-    "goToOrgAdmin": "前往組織後台"
+    "goToOrgAdmin": "前往組織後台",
+    "nav": {
+      "label": "組織頁面",
+      "items": "物品",
+      "manage": "物品管理",
+      "admin": "組織後台",
+      "report": "報表"
+    },
+    "listFirstItem": "上架第一件物品",
+    "categoryFilter": "依類別篩選",
+    "allCategories": "全部",
+    "noPhoto": "沒有照片"
   },
   "OrgReport": {
     "title": "組織報表",
     "subtitle": "物品在組織內流通的情形，以及估算的重量、價值與避免排放量。數字依完成交接的紀錄計算。",
-    "backToAdmin": "回組織後台",
-    "orgLabel": "組織",
     "loading": "載入中…",
     "loadFailed": "報表載入失敗，請稍後再試。",
     "noOrgs": "你不是任何組織的管理員。",
@@ -1459,13 +1487,12 @@
     "colListed": "上架件數",
     "colGiven": "流出件數",
     "colReceived": "代表單位認領件數",
-    "colUnitEstimated": "流出的估算避免排放量（kgCO2e）",
     "unitsHint": "流出＝這個單位的物品完成交接的件數；代表單位認領＝窗口代表這個單位申請並完成的件數（個人申請不算進任何單位）。",
     "emissionsHeading": "估算重量、價值與避免排放量",
     "emissionsScope": "只計已完成交接的物品，每次交接算一次。",
     "estimatedKg": "估算避免排放量",
-    "estimatedKgHint": "潛在值 × 取代率 R（{rate}）",
-    "potentialKg": "潛在值（R = 1）",
+    "estimatedKgHint": "理想值 × 取代率 R（{rate}）",
+    "potentialKg": "理想值（R = 1）",
     "potentialKgHint": "假設每件都取代一件新品",
     "kgCO2e": "{value} kgCO2e",
     "kg": "{value} 公斤",
@@ -1485,14 +1512,14 @@
     "defaultWeightShareLabel": "預設重量占比",
     "uncounted": "不計入件數（類別無係數或缺重量）",
     "formulaHeading": "計算方法",
-    "formulaPotential": "潛在值 = 重量（公斤）× 類別新品生產排放係數（kgCO2e／公斤）",
-    "formulaEstimated": "估算避免排放量 = 潛在值 × 取代率 R",
+    "formulaPotential": "理想值 = 重量（公斤）× 類別新品生產排放係數（kgCO2e／公斤）",
+    "formulaEstimated": "估算避免排放量 = 理想值 × 取代率 R",
     "formulaFactor": "家具類係數取「材質組成 × 環境部材質係數」與「參考產品 EPD 平均」兩者較低者；電子產品用 US EPA WARM 產品係數；找不到可引用係數的類別不計入。",
     "byCategoryHeading": "各類別",
     "colCategory": "類別",
     "colQuantity": "件數",
     "colWeight": "重量（公斤）",
-    "colPotential": "潛在值（kgCO2e）",
+    "colPotential": "理想值（kgCO2e）",
     "colEstimated": "估算值（kgCO2e）",
     "factorsHeading": "排放係數與來源",
     "colFactor": "係數（kgCO2e／公斤）",
@@ -1509,7 +1536,15 @@
       "material_bom": "採材質組成（較低）",
       "reference_epd": "採參考產品 EPD（較低）"
     },
-    "footnote": "本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 {version}。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。"
+    "footnote": "本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 {version}。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。「待實現的避免排放量」是預估值，物品不一定會被接手，不得用於任何對外主張。",
+    "colUnitEstimatedShort": "流出的避免排放量（kgCO2e）",
+    "factorsSummary": "{count} 個類別的新品排放係數、計算方法與引用來源。",
+    "unrealizedLabel": "待實現的避免排放量",
+    "unrealizedHint": "在架物品還有 {count} 件尚未交接（含申請中）；若全數完成交接，估算避免排放量可再增加這麼多。只是預估，不加進上方數字。",
+    "unrealizedNone": "架上沒有尚未交接的物品。",
+    "unrealizedUncounted": "其中 {count} 件類別無係數或缺重量，未計入。",
+    "unrealizedValue": "+{value} kgCO2e",
+    "formulaUnrealized": "待實現 = 在架物品剩下的件數（目前庫存與「上架件數 − 已交接件數」取較小者）× 單件重量 × 係數 × 取代率 R"
   },
   "Publisher": {
     "anonymous": "匿名"

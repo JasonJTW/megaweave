@@ -232,6 +232,12 @@ export interface OrgReport {
       potentialKgCO2e: number;
       estimatedKgCO2e: number;
     }[];
+    /** 在架物品剩下的件數若全數完成交接的估算值；不含在 estimatedKgCO2e */
+    unrealized: {
+      quantity: number;
+      estimatedKgCO2e: number;
+      uncountedQuantity: number;
+    };
   };
   factors: OrgReportFactor[];
 }

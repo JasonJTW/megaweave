@@ -134,7 +134,9 @@ test.describe("Unit Contact claims another unit's Internal item", () => {
         `${API_URL}/api/posts/${viewerItemId}`,
       );
       expect(detail.ok(), await detail.text()).toBeTruthy();
-      const { post } = (await detail.json()) as { post: { id: number } };
+      const { post } = (await detail.json()) as {
+        post: { id: number; items: Array<{ id: number }> };
+      };
       const units = await requester.get(
         `${API_URL}/api/weaves/acting-units?postId=${post.id}`,
       );
@@ -145,7 +147,7 @@ test.describe("Unit Contact claims another unit's Internal item", () => {
       const sent = await requester.post(`${API_URL}/api/weaves`, {
         data: {
           postId: post.id,
-          items: [{ itemId: null, quantity: 1 }],
+          items: [{ itemId: post.items[0].id, quantity: 1 }],
           actingUnitId: supply!.id,
         },
       });

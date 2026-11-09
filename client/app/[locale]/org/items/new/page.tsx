@@ -169,7 +169,7 @@ function ItemForm({ org }: { org: OrgAccess }) {
   return (
     <form
       onSubmit={submit}
-      className="divide-y overflow-hidden rounded-lg border bg-white"
+      className="divide-y divide-primary-15 overflow-hidden rounded-2xl bg-white"
     >
       <FormSection title={t("sectionBasics")} hint={t("sectionBasicsHint")}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -437,8 +437,10 @@ function FormSection({
   return (
     <section className="grid gap-4 p-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:p-6">
       <div className="space-y-1">
-        <h2 className="font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground">{hint}</p>
+        <h2 className="text-xl font-bold tracking-tight text-megaweave-forest-dark">
+          {title}
+        </h2>
+        <p className="text-base leading-relaxed text-dark/70">{hint}</p>
       </div>
       <div className="max-w-2xl space-y-4">{children}</div>
     </section>

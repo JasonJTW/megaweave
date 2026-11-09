@@ -1540,7 +1540,7 @@
     "colUnitEstimatedShort": "Avoided emissions given (kgCO2e)",
     "factorsSummary": "New-product emission factors, methods and sources for {count} categories.",
     "unrealizedLabel": "Unrealized avoided emissions",
-    "unrealizedHint": "{count, plural, one {# piece on the shelf has} other {# pieces on the shelf have}} not been handed over yet (including requested ones). If all were handed over, the estimate would grow by this much. A projection only; not added to the figures above.",
+    "unrealizedHint": "{count, plural, one {# piece on the shelf has} other {# pieces on the shelf have}} not been handed over yet (including requested ones). If all were handed over, the estimate would grow by this much. A projection only; not added to the realised estimate below.",
     "unrealizedNone": "Nothing on the shelf is waiting to be handed over.",
     "unrealizedUncounted": "{count, plural, one {# piece is} other {# pieces are}} not counted (no factor for the category, or no weight).",
     "unrealizedValue": "+{value} kgCO2e",

@@ -14,7 +14,7 @@ import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { hostName, OrgAccess, OrgReport, requestJson } from "@/lib/orgApi";
 
-/** 一個數字：標籤在上、數值、灰色補充；KPI 列用 1px 分隔線切成等寬欄，不各自成卡 */
+/** 一個數字：標籤在上、數值、補充說明 */
 function Stat({
   label,
   value,
@@ -29,16 +29,42 @@ function Stat({
   children?: ReactNode;
 }) {
   return (
-    <div className="min-w-0 space-y-1 bg-white p-5">
-      <p className="text-sm text-muted-foreground">{label}</p>
+    <div className="min-w-0 space-y-1.5 bg-white p-5 md:p-6">
+      <p className="text-sm font-medium text-dark/70">{label}</p>
       <p
-        className="text-2xl font-semibold tabular-nums tracking-tight"
+        className="text-3xl font-bold tabular-nums tracking-tight text-megaweave-forest-dark"
         data-testid={testId}
       >
         {value}
       </p>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-sm text-dark/60">{hint}</p>}
+    </div>
+  );
+}
+
+/** 排放量區塊裡已實現的數字：淺底與白色區塊分層 */
+function FieldStat({
+  label,
+  value,
+  hint,
+  testId,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  testId?: string;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5 rounded-2xl bg-primary-5 p-5">
+      <p className="text-sm font-medium text-dark/70">{label}</p>
+      <p
+        className="text-2xl font-bold tabular-nums tracking-tight text-megaweave-forest-dark md:text-3xl"
+        data-testid={testId}
+      >
+        {value}
+      </p>
+      {hint && <p className="text-sm text-dark/60">{hint}</p>}
     </div>
   );
 }
@@ -54,7 +80,7 @@ function StatStrip({
     //* gap-px 透出底色當分隔線：換行成 2×2 時也不用另外處理邊框
     <div
       className={cn(
-        "grid gap-px overflow-hidden rounded-lg border bg-border",
+        "grid gap-px overflow-hidden rounded-2xl bg-primary-15",
         cols === 2 && "sm:grid-cols-2",
         cols === 3 && "sm:grid-cols-3",
         cols === 4 && "sm:grid-cols-2 lg:grid-cols-4",
@@ -76,18 +102,29 @@ function ReportSection({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+        <h2 className="text-2xl font-bold tracking-tight text-megaweave-forest-dark">
+          {title}
+        </h2>
+        {hint && <p className="text-base text-dark/70">{hint}</p>}
       </div>
       {children}
     </section>
   );
 }
 
-const th = "px-4 py-2.5 align-bottom font-normal";
-const td = "px-4 py-2.5";
+function SubHeading({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="text-lg font-bold text-megaweave-forest-dark">{children}</h3>
+  );
+}
+
+const th = "px-4 py-3 align-bottom font-medium";
+const td = "px-4 py-3";
+const tableBox = "overflow-x-auto rounded-2xl bg-white";
+const thead = "text-left text-sm text-dark/60";
+const row = "border-t border-primary-15";
 
 function ReportView({ report }: { report: OrgReport }) {
   const t = useTranslations("OrgReport");
@@ -103,7 +140,77 @@ function ReportView({ report }: { report: OrgReport }) {
   const rate = report.circulation.rate;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-14">
+      {/* E6-2 避免排放量：報表的主角，放最上面。待實現（預估）最大；已實現的數字並列在下，兩者不相加 */}
+      <section
+        aria-labelledby="report-emissions-heading"
+        className="space-y-8 rounded-3xl bg-white p-6 md:p-10"
+      >
+        <div className="space-y-1">
+          <h2
+            id="report-emissions-heading"
+            className="text-2xl font-bold tracking-tight text-megaweave-forest-dark"
+          >
+            {t("emissionsHeading")}
+          </h2>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-lg font-semibold text-dark/80">
+            {t("unrealizedLabel")}
+          </p>
+          <p
+            className="text-6xl font-bold tabular-nums leading-none tracking-tight text-megaweave-forest md:text-8xl"
+            data-testid="report-unrealized"
+          >
+            {t("unrealizedValue", {
+              value: num(e.unrealized.estimatedKgCO2e, 1),
+            })}
+          </p>
+          <p className="max-w-3xl text-base leading-relaxed text-dark/70">
+            {e.unrealized.quantity === 0
+              ? t("unrealizedNone")
+              : t("unrealizedHint", { count: e.unrealized.quantity })}
+            {e.unrealized.uncountedQuantity > 0 &&
+              ` ${t("unrealizedUncounted", { count: e.unrealized.uncountedQuantity })}`}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-base text-dark/70">{t("emissionsScope")}</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <FieldStat
+              label={t("estimatedKg")}
+              value={t("kgCO2e", { value: num(e.estimatedKgCO2e, 1) })}
+              hint={t("estimatedKgHint", {
+                rate: num(e.replacementRate.value, 2),
+              })}
+              testId="report-estimated"
+            />
+            <FieldStat
+              label={t("potentialKg")}
+              value={t("kgCO2e", { value: num(e.potentialKgCO2e, 1) })}
+              hint={t("potentialKgHint")}
+              testId="report-potential"
+            />
+            <FieldStat
+              label={t("totalWeight")}
+              value={t("kg", { value: num(e.totalWeightKg, 1) })}
+              hint={t("defaultWeightShare", {
+                share: pct(e.defaultWeightShare),
+              })}
+              testId="report-weight"
+            />
+            <FieldStat
+              label={t("estimatedValue")}
+              value={t("twd", { value: num(value.estimatedValueTwd) })}
+              hint={t("unvalued", { count: value.unvaluedQuantity })}
+              testId="report-value"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* E6-1 流通 */}
       <ReportSection title={t("circulationHeading")}>
         <StatStrip cols={3}>
@@ -146,12 +253,12 @@ function ReportView({ report }: { report: OrgReport }) {
           </Stat>
         </StatStrip>
 
-        <div className="grid gap-6 pt-3 xl:grid-cols-[2fr_3fr]">
-          <div className="min-w-0 space-y-2">
-            <h3 className="text-sm font-semibold">{t("tiersHeading")}</h3>
-            <div className="overflow-x-auto rounded-lg border bg-white">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
+        <div className="grid gap-6 pt-4 xl:grid-cols-[2fr_3fr]">
+          <div className="min-w-0 space-y-3">
+            <SubHeading>{t("tiersHeading")}</SubHeading>
+            <div className={tableBox}>
+              <table className="w-full min-w-[420px] text-[15px]">
+                <thead className={thead}>
                   <tr>
                     <th className={th}>{t("colTier")}</th>
                     <th className={cn(th, "text-right")}>{t("colReached")}</th>
@@ -163,7 +270,7 @@ function ReportView({ report }: { report: OrgReport }) {
                   {report.tiers.map((tier) => (
                     <tr
                       key={tier.tier}
-                      className="border-t"
+                      className={row}
                       data-testid={`report-tier-${tier.tier}`}
                     >
                       <td className={td}>{t(`tier.${tier.tier}`)}</td>
@@ -173,7 +280,12 @@ function ReportView({ report }: { report: OrgReport }) {
                       <td className={cn(td, "text-right tabular-nums")}>
                         {num(tier.quantity)}
                       </td>
-                      <td className={cn(td, "text-right tabular-nums")}>
+                      <td
+                        className={cn(
+                          td,
+                          "text-right font-bold tabular-nums text-megaweave-forest-dark",
+                        )}
+                      >
                         {pct(tier.rate)}
                       </td>
                     </tr>
@@ -181,17 +293,19 @@ function ReportView({ report }: { report: OrgReport }) {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground">{t("tiersHint")}</p>
+            <p className="text-sm leading-relaxed text-dark/60">
+              {t("tiersHint")}
+            </p>
           </div>
 
-          <div className="min-w-0 space-y-2">
-            <h3 className="text-sm font-semibold">{t("unitsHeading")}</h3>
+          <div className="min-w-0 space-y-3">
+            <SubHeading>{t("unitsHeading")}</SubHeading>
             {report.units.length === 0 ? (
               <OrgNotice>{t("unitsEmpty")}</OrgNotice>
             ) : (
-              <div className="overflow-x-auto rounded-lg border bg-white">
-                <table className="w-full min-w-[520px] text-sm">
-                  <thead className="text-left text-xs text-muted-foreground">
+              <div className={tableBox}>
+                <table className="w-full min-w-[520px] text-[15px]">
+                  <thead className={thead}>
                     <tr>
                       <th className={th}>{t("colUnit")}</th>
                       <th className={cn(th, "text-right")}>{t("colListed")}</th>
@@ -206,7 +320,7 @@ function ReportView({ report }: { report: OrgReport }) {
                   </thead>
                   <tbody>
                     {report.units.map((u) => (
-                      <tr key={u.unit.id} className="border-t">
+                      <tr key={u.unit.id} className={row}>
                         <td className={cn(td, "font-medium")}>{u.unit.name}</td>
                         <td className={cn(td, "text-right tabular-nums")}>
                           {num(u.listedQuantity)}
@@ -217,7 +331,12 @@ function ReportView({ report }: { report: OrgReport }) {
                         <td className={cn(td, "text-right tabular-nums")}>
                           {num(u.receivedQuantity)}
                         </td>
-                        <td className={cn(td, "text-right tabular-nums")}>
+                        <td
+                          className={cn(
+                            td,
+                            "text-right font-bold tabular-nums text-megaweave-forest-dark",
+                          )}
+                        >
                           {num(u.givenEstimatedKgCO2e, 1)}
                         </td>
                       </tr>
@@ -226,70 +345,30 @@ function ReportView({ report }: { report: OrgReport }) {
                 </table>
               </div>
             )}
-            <p className="text-xs text-muted-foreground">{t("unitsHint")}</p>
+            <p className="text-sm leading-relaxed text-dark/60">
+              {t("unitsHint")}
+            </p>
           </div>
         </div>
       </ReportSection>
 
-      {/* E6-2 重量、價值、避免排放量 */}
-      <ReportSection title={t("emissionsHeading")} hint={t("emissionsScope")}>
-        <StatStrip cols={4}>
-          <Stat
-            label={t("estimatedKg")}
-            value={t("kgCO2e", { value: num(e.estimatedKgCO2e, 1) })}
-            hint={t("estimatedKgHint", {
-              rate: num(e.replacementRate.value, 2),
-            })}
-            testId="report-estimated"
-          />
-          <Stat
-            label={t("potentialKg")}
-            value={t("kgCO2e", { value: num(e.potentialKgCO2e, 1) })}
-            hint={t("potentialKgHint")}
-            testId="report-potential"
-          />
-          <Stat
-            label={t("totalWeight")}
-            value={t("kg", { value: num(e.totalWeightKg, 1) })}
-            hint={t("defaultWeightShare", {
-              share: pct(e.defaultWeightShare),
-            })}
-            testId="report-weight"
-          />
-          <Stat
-            label={t("estimatedValue")}
-            value={t("twd", { value: num(value.estimatedValueTwd) })}
-            hint={t("unvalued", { count: value.unvaluedQuantity })}
-            testId="report-value"
-          />
-        </StatStrip>
-
-        {/* 待實現：預估值，跟上方已實現的數字分開，不相加 */}
-        <div className="flex flex-col gap-2 rounded-lg border border-dashed bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="min-w-0 space-y-1">
-            <p className="text-sm font-medium">{t("unrealizedLabel")}</p>
-            <p className="text-xs text-muted-foreground">
-              {e.unrealized.quantity === 0
-                ? t("unrealizedNone")
-                : t("unrealizedHint", { count: e.unrealized.quantity })}
-              {e.unrealized.uncountedQuantity > 0 &&
-                ` ${t("unrealizedUncounted", { count: e.unrealized.uncountedQuantity })}`}
+      {/* 計算方法與揭露項目、各類別 */}
+      <ReportSection title={t("formulaHeading")}>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-2 rounded-2xl bg-white p-5 text-base md:p-6">
+            <p>{t("formulaPotential")}</p>
+            <p>{t("formulaEstimated")}</p>
+            <p className="font-semibold text-megaweave-forest-dark">
+              {t("formulaUnrealized")}
+            </p>
+            <p className="pt-1 text-sm leading-relaxed text-dark/60">
+              {t("formulaFactor")}
             </p>
           </div>
-          <p
-            className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground"
-            data-testid="report-unrealized"
-          >
-            {t("unrealizedValue", {
-              value: num(e.unrealized.estimatedKgCO2e, 1),
-            })}
-          </p>
-        </div>
 
-        <div className="grid gap-6 pt-3 lg:grid-cols-2">
-          <dl className="min-w-0 divide-y rounded-lg border bg-white text-sm">
-            <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
-              <dt className="text-muted-foreground">{t("replacementRate")}</dt>
+          <dl className="min-w-0 divide-y divide-primary-15 rounded-2xl bg-white text-base">
+            <div className="flex items-baseline justify-between gap-4 px-5 py-3.5">
+              <dt className="text-dark/60">{t("replacementRate")}</dt>
               <dd data-testid="report-replacement-rate" className="text-right">
                 {t("replacementRateValue", {
                   rate: num(e.replacementRate.value, 2),
@@ -299,53 +378,39 @@ function ReportView({ report }: { report: OrgReport }) {
                   href={e.replacementRate.source.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="underline underline-offset-2"
+                  className="font-medium text-megaweave-forest underline underline-offset-4 hover:text-megaweave-forest-dark"
                 >
                   {t("replacementRateSource")}
                 </a>
               </dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
-              <dt className="text-muted-foreground">
-                {t("factorTableVersion")}
-              </dt>
+            <div className="flex items-baseline justify-between gap-4 px-5 py-3.5">
+              <dt className="text-dark/60">{t("factorTableVersion")}</dt>
               <dd data-testid="report-factor-version" className="tabular-nums">
                 {e.factorTableVersion}
               </dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
-              <dt className="text-muted-foreground">
-                {t("defaultWeightShareLabel")}
-              </dt>
+            <div className="flex items-baseline justify-between gap-4 px-5 py-3.5">
+              <dt className="text-dark/60">{t("defaultWeightShareLabel")}</dt>
               <dd data-testid="report-default-share" className="tabular-nums">
                 {pct(e.defaultWeightShare)}
               </dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
-              <dt className="text-muted-foreground">{t("uncounted")}</dt>
+            <div className="flex items-baseline justify-between gap-4 px-5 py-3.5">
+              <dt className="text-dark/60">{t("uncounted")}</dt>
               <dd data-testid="report-uncounted" className="tabular-nums">
                 {t("pieces", { count: e.uncountedQuantity })}
               </dd>
             </div>
           </dl>
-
-          <div className="space-y-1.5 rounded-lg bg-primary-5 p-4 text-sm">
-            <p className="font-semibold">{t("formulaHeading")}</p>
-            <p>{t("formulaPotential")}</p>
-            <p>{t("formulaEstimated")}</p>
-            <p>{t("formulaUnrealized")}</p>
-            <p className="pt-1 text-xs text-muted-foreground">
-              {t("formulaFactor")}
-            </p>
-          </div>
         </div>
 
         {e.byCategory.length > 0 && (
-          <div className="space-y-2 pt-3">
-            <h3 className="text-sm font-semibold">{t("byCategoryHeading")}</h3>
-            <div className="overflow-x-auto rounded-lg border bg-white">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
+          <div className="space-y-3 pt-4">
+            <SubHeading>{t("byCategoryHeading")}</SubHeading>
+            <div className={tableBox}>
+              <table className="w-full min-w-[560px] text-[15px]">
+                <thead className={thead}>
                   <tr>
                     <th className={th}>{t("colCategory")}</th>
                     <th className={cn(th, "text-right")}>{t("colQuantity")}</th>
@@ -360,8 +425,8 @@ function ReportView({ report }: { report: OrgReport }) {
                 </thead>
                 <tbody>
                   {e.byCategory.map((c) => (
-                    <tr key={c.categoryId} className="border-t">
-                      <td className={td}>{c.name}</td>
+                    <tr key={c.categoryId} className={row}>
+                      <td className={cn(td, "font-medium")}>{c.name}</td>
                       <td className={cn(td, "text-right tabular-nums")}>
                         {num(c.quantity)}
                       </td>
@@ -371,7 +436,12 @@ function ReportView({ report }: { report: OrgReport }) {
                       <td className={cn(td, "text-right tabular-nums")}>
                         {num(c.potentialKgCO2e, 1)}
                       </td>
-                      <td className={cn(td, "text-right tabular-nums")}>
+                      <td
+                        className={cn(
+                          td,
+                          "text-right font-bold tabular-nums text-megaweave-forest-dark",
+                        )}
+                      >
                         {num(c.estimatedKgCO2e, 1)}
                       </td>
                     </tr>
@@ -384,26 +454,26 @@ function ReportView({ report }: { report: OrgReport }) {
       </ReportSection>
 
       {/* 係數與來源：參考資料，預設收合 */}
-      <details className="group rounded-lg border bg-white">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+      <details className="group rounded-2xl bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-5 md:px-6 [&::-webkit-details-marker]:hidden">
           <span>
-            <span className="block text-lg font-semibold">
+            <span className="block text-xl font-bold tracking-tight text-megaweave-forest-dark">
               {t("factorsHeading")}
             </span>
-            <span className="block text-sm text-muted-foreground">
+            <span className="block text-base text-dark/60">
               {t("factorsSummary", { count: report.factors.length })}
             </span>
           </span>
           <span
             aria-hidden
-            className="text-muted-foreground transition-transform group-open:rotate-180"
+            className="text-xl text-megaweave-forest transition-transform group-open:rotate-180"
           >
             ▾
           </span>
         </summary>
-        <div className="overflow-x-auto border-t">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="text-left text-xs text-muted-foreground">
+        <div className="overflow-x-auto border-t border-primary-15">
+          <table className="w-full min-w-[640px] text-[15px]">
+            <thead className={thead}>
               <tr>
                 <th className={th}>{t("colCategory")}</th>
                 <th className={cn(th, "text-right")}>{t("colFactor")}</th>
@@ -413,13 +483,11 @@ function ReportView({ report }: { report: OrgReport }) {
             </thead>
             <tbody>
               {report.factors.map((f) => (
-                <tr key={f.categoryId} className="border-t align-top">
+                <tr key={f.categoryId} className={cn(row, "align-top")}>
                   <td className={cn(td, "font-medium")}>{f.name}</td>
                   <td className={cn(td, "text-right tabular-nums")}>
                     {f.kgCO2ePerKg === null ? (
-                      <span className="text-muted-foreground">
-                        {t("notCounted")}
-                      </span>
+                      <span className="text-dark/60">{t("notCounted")}</span>
                     ) : (
                       num(f.kgCO2ePerKg, 2)
                     )}
@@ -427,7 +495,7 @@ function ReportView({ report }: { report: OrgReport }) {
                   <td className={td}>
                     {t(`method.${f.method}`)}
                     {f.basis && (
-                      <span className="block text-xs text-muted-foreground">
+                      <span className="block text-sm text-dark/60">
                         {t(`basis.${f.basis}`)}
                       </span>
                     )}
@@ -440,7 +508,7 @@ function ReportView({ report }: { report: OrgReport }) {
                             href={s.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="underline underline-offset-2 hover:text-primary"
+                            className="text-megaweave-forest underline underline-offset-4 hover:text-megaweave-forest-dark"
                           >
                             {s.publisher}（{s.year}）
                           </a>
@@ -456,7 +524,7 @@ function ReportView({ report }: { report: OrgReport }) {
       </details>
 
       <p
-        className="max-w-4xl text-xs leading-relaxed text-muted-foreground"
+        className="max-w-4xl text-sm leading-relaxed text-dark/60"
         data-testid="report-footnote"
       >
         {t("footnote", { version: e.factorTableVersion })}

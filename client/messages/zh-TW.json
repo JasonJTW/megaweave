@@ -1540,7 +1540,7 @@
     "colUnitEstimatedShort": "流出的避免排放量（kgCO2e）",
     "factorsSummary": "{count} 個類別的新品排放係數、計算方法與引用來源。",
     "unrealizedLabel": "待實現的避免排放量",
-    "unrealizedHint": "在架物品還有 {count} 件尚未交接（含申請中）；若全數完成交接，估算避免排放量可再增加這麼多。只是預估，不加進上方數字。",
+    "unrealizedHint": "在架物品還有 {count} 件尚未交接（含申請中）；若全數完成交接，估算避免排放量可再增加這麼多。只是預估，不加進下方已實現的估算避免排放量。",
     "unrealizedNone": "架上沒有尚未交接的物品。",
     "unrealizedUncounted": "其中 {count} 件類別無係數或缺重量，未計入。",
     "unrealizedValue": "+{value} kgCO2e",

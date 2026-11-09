@@ -541,7 +541,7 @@ function ItemRow({
       {open && (
         <tr className="bg-primary-5">
           <td colSpan={6} className="px-4 pb-4 pt-0">
-            <div className="rounded-lg border bg-white p-4">
+            <div className="rounded-2xl bg-white p-5">
               {open === "requests" ? (
                 <ItemRequests org={org} item={item} onReviewed={onReviewed} />
               ) : (
@@ -557,7 +557,7 @@ function ItemRow({
 
 function TableSkeleton() {
   return (
-    <div aria-hidden className="rounded-lg border">
+    <div aria-hidden className="rounded-2xl bg-white">
       {Array.from({ length: 5 }, (_, i) => (
         <div
           key={i}
@@ -689,7 +689,7 @@ function ItemTable({ org }: { org: OrgAccess }) {
         </OrgNotice>
       )}
       {items.length > 0 && (
-        <div className="relative overflow-x-auto rounded-lg border bg-white">
+        <div className="relative overflow-x-auto rounded-2xl bg-white">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="text-left text-xs text-muted-foreground">

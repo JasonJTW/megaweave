@@ -60,54 +60,62 @@ export function OrgShell({
   const showTabs = org && tabs.length > 1;
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-16 pt-6 sm:px-6">
-      {(showSwitcher || showTabs) && (
-        <div className="mb-6 space-y-3">
-          {showSwitcher && (
-            <OrgSwitcher orgs={orgs} org={org} basePath={switchPath} />
-          )}
-          {showTabs && (
-            <nav
-              aria-label={t("label")}
-              className="-mx-4 overflow-x-auto border-b px-4 sm:mx-0 sm:px-0"
-            >
-              <ul className="flex gap-6">
-                {tabs.map((tab) => {
-                  const active = tab === current;
-                  return (
-                    <li key={tab} className="shrink-0">
-                      <Link
-                        href={`${TAB_PATHS[tab]}?org=${org.id}`}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "-mb-px inline-flex h-10 items-center border-b-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                          active
-                            ? "border-primary font-semibold text-foreground"
-                            : "border-transparent text-muted-foreground hover:border-primary-30 hover:text-foreground",
-                        )}
-                      >
-                        {t(tab)}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-          )}
-        </div>
-      )}
+    //* 底色與主頁（HomeFeed）相同：固定層蓋滿視窗，外框本身也上色，整頁截圖與列印不會露白
+    <div className="min-h-screen bg-primary-5 font-ddin text-dark">
+      <div aria-hidden className="fixed inset-0 -z-10 bg-primary-5" />
+      <div className="mx-auto w-full min-w-0 max-w-6xl px-4 pb-20 pt-8 sm:px-6">
+        {(showSwitcher || showTabs) && (
+          <div className="mb-6 space-y-3">
+            {showSwitcher && (
+              <OrgSwitcher orgs={orgs} org={org} basePath={switchPath} />
+            )}
+            {showTabs && (
+              <nav
+                aria-label={t("label")}
+                className="-mx-4 overflow-x-auto border-b border-primary-15 px-4 sm:mx-0 sm:px-0"
+              >
+                <ul className="flex gap-6">
+                  {tabs.map((tab) => {
+                    const active = tab === current;
+                    return (
+                      <li key={tab} className="shrink-0">
+                        <Link
+                          href={`${TAB_PATHS[tab]}?org=${org.id}`}
+                          aria-current={active ? "page" : undefined}
+                          className={cn(
+                            "-mb-px inline-flex h-11 items-center border-b-[3px] text-base transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                            active
+                              ? "border-primary font-bold text-megaweave-forest-dark"
+                              : "border-transparent text-dark/60 hover:border-primary-30 hover:text-megaweave-forest-dark",
+                          )}
+                        >
+                          {t(tab)}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+            )}
+          </div>
+        )}
 
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          )}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight text-megaweave-forest-dark md:text-4xl">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="max-w-3xl text-base leading-relaxed text-dark/70">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
         </div>
-        {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
+
+        {children}
       </div>
-
-      {children}
     </div>
   );
 }
@@ -124,10 +132,10 @@ export function OrgNotice({
     <div
       role={tone === "error" ? "alert" : undefined}
       className={cn(
-        "rounded-lg border border-dashed px-4 py-6 text-sm",
+        "rounded-2xl border border-dashed border-primary-30 bg-white/60 px-5 py-6 text-base",
         tone === "error"
           ? "border-destructive/40 text-destructive"
-          : "text-muted-foreground",
+          : "text-dark/60",
       )}
     >
       {children}

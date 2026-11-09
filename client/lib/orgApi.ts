@@ -5,6 +5,7 @@
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { ApiError } from "@/lib/apiError";
+import { pickOrg } from "@/lib/orgAdminRules";
 
 export const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -142,7 +143,7 @@ export function useSelectedOrg() {
   );
   const wanted = searchParams.get("org");
   const orgs = data?.orgs ?? [];
-  const org = orgs.find((o) => o.id === wanted) ?? orgs[0] ?? null;
+  const org = pickOrg(orgs, wanted);
   return { orgs, org, error, isLoading };
 }
 

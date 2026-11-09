@@ -24,6 +24,12 @@ import { ApiError } from "@/lib/apiError";
 import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Link } from "@/i18n/navigation";
+import {
+  addAdminRequest,
+  demoteAdminRequest,
+  type MemberRequest,
+  type OrgMemberIdentity,
+} from "@/lib/orgAdminRules";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -67,13 +73,6 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-interface OrgMember {
-  id: number;
-  email: string;
-  role: "admin" | "member";
-  unitIds: number[];
-}
-
 /**
  * 組織管理員的增減。加入：已是成員就改成 Org Admin（保留窗口單位），否則以 Org Admin 身分加入；
  * 移除：降為 Org Member，帳號與成員身分保留。最後一位 Org Admin 由 server 擋下（ORG_LAST_ADMIN）
@@ -89,7 +88,7 @@ function OrgAdminsEditor({
   const errorMessage = useApiErrorMessage();
   const url = `${hostName}/api/org-admin/orgs/${orgId}`;
   const { data, error, mutate } = useSWR(url, (key: string) =>
-    requestJson<{ members: OrgMember[] }>(key),
+    requestJson<{ members: OrgMemberIdentity[] }>(key),
   );
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -110,48 +109,26 @@ function OrgAdminsEditor({
     }
   }
 
+  function send(request: MemberRequest) {
+    return requestJson(`${url}${request.path}`, {
+      method: request.method,
+      body: JSON.stringify(request.body),
+    });
+  }
+
   async function handleAdd(event: React.FormEvent) {
     event.preventDefault();
     if (!data) return;
-    const typed = email.trim();
-    const existing = data.members.find(
-      (m) => m.email.toLowerCase() === typed.toLowerCase(),
-    );
-    const added = await run(
-      () =>
-        existing
-          ? requestJson(`${url}/members/${existing.id}`, {
-              method: "PATCH",
-              body: JSON.stringify({
-                role: "admin",
-                unitIds: existing.unitIds,
-              }),
-            })
-          : requestJson(`${url}/members`, {
-              method: "POST",
-              body: JSON.stringify({
-                email: typed,
-                role: "admin",
-                unitIds: [],
-              }),
-            }),
-      t("adminAdded"),
-    );
+    const request = addAdminRequest(data.members, email);
+    const added = await run(() => send(request), t("adminAdded"));
     if (added) setEmail("");
   }
 
-  function handleRemove(member: OrgMember) {
+  function handleRemove(member: OrgMemberIdentity) {
     if (!window.confirm(t("removeAdminConfirm", { email: member.email }))) {
       return;
     }
-    void run(
-      () =>
-        requestJson(`${url}/members/${member.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ role: "member", unitIds: member.unitIds }),
-        }),
-      t("adminRemoved"),
-    );
+    void run(() => send(demoteAdminRequest(member)), t("adminRemoved"));
   }
 
   return (

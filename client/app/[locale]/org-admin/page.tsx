@@ -29,6 +29,7 @@ import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { useUser } from "@/app/contexts/UserContext";
 import { Link } from "@/i18n/navigation";
+import { pickOrg } from "@/lib/orgAdminRules";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -511,8 +512,7 @@ function OrgAdminContent() {
     (url) => requestJson<{ orgs: OrgOption[] }>(url),
   );
   const orgs = orgList?.orgs ?? [];
-  const currentOrg =
-    orgs.find((org) => org.id === selectedOrgId) ?? orgs[0] ?? null;
+  const currentOrg = pickOrg(orgs, selectedOrgId);
   const orgId = currentOrg?.id ?? null;
   const orgUrl = orgId ? `${hostName}/api/org-admin/orgs/${orgId}` : null;
   const {

@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link, useRouter } from "@/i18n/navigation";
+import { pickOrg } from "@/lib/orgAdminRules";
 import {
   Select,
   SelectContent,
@@ -399,7 +400,7 @@ function OrgReportContent() {
   );
   const adminOrgs = (orgList?.orgs ?? []).filter((o) => o.isAdmin);
   const wanted = searchParams.get("org");
-  const org = adminOrgs.find((o) => o.id === wanted) ?? adminOrgs[0] ?? null;
+  const org = pickOrg(adminOrgs, wanted);
 
   const { data, error } = useSWR(
     org ? `${hostName}/api/org-admin/orgs/${org.id}/report` : null,

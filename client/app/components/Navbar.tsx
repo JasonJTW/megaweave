@@ -27,6 +27,7 @@ import {
   // FileText,
 } from "lucide-react";
 import { useOrgNav } from "@/lib/orgApi";
+import { orgNavHref } from "@/lib/orgAdminRules";
 import { googleLogout } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -90,13 +91,7 @@ const Navbar = () => {
   const isPlatformAdmin = user?.role === "admin";
   //* 組織入口（ADR 0003）：能管組織 → 組織後台；只是成員 → 組織頁；
   //* 還沒有任何組織的 Platform Admin → 開通組織
-  const orgHref = isOrgAdmin
-    ? "/org-admin"
-    : isMember
-      ? "/org"
-      : isPlatformAdmin
-        ? "/admin/orgs"
-        : null;
+  const orgHref = orgNavHref({ isOrgAdmin, isMember, isPlatformAdmin });
 
   const handleSignOut = async () => {
     try {

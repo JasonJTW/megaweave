@@ -5,6 +5,7 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import type { OrgAccess } from "@/lib/orgApi";
+import { OrgNotice } from "@/components/org/OrgShell";
 
 export function NoUnitsNotice({
   org,
@@ -15,14 +16,17 @@ export function NoUnitsNotice({
 }) {
   const t = useTranslations("Org");
   if (!org.isAdmin) {
-    return <p className="text-sm text-muted-foreground">{notContactMessage}</p>;
+    return <OrgNotice>{notContactMessage}</OrgNotice>;
   }
   return (
-    <p className="text-sm text-muted-foreground">
+    <OrgNotice>
       {t("noUnitsYet", { org: org.name })}{" "}
-      <Link href={`/org-admin?org=${org.id}`} className="underline">
+      <Link
+        href={`/org-admin?org=${org.id}`}
+        className="font-medium text-foreground underline underline-offset-4"
+      >
         {t("goToOrgAdmin")}
       </Link>
-    </p>
+    </OrgNotice>
   );
 }

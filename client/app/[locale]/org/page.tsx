@@ -2,15 +2,16 @@
 
 //* 組織頁（PRD 0001 §5.1、ADR 0003 prototype 例外）：Internal／Members 物品只在這裡顯示，
 //* 不進首頁 Feed 與搜尋。上方切換器一次看一個組織；看得到哪些層級由 server 依 membership 判斷。
-import { Suspense } from "react";
+//* 類別篩選只在畫面上過濾已載入的物品，不另打 API
+import { Suspense, useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { Link } from "@/i18n/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { getImageUrl } from "@/utils/imageUtils";
-import { OrgSwitcher } from "@/components/org/OrgSwitcher";
+import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
+import { TierPill } from "@/components/org/TierPill";
 import {
   hostName,
   OrgAccess,
@@ -21,60 +22,161 @@ import {
 } from "@/lib/orgApi";
 import { orgPostsKey } from "@/lib/orgSwrKeys";
 
+const ALL = "all";
+
+function PostCardSkeleton() {
+  return (
+    <li aria-hidden className="overflow-hidden rounded-lg border">
+      <div className="aspect-[4/3] bg-muted" />
+      <div className="space-y-2 p-4">
+        <div className="h-4 w-3/4 rounded bg-muted" />
+        <div className="h-3 w-1/2 rounded bg-muted" />
+      </div>
+    </li>
+  );
+}
+
 function OrgPosts({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org");
   const categories = useOrgItemCategories();
+  const [category, setCategory] = useState(ALL);
   const { data, error } = useSWR(orgPostsKey(hostName, org.id), (url: string) =>
     requestJson<{ posts: OrgPagePost[] }>(url),
   );
 
-  if (error)
-    return <p className="text-sm text-destructive">{t("loadFailed")}</p>;
-  if (!data)
-    return <p className="text-sm text-muted-foreground">{t("loading")}</p>;
+  if (error) return <OrgNotice tone="error">{t("loadFailed")}</OrgNotice>;
+  if (!data) {
+    return (
+      <ul
+        aria-label={t("loading")}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      >
+        {Array.from({ length: 8 }, (_, i) => (
+          <PostCardSkeleton key={i} />
+        ))}
+      </ul>
+    );
+  }
   if (data.posts.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t("empty")}</p>;
+    return (
+      <OrgNotice>
+        {t("empty")}
+        {org.manageableUnits.length > 0 && (
+          <>
+            {" "}
+            <Link
+              href={`/org/items/new?org=${org.id}`}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              {t("listFirstItem")}
+            </Link>
+          </>
+        )}
+      </OrgNotice>
+    );
   }
 
+  const nameOf = (id: string | null) =>
+    categories.find((c) => c.id === id)?.name ?? null;
+  //* 只列出這個組織真的有物品的類別，依件數排序
+  const counts = new Map<string, number>();
+  for (const post of data.posts) {
+    if (post.orgCategory) {
+      counts.set(post.orgCategory, (counts.get(post.orgCategory) ?? 0) + 1);
+    }
+  }
+  const chips = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const visible =
+    category === ALL
+      ? data.posts
+      : data.posts.filter((p) => p.orgCategory === category);
+
   return (
-    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {data.posts.map((post) => {
-        const category = categories.find((c) => c.id === post.orgCategory);
-        const cover = post.s3Keys[0];
-        return (
-          <li key={post.id}>
-            <Link href={`/item/${post.id}`} className="block h-full">
-              <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
-                {cover && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={getImageUrl(cover, "original")}
-                    alt=""
-                    className="aspect-[4/3] w-full object-cover"
-                  />
+    <div className="space-y-5">
+      {chips.length > 1 && (
+        <div
+          role="group"
+          aria-label={t("categoryFilter")}
+          className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        >
+          {[[ALL, data.posts.length] as const, ...chips].map(([id, count]) => {
+            const active = category === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setCategory(id)}
+                className={cn(
+                  "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  active
+                    ? "border-primary bg-primary text-white"
+                    : "border-primary-30 bg-white text-foreground hover:bg-primary-5",
                 )}
-                <CardContent className="space-y-2 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">
-                      {t(`tier.${post.audienceTier}`)}
-                    </Badge>
-                    {category && (
-                      <Badge variant="outline">{category.name}</Badge>
-                    )}
-                  </div>
-                  <h2 className="font-semibold">{post.title}</h2>
+              >
+                {id === ALL ? t("allCategories") : (nameOf(id) ?? id)}
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    active ? "text-white/80" : "text-muted-foreground",
+                  )}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {visible.map((post) => {
+          const categoryName = nameOf(post.orgCategory);
+          const cover = post.s3Keys[0];
+          return (
+            <li key={post.id}>
+              <Link
+                href={`/item/${post.id}`}
+                className="group block h-full overflow-hidden rounded-lg border bg-white transition-colors hover:border-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <div className="relative aspect-[4/3] overflow-hidden bg-primary-5">
+                  {cover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={getImageUrl(cover, "original")}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    />
+                  ) : (
+                    <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-primary-75">
+                      {categoryName ?? t("noPhoto")}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5 p-4">
+                  <h2 className="line-clamp-2 font-medium leading-snug group-hover:underline group-hover:underline-offset-4">
+                    {post.title}
+                  </h2>
                   <p className="text-sm text-muted-foreground">
                     {post.unit.name}
                     {post.quantity !== null &&
                       ` · ${t("quantity", { count: post.quantity })}`}
                   </p>
-                </CardContent>
-              </Card>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <TierPill tier={post.audienceTier} />
+                    {cover && categoryName && (
+                      <span className="text-xs text-muted-foreground">
+                        {categoryName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -83,50 +185,38 @@ function OrgPageContent() {
   const { orgs, org, error, isLoading } = useSelectedOrg();
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">{org ? org.name : t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
-      </div>
-
-      {error && <p className="text-sm text-destructive">{t("loadFailed")}</p>}
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">{t("loading")}</p>
-      )}
+    <OrgShell
+      orgs={orgs}
+      org={org}
+      switchPath="/org"
+      tabs={
+        org
+          ? orgTabs({
+              isAdmin: org.isAdmin,
+              canManage: org.manageableUnits.length > 0,
+            })
+          : []
+      }
+      current="items"
+      title={org ? org.name : t("title")}
+      subtitle={t("subtitle")}
+      showSingleOrg={false}
+      actions={
+        org &&
+        org.manageableUnits.length > 0 && (
+          <Button asChild className="w-auto">
+            <Link href={`/org/items/new?org=${org.id}`}>{t("listItem")}</Link>
+          </Button>
+        )
+      }
+    >
+      {error && <OrgNotice tone="error">{t("loadFailed")}</OrgNotice>}
+      {isLoading && <OrgNotice>{t("loading")}</OrgNotice>}
       {!isLoading && !error && orgs.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t("noOrgs")}</p>
+        <OrgNotice>{t("noOrgs")}</OrgNotice>
       )}
-
-      {org && (
-        <>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <OrgSwitcher orgs={orgs} org={org} basePath="/org" />
-            {org.isAdmin && org.manageableUnits.length === 0 && (
-              <Button asChild variant="outline">
-                <Link href={`/org-admin?org=${org.id}`}>
-                  {t("goToOrgAdmin")}
-                </Link>
-              </Button>
-            )}
-            {org.manageableUnits.length > 0 && (
-              <div className="flex gap-2">
-                <Button asChild>
-                  <Link href={`/org/items/new?org=${org.id}`}>
-                    {t("listItem")}
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href={`/org/items?org=${org.id}`}>
-                    {t("manageItems")}
-                  </Link>
-                </Button>
-              </div>
-            )}
-          </div>
-          <OrgPosts key={org.id} org={org} />
-        </>
-      )}
-    </div>
+      {org && <OrgPosts key={org.id} org={org} />}
+    </OrgShell>
   );
 }
 

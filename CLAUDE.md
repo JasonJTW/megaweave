@@ -41,7 +41,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 ## Worktrees & Git Hooks
 - `npm run setup:worktree` (repo root): links the main checkout's `.env*` files and localhost certificates into a worktree, then runs `npm ci` in the root, `client/` and `server/`. Run it in any worktree missing them. Every worktree gets its own `node_modules`; never symlink one.
 - T3 Code runs that script on worktree creation once the user imports it from `t3.json` by hand: Settings → Projects → project → Actions → **Import scripts**. Remind them once.
-- `lefthook.yml` (installed by the root `npm ci`): pre-commit formats `client/` with Prettier, runs ESLint `--fix` on staged files, then `make typecheck` and `make test`. Pre-push refuses pushes to `main`, then runs `make e2e-up && E2E_BUILD=1 make e2e` against the production build, as CI does (needs Docker). Fix failures; never bypass a hook with `--no-verify`.
+- `lefthook.yml` (installed by the root `npm ci`): pre-commit formats `client/` with Prettier, runs ESLint `--fix` on staged files, then `make typecheck` and `make test`. Pre-push refuses pushes to `main`, then runs `make e2e-up && E2E_BUILD=1 make e2e` against the production build, as CI does (needs Docker). Worktrees share one E2E stack, so `make e2e` waits for another worktree's run to finish (`scripts/e2e-lock.sh`). Fix failures; never bypass a hook with `--no-verify`.
 
 ## Pull Requests
 - Changes reach `main` only through a PR. The `main` ruleset requires `E2E (Playwright)`, `Claude Code Review` and `Claude Security Review` to pass; a Claude review fails the check when it posts a blocking finding (`docs/agents/*.md` define blocking). Only merge commits are allowed.

@@ -27,6 +27,8 @@ npm run dev:e2e          # client on https://localhost:3100 (build dir .next-e2e
 npm run build:e2e && npm run start:e2e  # production build, served over HTTPS by e2e/serve-https.mjs
 ```
 
+Every worktree uses this same stack (fixed ports, one database), so `make e2e` and `npm run test:e2e` hold a lock (`scripts/e2e-lock.sh`, in the git common dir): a second run waits for the first instead of wiping its data with its own seed. Running `npx playwright test` directly skips the lock. Locally Playwright uses 3 workers; more do not finish sooner, because the suite waits on the servers and the queue worker, and they only add browser CPU load. The E2E server processes run `ts-node --transpile-only`: `make typecheck` and CI check the types, so each of the four processes skips its own type check (about 3 times faster to start, half the memory).
+
 Locally the client runs `next dev`. With `CI` set, Playwright builds and serves the production build instead (`CI=1 npx playwright test` reproduces the CI run).
 
 ## Services

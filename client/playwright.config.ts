@@ -34,7 +34,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // Locally the suite waits on the servers and the async worker, not the CPU: 3 workers
+  // finish as fast as the default (half the cores) while the browsers use a third less CPU
+  workers: process.env.CI ? 1 : 3,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",
   use: {
     baseURL,

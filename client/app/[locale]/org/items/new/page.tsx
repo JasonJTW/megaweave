@@ -24,6 +24,7 @@ import { usePost } from "@/app/contexts/PostContext";
 import { useConditionText } from "@/i18n/referenceNames";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { OrgSwitcher } from "@/components/org/OrgSwitcher";
+import { NoUnitsNotice } from "@/components/org/NoUnitsNotice";
 import {
   hostName,
   OrgAccess,
@@ -127,7 +128,7 @@ function ItemForm({ org }: { org: OrgAccess }) {
   }
 
   if (units.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t("noUnits")}</p>;
+    return <NoUnitsNotice org={org} notContactMessage={t("noUnits")} />;
   }
 
   return (

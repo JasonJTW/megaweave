@@ -102,7 +102,7 @@ beforeEach(() => {
       { id: UNIT_CONTACT, email: "contact@corp.tw" },
       { id: ORG_MEMBER, email: "staff@corp.tw" },
       { id: OUTSIDER, email: "someone@gmail.com" },
-      { id: PLATFORM_ADMIN, email: "ops@megaweave.tw" },
+      { id: PLATFORM_ADMIN, email: "ops@megaweave.tw", role: "admin" },
       { id: OTHER_ORG_CONTACT, email: "contact@other.tw" },
     ],
     organizations: [
@@ -186,6 +186,7 @@ describe("GET /api/orgs", () => {
         name: "甲公司",
         accessLevel: "internal",
         isAdmin: false,
+        isPlatformAdmin: false,
         manageableUnits: [{ id: GENERAL_AFFAIRS, name: "總務部" }],
         autoRelease: { enabled: true, days: 30 },
         isDemo: false,
@@ -207,11 +208,30 @@ describe("GET /api/orgs", () => {
     );
   });
 
-  it("is empty for someone outside every org, including a Platform Admin", async () => {
-    signInAs(PLATFORM_ADMIN, "admin");
+  it("is empty for someone outside every org", async () => {
+    signInAs(OUTSIDER);
     const res = await api().get("/api/orgs");
     expect(res.status).toBe(200);
     expect(res.body.orgs).toEqual([]);
+  });
+
+  it("gives a Platform Admin every org as an Org Admin without a membership (ADR 0003)", async () => {
+    signInAs(PLATFORM_ADMIN, "admin");
+    const res = await api().get("/api/orgs");
+
+    expect(res.status).toBe(200);
+    const org = res.body.orgs.find((o: { id: string }) => o.id === ORG);
+    expect(org).toMatchObject({
+      accessLevel: "internal",
+      isAdmin: true,
+      isPlatformAdmin: true,
+    });
+    expect(org.manageableUnits).toEqual(
+      expect.arrayContaining([
+        { id: IT_DEPT, name: "資訊部" },
+        { id: GENERAL_AFFAIRS, name: "總務部" },
+      ]),
+    );
   });
 
   it("requires sign-in", async () => {
@@ -280,17 +300,31 @@ describe("POST /api/orgs/:orgId/items", () => {
     expect(res.body.posts).toEqual([]);
   });
 
-  it("returns 404 ORG_NOT_FOUND on the org page to non-members and Platform Admins", async () => {
-    for (const [viewer, role] of [
-      [OUTSIDER, "user"],
-      [OTHER_ORG_CONTACT, "user"],
-      [PLATFORM_ADMIN, "admin"],
-    ] as const) {
-      signInAs(viewer, role);
+  it("returns 404 ORG_NOT_FOUND on the org page to non-members", async () => {
+    for (const viewer of [OUTSIDER, OTHER_ORG_CONTACT]) {
+      signInAs(viewer);
       const res = await api().get(`/api/orgs/${ORG}/posts`);
       expect(res.status).toBe(404);
       expect(res.body.code).toBe("ORG_NOT_FOUND");
     }
+  });
+
+  it("shows a Platform Admin the Internal item on the org page and lets them list for any unit", async () => {
+    signInAs(UNIT_CONTACT);
+    await api().post(`/api/orgs/${ORG}/items`).send(CHAIR).expect(201);
+
+    signInAs(PLATFORM_ADMIN, "admin");
+    const page = await api().get(`/api/orgs/${ORG}/posts`);
+    expect(page.status).toBe(200);
+    expect(page.body.posts).toEqual([
+      expect.objectContaining({ title: "人體工學辦公椅", audienceTier: "internal" }),
+    ]);
+
+    const listed = await api()
+      .post(`/api/orgs/${ORG}/items`)
+      .send({ ...CHAIR, unitId: IT_DEPT });
+    expect(listed.status).toBe(201);
+    expect(listed.body.item.unit).toEqual({ id: IT_DEPT, name: "資訊部" });
   });
 
   it("lets an Org Admin list for any unit", async () => {

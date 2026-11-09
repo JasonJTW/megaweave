@@ -67,6 +67,7 @@ const OUTSIDER = 5;
 const MULTI_CONTACT = 6; //* 同時負責資訊部與法務部
 const GA_CONTACT_2 = 7; //* 總務部的另一位窗口
 const ADMIN_IT_CONTACT = 8; //* Org Admin 兼資訊部窗口
+const PLATFORM_ADMIN = 9; //* 全站 role = admin，不是這個組織的成員
 
 const GENERAL_AFFAIRS = 201;
 const IT_DEPT = 202;
@@ -146,9 +147,14 @@ beforeEach(() => {
     MULTI_CONTACT,
     GA_CONTACT_2,
     ADMIN_IT_CONTACT,
+    PLATFORM_ADMIN,
   ];
   fakeDb = createFakeOrgWeavesDb({
-    users: userIds.map((id) => ({ id, email: `user${id}@example.com` })),
+    users: userIds.map((id) => ({
+      id,
+      email: `user${id}@example.com`,
+      ...(id === PLATFORM_ADMIN ? { role: "admin" } : {}),
+    })),
     organizations: [
       {
         id: 10,
@@ -353,6 +359,7 @@ describe("PATCH /api/weaves/:id/status: who may review an org request", () => {
     ["the contact who listed it", GA_CONTACT],
     ["another contact of the owning unit", GA_CONTACT_2],
     ["an Org Admin", ORG_ADMIN],
+    ["a Platform Admin who is not a member (ADR 0003)", PLATFORM_ADMIN],
   ])("lets %s approve", async (_who, userId) => {
     const weaveId = await pendingRequest();
     const res = await setStatus(userId, weaveId, "approved");

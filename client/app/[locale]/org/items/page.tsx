@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OrgSwitcher } from "@/components/org/OrgSwitcher";
+import { NoUnitsNotice } from "@/components/org/NoUnitsNotice";
 import { ItemTimeline } from "@/components/org/ItemTimeline";
 import { PublicAction } from "@/components/org/PublicAction";
 import {
@@ -585,9 +586,7 @@ function OrgItemsContent() {
             )}
           </div>
           {org.manageableUnits.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {t("manage.noUnits")}
-            </p>
+            <NoUnitsNotice org={org} notContactMessage={t("manage.noUnits")} />
           ) : (
             <>
               <p className="text-sm text-muted-foreground">

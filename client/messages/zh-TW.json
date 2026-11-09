@@ -21,7 +21,14 @@
     "menuTitle": "導覽選單",
     "menuDescription": "瀏覽所有導覽選項",
     "notSignedIn": "您尚未登入",
-    "unexpectedError": "發生未預期的錯誤"
+    "unexpectedError": "發生未預期的錯誤",
+    "org": "組織",
+    "orgPage": "組織頁",
+    "orgPageDescription": "只有組織內部看得到的物品",
+    "orgAdmin": "組織後台",
+    "orgAdminDescription": "管理單位、成員、物品與報表",
+    "adminOrgs": "開通組織",
+    "adminOrgsDescription": "平台管理員：開通組織、管理各組織的管理員"
   },
   "Footer": {
     "about": "關於我們",
@@ -1125,7 +1132,7 @@
   },
   "AdminOrgs": {
     "title": "組織管理",
-    "subtitle": "開通組織並指定第一位組織管理員。",
+    "subtitle": "開通組織、管理各組織的管理員。",
     "createHeading": "開通組織",
     "editHeading": "編輯組織",
     "listHeading": "已開通的組織",
@@ -1157,7 +1164,19 @@
     "saving": "處理中…",
     "created": "已開通組織。",
     "saved": "已儲存。",
-    "loadFailed": "無法載入組織列表。"
+    "loadFailed": "無法載入組織列表。",
+    "openOrgAdmin": "組織後台",
+    "manageAdmins": "管理員",
+    "hideAdmins": "收合",
+    "addAdminLabel": "以 Email 加入組織管理員",
+    "addAdminHint": "必須是已註冊的帳號。已是成員的人會改成組織管理員，保留原本的窗口單位。",
+    "addAdmin": "加入",
+    "removeAdmin": "移除管理員",
+    "removeAdminConfirm": "要移除 {email} 的組織管理員身分嗎？他仍會是組織成員。",
+    "adminAdded": "已設為組織管理員。",
+    "adminRemoved": "已移除組織管理員身分。",
+    "adminsEmpty": "這個組織目前沒有管理員。",
+    "adminsLoadFailed": "無法載入組織管理員。"
   },
   "OrgAdmin": {
     "title": "組織後台",
@@ -1400,7 +1419,9 @@
       "completedUnit": "申請 #{weaveId}：{unit}（{name}）領取 {quantity} 件",
       "completedPerson": "申請 #{weaveId}：{name}（個人）領取 {quantity} 件",
       "pendingPublicConfirmed": "已確認完成報廢／處分程序"
-    }
+    },
+    "noUnitsYet": "{org} 還沒有任何單位，要先新增單位才能上架與管理物品。",
+    "goToOrgAdmin": "前往組織後台"
   },
   "OrgReport": {
     "title": "組織報表",

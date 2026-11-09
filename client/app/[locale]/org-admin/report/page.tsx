@@ -411,9 +411,13 @@ function OrgReportContent() {
     <main className="mx-auto w-full max-w-4xl space-y-6 px-4 py-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
+        {org && <p className="text-lg font-semibold">{org.name}</p>}
         <p className="text-sm text-muted-foreground">{t("subtitle")}</p>
         {org && (
-          <Link href="/org-admin" className="inline-block text-sm underline">
+          <Link
+            href={`/org-admin?org=${org.id}`}
+            className="inline-block text-sm underline"
+          >
             {t("backToAdmin")}
           </Link>
         )}

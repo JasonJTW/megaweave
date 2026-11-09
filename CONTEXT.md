@@ -130,7 +130,7 @@ _Avoid_: Owner, 總務（僅為常見職稱）
 _Avoid_: Student, Employee
 
 **Platform Admin (平台管理員)**:
-大量交織的營運方，負責開通組織，可進入並管理任何組織的組織後台，不必是該組織的成員。
+大量交織的營運方，負責開通組織與增減各組織的 Org Admin。在每個組織都等同 Org Admin（含看 Internal／Members 物品），不必是該組織的成員。
 
 同一人在一個組織內的身分可以疊加：Org Admin 與 Unit Contact 彼此獨立，不是三選一。
 

@@ -2,6 +2,7 @@
 
 //* Platform Admin 開通組織（PRD 0001 §5.1）
 //* 頁面守門：middleware 的 ADMIN_ROUTES（cookie，僅外觀）；真正的權限由 server `requireRole("admin")` 把關
+//* 管理員增減：Platform Admin 在每個組織都等同 Org Admin（ADR 0003），沿用 `/api/org-admin` 的成員 API
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
@@ -22,6 +23,7 @@ import {
 import { ApiError } from "@/lib/apiError";
 import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { Link } from "@/i18n/navigation";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -65,11 +67,153 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+interface OrgMember {
+  id: number;
+  email: string;
+  role: "admin" | "member";
+  unitIds: number[];
+}
+
+/**
+ * 組織管理員的增減。加入：已是成員就改成 Org Admin（保留窗口單位），否則以 Org Admin 身分加入；
+ * 移除：降為 Org Member，帳號與成員身分保留。最後一位 Org Admin 由 server 擋下（ORG_LAST_ADMIN）
+ */
+function OrgAdminsEditor({
+  orgId,
+  onChanged,
+}: {
+  orgId: string;
+  onChanged: () => Promise<unknown>;
+}) {
+  const t = useTranslations("AdminOrgs");
+  const errorMessage = useApiErrorMessage();
+  const url = `${hostName}/api/org-admin/orgs/${orgId}`;
+  const { data, error, mutate } = useSWR(url, (key: string) =>
+    requestJson<{ members: OrgMember[] }>(key),
+  );
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const admins = data?.members.filter((m) => m.role === "admin") ?? [];
+
+  async function run(action: () => Promise<unknown>, success: string) {
+    setBusy(true);
+    try {
+      await action();
+      toast.success(success);
+      await Promise.all([mutate(), onChanged()]);
+      return true;
+    } catch (err) {
+      toast.error(errorMessage(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleAdd(event: React.FormEvent) {
+    event.preventDefault();
+    if (!data) return;
+    const typed = email.trim();
+    const existing = data.members.find(
+      (m) => m.email.toLowerCase() === typed.toLowerCase(),
+    );
+    const added = await run(
+      () =>
+        existing
+          ? requestJson(`${url}/members/${existing.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                role: "admin",
+                unitIds: existing.unitIds,
+              }),
+            })
+          : requestJson(`${url}/members`, {
+              method: "POST",
+              body: JSON.stringify({
+                email: typed,
+                role: "admin",
+                unitIds: [],
+              }),
+            }),
+      t("adminAdded"),
+    );
+    if (added) setEmail("");
+  }
+
+  function handleRemove(member: OrgMember) {
+    if (!window.confirm(t("removeAdminConfirm", { email: member.email }))) {
+      return;
+    }
+    void run(
+      () =>
+        requestJson(`${url}/members/${member.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ role: "member", unitIds: member.unitIds }),
+        }),
+      t("adminRemoved"),
+    );
+  }
+
+  return (
+    <div className="space-y-3 border-t pt-3">
+      {error && (
+        <p className="text-sm text-destructive">
+          {errorMessage(error, t("adminsLoadFailed"))}
+        </p>
+      )}
+      {data && admins.length === 0 && (
+        <p className="text-sm text-muted-foreground">{t("adminsEmpty")}</p>
+      )}
+      {admins.length > 0 && (
+        <ul className="space-y-2">
+          {admins.map((admin) => (
+            <li
+              key={admin.id}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="truncate text-sm">{admin.email}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => handleRemove(admin)}
+              >
+                {t("removeAdmin")}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form
+        className="flex flex-col gap-2 sm:flex-row sm:items-end"
+        onSubmit={handleAdd}
+      >
+        <div className="flex-1 space-y-1">
+          <Label htmlFor={`org-${orgId}-add-admin`}>{t("addAdminLabel")}</Label>
+          <Input
+            id={`org-${orgId}-add-admin`}
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">{t("addAdminHint")}</p>
+        </div>
+        <Button type="submit" disabled={busy || !data}>
+          {busy ? t("saving") : t("addAdmin")}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function AdminOrgsPage() {
   const t = useTranslations("AdminOrgs");
   const errorMessage = useApiErrorMessage();
   const [form, setForm] = useState<OrgForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [adminsOpenId, setAdminsOpenId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const { data, error, mutate } = useSWR(`${hostName}/api/admin/orgs`, (url) =>
@@ -280,37 +424,59 @@ export default function AdminOrgsPage() {
         )}
         <ul className="space-y-2">
           {data?.orgs.map((org) => (
-            <li
-              key={org.id}
-              className="flex items-start justify-between gap-4 rounded-lg border p-4"
-            >
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{org.name}</span>
-                  {org.isDemo && (
-                    <Badge variant="secondary">{t("demoBadge")}</Badge>
-                  )}
+            <li key={org.id} className="space-y-3 rounded-lg border p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{org.name}</span>
+                    {org.isDemo && (
+                      <Badge variant="secondary">{t("demoBadge")}</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t(`publisherDisplay.${org.publisherDisplay}`)}
+                    {" · "}
+                    {org.autoReleaseEnabled
+                      ? t("autoReleaseOn", { days: org.autoReleaseDays })
+                      : t("autoReleaseOff")}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {t("orgAdminsLabel")}：
+                    {org.orgAdmins.map((admin) => admin.email).join("、")}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {t(`publisherDisplay.${org.publisherDisplay}`)}
-                  {" · "}
-                  {org.autoReleaseEnabled
-                    ? t("autoReleaseOn", { days: org.autoReleaseDays })
-                    : t("autoReleaseOff")}
-                </p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {t("orgAdminsLabel")}：
-                  {org.orgAdmins.map((admin) => admin.email).join("、")}
-                </p>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/org-admin?org=${org.id}`}>
+                      {t("openOrgAdmin")}
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-expanded={adminsOpenId === org.id}
+                    onClick={() =>
+                      setAdminsOpenId(adminsOpenId === org.id ? null : org.id)
+                    }
+                  >
+                    {adminsOpenId === org.id
+                      ? t("hideAdmins")
+                      : t("manageAdmins")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => startEdit(org)}
+                  >
+                    {t("edit")}
+                  </Button>
+                </div>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => startEdit(org)}
-              >
-                {t("edit")}
-              </Button>
+              {adminsOpenId === org.id && (
+                <OrgAdminsEditor orgId={org.id} onChanged={() => mutate()} />
+              )}
             </li>
           ))}
         </ul>

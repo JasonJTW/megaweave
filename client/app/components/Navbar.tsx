@@ -22,8 +22,11 @@ import {
   SquarePlus,
   NewspaperIcon,
   Flame,
+  Building2,
+  ShieldCheck,
   // FileText,
 } from "lucide-react";
+import { useOrgNav } from "@/lib/orgApi";
 import { googleLogout } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -83,6 +86,17 @@ const Navbar = () => {
 
   const { conversations } = useConversations(); // Chat messages
   const { user, mutate } = useUser(); // Check if user is logged in
+  const { isMember, isOrgAdmin } = useOrgNav(Boolean(user));
+  const isPlatformAdmin = user?.role === "admin";
+  //* 組織入口（ADR 0003）：能管組織 → 組織後台；只是成員 → 組織頁；
+  //* 還沒有任何組織的 Platform Admin → 開通組織
+  const orgHref = isOrgAdmin
+    ? "/org-admin"
+    : isMember
+      ? "/org"
+      : isPlatformAdmin
+        ? "/admin/orgs"
+        : null;
 
   const handleSignOut = async () => {
     try {
@@ -104,7 +118,10 @@ const Navbar = () => {
           return;
         }
 
-        throw new ApiError(await response.json().catch(() => null), response.status);
+        throw new ApiError(
+          await response.json().catch(() => null),
+          response.status,
+        );
       }
 
       await mutate({ user: null }, false);
@@ -112,9 +129,7 @@ const Navbar = () => {
       window.location.href = localizePath(locale, "/");
     } catch (error) {
       console.error("Error signing out:", error);
-      toast.error(
-        apiErrorMessage(error, t("unexpectedError")),
-      );
+      toast.error(apiErrorMessage(error, t("unexpectedError")));
     }
   };
   const messageUnreadCount = conversations.reduce(
@@ -125,10 +140,15 @@ const Navbar = () => {
   // 主要導航項目
   const mainNavItems: MainNavigationItem[] = [
     { href: "/tinder", label: t("tinder"), icon: Flame },
+    ...(orgHref ? [{ href: orgHref, label: t("org"), icon: Building2 }] : []),
     ...(user
       ? [
           { href: "/messages", label: t("messages"), icon: DirectMessageIcon },
-          { href: "/notifications", label: t("notifications"), icon: NotificationIcon },
+          {
+            href: "/notifications",
+            label: t("notifications"),
+            icon: NotificationIcon,
+          },
         ]
       : []),
     { href: "/user", label: t("profile"), icon: UserIcon },
@@ -164,6 +184,36 @@ const Navbar = () => {
       description: t("profileDescription"),
       icon: UserIcon,
     },
+    ...(isMember
+      ? [
+          {
+            href: "/org",
+            title: t("orgPage"),
+            description: t("orgPageDescription"),
+            icon: Building2,
+          },
+        ]
+      : []),
+    ...(isOrgAdmin
+      ? [
+          {
+            href: "/org-admin",
+            title: t("orgAdmin"),
+            description: t("orgAdminDescription"),
+            icon: Building2,
+          },
+        ]
+      : []),
+    ...(isPlatformAdmin
+      ? [
+          {
+            href: "/admin/orgs",
+            title: t("adminOrgs"),
+            description: t("adminOrgsDescription"),
+            icon: ShieldCheck,
+          },
+        ]
+      : []),
     ...(user
       ? [
           {
@@ -231,7 +281,7 @@ const Navbar = () => {
           bezelWidth: 20,
         }}
         className={cn(
-          "sticky top-0 left-0 right-0 transition-transform duration-300 ease-in-out",
+          "sticky left-0 right-0 top-0 transition-transform duration-300 ease-in-out",
           isMobileMenuOpen ? "z-[60]" : "z-50",
           isNavbarVisible ? "translate-y-0" : "-translate-y-full",
           isAtTop ? "bg-transparent" : "bg-primary-30/20 backdrop-blur-lg",
@@ -355,6 +405,8 @@ const Navbar = () => {
                         >
                           <Link
                             href={item.href}
+                            aria-label={item.label}
+                            title={item.label}
                             className="group flex items-center text-[18px] font-semibold"
                           >
                             <div className="relative flex items-center">

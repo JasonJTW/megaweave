@@ -101,7 +101,10 @@ async function declineRows(
   return declined;
 }
 
-/** 某人在某單位還經手著、但已不是該單位窗口（也不是 Org Admin）的物品，等著交接 */
+/**
+ * 某人在某單位還經手著、但已不是該單位窗口（也不是 Org Admin）的物品，等著交接。
+ * Platform Admin 在每個組織都等同 Org Admin（ADR 0003），他上架的物品不算待交接
+ */
 export interface PendingHandover {
   /** users.public_id */
   user: { id: string; email: string; isMember: boolean };
@@ -154,6 +157,7 @@ export const orgHandoverService = {
        LEFT JOIN org_memberships m ON m.org_id = p.org_id AND m.user_id = p.user_id
        LEFT JOIN weaves w ON w.post_id = p.id AND w.giver_id = p.user_id AND w.status IN ('requested', 'approved')
        WHERE p.org_id = ? AND p.deleted_at IS NULL
+         AND u.role <> 'admin'
          AND NOT EXISTS (
            SELECT 1 FROM org_memberships cm
            WHERE cm.org_id = p.org_id AND cm.user_id = p.user_id

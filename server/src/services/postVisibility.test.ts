@@ -58,7 +58,25 @@ describe("loadViewerScope", () => {
         { orgId: 30, tiers: ["members"] },
       ],
     });
-    expect(execute.mock.calls[0][1]).toEqual([7]);
+    expect(execute.mock.calls[0][1]).toEqual([7, 7]);
+  });
+
+  it("gives a Platform Admin Internal in every org, merged with their own memberships", async () => {
+    //* SQL 的 UNION 段為 Platform Admin 每個組織各補一列 Internal；同組織的 Member 列被 Internal 蓋過
+    const execute = jest.fn().mockResolvedValue([
+      [
+        { org_id: 30, access_level: "member" },
+        { org_id: 12, access_level: "internal" },
+        { org_id: 30, access_level: "internal" },
+      ],
+    ]);
+    await expect(loadViewerScope({ execute }, 7)).resolves.toEqual({
+      orgs: [
+        { orgId: 30, tiers: ["internal", "members"] },
+        { orgId: 12, tiers: ["internal", "members"] },
+      ],
+    });
+    expect(execute.mock.calls[0][0]).toContain("u.role = 'admin'");
   });
 
   it("gives signed-out viewers the Public scope without querying", async () => {

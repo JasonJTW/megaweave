@@ -21,7 +21,14 @@
     "menuTitle": "Navigation Menu",
     "menuDescription": "Browse through the navigation options",
     "notSignedIn": "You are not signed in",
-    "unexpectedError": "An unexpected error occurred"
+    "unexpectedError": "An unexpected error occurred",
+    "org": "Organization",
+    "orgPage": "Organization page",
+    "orgPageDescription": "Items only people inside the organization can see",
+    "orgAdmin": "Organization admin",
+    "orgAdminDescription": "Manage units, members, items and reports",
+    "adminOrgs": "Organizations",
+    "adminOrgsDescription": "Platform admin: set up organizations and manage their admins"
   },
   "Footer": {
     "about": "About Us",
@@ -1125,7 +1132,7 @@
   },
   "AdminOrgs": {
     "title": "Organizations",
-    "subtitle": "Set up organizations and assign their first Org Admin.",
+    "subtitle": "Set up organizations and manage their admins.",
     "createHeading": "New organization",
     "editHeading": "Edit organization",
     "listHeading": "Organizations",
@@ -1157,7 +1164,19 @@
     "saving": "Saving…",
     "created": "Organization created.",
     "saved": "Saved.",
-    "loadFailed": "Couldn't load organizations."
+    "loadFailed": "Couldn't load organizations.",
+    "openOrgAdmin": "Org admin",
+    "manageAdmins": "Admins",
+    "hideAdmins": "Hide",
+    "addAdminLabel": "Add an org admin by email",
+    "addAdminHint": "Must be a registered account. An existing member becomes an org admin and keeps their units.",
+    "addAdmin": "Add",
+    "removeAdmin": "Remove admin",
+    "removeAdminConfirm": "Remove {email} as an org admin? They stay a member of the organization.",
+    "adminAdded": "Now an org admin.",
+    "adminRemoved": "No longer an org admin.",
+    "adminsEmpty": "This organization has no admins.",
+    "adminsLoadFailed": "Couldn't load the org admins."
   },
   "OrgAdmin": {
     "title": "Organization admin",
@@ -1400,7 +1419,9 @@
       "completedUnit": "Request #{weaveId}: {unit} ({name}) received {quantity}",
       "completedPerson": "Request #{weaveId}: {name} (personal) received {quantity}",
       "pendingPublicConfirmed": "Scrapping or disposal confirmed"
-    }
+    },
+    "noUnitsYet": "{org} has no units yet. Add a unit before listing or managing items.",
+    "goToOrgAdmin": "Go to organization admin"
   },
   "OrgReport": {
     "title": "Org report",

@@ -1,8 +1,8 @@
 //* 組織物品（#136，PRD 0001 §5.1 E2-1、E3、E4-1、E6-2；ADR 0003、ADR 0004、ADR 0005）
 //* - 物品屬於單位（posts.org_unit_id），posts.user_id 是經手上架的人
 //* - 只能是 Share、上架後一律在 Internal；不開放 ECPay 與 Lalamove（paymentService 擋 org 貼文）
-//* - 能管哪些單位（OrgAccess.manageableUnits）：Org Admin → 全部單位；Unit Contact → 自己負責的單位
-//* - 看得到哪些層級：只來自 membership（scopeFromMemberships）；Platform Admin 不因身分多看到任何東西
+//* - 能管哪些單位（OrgAccess.manageableUnits）：Org Admin 與 Platform Admin → 全部單位；Unit Contact → 自己負責的單位
+//* - 看得到哪些層級：membership 推導（scopeFromMemberships）；Platform Admin 在每個組織都是 Internal
 //* - 公開熱門排行只收 Public：上架不寫 feed:trending；向量索引照常寫入，scope 由 job 從 MySQL 讀
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { randomUUID } from "crypto";
@@ -55,6 +55,8 @@ export interface OrgAccess {
   name: string;
   accessLevel: AccessLevel;
   isAdmin: boolean;
+  /** 是全站 Platform Admin（isAdmin 也為 true）；不一定是這個組織的成員 */
+  isPlatformAdmin: boolean;
   /** 可代表上架、可在後台管理的單位 */
   manageableUnits: OrgUnitRef[];
   /** 組織的 Auto Release 設定（#139）；單件可覆寫 */
@@ -157,32 +159,42 @@ interface MembershipRow extends RowDataPacket {
   auto_release_enabled: boolean | number;
   auto_release_days: number;
   is_demo: boolean | number;
-  membership_id: number;
-  access_level: AccessLevel;
-  org_role: OrgRole;
+  /** Platform Admin 不是成員的組織：membership 欄位都是 null */
+  membership_id: number | null;
+  access_level: AccessLevel | null;
+  org_role: OrgRole | null;
+  is_platform_admin: boolean | number;
 }
 
 async function loadAccesses(
   userId: number,
   orgPublicId?: string,
 ): Promise<OrgAccess[]> {
+  //* Platform Admin（users.role = 'admin'）在每個組織都等同 Org Admin（ADR 0003，2026-11-09），不必是成員
   const [rows] = await dbPool.query<MembershipRow[]>(
-    `SELECT o.id, o.public_id, o.name, o.auto_release_enabled, o.auto_release_days, o.is_demo, m.id AS membership_id, m.access_level, m.org_role
-     FROM org_memberships m JOIN organizations o ON o.id = m.org_id
-     WHERE m.user_id = ?${orgPublicId ? " AND o.public_id = ?" : ""}
+    `SELECT o.id, o.public_id, o.name, o.auto_release_enabled, o.auto_release_days, o.is_demo, m.id AS membership_id, m.access_level, m.org_role, u.role = 'admin' AS is_platform_admin
+     FROM organizations o
+     JOIN users u ON u.id = ?
+     LEFT JOIN org_memberships m ON m.org_id = o.id AND m.user_id = u.id
+     WHERE (m.id IS NOT NULL OR u.role = 'admin')${orgPublicId ? " AND o.public_id = ?" : ""}
      ORDER BY o.name`,
     orgPublicId ? [userId, orgPublicId] : [userId],
   );
   if (rows.length === 0) return [];
 
   const contactUnits = new Map<number, OrgUnitRef[]>();
-  //* IN (?) 需要 query() 展開陣列
-  const [contacts] = await dbPool.query<RowDataPacket[]>(
-    `SELECT c.membership_id, u.id, u.name
+  const membershipIds = rows
+    .map((row) => row.membership_id)
+    .filter((id): id is number => id != null);
+  //* IN (?) 需要 query() 展開陣列；空陣列會變成 IN ()，所以沒有 membership 就不查
+  const [contacts] = membershipIds.length
+    ? await dbPool.query<RowDataPacket[]>(
+        `SELECT c.membership_id, u.id, u.name
      FROM org_unit_contacts c JOIN org_units u ON u.id = c.org_unit_id
      WHERE c.membership_id IN (?) ORDER BY u.name`,
-    [rows.map((row) => row.membership_id)],
-  );
+        [membershipIds],
+      )
+    : [[] as RowDataPacket[]];
   for (const contact of contacts) {
     const membershipId = Number(contact.membership_id);
     const units = contactUnits.get(membershipId) ?? [];
@@ -192,7 +204,8 @@ async function loadAccesses(
 
   return Promise.all(
     rows.map(async (row) => {
-      const isAdmin = row.org_role === "admin";
+      const isPlatformAdmin = Boolean(Number(row.is_platform_admin));
+      const isAdmin = row.org_role === "admin" || isPlatformAdmin;
       const manageableUnits = isAdmin
         ? await listUnits(Number(row.id))
         : (contactUnits.get(Number(row.membership_id)) ?? []);
@@ -200,7 +213,8 @@ async function loadAccesses(
         orgId: Number(row.id),
         publicId: row.public_id,
         name: row.name,
-        accessLevel: row.access_level,
+        accessLevel: isPlatformAdmin ? "internal" : row.access_level!,
+        isPlatformAdmin,
         isAdmin,
         manageableUnits,
         autoRelease: {
@@ -388,12 +402,12 @@ async function queryItemRows(
 }
 
 export const orgItemService = {
-  /** 呼叫者所屬的組織（組織頁切換器）；Platform Admin 身分不算 */
+  /** 呼叫者所屬的組織（組織頁切換器）；Platform Admin 得到每個組織 */
   listAccesses(userId: number): Promise<OrgAccess[]> {
     return loadAccesses(userId);
   },
 
-  /** 呼叫者在這個組織的身分；不是成員回 404 ORG_NOT_FOUND（不洩漏組織存在） */
+  /** 呼叫者在這個組織的身分；不是成員也不是 Platform Admin 回 404 ORG_NOT_FOUND（不洩漏組織存在） */
   async requireAccess(orgPublicId: string, userId: number): Promise<OrgAccess> {
     const [access] = await loadAccesses(userId, orgPublicId);
     if (!access) throw orgNotFound();

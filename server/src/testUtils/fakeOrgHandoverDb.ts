@@ -35,7 +35,7 @@ const DECLINE_ON_BEHALF_SQL =
   "SELECT w.id, w.post_id, w.giver_id, w.receiver_id FROM weaves w JOIN posts p ON p.id = w.post_id WHERE p.org_id = ? AND w.receiver_id = ? AND w.status = 'requested' AND w.receiver_org_unit_id IN (?) FOR UPDATE";
 
 const LIST_PENDING_SQL =
-  "SELECT u.public_id, u.email, ou.id AS unit_id, ou.name AS unit_name, MAX(m.id) IS NOT NULL AS is_member, COUNT(DISTINCT p.id) AS item_count, COUNT(DISTINCT w.id) AS open_weave_count FROM posts p JOIN users u ON u.id = p.user_id JOIN org_units ou ON ou.id = p.org_unit_id LEFT JOIN org_memberships m ON m.org_id = p.org_id AND m.user_id = p.user_id LEFT JOIN weaves w ON w.post_id = p.id AND w.giver_id = p.user_id AND w.status IN ('requested', 'approved') WHERE p.org_id = ? AND p.deleted_at IS NULL AND NOT EXISTS ( SELECT 1 FROM org_memberships cm WHERE cm.org_id = p.org_id AND cm.user_id = p.user_id AND (cm.org_role = 'admin' OR EXISTS (SELECT 1 FROM org_unit_contacts c WHERE c.membership_id = cm.id AND c.org_unit_id = p.org_unit_id))) GROUP BY u.id, u.public_id, u.email, ou.id, ou.name ORDER BY ou.name, u.email";
+  "SELECT u.public_id, u.email, ou.id AS unit_id, ou.name AS unit_name, MAX(m.id) IS NOT NULL AS is_member, COUNT(DISTINCT p.id) AS item_count, COUNT(DISTINCT w.id) AS open_weave_count FROM posts p JOIN users u ON u.id = p.user_id JOIN org_units ou ON ou.id = p.org_unit_id LEFT JOIN org_memberships m ON m.org_id = p.org_id AND m.user_id = p.user_id LEFT JOIN weaves w ON w.post_id = p.id AND w.giver_id = p.user_id AND w.status IN ('requested', 'approved') WHERE p.org_id = ? AND p.deleted_at IS NULL AND u.role <> 'admin' AND NOT EXISTS ( SELECT 1 FROM org_memberships cm WHERE cm.org_id = p.org_id AND cm.user_id = p.user_id AND (cm.org_role = 'admin' OR EXISTS (SELECT 1 FROM org_unit_contacts c WHERE c.membership_id = cm.id AND c.org_unit_id = p.org_unit_id))) GROUP BY u.id, u.public_id, u.email, ou.id, ou.name ORDER BY ou.name, u.email";
 
 const OPEN = ["requested", "approved"];
 
@@ -133,6 +133,7 @@ export function createFakeOrgHandoverDb<Base extends FakeOrgWeavesDb = FakeOrgWe
       for (const p of base.posts) {
         if (p.org_id !== orgId || p.deleted_at !== null) continue;
         if (isContactOrAdmin(p.user_id, p.org_id, p.org_unit_id)) continue;
+        if (base.users.find((u) => u.id === p.user_id)?.role === "admin") continue;
         const key = `${p.user_id}:${p.org_unit_id}`;
         const group = groups.get(key) ?? { userId: p.user_id, unitId: p.org_unit_id, posts: [] };
         group.posts.push(p.id);

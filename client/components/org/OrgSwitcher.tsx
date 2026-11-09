@@ -23,7 +23,15 @@ export function OrgSwitcher({
 }) {
   const t = useTranslations("Org");
   const router = useRouter();
-  if (orgs.length < 2) return null;
+  //* 只有一個組織時沒得切換，但仍要讓人知道現在看的是哪個組織
+  if (orgs.length < 2) {
+    return (
+      <p className="text-sm">
+        <span className="text-muted-foreground">{t("orgLabel")}：</span>
+        <span className="font-medium">{org.name}</span>
+      </p>
+    );
+  }
   return (
     <div className="max-w-xs space-y-1">
       <span className="text-sm font-medium">{t("orgLabel")}</span>

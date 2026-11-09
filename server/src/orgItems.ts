@@ -1,6 +1,6 @@
 //* 組織物品與組織頁（#136，PRD 0001 §5.1、ADR 0003、ADR 0005）
-//* `/api/orgs/:orgId/*` 先確認呼叫者是該組織成員，否則一律 404 ORG_NOT_FOUND（含 Platform Admin：
-//* 可見範圍只來自 membership）。能管哪些單位由 orgItemService 判斷，不符回 403 ORG_UNIT_NOT_MANAGED。
+//* `/api/orgs/:orgId/*` 先確認呼叫者是該組織成員或 Platform Admin（在每個組織都等同 Org Admin），
+//* 否則一律 404 ORG_NOT_FOUND。能管哪些單位由 orgItemService 判斷，不符回 403 ORG_UNIT_NOT_MANAGED。
 import Router, { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware/auth";
@@ -78,6 +78,7 @@ function accessView(access: OrgAccess) {
     name: access.name,
     accessLevel: access.accessLevel,
     isAdmin: access.isAdmin,
+    isPlatformAdmin: access.isPlatformAdmin,
     manageableUnits: access.manageableUnits,
     autoRelease: access.autoRelease,
     isDemo: access.isDemo,

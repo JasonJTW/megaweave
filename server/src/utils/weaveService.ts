@@ -528,10 +528,18 @@ export async function requestWeave(
   const { postId, items, notes, initiator, actingUnitId } = params;
 
   const post = await validatePost(postId, initiator.id);
-  await validateItems(items, postId);
-
   const { user_id: postOwnerId, type: postType } = post;
   const isWish = postType === "wish";
+  //* 組織物品要記下品項與數量、交接時扣庫存，所以不接受「整篇貼文」（沒有指定品項）的申請。
+  //* 前端不會送出這種 payload，送了就是 client bug → INVALID_REQUEST
+  if (
+    post.org_id !== null &&
+    !isWish &&
+    (items.length === 0 || items.some((item) => !item.itemId || item.quantity < 1))
+  ) {
+    throw new WeaveError(400, "INVALID_REQUEST", "Org items must be requested by item and quantity");
+  }
+  await validateItems(items, postId);
   // ADR 0004：組織物品（只會是 Share）流向申請人，記下他代表的單位；個人貼文一律 NULL
   const receiverOrgUnitId =
     post.org_id !== null && post.org_unit_id !== null && !isWish

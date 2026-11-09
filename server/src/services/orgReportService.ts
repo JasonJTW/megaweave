@@ -16,7 +16,9 @@ export async function getOrgReport(orgId: number): Promise<OrgReport> {
     ),
     dbPool.query<RowDataPacket[]>(
       `SELECT p.id, p.org_unit_id, d.org_category, d.quantity, d.unit_weight_kg,
-              d.weight_is_default, d.estimated_value_twd
+              d.weight_is_default, d.estimated_value_twd,
+              (p.deleted_at IS NULL AND p.status = 'active') AS on_shelf,
+              (SELECT SUM(i.quantity) FROM items i WHERE i.post_id = p.id) AS stock_quantity
        FROM posts p
        LEFT JOIN org_post_details d ON d.post_id = p.id
        WHERE p.org_id = ?
@@ -51,6 +53,8 @@ export async function getOrgReport(orgId: number): Promise<OrgReport> {
       unitWeightKg: p.unit_weight_kg == null ? null : Number(p.unit_weight_kg),
       weightIsDefault: p.weight_is_default == null ? null : Boolean(Number(p.weight_is_default)),
       estimatedValueTwd: p.estimated_value_twd == null ? null : Number(p.estimated_value_twd),
+      onShelf: Boolean(Number(p.on_shelf)),
+      stockQuantity: p.stock_quantity == null ? null : Number(p.stock_quantity),
     })),
     weaves: weaves.map((w) => ({
       weaveId: Number(w.id),

@@ -117,7 +117,7 @@ async function requestAs(
     .post("/api/weaves")
     .send({
       postId,
-      items: [{ itemId: null, quantity }],
+      items: [{ itemId: fakeDb.items.find((i) => i.post_id === postId)!.id, quantity }],
       ...(actingUnitId === undefined ? {} : { actingUnitId }),
     });
   expect(res.status).toBe(201);
@@ -329,6 +329,13 @@ describe("GET /api/org-admin/orgs/:orgId/report", () => {
       status: "assumed",
     });
     expect(r.emissions.uncountedQuantity).toBe(0);
+    //* 待實現：鋼櫃剩 1 件、螢幕剩 1 件（核可未完成的那件還沒扣庫存）
+    expect(r.emissions.unrealized.quantity).toBe(2);
+    expect(r.emissions.unrealized.uncountedQuantity).toBe(0);
+    expect(r.emissions.unrealized.estimatedKgCO2e).toBeCloseTo(
+      (30 * steel + monitorDefault * display) * 0.5,
+      6,
+    );
     expect(r.value).toEqual({
       estimatedValueTwd: 6000,
       valuedQuantity: 3,

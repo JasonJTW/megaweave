@@ -78,7 +78,9 @@ test.describe("Org item timeline and where items went", () => {
       expect(listerSignin.ok(), await listerSignin.text()).toBeTruthy();
       const detail = await listerApi.get(`${API_URL}/api/posts/${itemId}`);
       expect(detail.ok(), await detail.text()).toBeTruthy();
-      const { post } = (await detail.json()) as { post: { id: number } };
+      const { post } = (await detail.json()) as {
+        post: { id: number; items: Array<{ id: number }> };
+      };
       const units = await listerApi.get(
         `${API_URL}/api/weaves/acting-units?postId=${post.id}`,
       );
@@ -89,7 +91,7 @@ test.describe("Org item timeline and where items went", () => {
       const sent = await listerApi.post(`${API_URL}/api/weaves`, {
         data: {
           postId: post.id,
-          items: [{ itemId: null, quantity: 1 }],
+          items: [{ itemId: post.items[0].id, quantity: 1 }],
           actingUnitId: supply!.id,
         },
       });

@@ -56,7 +56,10 @@ test.describe("Org report", () => {
     });
 
     await page.goto(`/org-admin?org=${org!.id}`);
-    await page.getByRole("link", { name: zhTW.OrgAdmin.reportLink }).click();
+    await page
+      .getByRole("navigation", { name: zhTW.Org.nav.label })
+      .getByRole("link", { name: zhTW.Org.nav.report })
+      .click();
     await expect(
       page.getByRole("heading", { name: t.title, level: 1 }),
     ).toBeVisible();

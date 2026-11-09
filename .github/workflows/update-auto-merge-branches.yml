@@ -5,9 +5,16 @@ name: Update auto-merge branches
 # main moves, this merges main into each open PR that has auto-merge enabled. The push comes
 # from AUTO_UPDATE_TOKEN (a fine-grained PAT; see ADR 0006 and scripts/setup-repo.sh): a push
 # made with GITHUB_TOKEN would not start the required checks again, and auto-merge would stall.
+#
+# It also runs when a PR turns on auto-merge: a PR opened after main's last push is already
+# behind, and without this it would wait for the next push to main that may never come.
+# pull_request_target runs main's copy of this file, so a PR cannot change the job that holds
+# the token; the job never checks out PR code or reads PR-controlled text.
 on:
   push:
     branches: [main]
+  pull_request_target:
+    types: [auto_merge_enabled]
   workflow_dispatch:
 
 permissions: {}

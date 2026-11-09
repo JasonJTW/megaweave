@@ -1176,12 +1176,13 @@
     "adminAdded": "Now an org admin.",
     "adminRemoved": "No longer an org admin.",
     "adminsEmpty": "This organization has no admins.",
-    "adminsLoadFailed": "Couldn't load the org admins."
+    "adminsLoadFailed": "Couldn't load the org admins.",
+    "editingNow": "Editing",
+    "noAdmins": "None assigned"
   },
   "OrgAdmin": {
     "title": "Organization admin",
     "subtitle": "Manage units and members. Members join by the email of a registered account.",
-    "orgLabel": "Organization",
     "noOrgs": "You don't manage any organization.",
     "loadFailed": "Couldn't load the organization.",
     "unitsHeading": "Units",
@@ -1218,7 +1219,6 @@
     "save": "Save",
     "cancel": "Cancel",
     "memberUpdated": "Member updated.",
-    "manageItemsLink": "Manage org items",
     "handover": {
       "heading": "Pending handovers",
       "hint": "These people have left the organization or no longer contact for the unit, but the items and open requests they handled stay with the unit. Hand them to another contact of the same unit, who then takes over the conversations and handoffs. Finished records keep the original handler.",
@@ -1230,7 +1230,8 @@
       "targetPlaceholder": "Choose the new contact",
       "submit": "Hand over",
       "submitting": "Handing over…",
-      "done": "Handed over {items} items and {weaves} requests."
+      "done": "Handed over {items} items and {weaves} requests.",
+      "headingCount": "Pending handovers ({count})"
     },
     "settings": {
       "heading": "Auto Release",
@@ -1240,9 +1241,9 @@
       "daysLabel": "Days without requests",
       "daysHint": "1 to 365 days. Unit Contacts can set a different value for one item.",
       "save": "Save",
-      "saved": "Auto Release setting updated."
+      "saved": "Auto Release setting updated.",
+      "unsaved": "Not saved yet"
     },
-    "reportLink": "View org report",
     "publisherDisplay": {
       "heading": "Public publisher name",
       "hint": "The name shown as the poster once an item is Public. Contacts’ personal accounts are never shown.",
@@ -1252,8 +1253,15 @@
         "org_unit": "Organisation + unit",
         "anonymous": "Anonymous"
       },
-      "saved": "Updated how Public items show the poster."
-    }
+      "saved": "Updated how Public items show the poster.",
+      "preview": "Public items will show",
+      "sampleUnit": "Unit name"
+    },
+    "loading": "Loading…",
+    "membersHint": "{count, plural, one {# member} other {# members}}. Org admins manage the whole organization; unit contacts list items and review requests for their units.",
+    "unitsSectionHint": "Items belong to units. A unit needs a contact before it can list items and review requests.",
+    "unitNoContact": "No contact yet",
+    "unitContacts": "{count, plural, one {# contact} other {# contacts}}"
   },
   "Org": {
     "title": "Organization",
@@ -1263,8 +1271,6 @@
     "loadFailed": "Couldn't load the organization.",
     "loading": "Loading…",
     "listItem": "List an item",
-    "manageItems": "Manage items",
-    "backToOrg": "Back to the org page",
     "empty": "There are no items you can see yet.",
     "unitLabel": "Unit",
     "quantity": "{count, plural, one {# item} other {# items}}",
@@ -1309,7 +1315,18 @@
       "created": "Listed. The org's units can see it now.",
       "createFailed": "Couldn't list the item. Try again later.",
       "missingSelection": "Choose a unit, a category and a condition.",
-      "tooManyPhotos": "You can add up to {max} photos."
+      "tooManyPhotos": "You can add up to {max} photos.",
+      "sectionBasics": "Item details",
+      "sectionBasicsHint": "The name, category and condition appear on the item page.",
+      "sectionAmount": "Quantity and weight",
+      "sectionAmountHint": "Weight is used to estimate avoided emissions in the org report.",
+      "sectionAsset": "Asset details",
+      "sectionAssetHint": "Items with an asset number need the disposal process confirmed before they go public.",
+      "sectionPhotosHint": "The first photo is the cover.",
+      "totalWeight": "About {kg} kg in total",
+      "totalWeightEmpty": "Enter the quantity and unit weight to see the total weight.",
+      "cancel": "Cancel",
+      "cover": "Cover"
     },
     "manage": {
       "title": "Manage org items",
@@ -1321,14 +1338,9 @@
       "filterStatus": "Status",
       "all": "All",
       "colTitle": "Item",
-      "colUnit": "Unit",
       "colTier": "Tier",
-      "colStatus": "Status",
       "colQuantity": "Qty",
-      "colWeight": "Weight per item",
-      "colAsset": "Asset no.",
       "colCreated": "Listed at",
-      "weightKg": "{kg} kg",
       "empty": "No items match these filters.",
       "filterWeaveStatus": "Requests",
       "colRequests": "Requests",
@@ -1382,7 +1394,14 @@
       "publishedNow": "Published.",
       "demoteFromPublic": "Move back to org members",
       "demoteFromPublicConfirm": "Move “{title}” from public back to org members? It disappears from the home feed, search and trending, and pending requests from non-members are declined with a notice. Previews already shared can't be taken back.",
-      "demotedFromPublic": "Moved back to org members. Public pages no longer show it."
+      "demotedFromPublic": "Moved back to org members. Public pages no longer show it.",
+      "perPieceKg": "{kg} kg each",
+      "requestsTitle": "Requests",
+      "count": "{count, plural, one {# item} other {# items}}",
+      "pendingTotal": "{count} awaiting review",
+      "clearFilters": "Clear filters",
+      "emptyAll": "No items yet. Items you list will appear here.",
+      "colActions": "Actions"
     },
     "weaveStatus": {
       "requested": "Awaiting review",
@@ -1424,13 +1443,22 @@
       "pendingPublicConfirmed": "Scrapping or disposal confirmed"
     },
     "noUnitsYet": "{org} has no units yet. Add a unit before listing or managing items.",
-    "goToOrgAdmin": "Go to organization admin"
+    "goToOrgAdmin": "Go to organization admin",
+    "nav": {
+      "label": "Organization pages",
+      "items": "Items",
+      "manage": "Manage items",
+      "admin": "Org admin",
+      "report": "Report"
+    },
+    "listFirstItem": "List the first item",
+    "categoryFilter": "Filter by category",
+    "allCategories": "All",
+    "noPhoto": "No photo"
   },
   "OrgReport": {
     "title": "Org report",
     "subtitle": "How items circulate in your organisation, with estimated weight, value and avoided emissions. Numbers come from completed hand-overs.",
-    "backToAdmin": "Back to org admin",
-    "orgLabel": "Organisation",
     "loading": "Loading…",
     "loadFailed": "Couldn't load the report. Please try again later.",
     "noOrgs": "You aren't an admin of any organisation.",
@@ -1459,13 +1487,12 @@
     "colListed": "Pieces listed",
     "colGiven": "Pieces given",
     "colReceived": "Pieces claimed for the unit",
-    "colUnitEstimated": "Avoided emissions of pieces given (kgCO2e)",
     "unitsHint": "Given = this unit's pieces in completed hand-overs. Claimed for the unit = pieces a contact requested on the unit's behalf (personal requests count for no unit).",
     "emissionsHeading": "Estimated weight, value and avoided emissions",
     "emissionsScope": "Only items in completed hand-overs count, once per hand-over.",
     "estimatedKg": "Estimated avoided emissions",
-    "estimatedKgHint": "Potential × replacement rate R ({rate})",
-    "potentialKg": "Potential (R = 1)",
+    "estimatedKgHint": "Ideal case × replacement rate R ({rate})",
+    "potentialKg": "Ideal case (R = 1)",
     "potentialKgHint": "If every piece replaced a new one",
     "kgCO2e": "{value} kgCO2e",
     "kg": "{value} kg",
@@ -1485,14 +1512,14 @@
     "defaultWeightShareLabel": "Default-weight share",
     "uncounted": "Pieces not counted (no factor or no weight)",
     "formulaHeading": "Method",
-    "formulaPotential": "Potential = weight (kg) × category production factor for a new item (kgCO2e/kg)",
-    "formulaEstimated": "Estimated avoided emissions = potential × replacement rate R",
+    "formulaPotential": "Ideal case = weight (kg) × category production factor for a new item (kgCO2e/kg)",
+    "formulaEstimated": "Estimated avoided emissions = ideal case × replacement rate R",
     "formulaFactor": "Furniture uses the lower of “material composition × MOENV material factors” and the reference products' EPD average; electronics use US EPA WARM product factors; categories without a citable factor are not counted.",
     "byCategoryHeading": "By category",
     "colCategory": "Category",
     "colQuantity": "Pieces",
     "colWeight": "Weight (kg)",
-    "colPotential": "Potential (kgCO2e)",
+    "colPotential": "Ideal case (kgCO2e)",
     "colEstimated": "Estimated (kgCO2e)",
     "factorsHeading": "Emission factors and sources",
     "colFactor": "Factor (kgCO2e/kg)",
@@ -1509,7 +1536,15 @@
       "material_bom": "Material composition used (lower)",
       "reference_epd": "Reference EPDs used (lower)"
     },
-    "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party."
+    "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party. \"Unrealized avoided emissions\" is a projection: the items may never be taken, and it must not be used in any external claim.",
+    "colUnitEstimatedShort": "Avoided emissions given (kgCO2e)",
+    "factorsSummary": "New-product emission factors, methods and sources for {count} categories.",
+    "unrealizedLabel": "Unrealized avoided emissions",
+    "unrealizedHint": "{count, plural, one {# piece on the shelf has} other {# pieces on the shelf have}} not been handed over yet (including requested ones). If all were handed over, the estimate would grow by this much. A projection only; not added to the figures above.",
+    "unrealizedNone": "Nothing on the shelf is waiting to be handed over.",
+    "unrealizedUncounted": "{count, plural, one {# piece is} other {# pieces are}} not counted (no factor for the category, or no weight).",
+    "unrealizedValue": "+{value} kgCO2e",
+    "formulaUnrealized": "Unrealized = pieces left on the shelf (the smaller of current stock and listed − handed over) × unit weight × factor × replacement rate R"
   },
   "Publisher": {
     "anonymous": "Anonymous"

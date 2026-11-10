@@ -6,7 +6,7 @@
 // 改任何數字都要：更新 FACTOR_TABLE_VERSION、更新方法學文件的係數表、跑單元測試。
 // 環境部係數可用 `npm run check:emission-factors` 對照開放資料 API 是否有更新。
 
-export const FACTOR_TABLE_VERSION = "2026-11-09";
+export const FACTOR_TABLE_VERSION = "2026-11-10";
 
 // ---------------------------------------------------------------------------
 // 來源
@@ -207,6 +207,10 @@ export const MATERIAL_IDS = [
   "aluminium",
   "polyamide",
   "polypropylene",
+  "polyurethane",
+  "polyoxymethylene",
+  "abs",
+  "pvc",
   "plastic_unspecified",
   "wood_panel",
   "polyester_fibre",
@@ -291,9 +295,65 @@ export const MATERIAL_FACTORS: Record<MaterialId, MaterialFactor> = {
     },
     note: "同名另有 2013 年 2.01（經濟部工業局），依審查 SOP 取較新者。",
   },
+  polyurethane: {
+    id: "polyurethane",
+    nameZh: "聚氨酯（PU 泡棉、PU 零件）",
+    kgCO2ePerKg: 5.211,
+    sourceId: "moenv-cfp-p-02",
+    moenvRecord: {
+      name: "聚氨基甲酸乙酯樹脂",
+      announcementYear: "2025",
+      departmentName: "環境部氣候變遷署",
+      coe: "5.211",
+      unit: "公斤(kg)",
+    },
+    note: "資料庫沒有軟質 PU 泡棉；「聚氨基甲酸乙酯樹脂」是庫內名稱最貼近的記錄（台灣此品名多指合成皮用 PU 樹脂）。同名另有 2015 年 3.17，依審查 SOP 取較新者。",
+  },
+  polyoxymethylene: {
+    id: "polyoxymethylene",
+    nameZh: "聚甲醛（POM）",
+    kgCO2ePerKg: 1.723,
+    sourceId: "moenv-cfp-p-02",
+    moenvRecord: {
+      name: "聚甲醛",
+      announcementYear: "2013",
+      departmentName: "經濟部工業局",
+      coe: "1.723",
+      unit: "公斤(kg)",
+    },
+    note: "庫內唯一一筆聚甲醛記錄。",
+  },
+  abs: {
+    id: "abs",
+    nameZh: "ABS 樹脂",
+    kgCO2ePerKg: 2.788,
+    sourceId: "moenv-cfp-p-02",
+    moenvRecord: {
+      name: "丙烯腈-丁二烯-苯乙烯共聚合物",
+      announcementYear: "2025",
+      departmentName: "環境部氣候變遷署",
+      coe: "2.788",
+      unit: "公斤(kg)",
+    },
+    note: "原生 ABS。「ABS再生塑膠粒」0.57（2019，單一廠商）是再生料，不適用。",
+  },
+  pvc: {
+    id: "pvc",
+    nameZh: "聚氯乙烯（PVC）",
+    kgCO2ePerKg: 2.571,
+    sourceId: "moenv-cfp-p-02",
+    moenvRecord: {
+      name: "聚氯乙烯",
+      announcementYear: "2025",
+      departmentName: "環境部氣候變遷署",
+      coe: "2.571",
+      unit: "公斤(kg)",
+    },
+    note: "同名另有 2021 年 3.02，取較新者。PVC 粉（均一粉 2.851、微懸浮乳化粉 2.449）是特定製程原料，名稱較不貼近。",
+  },
   plastic_unspecified: {
     id: "plastic_unspecified",
-    nameZh: "其他塑膠（PU、POM、ABS 等無台灣係數者，以 PP 代理）",
+    nameZh: "其他塑膠（未指名或無台灣係數者，以 PP 代理）",
     kgCO2ePerKg: 1.95,
     sourceId: "moenv-cfp-p-02",
     moenvRecord: {
@@ -303,7 +363,7 @@ export const MATERIAL_FACTORS: Record<MaterialId, MaterialFactor> = {
       coe: "1.95",
       unit: "公斤(kg)",
     },
-    note: "環境部資料庫沒有 PU 泡棉、POM、原生 ABS 係數；PP 是庫內塑膠類最低值之一（LDPE 1.9、PP 1.95、EPS 1.96），用作下限代理。",
+    note: "用於 EPD 未指名的塑膠（other plastics、plastic components、other polymers）、資料庫沒有的彈性體（熱塑性聚酯彈性體、共聚酯醚），以及未標明 LDPE 或 HDPE 的 PE（LDPE 1.9、HDPE 2.21，PP 介於兩者之間）。",
   },
   wood_panel: {
     id: "wood_panel",
@@ -474,10 +534,10 @@ const SERIES_1: ReferenceProduct = {
     { label: "Steel", material: "steel", amount: 3.928 },
     { label: "Polypropylene", material: "polypropylene", amount: 2.514 },
     { label: "Aluminum", material: "aluminium", amount: 0.625 },
-    { label: "Polyurethane", material: "plastic_unspecified", amount: 0.563 },
+    { label: "Polyurethane", material: "polyurethane", amount: 0.563 },
     {
       label: "Polyoxymethylene",
-      material: "plastic_unspecified",
+      material: "polyoxymethylene",
       amount: 0.261,
     },
     { label: "Other", material: null, amount: 0.142 },
@@ -502,12 +562,12 @@ const AERON: ReferenceProduct = {
     },
     {
       label: "Polyoxymethylene",
-      material: "plastic_unspecified",
+      material: "polyoxymethylene",
       amount: 0.41,
     },
     {
       label: "Polyurethane Foam",
-      material: "plastic_unspecified",
+      material: "polyurethane",
       amount: 0.4,
     },
     { label: "Fiberglass", material: null, amount: 0.3 },
@@ -535,12 +595,12 @@ const SOJI: ReferenceProduct = {
     { label: "Nylon PA6", material: "polyamide", amount: 4.88 },
     { label: "Fiberboard", material: "wood_panel", amount: 2.43 },
     { label: "Aluminum", material: "aluminium", amount: 2.17 },
-    { label: "Polyurethane", material: "plastic_unspecified", amount: 1.12 },
+    { label: "Polyurethane", material: "polyurethane", amount: 1.12 },
     { label: "Polyester Fabric", material: "polyester_fibre", amount: 0.58 },
     { label: "Polypropylene", material: "polypropylene", amount: 0.37 },
     {
       label: "Polyoxymethylene",
-      material: "plastic_unspecified",
+      material: "polyoxymethylene",
       amount: 0.35,
     },
     { label: "Other", material: null, amount: 0.18 },
@@ -566,7 +626,7 @@ const KINNARPS_6240: ReferenceProduct = {
     { label: "Glass fibre", material: null, amount: 0.01 },
     {
       label: "Plastic - Polyurethane (PUR)",
-      material: "plastic_unspecified",
+      material: "polyurethane",
       amount: 1.56,
     },
     { label: "Wood - MDF", material: "wood_panel", amount: 0.67 },
@@ -577,7 +637,7 @@ const KINNARPS_6240: ReferenceProduct = {
     },
     {
       label: "Plastic - Polyoxymethylene",
-      material: "plastic_unspecified",
+      material: "polyoxymethylene",
       amount: 0.09,
     },
     { label: "Wood - Plywood", material: "wood_panel", amount: 0.15 },
@@ -605,11 +665,11 @@ const PERSONALITY_PLUS_APAC: ReferenceProduct = {
     { label: "Nylon", material: "polyamide", amount: 5.57 },
     { label: "Polypropylene", material: "polypropylene", amount: 1.86 },
     { label: "Steel", material: "steel", amount: 9.05 },
-    { label: "Foam", material: "plastic_unspecified", amount: 0.76 },
-    { label: "ABS", material: "plastic_unspecified", amount: 0.17 },
+    { label: "Foam", material: "polyurethane", amount: 0.76 },
+    { label: "ABS", material: "abs", amount: 0.17 },
     // 未揭露纖維種類，不套聚酯係數
     { label: "Fabric", material: null, amount: 0.04 },
-    { label: "POM", material: "plastic_unspecified", amount: 0.33 },
+    { label: "POM", material: "polyoxymethylene", amount: 0.33 },
     { label: "Other plastics", material: "plastic_unspecified", amount: 0.01 },
   ],
 };
@@ -632,12 +692,12 @@ const THINK_APAC: ReferenceProduct = {
     { label: "Polypropylene (PP)", material: "polypropylene", amount: 1.377 },
     {
       label: "Polyurethane (PU)",
-      material: "plastic_unspecified",
+      material: "polyurethane",
       amount: 0.811,
     },
     {
       label: "Polyoxymethylene (POM)",
-      material: "plastic_unspecified",
+      material: "polyoxymethylene",
       amount: 0.232,
     },
     { label: "Polyester Fabric", material: "polyester_fibre", amount: 0.272 },
@@ -657,7 +717,7 @@ const ALOHA_ACTIVE_AP: ReferenceProduct = {
     { label: "Nylon PA6", material: "polyamide", amount: 6.29 },
     { label: "Steel", material: "steel", amount: 5.22 },
     { label: "Polypropylene", material: "polypropylene", amount: 2.83 },
-    { label: "Polyurethane", material: "plastic_unspecified", amount: 0.72 },
+    { label: "Polyurethane", material: "polyurethane", amount: 0.72 },
     { label: "Polyethylene", material: "plastic_unspecified", amount: 0.17 },
     { label: "Other", material: null, amount: 0.1 },
   ],
@@ -705,15 +765,15 @@ const ATLANTA: ReferenceProduct = {
     { label: "Steel", material: "steel", amount: 7.69 },
     { label: "Glue", material: null, amount: 0.05 },
     { label: "Dacron", material: "polyester_fibre", amount: 0.39 },
-    { label: "ABS", material: "plastic_unspecified", amount: 0.01 },
+    { label: "ABS", material: "abs", amount: 0.01 },
     { label: "PA", material: "polyamide", amount: 1.97 },
     // 再生料，比照 Aeron 的 Recycled PET 不套原生係數
     { label: "PCR PA", material: null, amount: 1.2 },
     { label: "PE", material: "plastic_unspecified", amount: 0.06 },
-    { label: "POM", material: "plastic_unspecified", amount: 0.18 },
+    { label: "POM", material: "polyoxymethylene", amount: 0.18 },
     { label: "PP", material: "polypropylene", amount: 2.71 },
-    { label: "PU", material: "plastic_unspecified", amount: 1.57 },
-    { label: "PVC", material: "plastic_unspecified", amount: 0.1 },
+    { label: "PU", material: "polyurethane", amount: 1.57 },
+    { label: "PVC", material: "pvc", amount: 0.1 },
     { label: "Fiberglass", material: null, amount: 0.91 },
     { label: "Wood", material: "wood_panel", amount: 1.92 },
   ],
@@ -733,7 +793,7 @@ const YOURPLACE: ReferenceProduct = {
     { label: "Aluminum", material: "aluminium", amount: 1.19 },
     {
       label: "Acrylonitrile Butadiene Styrene",
-      material: "plastic_unspecified",
+      material: "abs",
       amount: 0.38,
     },
     { label: "Other", material: null, amount: 0.37 },
@@ -932,7 +992,7 @@ export const CATEGORIES: Record<CategoryId, CategoryProfile> = {
       sourceNote: "WRAP 2011 p.8「average sofa」材質比例",
       components: [
         { label: "particleboard", material: "wood_panel", amount: 63 },
-        { label: "foam (PUR)", material: "plastic_unspecified", amount: 9 },
+        { label: "foam (PUR)", material: "polyurethane", amount: 9 },
         { label: "woven cotton", material: "cotton_yarn", amount: 8 },
         { label: "softwood", material: null, amount: 8 },
         { label: "low alloyed steel", material: "steel", amount: 8 },

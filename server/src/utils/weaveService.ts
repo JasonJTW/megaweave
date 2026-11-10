@@ -242,6 +242,25 @@ async function deductInventory(
   }
 }
 
+/**
+ * 這筆交織是否等於「整篇貼文的全部物品」：沒指定物品，或每一種物品都選了而且數量拿滿。
+ * 只有一種物品的貼文選 2 張（剩 5 張）不算全部。
+ * 庫存在完成交織時才扣，所以送出請求當下 `postItems` 的數量就是可領的數量。
+ */
+export function isWholePostRequest(
+  items: Array<{ itemId: number | null; quantity: number }>,
+  postItems: Array<{ id: number; quantity: number }>,
+): boolean {
+  if (items.length === 0 || items[0]?.itemId === null) return true;
+  return (
+    postItems.length > 0 &&
+    items.length === postItems.length &&
+    postItems.every((pi) =>
+      items.some((it) => it.itemId === pi.id && it.quantity >= pi.quantity),
+    )
+  );
+}
+
 async function buildSystemMessageMeta(
   items: Array<{ itemId: number | null; quantity: number }>,
   postId: number,
@@ -250,16 +269,17 @@ async function buildSystemMessageMeta(
   postOwnerId: number,
 ) {
   const [postItems] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT id, title FROM items WHERE post_id = ?`,
+    `SELECT id, title, quantity FROM items WHERE post_id = ?`,
     [postId],
   );
 
-  const isAll =
-    items.length === 0 ||
-    items[0]?.itemId === null ||
-    (postItems.length > 0 &&
-      items.length === postItems.length &&
-      items.every((it) => postItems.some((pi) => pi.id === it.itemId)));
+  const isAll = isWholePostRequest(
+    items,
+    postItems.map((pi) => ({
+      id: Number(pi.id),
+      quantity: Number(pi.quantity),
+    })),
+  );
 
   let itemTitle = "All";
   let firstItemId: number | null = null;

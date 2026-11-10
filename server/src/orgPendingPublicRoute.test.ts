@@ -15,6 +15,7 @@ import orgItemsRouter from "./orgItems";
 import * as sessionModule from "./session";
 import { errorMiddleware } from "./utils/errorHandler";
 import { createNotification } from "./utils/notificationService";
+import { postService } from "./services/postService";
 import { runPendingPublic, PENDING_PUBLIC_DELAY_MS } from "./services/orgPendingPublicService";
 import {
   createFakeOrgPendingPublicDb,
@@ -73,6 +74,11 @@ jest.mock("./utils/notificationService", () => ({
 
 jest.mock("./utils/messageService", () => ({
   messageService: { getConversationId: jest.fn().mockResolvedValue(null) },
+}));
+
+//* 公開資訊改了要重建語意向量；這裡只確認有排入
+jest.mock("./services/postService", () => ({
+  postService: { enqueueEmbeddingForPost: jest.fn().mockResolvedValue(undefined) },
 }));
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -136,9 +142,37 @@ async function listItem(
   return { postId: post.id, publicId: post.public_id };
 }
 
+//* 公開資訊：像一般貼文一樣有地點、到期日、分類，標籤選填
+const TAIPEI_101 = {
+  place_id: "ChIJH56c2rarQjQRphD9gvC8BhI",
+  full_address: "110台北市信義區信義路五段7號",
+  name: "台北101",
+  city: "信義區",
+  province: "台北市",
+  lat: 25.033976,
+  lng: 121.5645389,
+};
+
+function listing(overrides: Record<string, unknown> = {}) {
+  return {
+    categoryId: 3,
+    tags: "螢幕, 辦公設備",
+    expiresAt: minutesFromNow(60 * 24 * 30).toISOString(),
+    location: TAIPEI_101,
+    ...overrides,
+  };
+}
+
 function startPendingAs(userId: number, publicId: string, body: Record<string, unknown> = {}, org = ORG) {
   signInAs(userId);
-  return api().post(`/api/orgs/${org}/items/${publicId}/pending-public`).send(body);
+  return api()
+    .post(`/api/orgs/${org}/items/${publicId}/pending-public`)
+    .send({ listing: listing(), ...body });
+}
+
+function getListingAs(userId: number, publicId: string, org = ORG) {
+  signInAs(userId);
+  return api().get(`/api/orgs/${org}/items/${publicId}/public-listing`);
 }
 
 function cancelPendingAs(userId: number, publicId: string, org = ORG) {
@@ -279,6 +313,101 @@ describe("an Org Admin sends an item to Pending Public", () => {
   });
 });
 
+describe("the public listing an Org Admin fills in before going public", () => {
+  it("starts empty, because org items are listed without a location, expiry or tags", async () => {
+    const { publicId } = await listItem();
+
+    const res = await getListingAs(ORG_ADMIN, publicId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.listing).toEqual({
+      categoryId: expect.any(Number),
+      tags: null,
+      expiresAt: null,
+      location: null,
+    });
+  });
+
+  it("is saved with the pending request and prefilled the next time", async () => {
+    const { postId, publicId } = await listItem();
+    const expiresAt = minutesFromNow(60 * 24 * 14).toISOString();
+
+    const res = await startPendingAs(ORG_ADMIN, publicId, {
+      listing: listing({ categoryId: 5, expiresAt, tags: "螢幕" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(postRow(postId)).toMatchObject({ category_id: 5, tags: "螢幕", location_id: expect.any(Number) });
+    expect(postRow(postId).expires_at?.toISOString()).toBe(expiresAt);
+    //* 分類、標籤、地點會進語意向量，要重建
+    expect(postService.enqueueEmbeddingForPost).toHaveBeenCalledWith(postId);
+
+    const prefill = await getListingAs(ORG_ADMIN, publicId);
+    expect(prefill.body.listing).toEqual({
+      categoryId: 5,
+      tags: "螢幕",
+      expiresAt,
+      location: expect.objectContaining({
+        placeId: TAIPEI_101.place_id,
+        fullAddress: TAIPEI_101.full_address,
+        lat: TAIPEI_101.lat,
+        lng: TAIPEI_101.lng,
+      }),
+    });
+  });
+
+  it("lets the tags stay empty, like a regular post", async () => {
+    const { postId, publicId } = await listItem();
+    const res = await startPendingAs(ORG_ADMIN, publicId, { listing: listing({ tags: "" }) });
+    expect(res.status).toBe(200);
+    expect(postRow(postId).tags).toBeNull();
+  });
+
+  it.each([
+    ["no location", { location: undefined }],
+    ["a location without coordinates", { location: { ...TAIPEI_101, lat: undefined } }],
+    ["no expiry date", { expiresAt: undefined }],
+    ["an expiry date in the past", { expiresAt: minutesFromNow(-5).toISOString() }],
+    ["no category", { categoryId: undefined }],
+  ])("refuses %s as VALIDATION_FAILED and does not start the pending period", async (_label, overrides) => {
+    const { postId, publicId } = await listItem();
+
+    const res = await startPendingAs(ORG_ADMIN, publicId, { listing: listing(overrides) });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_FAILED");
+    expect(res.body.item).toBeUndefined();
+    expect(fakeDb.pendingEvents).toHaveLength(0);
+    expect(postRow(postId).location_id ?? null).toBeNull();
+  });
+
+  it("refuses a request without any listing", async () => {
+    const { publicId } = await listItem();
+    signInAs(ORG_ADMIN);
+    const res = await api().post(`/api/orgs/${ORG}/items/${publicId}/pending-public`).send({});
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("VALIDATION_FAILED");
+  });
+
+  it("refuses an inactive or unknown category as INVALID_CATEGORY and saves nothing", async () => {
+    const { postId, publicId } = await listItem();
+
+    const res = await startPendingAs(ORG_ADMIN, publicId, { listing: listing({ categoryId: 999 }) });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("INVALID_CATEGORY");
+    expect(postRow(postId).location_id ?? null).toBeNull();
+    expect(fakeDb.pendingEvents).toHaveLength(0);
+  });
+
+  it("is only shown to Org Admins", async () => {
+    const { publicId } = await listItem();
+    const res = await getListingAs(GA_CONTACT, publicId);
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("ORG_TIER_NOT_ALLOWED");
+  });
+});
+
 describe("cancelling Pending Public", () => {
   it("keeps the item in its original tier and records the cancellation", async () => {
     const { postId, publicId } = await listItem();
@@ -356,6 +485,20 @@ describe("the pending period running out", () => {
     expect(list.body.items[0]).toMatchObject({ audienceTier: "public", pendingPublic: null });
   });
 
+  it("does not publish an item whose expiry date passed during the pending period", async () => {
+    const { postId, publicId } = await listItem();
+    await startPendingAs(ORG_ADMIN, publicId);
+    postRow(postId).expires_at = minutesFromNow(5);
+
+    expect(await runPendingPublic(minutesFromNow(11))).toEqual({ published: 0 });
+    expect(postRow(postId).audience_tier).toBe("internal");
+    expect(fakeDb.tierEvents).toHaveLength(0);
+    //* 不再每分鐘重試：待公開狀態清掉，管理員要重新送出
+    signInAs(ORG_ADMIN);
+    const list = await api().get(`/api/orgs/${ORG}/items`);
+    expect(list.body.items[0].pendingPublic).toBeNull();
+  });
+
   it("drops a pending item that was deleted meanwhile", async () => {
     const { postId, publicId } = await listItem();
     await startPendingAs(ORG_ADMIN, publicId);
@@ -384,6 +527,18 @@ describe("skipping the pending period", () => {
     expect((await api().get(`/api/orgs/${DEMO_ORG}`)).body.org.isDemo).toBe(true);
     signInAs(ORG_ADMIN);
     expect((await api().get(`/api/orgs/${ORG}`)).body.org.isDemo).toBe(false);
+  });
+
+  it("refuses to skip once the listing is no longer complete", async () => {
+    const { postId, publicId } = await listItem(DEMO_CONTACT, {}, { org: DEMO_ORG, unitId: DEMO_UNIT });
+    await startPendingAs(DEMO_ADMIN, publicId, {}, DEMO_ORG);
+    postRow(postId).location_id = null;
+
+    const res = await skipPendingAs(DEMO_ADMIN, publicId, DEMO_ORG);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("ORG_PUBLIC_LISTING_INCOMPLETE");
+    expect(postRow(postId).audience_tier).toBe("internal");
   });
 
   it("refuses a regular org's admin and keeps the 10-minute wait", async () => {

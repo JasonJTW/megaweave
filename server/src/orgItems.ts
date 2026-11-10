@@ -12,6 +12,7 @@ import {
   ORG_ITEM_CATEGORY_IDS,
 } from "./services/orgItemCategories";
 import { AUTO_RELEASE_MAX_DAYS } from "./services/orgAutoReleaseService";
+import { PublicListingSchema } from "./services/orgPublicListing";
 import {
   ItemAutoReleaseInput,
   ORG_ITEM_STATUSES,
@@ -227,14 +228,37 @@ router.patch(
   },
 );
 
-//* 確認框的勾選是 client 帶入的布林值，格式錯 → INVALID_REQUEST
+//* 確認框的勾選是 client 帶入的布林值，格式錯 → INVALID_REQUEST；
+//* 公開資訊（listing）是使用者填的表單，另外驗證，錯了 → VALIDATION_FAILED
 const PendingPublicSchema = z.object({
   assetDisposalConfirmed: z.boolean().default(false),
+  listing: z.unknown(),
 });
 
 /**
+ * GET /api/orgs/:orgId/items/:itemId/public-listing
+ * 公開確認框預填：目前的地點、到期日、分類、標籤（沒填過為 null）。Unit Contact → 403 ORG_TIER_NOT_ALLOWED
+ */
+router.get(
+  "/:orgId/items/:itemId/public-listing",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const itemId = ItemIdSchema.safeParse(req.params.itemId);
+      if (!itemId.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid item id"));
+      }
+      const listing = await orgItemService.getPublicListing(orgAccess(res), itemId.data);
+      return res.status(200).json({ listing });
+    } catch (error) {
+      return next(error);
+    }
+  },
+);
+
+/**
  * POST /api/orgs/:orgId/items/:itemId/pending-public
- * Org Admin 把物品送進 10 分鐘待公開期（#140）。有財產編號的要帶 `assetDisposalConfirmed: true`，
+ * Org Admin 把物品送進 10 分鐘待公開期（#140），同時帶 `listing`（地點、到期日、分類、標籤），
+ * 像一般貼文一樣補齊公開所需的資訊。有財產編號的要帶 `assetDisposalConfirmed: true`，
  * 否則 400 ORG_ASSET_DISPOSAL_UNCONFIRMED；Unit Contact → 403 ORG_TIER_NOT_ALLOWED
  */
 router.post(
@@ -246,11 +270,13 @@ router.post(
       if (!itemId.success || !body.success) {
         return next(new HttpError(400, "INVALID_REQUEST", "Invalid pending public request"));
       }
+      const listing = PublicListingSchema.safeParse(body.data.listing);
+      if (!listing.success) return next(listing.error);
       const item = await orgItemService.startPendingPublic(
         orgAccess(res),
         req.user!.userId,
         itemId.data,
-        body.data,
+        { assetDisposalConfirmed: body.data.assetDisposalConfirmed, listing: listing.data },
       );
       return res.status(200).json({ item });
     } catch (error) {

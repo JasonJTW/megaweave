@@ -4,6 +4,8 @@
 //* - 時間到由排程 runPendingPublic 經 changePostTier 升到 Public，層級紀錄記在送出的管理員名下
 //* - 演示組織（organizations.is_demo）的管理員可跳過，立即公開；一般組織沒有這個選項
 //* - 待公開期間不能做其他層級變更（ORG_ITEM_PENDING_PUBLIC），要先取消
+//* - 送出時一併填寫公開資訊（地點、到期日、分類、標籤；orgPublicListing），正式公開前再檢查一次：
+//*   缺地點或已過期的不公開（ORG_PUBLIC_LISTING_INCOMPLETE）
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { Server } from "socket.io";
 import dbPool from "../utils/db";
@@ -13,6 +15,15 @@ import { afterTierChange, changePostTier, TierChangeResult } from "./orgTierServ
 import type { AudienceTier } from "./postVisibility";
 import { displayNameSql } from "../utils/displayName";
 import { tierNotAllowed, unitNotManaged } from "./orgErrors";
+import {
+  isPublicListingComplete,
+  loadPublicListing,
+  PublicListing,
+  PublicListingInput,
+  publicListingIncomplete,
+  savePublicListing,
+} from "./orgPublicListing";
+import { postService } from "./postService";
 
 export const PENDING_PUBLIC_DELAY_MS = 10 * 60 * 1000;
 
@@ -55,10 +66,14 @@ interface PendingRow {
   by: number | null;
   /** 有沒有 org_post_details（待公開狀態存在那裡） */
   hasDetails: boolean;
+  /** 公開資訊（orgPublicListing）：正式公開前檢查 */
+  locationId: number | null;
+  expiresAt: Date | null;
+  categoryId: number | null;
 }
 
 //* LEFT JOIN：早期資料（或 fixture）可能沒有 org_post_details，層級變更仍要找得到貼文
-const LOCK_SQL = `SELECT p.id, p.org_unit_id, p.audience_tier, d.post_id AS details_post_id, d.asset_number, d.pending_public_due_at, d.pending_public_by
+const LOCK_SQL = `SELECT p.id, p.org_unit_id, p.audience_tier, p.location_id, p.expires_at, p.category_id, d.post_id AS details_post_id, d.asset_number, d.pending_public_due_at, d.pending_public_by
   FROM posts p LEFT JOIN org_post_details d ON d.post_id = p.id
   WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL FOR UPDATE`;
 
@@ -79,6 +94,9 @@ export async function lockPendingRow(
     dueAt: row.pending_public_due_at ? new Date(row.pending_public_due_at) : null,
     by: row.pending_public_by == null ? null : Number(row.pending_public_by),
     hasDetails: row.details_post_id != null,
+    locationId: row.location_id == null ? null : Number(row.location_id),
+    expiresAt: row.expires_at ? new Date(row.expires_at) : null,
+    categoryId: row.category_id == null ? null : Number(row.category_id),
   };
 }
 
@@ -123,23 +141,36 @@ async function recordEvent(
   );
 }
 
+/** 公開確認框預填：目前的公開資訊。只給 Org Admin（與送出待公開同一個權限） */
+export async function getPublicListing(
+  access: PendingPublicAccess,
+  postPublicId: string,
+): Promise<PublicListing> {
+  return withTransaction(async (connection) => {
+    const row = await lockPendingRow(connection, access.orgId, postPublicId);
+    assertAdminOf(access, row);
+    return loadPublicListing(connection, row.postId);
+  });
+}
+
 /**
- * Org Admin 送出待公開。已在待公開就不重設時間（重複點擊無害）；已是 Public → 400 INVALID_REQUEST
+ * Org Admin 送出待公開，同時寫入公開資訊（地點、到期日、分類、標籤）。
+ * 已在待公開就不重設時間也不改資訊（重複點擊無害）；已是 Public → 400 INVALID_REQUEST
  */
 export async function startPendingPublic(
   access: PendingPublicAccess,
   userId: number,
   postPublicId: string,
-  input: { assetDisposalConfirmed: boolean },
+  input: { assetDisposalConfirmed: boolean; listing: PublicListingInput },
   now: Date = new Date(),
 ): Promise<void> {
-  await withTransaction(async (connection) => {
+  const postId = await withTransaction(async (connection): Promise<number | null> => {
     const row = await lockPendingRow(connection, access.orgId, postPublicId);
     assertAdminOf(access, row);
     if (row.tier === "public") {
       throw new HttpError(400, "INVALID_REQUEST", "The item is already public");
     }
-    if (row.dueAt) return;
+    if (row.dueAt) return null;
     //* 待公開狀態存在 org_post_details；沒有那列就無法排程，當作不是組織物品
     if (!row.hasDetails) throw new HttpError(404, "POST_NOT_FOUND", "Item not found");
     if (row.assetNumber && !input.assetDisposalConfirmed) {
@@ -149,6 +180,7 @@ export async function startPendingPublic(
         "Confirm the disposal of this asset before making it public",
       );
     }
+    await savePublicListing(connection, row.postId, input.listing);
     await setPending(connection, row.postId, {
       dueAt: new Date(now.getTime() + PENDING_PUBLIC_DELAY_MS),
       by: userId,
@@ -160,7 +192,13 @@ export async function startPendingPublic(
       assetDisposalConfirmed: row.assetNumber !== null && input.assetDisposalConfirmed,
       actorUserId: userId,
     });
+    return row.postId;
   });
+  if (postId === null) return;
+  //* 分類、標籤、地點都進語意向量（generatePostText），改了要重建；失敗只記 log，待公開已生效
+  await postService
+    .enqueueEmbeddingForPost(postId)
+    .catch((error) => console.error(`Embedding re-enqueue failed for post #${postId}:`, error));
 }
 
 /** 取消待公開：維持原層級並留下紀錄。已經公開（或沒有待公開）→ 409 */
@@ -201,6 +239,7 @@ export async function skipPendingPublic(
       );
     }
     if (!row.dueAt) throw pendingPublicNotPending();
+    if (!isPublicListingComplete(row, new Date())) throw publicListingIncomplete();
     await setPending(connection, row.postId, null);
     await recordEvent(connection, {
       postId: row.postId,
@@ -271,6 +310,11 @@ async function publishOne(due: DueRow, now: Date): Promise<boolean> {
     if (!row.dueAt || row.by === null || row.dueAt.getTime() > now.getTime()) return null;
     await setPending(connection, row.postId, null);
     if (row.tier === "public") return null;
+    //* 待公開期間被改掉（到期日過了、地點被清掉）：不公開，維持原層級，管理員要重新送出
+    if (!isPublicListingComplete(row, now)) {
+      console.warn(`Pending Public skipped for post #${row.postId}: public listing incomplete`);
+      return null;
+    }
     return changePostTier(connection, {
       orgId: due.orgId,
       postPublicId: due.postPublicId,

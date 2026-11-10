@@ -46,12 +46,17 @@ test.describe("Org report", () => {
         emissions: {
           factorTableVersion: string;
           replacementRate: { value: number; status: string };
+          lifetimeRatio: { value: number; status: string };
         };
       };
     };
     expect(report.listing.itemCount).toBeGreaterThanOrEqual(1);
     expect(report.emissions.replacementRate).toMatchObject({
       value: 0.5,
+      status: "assumed",
+    });
+    expect(report.emissions.lifetimeRatio).toMatchObject({
+      value: 1,
       status: "assumed",
     });
 
@@ -71,6 +76,9 @@ test.describe("Org report", () => {
     );
     await expect(page.getByTestId("report-replacement-rate")).toContainText(
       t.rateStatus.assumed,
+    );
+    await expect(page.getByTestId("report-lifetime-ratio")).toContainText(
+      t.lifetimeStatus.assumed,
     );
     await expect(page.getByText(t.formulaEstimated)).toBeVisible();
     await expect(page.getByTestId("report-footnote")).toContainText("非碳權");

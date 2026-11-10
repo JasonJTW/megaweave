@@ -134,6 +134,7 @@ describe("buildOrgReport: weight, value and avoided emissions (E6-2)", () => {
     expect(e.potentialKgCO2e).toBeCloseTo(potential, 10);
     expect(e.estimatedKgCO2e).toBeCloseTo(potential * 0.5, 10);
     expect(e.replacementRate).toMatchObject({ value: 0.5, status: "assumed" });
+    expect(e.lifetimeRatio).toMatchObject({ value: 1, status: "assumed" });
     expect(e.countedQuantity).toBe(3);
     expect(e.uncountedQuantity).toBe(1);
     expect(e.byCategory.map((c) => [c.categoryId, c.quantity])).toEqual([

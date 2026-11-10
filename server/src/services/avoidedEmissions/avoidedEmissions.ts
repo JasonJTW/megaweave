@@ -2,7 +2,9 @@
 // 二手物再使用的避免排放量估算（純函式，無 I/O）。
 //
 //   理想值（1:1 取代）  P = 重量 kg × 類別生產係數 EF (kgCO2e/kg)
-//   估算值（含取代率）  A = P × 取代率 R
+//   估算值             A = P × 取代率 R × 壽命比 L
+//
+// L = 二手使用年限 ÷ 新品使用年限，上限 1；預設 1（WRAP 2011 like-for-like）。
 //
 // EF：家具類 = min(材質組成 × 環境部材質係數, 參考產品 EPD 的 A1–A3 平均)；
 //     電子類 = EPA WARM v16 產品係數；其他 = 固定材質組成 × 環境部材質係數。
@@ -15,6 +17,7 @@ import {
   CATEGORIES,
   CATEGORY_IDS,
   CategoryId,
+  DEFAULT_LIFETIME_RATIO,
   DEFAULT_REPLACEMENT_RATE,
   FACTOR_TABLE_VERSION,
   FactorMethod,
@@ -224,6 +227,7 @@ export interface ItemEstimate {
   weightSource: "entered" | "category_default" | "missing";
   productionFactorKgCO2ePerKg: number | null;
   replacementRate: number;
+  lifetimeRatio: number;
   potentialKgCO2e: number;
   estimatedKgCO2e: number;
 }
@@ -231,11 +235,19 @@ export interface ItemEstimate {
 export interface EstimateOptions {
   /** 問卷實測的類別取代率（僅傳 usable 的值），未提供的類別用預設 0.5 */
   replacementRates?: Partial<Record<CategoryId, number>>;
+  /** 實測的類別壽命比，未提供的類別用預設 1 */
+  lifetimeRatios?: Partial<Record<CategoryId, number>>;
 }
 
 function assertRate(rate: number): void {
   if (!(rate >= 0 && rate <= 1)) {
     throw new RangeError(`Replacement rate must be within [0, 1]: ${rate}`);
+  }
+}
+
+function assertLifetimeRatio(ratio: number): void {
+  if (!(ratio > 0 && ratio <= 1)) {
+    throw new RangeError(`Lifetime ratio must be within (0, 1]: ${ratio}`);
   }
 }
 
@@ -265,6 +277,9 @@ export function estimateItem(
     options.replacementRates?.[input.categoryId] ??
     DEFAULT_REPLACEMENT_RATE.value;
   assertRate(replacementRate);
+  const lifetimeRatio =
+    options.lifetimeRatios?.[input.categoryId] ?? DEFAULT_LIFETIME_RATIO.value;
+  assertLifetimeRatio(lifetimeRatio);
 
   let unitWeightKg: number | null = null;
   let weightSource: ItemEstimate["weightSource"] = "missing";
@@ -285,6 +300,7 @@ export function estimateItem(
     weightSource,
     productionFactorKgCO2ePerKg: factor,
     replacementRate,
+    lifetimeRatio,
   };
   if (factor === null) {
     return {
@@ -307,7 +323,7 @@ export function estimateItem(
     ...base,
     status: "counted",
     potentialKgCO2e,
-    estimatedKgCO2e: potentialKgCO2e * replacementRate,
+    estimatedKgCO2e: potentialKgCO2e * replacementRate * lifetimeRatio,
   };
 }
 

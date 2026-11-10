@@ -1186,5 +1186,25 @@ export const DEFAULT_REPLACEMENT_RATE: ReplacementRate = {
     "p.10「50% of reuse is displacement of a new item」；p.11 作者註明尚無實證資料",
 };
 
+// ---------------------------------------------------------------------------
+// 壽命比 L：二手品在接手者手上的使用年限 ÷ 被取代新品的使用年限（eBay × Anthesis 的
+// 「額外壽命比」、Privett 2018 RR = LEP × Pb）。上限 1：二手品再耐用也只取代一件新品
+// ---------------------------------------------------------------------------
+
+export interface LifetimeRatio {
+  value: number;
+  status: "assumed" | "surveyed";
+  sourceId: SourceId;
+  locator: string;
+}
+
+export const DEFAULT_LIFETIME_RATIO: LifetimeRatio = {
+  value: 1,
+  status: "assumed",
+  sourceId: "wrap-2011-furniture",
+  locator:
+    "p.12「furniture donors keep an item for the same amount of time as furniture recipients anticipate housing the item」，假設二手壽命等於新品壽命（like-for-like）",
+};
+
 /** 問卷取代率（Vaayu 2023 作法）至少需要的有效樣本數，未達則沿用預設值 */
 export const MIN_SURVEY_SAMPLE = 100;

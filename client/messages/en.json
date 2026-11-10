@@ -1508,8 +1508,8 @@
     "emissionsHeading": "Estimated weight, value and avoided emissions",
     "emissionsScope": "Only items in completed hand-overs count, once per hand-over.",
     "estimatedKg": "Estimated avoided emissions",
-    "estimatedKgHint": "Ideal case × replacement rate R ({rate})",
-    "potentialKg": "Ideal case (R = 1)",
+    "estimatedKgHint": "Ideal case × replacement rate R ({rate}) × lifetime ratio L ({lifetime})",
+    "potentialKg": "Ideal case (R = 1, L = 1)",
     "potentialKgHint": "If every piece replaced a new one",
     "kgCO2e": "{value} kgCO2e",
     "kg": "{value} kg",
@@ -1521,6 +1521,12 @@
     "replacementRate": "Replacement rate R",
     "replacementRateValue": "{rate} ({status})",
     "replacementRateSource": "Source",
+    "lifetimeRatio": "Lifetime ratio L (second-hand years ÷ new-item years)",
+    "lifetimeRatioValue": "{ratio} ({status})",
+    "lifetimeStatus": {
+      "assumed": "Assumes a second-hand item lasts as long as a new one; not yet measured",
+      "surveyed": "Measured by survey"
+    },
     "rateStatus": {
       "assumed": "assumed, not yet measured by a survey on this platform",
       "surveyed": "measured by survey"
@@ -1530,7 +1536,7 @@
     "uncounted": "Pieces not counted (no factor or no weight)",
     "formulaHeading": "Method",
     "formulaPotential": "Ideal case = weight (kg) × category production factor for a new item (kgCO2e/kg)",
-    "formulaEstimated": "Estimated avoided emissions = ideal case × replacement rate R",
+    "formulaEstimated": "Estimated avoided emissions = ideal case × replacement rate R × lifetime ratio L",
     "formulaFactor": "Furniture uses the lower of “material composition × MOENV material factors” and the reference products' EPD average; electronics use US EPA WARM product factors; categories without a citable factor are not counted.",
     "byCategoryHeading": "By category",
     "colCategory": "Category",
@@ -1553,7 +1559,7 @@
       "material_bom": "Material composition used (lower)",
       "reference_epd": "Reference EPDs used (lower)"
     },
-    "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party. \"Unrealized avoided emissions\" is a projection: the items may never be taken, and it must not be used in any external claim.",
+    "footnote": "These are estimated avoided emissions. They assume that a recipient who hadn't received the item would have bought a comparable new one with 50% probability (replacement rate R = 0.5, the WRAP 2011 default, not yet measured by a survey on this platform), and that a second-hand item stays in use as long as a new one would (lifetime ratio L = 1, the WRAP 2011 default, not yet measured). Production factors come from the MOENV carbon footprint emission factor database (2026-11-08 snapshot), US EPA WARM v16 (2023-12) and third-party verified environmental product declarations (EPD); factor table version {version}. Use phase, end-of-life and travel to hand-overs are not included; small appliances and “Other” are not counted. This is a comparative estimate, not a carbon credit or reduction unit. It must not be used to offset an organisation's GHG inventory or to support carbon-neutral or net-zero claims, and it has not been verified by a third party. \"Unrealized avoided emissions\" is a projection: the items may never be taken, and it must not be used in any external claim.",
     "colUnitEstimatedShort": "Avoided emissions given (kgCO2e)",
     "factorsSummary": "New-product emission factors, methods and sources for {count} categories.",
     "unrealizedLabel": "Unrealized avoided emissions",
@@ -1561,7 +1567,7 @@
     "unrealizedNone": "Nothing on the shelf is waiting to be handed over.",
     "unrealizedUncounted": "{count, plural, one {# piece is} other {# pieces are}} not counted (no factor for the category, or no weight).",
     "unrealizedValue": "+{value} kgCO2e",
-    "formulaUnrealized": "Unrealized = pieces left on the shelf (the smaller of current stock and listed − handed over) × unit weight × factor × replacement rate R"
+    "formulaUnrealized": "Unrealized = pieces left on the shelf (the smaller of current stock and listed − handed over) × unit weight × factor × replacement rate R × lifetime ratio L"
   },
   "Publisher": {
     "anonymous": "Anonymous"

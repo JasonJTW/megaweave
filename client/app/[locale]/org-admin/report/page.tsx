@@ -3,7 +3,7 @@
 //* 組織報表（#143，PRD 0001 §5.1 E6-1、E6-2；ADR 0005）
 //* 只有 Org Admin 看得到（server 不是就回 ORG_NOT_FOUND）；這版不做 CSV 匯出
 //* 減碳量是「估算避免排放量」：依 docs/notes/avoided-emissions-model.md §8 揭露理想值、估算值、
-//* 取代率 R 與其狀態、係數表版本、預設重量占比、不計入件數與註腳；數字都來自 server，頁面不另算
+//* 取代率 R、壽命比 L 與其狀態、係數表版本、預設重量占比、不計入件數與註腳；數字都來自 server，頁面不另算
 import { type ReactNode, Suspense } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
@@ -137,6 +137,7 @@ function ReportView({ report }: { report: OrgReport }) {
       : format.number(rate, { style: "percent", maximumFractionDigits: 1 });
   const { emissions: e, value } = report;
   const rateStatus = t(`rateStatus.${e.replacementRate.status}`);
+  const lifetimeStatus = t(`lifetimeStatus.${e.lifetimeRatio.status}`);
   const rate = report.circulation.rate;
 
   return (
@@ -184,6 +185,7 @@ function ReportView({ report }: { report: OrgReport }) {
               value={t("kgCO2e", { value: num(e.estimatedKgCO2e, 1) })}
               hint={t("estimatedKgHint", {
                 rate: num(e.replacementRate.value, 2),
+                lifetime: num(e.lifetimeRatio.value, 2),
               })}
               testId="report-estimated"
             />
@@ -376,6 +378,23 @@ function ReportView({ report }: { report: OrgReport }) {
                 })}{" "}
                 <a
                   href={e.replacementRate.source.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-megaweave-forest underline underline-offset-4 hover:text-megaweave-forest-dark"
+                >
+                  {t("replacementRateSource")}
+                </a>
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 px-5 py-3.5">
+              <dt className="text-dark/60">{t("lifetimeRatio")}</dt>
+              <dd data-testid="report-lifetime-ratio" className="text-right">
+                {t("lifetimeRatioValue", {
+                  ratio: num(e.lifetimeRatio.value, 2),
+                  status: lifetimeStatus,
+                })}{" "}
+                <a
+                  href={e.lifetimeRatio.source.url}
                   target="_blank"
                   rel="noreferrer"
                   className="font-medium text-megaweave-forest underline underline-offset-4 hover:text-megaweave-forest-dark"

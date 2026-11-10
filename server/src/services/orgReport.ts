@@ -5,7 +5,7 @@
 //* - 各層去化：Weave 歸到「申請當下」物品所在的層級（org_post_tier_events），比例的分母都是上架總件數，
 //*   所以各層比例相加＝總去化率（PRD §6「Tier 1 去化率＝內部認領件數 ÷ 上架件數」）
 //* - 待實現：在架物品剩下的件數若全數完成交接的估算值，另列、不加進已實現的數字
-//* - 減碳量只用既有模型（estimateReport：重量 × 類別新品生產係數 × 取代率 R），不另寫公式
+//* - 減碳量只用既有模型（estimateReport：重量 × 類別新品生產係數 × 取代率 R × 壽命比 L），不另寫公式
 import {
   AvoidedEmissionsReport,
   estimateReport,
@@ -17,7 +17,9 @@ import {
   CATEGORIES,
   CATEGORY_IDS,
   CategoryId,
+  DEFAULT_LIFETIME_RATIO,
   DEFAULT_REPLACEMENT_RATE,
+  LifetimeRatio,
   ReplacementRate,
   SOURCES,
 } from "./avoidedEmissions/factorTable";
@@ -118,15 +120,16 @@ export interface OrgReport {
     defaultWeightShare: number | null;
     /** 理想值（R = 1：每件都取代一件新品） */
     potentialKgCO2e: number;
-    /** 估算值（× R） */
+    /** 估算值（× R × L） */
     estimatedKgCO2e: number;
     replacementRate: ReplacementRate & { source: { title: string; url: string } };
+    lifetimeRatio: LifetimeRatio & { source: { title: string; url: string } };
     countedQuantity: number;
     /** 不計入的件數：類別無係數、缺重量或缺物品資料 */
     uncountedQuantity: number;
     byCategory: (AvoidedEmissionsReport["byCategory"][number] & { name: string })[];
     /**
-     * 待實現：在架物品還沒交接的件數若全數完成交接，可再增加的估算避免排放量（同一個模型、同一個 R）。
+     * 待實現：在架物品還沒交接的件數若全數完成交接，可再增加的估算避免排放量（同一個模型、同一個 R 與 L）。
      * 只是預估，不加進 estimatedKgCO2e
      */
     unrealized: {
@@ -280,6 +283,9 @@ export function buildOrgReport(input: ReportInput): OrgReport {
     .reduce((sum, x) => sum + x.remaining, 0);
 
   const rateSource = SOURCES[DEFAULT_REPLACEMENT_RATE.sourceId];
+  //* estimateReport 沒有傳 replacementRates／lifetimeRatios，所以全部物品都用預設的 R 與 L，揭露的值與計算一致；
+  //* 之後改傳實測值時，這裡的揭露也要改成按類別列出
+  const lifetimeSource = SOURCES[DEFAULT_LIFETIME_RATIO.sourceId];
   return {
     listing: { itemCount: input.posts.length, quantity: listedQuantity },
     circulation: {
@@ -300,6 +306,10 @@ export function buildOrgReport(input: ReportInput): OrgReport {
       replacementRate: {
         ...DEFAULT_REPLACEMENT_RATE,
         source: { title: rateSource.title, url: rateSource.url },
+      },
+      lifetimeRatio: {
+        ...DEFAULT_LIFETIME_RATIO,
+        source: { title: lifetimeSource.title, url: lifetimeSource.url },
       },
       countedQuantity: circulatedQuantity - uncountedQuantity,
       uncountedQuantity,

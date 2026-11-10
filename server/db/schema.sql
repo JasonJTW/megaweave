@@ -527,7 +527,7 @@ CREATE TABLE `org_pending_public_events` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `post_id` bigint unsigned NOT NULL,
   `org_id` bigint unsigned NOT NULL,
-  `action` enum('started','cancelled','skipped') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `action` enum('started','cancelled','skipped','blocked') COLLATE utf8mb4_unicode_ci NOT NULL,
   `asset_disposal_confirmed` tinyint(1) NOT NULL DEFAULT '0',
   `actor_user_id` bigint unsigned NOT NULL,
   `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

@@ -22,6 +22,7 @@ const KNOWN_KINDS = [
   "public_pending_started",
   "public_pending_cancelled",
   "public_pending_skipped",
+  "public_pending_blocked",
 ] as const;
 type KnownKind = (typeof KNOWN_KINDS)[number];
 

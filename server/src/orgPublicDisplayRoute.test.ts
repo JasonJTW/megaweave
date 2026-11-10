@@ -55,6 +55,10 @@ jest.mock("./queue/queues", () => ({
   enqueueSendEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("./services/postService", () => ({
+  postService: { enqueueEmbeddingForPost: jest.fn().mockResolvedValue(undefined) },
+}));
+
 jest.mock("./utils/notificationService", () => ({
   createNotification: jest.fn().mockResolvedValue(true),
 }));
@@ -127,7 +131,12 @@ async function listItem() {
 async function listPublicItem() {
   const item = await listItem();
   signInAs(ORG_ADMIN);
-  expect((await api().post(`/api/orgs/${ORG}/items/${item.publicId}/pending-public`).send({})).status).toBe(200);
+  const listing = {
+    categoryId: 3,
+    expiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString(),
+    location: { place_id: "place-e2e", full_address: "台北市信義區", lat: 25.03, lng: 121.56 },
+  };
+  expect((await api().post(`/api/orgs/${ORG}/items/${item.publicId}/pending-public`).send({ listing })).status).toBe(200);
   await runPendingPublic(new Date(Date.now() + 11 * 60_000));
   expect(fakeDb.posts.find((p) => p.id === item.postId)!.audience_tier).toBe("public");
   return item;

@@ -12,10 +12,15 @@ import zhTW from "../messages/zh-TW.json";
 // the demo org's skip button publishes it at once. Afterwards the home feed shows it under the
 // org's name, and nowhere public (feed, detail page, SEO title, API JSON, chat) shows the Unit
 // Contact who listed it. A second item is sent to Pending Public and cancelled.
+// Going public needs a pickup location, expiry date and category like a regular post: the
+// fixture seeds them (there is no Google place picker in E2E), so the confirmation shows them
+// prefilled; a third item without them can't be sent.
 const ORG_NAME = "E2E Public Org";
 const ITEM_TITLE = "E2E Org Public item";
 const ITEM_ASSET = "E2E-ASSET-140";
 const CANCEL_TITLE = "E2E Org Public cancel item";
+const INCOMPLETE_TITLE = "E2E Org Public incomplete item";
+const ITEM_ADDRESS = "110台北市信義區信義路五段7號";
 const CONTACT_NAME = "E2E Hidden Contact Person";
 const admin = {
   email: "e2e-public-admin@megaweave.test",
@@ -70,6 +75,11 @@ test.describe("Org Admin makes an item public", () => {
       name: m.publicConfirmTitle.replace("{title}", ITEM_TITLE),
     });
     await expect(confirm.getByText(ITEM_ASSET)).toBeVisible();
+    // The public listing saved earlier is prefilled
+    await expect(confirm.getByLabel(m.publicListingLocation)).toHaveValue(
+      ITEM_ADDRESS,
+    );
+    await expect(confirm.getByText("#E2E")).toBeVisible();
     const submit = confirm.getByRole("button", { name: m.publicConfirmSubmit });
     await expect(submit).toBeDisabled();
     await confirm.getByLabel(m.publicConfirmDisposal).check();
@@ -242,5 +252,37 @@ test.describe("Org Admin makes an item public", () => {
     await expect(row.getByTestId("org-pending-public")).toHaveCount(0);
     await expect(row.getByText(zhTW.Org.tier.members)).toBeVisible();
     await expect(row.getByRole("button", { name: m.makePublic })).toBeVisible();
+  });
+
+  test("an item without a pickup location and expiry date can't be sent to Pending Public", async ({
+    page,
+  }) => {
+    const signin = await page.request.post(`${API_URL}/api/signin`, {
+      data: admin,
+    });
+    expect(signin.ok(), await signin.text()).toBeTruthy();
+    const orgs = (await (
+      await page.request.get(`${API_URL}/api/orgs`)
+    ).json()) as {
+      orgs: Array<{ id: string; name: string }>;
+    };
+    const org = orgs.orgs.find((o) => o.name === ORG_NAME)!;
+
+    await page.goto(`/org/items?org=${org.id}`);
+    const row = page.getByRole("row", { name: new RegExp(INCOMPLETE_TITLE) });
+    await row.getByRole("button", { name: m.makePublic }).click();
+    const confirm = row.getByRole("group", {
+      name: m.publicConfirmTitle.replace("{title}", INCOMPLETE_TITLE),
+    });
+    await expect(confirm.getByLabel(m.publicListingLocation)).toHaveValue("");
+
+    // Typing an address without picking a suggestion is not a location
+    await confirm.getByLabel(m.publicListingLocation).fill("台北市信義區");
+    await confirm.getByRole("button", { name: m.publicConfirmSubmit }).click();
+    await expect(
+      confirm.getByText(m.publicListingLocationMissing),
+    ).toBeVisible();
+    await expect(confirm.getByText(m.publicListingExpiryMissing)).toBeVisible();
+    await expect(row.getByTestId("org-pending-public")).toHaveCount(0);
   });
 });

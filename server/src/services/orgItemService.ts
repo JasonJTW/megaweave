@@ -26,11 +26,13 @@ import type { Server } from "socket.io";
 import type { AutoReleaseOverride } from "./orgAutoReleaseService";
 import {
   cancelPendingPublic,
+  getPublicListing,
   itemPendingPublic,
   lockPendingRow,
   skipPendingPublic,
   startPendingPublic,
 } from "./orgPendingPublicService";
+import type { PublicListing, PublicListingInput } from "./orgPublicListing";
 import { buildTimeline, findTimelinePost, TimelineEntry } from "./orgTimelineService";
 import {
   defaultUnitWeightKg,
@@ -584,14 +586,19 @@ export const orgItemService = {
     return item;
   },
 
+  /** 後台：公開確認框預填目前的公開資訊（地點、到期日、分類、標籤）；只給 Org Admin */
+  getPublicListing(access: OrgAccess, itemPublicId: string): Promise<PublicListing> {
+    return getPublicListing(access, itemPublicId);
+  },
+
   /**
-   * 後台：Org Admin 把物品送進待公開（#140）。有財產編號的要帶 assetDisposalConfirmed: true
+   * 後台：Org Admin 把物品送進待公開（#140），同時寫入公開資訊。有財產編號的要帶 assetDisposalConfirmed: true
    */
   async startPendingPublic(
     access: OrgAccess,
     userId: number,
     itemPublicId: string,
-    input: { assetDisposalConfirmed: boolean },
+    input: { assetDisposalConfirmed: boolean; listing: PublicListingInput },
   ): Promise<OrgItem> {
     await startPendingPublic(access, userId, itemPublicId, input);
     const [item] = await queryItems(access.orgId, { publicId: itemPublicId });

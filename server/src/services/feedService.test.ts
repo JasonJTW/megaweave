@@ -542,6 +542,45 @@ describe("FeedService", () => {
       );
     });
 
+    it("fills a short KNN recall with public posts missing from the vector index", async () => {
+      //* 索引只剩一篇有 public scope（例如剛升到 Public 的組織物品）時，其他公開貼文仍要出現在 Feed
+      mockDatabase();
+      mockRedis.sendCommand.mockImplementation(async (args: unknown) => {
+        const [command] = args as string[];
+        if (command === "FT.SEARCH") return [1, "post:3", ["vector_distance", "0.1"]];
+        return null;
+      });
+      const service = new FeedService();
+
+      const result = await service.getPersonalizedFeed(userVector(), { userId: 7, limit: 10 });
+
+      expect(result.posts.map((post) => post.id)).toEqual([3, 1, 2, 4]);
+      expect(result.pagination.totalPosts).toBe(4);
+      const supplement = (dbPool.execute as jest.Mock).mock.calls.find(([sql]) =>
+        String(sql).includes("p.id NOT IN"),
+      );
+      expect(supplement?.[0]).toContain("p.status = 'active'");
+      expect(supplement?.[0]).toContain("p.audience_tier = 'public'");
+      expect(supplement?.[1]).toEqual([3]);
+    });
+
+    it("does not query MySQL for more candidates when the KNN recall is full", async () => {
+      mockDatabase();
+      const fullRecall = [150];
+      for (let id = 1; id <= 150; id++) fullRecall.push(`post:${id}` as never, ["vector_distance", "0.1"] as never);
+      mockRedis.sendCommand.mockImplementation(async (args: unknown) =>
+        (args as string[])[0] === "FT.SEARCH" ? fullRecall : null,
+      );
+      const service = new FeedService();
+
+      await service.getPersonalizedFeed(userVector(), { userId: 7, limit: 10 });
+
+      const supplement = (dbPool.execute as jest.Mock).mock.calls.find(([sql]) =>
+        String(sql).includes("p.id NOT IN"),
+      );
+      expect(supplement).toBeUndefined();
+    });
+
     it("ranks filtered candidates with embeddings hydrated from MySQL rather than Redis", async () => {
       mockDatabase();
       mockRedis.sendCommand.mockResolvedValue(null);

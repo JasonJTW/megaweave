@@ -222,6 +222,26 @@ async function fetchCandidateScoringFields(
   return new Map(rows.map((row) => [row.id as number, row]));
 }
 
+/** 公開、上架中、但不在 excludeIds 裡的貼文 id，依熱度排序；供 KNN 召回不足時補候選 */
+async function fetchUnindexedCandidateIds(
+  excludeIds: number[],
+  limit: number,
+): Promise<number[]> {
+  const exclude = excludeIds.length
+    ? ` AND p.id NOT IN (${excludeIds.map(() => "?").join(",")})`
+    : "";
+  //* LIMIT 是程式內的整數，不是使用者輸入
+  const [rows] = await dbPool.execute<RowDataPacket[]>(
+    `SELECT p.id FROM posts p
+     WHERE p.status = 'active' AND p.deleted_at IS NULL AND ${PUBLIC_SURFACE_SQL}${exclude}
+     ORDER BY p.hot_score DESC, p.id DESC
+     LIMIT ${Math.max(1, Math.floor(limit))}`,
+    excludeIds,
+  );
+  const excluded = new Set(excludeIds);
+  return rows.map((row) => Number(row.id)).filter((id) => !excluded.has(id));
+}
+
 /** Full-hydration baseline：候選列已含完整欄位，只需為當頁貼文標記 is_liked。 */
 async function pickHydratedPosts(
   candidates: RowDataPacket[],
@@ -978,6 +998,18 @@ export class FeedService {
     // 若向量搜尋無結果（例如貼文尚未建立索引），自動 fallback
     if (candidates.length === 0) {
       return await this.getFilteredFeed(params, userVectorBuffer);
+    }
+
+    //* 召回不足 K 筆代表索引裡的公開貼文已全數取出；不在索引裡的公開貼文（還沒產生向量、scope 缺漏）
+    //* 從 MySQL 補上，相似度記 0 排在後面。少了這步，索引只剩幾篇時 Feed 就只剩那幾篇
+    if (candidates.length < CANDIDATE_LIMIT) {
+      const unindexedIds = await fetchUnindexedCandidateIds(
+        candidates.map((c) => c.postId),
+        CANDIDATE_LIMIT - candidates.length,
+      );
+      for (const postId of unindexedIds) {
+        candidates.push({ postId, distance: 1, similarity: 0 });
+      }
     }
 
     // 2. 🌟 延遲關聯 (Late Materialization)：先輕量查詢候選 150 篇的打分欄位 (不 JOIN images/users)

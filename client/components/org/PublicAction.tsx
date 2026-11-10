@@ -2,17 +2,27 @@
 
 //* 升到 Public（#140，PRD 0001 §5.1 E2-6、E2-7、E4-2；ADR 0003）：只給 Org Admin
 //* - 公開前先確認：列出名稱與財產編號；有財產編號要勾「已完成報廢／處分程序」才能送出
+//* - 確認框同時補上公開資訊（地點、到期日、分類必填，標籤選填；PublicListingFields），
+//*   像一般貼文一樣才進公開 Feed；上次填過的會預填
 //* - 送出後 10 分鐘待公開：顯示倒數，可一鍵取消；演示組織另有「跳過」鍵立即公開
 //* - 已公開：可降回組織成員（降級會從公開 Feed、搜尋、排行移除，非成員的待核可申請自動婉拒）
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useSWRConfig } from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import toast from "react-hot-toast";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Button } from "@/components/ui/button";
 import { hostName, OrgAccess, OrgItem, requestJson } from "@/lib/orgApi";
 import { compactButton } from "@/components/org/OrgShell";
 import { isOrgListingKey } from "@/lib/orgSwrKeys";
+import { PublicListingFields } from "@/components/org/PublicListingFields";
+import {
+  draftFromListing,
+  listingPayload,
+  missingListingFields,
+  type PublicListing,
+  type PublicListingDraft,
+} from "@/lib/publicListing";
 
 function useRemaining(dueAt: string | null): number | null {
   const [now, setNow] = useState(() => Date.now());
@@ -35,7 +45,6 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
   const { mutate } = useSWRConfig();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [disposalConfirmed, setDisposalConfirmed] = useState(false);
   const remaining = useRemaining(item.pendingPublic?.dueAt ?? null);
   const base = `${hostName}/api/orgs/${org.id}/items/${item.id}`;
 
@@ -155,12 +164,70 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
     );
   }
 
+  return (
+    <PublicConfirm
+      item={item}
+      base={base}
+      busy={busy}
+      onCancel={() => setConfirming(false)}
+      onSubmit={async (body) => {
+        const ok = await run(
+          `${base}/pending-public`,
+          { method: "POST", body: JSON.stringify(body) },
+          t("pendingPublicStarted"),
+        );
+        if (ok) setConfirming(false);
+      }}
+    />
+  );
+}
+
+/** 送出待公開前的確認框：財產確認，加上公開資訊（打開時讀目前存的資訊預填） */
+function PublicConfirm({
+  item,
+  base,
+  busy,
+  onCancel,
+  onSubmit,
+}: {
+  item: OrgItem;
+  base: string;
+  busy: boolean;
+  onCancel: () => void;
+  onSubmit: (body: {
+    assetDisposalConfirmed: boolean;
+    listing: NonNullable<ReturnType<typeof listingPayload>>;
+  }) => Promise<void>;
+}) {
+  const t = useTranslations("Org.manage");
+  const apiErrorMessage = useApiErrorMessage();
+  const [disposalConfirmed, setDisposalConfirmed] = useState(false);
+  const [draft, setDraft] = useState<PublicListingDraft | null>(null);
+  //* 欄位元件的 effect 依賴它，要固定參考
+  const updateDraft = useCallback(
+    (update: (prev: PublicListingDraft) => PublicListingDraft) =>
+      setDraft((prev) => (prev ? update(prev) : prev)),
+    [],
+  );
+  //* 按過送出才標出缺的欄位；之後邊填邊更新
+  const [attempted, setAttempted] = useState(false);
+  //* 每次打開都重抓，不沿用快取：別人可能剛改過
+  const { data, error } = useSWR(
+    `${base}/public-listing`,
+    (url) => requestJson<{ listing: PublicListing }>(url),
+    { revalidateOnFocus: false, dedupingInterval: 0 },
+  );
+  useEffect(() => {
+    if (data && draft === null) setDraft(draftFromListing(data.listing));
+  }, [data, draft]);
+  const invalid = attempted && draft ? missingListingFields(draft) : [];
+
   const needsDisposal = item.assetNumber !== null;
   return (
     <div
       role="group"
       aria-label={t("publicConfirmTitle", { title: item.title })}
-      className="w-72 space-y-2 whitespace-normal rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm"
+      className="w-80 space-y-2 whitespace-normal rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm"
     >
       <p className="font-semibold">
         {t("publicConfirmTitle", { title: item.title })}
@@ -169,6 +236,19 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
         <p>{t("publicConfirmAsset", { asset: item.assetNumber })}</p>
       )}
       <p className="text-amber-900/80">{t("publicConfirmBody")}</p>
+      {error ? (
+        <p className="text-red-600">
+          {apiErrorMessage(error, t("publicListingLoadFailed"))}
+        </p>
+      ) : draft ? (
+        <PublicListingFields
+          draft={draft}
+          onChange={updateDraft}
+          invalid={invalid}
+        />
+      ) : (
+        <p className="text-amber-900/60">{t("publicListingLoading")}</p>
+      )}
       {needsDisposal && (
         <label className="flex items-center gap-2 font-medium">
           <input
@@ -183,19 +263,18 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
         <Button
           size="sm"
           className={compactButton}
-          disabled={busy || (needsDisposal && !disposalConfirmed)}
+          disabled={busy || !draft || (needsDisposal && !disposalConfirmed)}
           onClick={async () => {
-            const ok = await run(
-              `${base}/pending-public`,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  assetDisposalConfirmed: needsDisposal && disposalConfirmed,
-                }),
-              },
-              t("pendingPublicStarted"),
-            );
-            if (ok) setConfirming(false);
+            if (!draft) return;
+            const listing = listingPayload(draft);
+            if (!listing) {
+              setAttempted(true);
+              return;
+            }
+            await onSubmit({
+              assetDisposalConfirmed: needsDisposal && disposalConfirmed,
+              listing,
+            });
           }}
         >
           {t("publicConfirmSubmit")}
@@ -205,7 +284,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
           className={compactButton}
           variant="ghost"
           disabled={busy}
-          onClick={() => setConfirming(false)}
+          onClick={onCancel}
         >
           {t("publicConfirmCancel")}
         </Button>

@@ -18,7 +18,29 @@ export interface FakeOrgPostRow {
   condition_level: number;
   created_at: Date;
   deleted_at: Date | null;
+  /** 公開資訊（orgPublicListing）；上架時沒有 */
+  location_id?: number | null;
+  tags?: string | null;
+  expires_at?: Date | null;
 }
+
+/** locations：公開資訊的地點（locationService.findOrCreateLocation） */
+export interface FakeLocationRow {
+  id: number;
+  place_id: string;
+  name: string | null;
+  url: string | null;
+  full_address: string;
+  province: string | null;
+  city: string | null;
+  route: string | null;
+  zip_code: string | null;
+  lat: number;
+  lng: number;
+}
+
+/** categories 裡 active 的 id；其他 id 當作不存在或已停用 */
+const ACTIVE_CATEGORY_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
 
 export interface FakeOrgPostDetailRow {
   post_id: number;
@@ -58,6 +80,7 @@ interface ItemTables {
   details: FakeOrgPostDetailRow[];
   items: FakeItemRow[];
   images: FakeImageRow[];
+  locations: FakeLocationRow[];
 }
 
 export interface FakeOrgItemsDb extends FakeOrgDb, ItemTables {
@@ -82,7 +105,8 @@ export function createFakeOrgItemsDb(
   seed: Parameters<typeof createFakeOrgDb>[0] & { users: FakeUser[] },
 ): FakeOrgItemsDb {
   const base = createFakeOrgDb(seed);
-  const tables: ItemTables = { posts: [], details: [], items: [], images: [] };
+  const tables: ItemTables = { posts: [], details: [], items: [], images: [], locations: [] };
+  let nextLocationId = 900;
   let snapshot: ItemTables | null = null;
   let nextPostId = 1000;
   let nextImageId = 1;
@@ -244,7 +268,7 @@ export function createFakeOrgItemsDb(
     //* 待公開（#140，orgPendingPublicService）
     if (
       sql ===
-      "SELECT p.id, p.org_unit_id, p.audience_tier, d.post_id AS details_post_id, d.asset_number, d.pending_public_due_at, d.pending_public_by FROM posts p LEFT JOIN org_post_details d ON d.post_id = p.id WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL FOR UPDATE"
+      "SELECT p.id, p.org_unit_id, p.audience_tier, p.location_id, p.expires_at, p.category_id, d.post_id AS details_post_id, d.asset_number, d.pending_public_due_at, d.pending_public_by FROM posts p LEFT JOIN org_post_details d ON d.post_id = p.id WHERE p.org_id = ? AND p.public_id = ? AND p.deleted_at IS NULL FOR UPDATE"
     ) {
       const rows = tables.posts
         .filter((p) => p.org_id === params[0] && p.public_id === params[1] && p.deleted_at === null)
@@ -254,6 +278,9 @@ export function createFakeOrgItemsDb(
             id: p.id,
             org_unit_id: p.org_unit_id,
             audience_tier: p.audience_tier,
+            location_id: p.location_id ?? null,
+            expires_at: p.expires_at ?? null,
+            category_id: p.category_id,
             details_post_id: d ? d.post_id : null,
             asset_number: d?.asset_number ?? null,
             pending_public_due_at: d?.pending_public_due_at ?? null,
@@ -273,6 +300,79 @@ export function createFakeOrgItemsDb(
         d.pending_public_by = params[1] == null ? null : Number(params[1]);
       }
       return [{ affectedRows: d ? 1 : 0 }, []];
+    }
+
+    //* 公開資訊（orgPublicListing、locationService）
+    if (sql === "SELECT id FROM categories WHERE id = ? AND status = 'active'") {
+      return [ACTIVE_CATEGORY_IDS.has(Number(params[0])) ? [{ id: Number(params[0]) }] : [], []];
+    }
+
+    if (
+      sql ===
+      "SELECT id, name, url, province, city, route, zip_code, full_address FROM locations WHERE place_id = ?"
+    ) {
+      return [tables.locations.filter((l) => l.place_id === params[0]), []];
+    }
+
+    if (/^INSERT INTO locations \( place_id, name, full_address, province, city, route, zip_code, lat, lng, url \) VALUES/.test(sql)) {
+      const [place_id, name, full_address, province, city, route, zip_code, lat, lng, url] = params;
+      const existing = tables.locations.find((l) => l.place_id === place_id);
+      if (existing) return [{ insertId: existing.id, affectedRows: 0 }, []];
+      const row: FakeLocationRow = {
+        id: nextLocationId++,
+        place_id: String(place_id),
+        name: (name as string | null) ?? null,
+        url: (url as string | null) ?? null,
+        full_address: String(full_address),
+        province: (province as string | null) ?? null,
+        city: (city as string | null) ?? null,
+        route: (route as string | null) ?? null,
+        zip_code: (zip_code as string | null) ?? null,
+        lat: Number(lat),
+        lng: Number(lng),
+      };
+      tables.locations.push(row);
+      return [{ insertId: row.id, affectedRows: 1 }, []];
+    }
+
+    if (sql === "UPDATE posts SET category_id = ?, tags = ?, expires_at = ?, location_id = ? WHERE id = ?") {
+      const p = tables.posts.find((x) => x.id === Number(params[4]));
+      if (p) {
+        p.category_id = Number(params[0]);
+        p.tags = (params[1] as string | null) ?? null;
+        p.expires_at = (params[2] as Date | null) ?? null;
+        p.location_id = params[3] == null ? null : Number(params[3]);
+      }
+      return [{ affectedRows: p ? 1 : 0 }, []];
+    }
+
+    if (
+      sql ===
+      "SELECT p.category_id, p.tags, p.expires_at, l.place_id, l.name, l.url, l.full_address, l.province, l.city, l.route, l.zip_code, l.lat, l.lng FROM posts p LEFT JOIN locations l ON l.id = p.location_id WHERE p.id = ?"
+    ) {
+      const p = tables.posts.find((x) => x.id === Number(params[0]));
+      if (!p) return [[], []];
+      const l = tables.locations.find((x) => x.id === p.location_id);
+      return [
+        [
+          {
+            category_id: p.category_id,
+            tags: p.tags ?? null,
+            expires_at: p.expires_at ?? null,
+            place_id: l?.place_id ?? null,
+            name: l?.name ?? null,
+            url: l?.url ?? null,
+            full_address: l?.full_address ?? null,
+            province: l?.province ?? null,
+            city: l?.city ?? null,
+            route: l?.route ?? null,
+            zip_code: l?.zip_code ?? null,
+            lat: l?.lat ?? null,
+            lng: l?.lng ?? null,
+          },
+        ],
+        [],
+      ];
     }
 
     const list = sql.match(LIST_ITEMS);
@@ -343,6 +443,7 @@ export function createFakeOrgItemsDb(
     details: { get: () => tables.details },
     items: { get: () => tables.items },
     images: { get: () => tables.images },
+    locations: { get: () => tables.locations },
   });
   db.connection = {
     ...baseConnection,
@@ -354,6 +455,7 @@ export function createFakeOrgItemsDb(
         details: tables.details.map((r) => ({ ...r })),
         items: tables.items.map((r) => ({ ...r })),
         images: tables.images.map((r) => ({ ...r })),
+        locations: tables.locations.map((r) => ({ ...r })),
       };
       await baseConnection.beginTransaction();
     },

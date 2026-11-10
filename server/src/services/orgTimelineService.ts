@@ -68,7 +68,11 @@ export interface HandedOverEntry extends TimelineEntryBase {
 
 /** 待公開期（#140）：送出（含財產處分確認）、取消、演示組織跳過；正式公開另有 tier_changed */
 export interface PendingPublicEntry extends TimelineEntryBase {
-  kind: "public_pending_started" | "public_pending_cancelled" | "public_pending_skipped";
+  kind:
+    | "public_pending_started"
+    | "public_pending_cancelled"
+    | "public_pending_skipped"
+    | "public_pending_blocked";
   assetDisposalConfirmed: boolean;
 }
 

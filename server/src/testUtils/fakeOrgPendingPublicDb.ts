@@ -8,7 +8,7 @@ export interface FakePendingPublicEventRow {
   id: number;
   post_id: number;
   org_id: number;
-  action: "started" | "cancelled" | "skipped";
+  action: "started" | "cancelled" | "skipped" | "blocked";
   asset_disposal_confirmed: number;
   actor_user_id: number;
   created_at: Date;

@@ -24,10 +24,9 @@ jest.mock("./utils/db", () => ({
   },
 }));
 
-jest.mock("./session", () => ({
-  getUserFromCookie: jest.fn(),
-  updateUserSession: jest.fn(),
-}));
+jest.mock("./session", () =>
+  jest.requireActual("./testUtils/mockSessionModule").mockSessionModule(),
+);
 
 jest.mock("./utils/redis", () => ({
   getRedisClient: jest.fn(() => ({ isOpen: true, isReady: true })),

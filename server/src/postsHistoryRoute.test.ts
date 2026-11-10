@@ -30,10 +30,9 @@ jest.mock("./services/postService", () => ({
   },
 }));
 
-jest.mock("./session", () => ({
-  getUserFromCookie: jest.fn(),
-  updateUserSession: jest.fn(),
-}));
+jest.mock("./session", () =>
+  jest.requireActual("./testUtils/mockSessionModule").mockSessionModule(),
+);
 
 jest.mock("./queue/queues", () => ({
   enqueueUserVectorUpdate: jest.fn().mockResolvedValue(true),

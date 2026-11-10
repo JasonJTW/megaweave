@@ -37,9 +37,11 @@ test.describe("Unit Contact lists an org item", () => {
     expect(signin.ok(), await signin.text()).toBeTruthy();
 
     await page.goto("/org");
+    //* 標題是頁名「物品」，組織名稱在頁籤上方的「組織」那一行（與其他組織頁一致）
     await expect(
-      page.getByRole("heading", { level: 1, name: "E2E Org", exact: true }),
+      page.getByRole("heading", { level: 1, name: "物品", exact: true }),
     ).toBeVisible();
+    await expect(page.getByText("E2E Org", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "上架物品" }).click();
     await expect(page).toHaveURL(/\/org\/items\/new\?org=/);
 

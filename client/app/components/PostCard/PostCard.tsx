@@ -1,12 +1,7 @@
 // PostCard.tsx 重點改寫
 "use client";
 import { Badge } from "@/components/ui/badge";
-import {
-  imageRetryReducer,
-  initialImageRetry,
-  isWaitingToRetry,
-  retryDelayMs,
-} from "@/utils/imageRetry";
+import { useImageWithRetry } from "@/hooks/useImageWithRetry";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import {
   getPostDistance,
@@ -32,36 +27,6 @@ import ShareBadgeIcon from "../icons/ShareBadgeIcon";
 import SeekBadgeIcon from "../icons/WishBadgeIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDisplayName } from "@/hooks/useDisplayName";
-
-// ─── Image Retry Hook (Exponential Backoff, see utils/imageRetry) ─────────────
-function useImageWithRetry(
-  primarySrc: string | undefined,
-  fallbackSrc: string | undefined,
-) {
-  const [state, dispatch] = React.useReducer(
-    imageRetryReducer,
-    initialImageRetry(primarySrc, fallbackSrc),
-  );
-
-  // 當 primarySrc 變更（例如切換貼文）時，重置所有狀態
-  React.useEffect(() => {
-    dispatch({ type: "reset", primarySrc, fallbackSrc });
-  }, [primarySrc, fallbackSrc]);
-
-  // 等待退避時間後重試縮圖；unmount 或狀態改變時清除計時器
-  const waiting = isWaitingToRetry(state);
-  const delay = retryDelayMs(state);
-  React.useEffect(() => {
-    if (!waiting) return;
-    const timer = setTimeout(() => dispatch({ type: "retry" }), delay);
-    return () => clearTimeout(timer);
-  }, [waiting, delay]);
-
-  const onError = React.useCallback(() => dispatch({ type: "error" }), []);
-  const onLoad = React.useCallback(() => dispatch({ type: "load" }), []);
-
-  return { src: state.src, status: state.status, onError, onLoad };
-}
 
 interface PostCardProps {
   post: Post;

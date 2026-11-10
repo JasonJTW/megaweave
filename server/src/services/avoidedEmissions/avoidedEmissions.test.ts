@@ -128,7 +128,7 @@ describe("factor derivation", () => {
 
   it("normalises BOM shares that do not add up to 100 (WRAP sofa sums to 101%)", () => {
     const expected =
-      (63 * 1.12 + 9 * 1.95 + 8 * 4.42 + 8 * 2.5 + 3 * 4.45) / 101;
+      (63 * 1.12 + 9 * 5.211 + 8 * 4.42 + 8 * 2.5 + 3 * 4.45) / 101;
     expect(getProductionFactor("upholstered_seating").kgCO2ePerKg).toBeCloseTo(
       expected,
       10,
@@ -150,7 +150,7 @@ describe("factor derivation", () => {
   it("takes the lower of the material BOM and the reference EPD average", () => {
     const chair = getProductionFactor("office_chair");
     expect(chair.basis).toBe("material_bom");
-    expect(chair.kgCO2ePerKg).toBeCloseTo(3.441, 3);
+    expect(chair.kgCO2ePerKg).toBeCloseTo(3.594, 3);
     expect(chair.referenceEpdKgCO2ePerKg).toBeCloseTo(
       (74.1 + 58.0 + 142 + 79.4 + 76.8 + 105.3 + 88.3 + 81.9 + 99.7) /
         (13.787 + 20.63 + 19.0 + 20.03 + 17.77 + 17.033 + 15.34 + 14.9 + 19.71),
@@ -166,7 +166,7 @@ describe("factor derivation", () => {
 
     const desk = getProductionFactor("desk_table");
     expect(desk.basis).toBe("reference_epd");
-    expect(desk.materialBomKgCO2ePerKg).toBeCloseTo(1.971, 3);
+    expect(desk.materialBomKgCO2ePerKg).toBeCloseTo(1.98, 3);
     expect(desk.kgCO2ePerKg).toBeCloseTo(60.0 / 37.4, 10);
 
     const storage = getProductionFactor("steel_storage");

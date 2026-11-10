@@ -257,6 +257,42 @@ describe("POST /api/weaves on an org item: items and quantities", () => {
 
     expect(weaveRow(weaveId).status).toBe("completed");
     expect(fakeDb.items.find((i) => i.id === itemId)!.quantity).toBe(MONITOR.quantity - 2);
+    expect(fakeDb.items.find((i) => i.id === itemId)!.reserved_quantity).toBe(0);
+  });
+
+  //* 核准即預留：兩筆申請搶同一批庫存時，後核准的那筆會被擋下，直到前一筆取消
+  it("reserves stock on approval, so a second approval can't take the same pieces", async () => {
+    const { postId, itemId } = await listInternalItem();
+    const ask = async (userId: number) => {
+      signInAs(userId);
+      const res = await api()
+        .post("/api/weaves")
+        .send({ postId, items: [{ itemId, quantity: 2 }], actingUnitId: IT_DEPT });
+      expect(res.status).toBe(201);
+      return res.body.weaveId as number;
+    };
+    const setStatus = (userId: number, weaveId: number, status: string) => {
+      signInAs(userId);
+      return api().patch(`/api/weaves/${weaveId}/status`).send({ status });
+    };
+    const first = await ask(IT_CONTACT);
+    const second = await ask(ADMIN_IT_CONTACT);
+    const item = () => fakeDb.items.find((i) => i.id === itemId)!;
+
+    expect((await setStatus(GA_CONTACT, first, "approved")).status).toBe(200);
+    expect(item().reserved_quantity).toBe(2);
+
+    const blocked = await setStatus(GA_CONTACT, second, "approved");
+    expect(blocked.status).toBe(400);
+    expect(blocked.body.code).toBe("INSUFFICIENT_STOCK");
+    expect(blocked.body.params).toMatchObject({ available: MONITOR.quantity - 2 });
+    expect(weaveRow(second).status).toBe("requested");
+
+    expect((await setStatus(IT_CONTACT, first, "cancelled")).status).toBe(200);
+    expect(item().reserved_quantity).toBe(0);
+    expect((await setStatus(GA_CONTACT, second, "approved")).status).toBe(200);
+    expect(item().reserved_quantity).toBe(2);
+    expect(item().quantity).toBe(MONITOR.quantity);
   });
 });
 

@@ -75,8 +75,11 @@ const connection = {
 };
 
 interface DbOptions {
-  /** weave_items 請求數量 vs items 現有庫存；省略代表 All-items weave */
-  stock?: { requested: number; available: number };
+  /**
+   * weave_items 請求數量 vs items 手上庫存（onHand）與已預留數量（reserved，預設 0）；
+   * 省略代表 All-items weave
+   */
+  stock?: { requested: number; onHand: number; reserved?: number };
   /** 對方是否已確認（false → 本次為單邊確認） */
   bothConfirmed?: boolean;
 }
@@ -93,7 +96,16 @@ function setupDb(
       return [stock ? [{ item_id: 500, quantity: stock.requested }] : []];
     if (sql.includes("FROM items"))
       return [
-        stock ? [{ id: 500, title: "Bottle", quantity: stock.available }] : [],
+        stock
+          ? [
+              {
+                id: 500,
+                title: "Bottle",
+                quantity: stock.onHand,
+                reserved_quantity: stock.reserved ?? 0,
+              },
+            ]
+          : [],
       ];
     if (sql.includes("FOR UPDATE")) return [[row]];
     if (sql.includes("giver_confirmed, receiver_confirmed"))
@@ -301,10 +313,10 @@ describe("approveWeave post-commit failures", () => {
 describe("approveWeave inventory checks", () => {
   const sqls = () => connection.execute.mock.calls.map((c) => c[0] as string);
   const deducted = () =>
-    sqls().some((q) => q.includes("UPDATE items SET quantity = quantity - ?"));
+    sqls().some((q) => q.includes("SET quantity = quantity - ?"));
 
   it("approve (requested -> approved) rejects when stock is already short", async () => {
-    setupDb("share", "requested", { stock: { requested: 3, available: 2 } });
+    setupDb("share", "requested", { stock: { requested: 3, onHand: 2 } });
     await expect(run("author", "approved")).rejects.toMatchObject({
       httpStatus: 400,
     });
@@ -312,9 +324,81 @@ describe("approveWeave inventory checks", () => {
     expect(connection.commit).not.toHaveBeenCalled();
   });
 
+  const reserved = () =>
+    sqls().some((q) =>
+      q.includes("SET reserved_quantity = reserved_quantity + ?"),
+    );
+  const released = () =>
+    sqls().some((q) => q.includes("GREATEST(reserved_quantity - ?, 0)"));
+
+  it("approve locks the item and reserves the requested quantity", async () => {
+    setupDb("share", "requested", { stock: { requested: 3, onHand: 5 } });
+    await run("author", "approved");
+    const lockIdx = sqls().findIndex(
+      (q) => q.includes("FROM items") && q.includes("FOR UPDATE"),
+    );
+    const reserveIdx = sqls().findIndex((q) =>
+      q.includes("SET reserved_quantity = reserved_quantity + ?"),
+    );
+    expect(lockIdx).toBeGreaterThan(-1);
+    expect(reserveIdx).toBeGreaterThan(lockIdx);
+    expect(deducted()).toBe(false);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("approve rejects when other approved weaves already reserved the stock", async () => {
+    setupDb("share", "requested", {
+      stock: { requested: 3, onHand: 5, reserved: 3 },
+    });
+    const err = await run("author", "approved").catch((e) => e);
+    expect(err).toBeInstanceOf(WeaveError);
+    expect((err as WeaveError).code).toBe("INSUFFICIENT_STOCK");
+    expect((err as WeaveError).params).toMatchObject({ available: 2 });
+    expect(reserved()).toBe(false);
+    expect(sqls().some((q) => q.includes("SET status = 'approved'"))).toBe(
+      false,
+    );
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
+  it("cancel in Approved stage releases the reservation", async () => {
+    setupDb("share", "approved", {
+      stock: { requested: 3, onHand: 5, reserved: 3 },
+    });
+    await run("author", "cancelled");
+    expect(released()).toBe(true);
+    expect(deducted()).toBe(false);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("partial confirm does not count the weave's own reservation as short", async () => {
+    setupDb("share", "approved", {
+      stock: { requested: 3, onHand: 3, reserved: 3 },
+      bothConfirmed: false,
+    });
+    await expect(run("author", "completed")).resolves.toBeDefined();
+    expect(deducted()).toBe(false);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
+  it("final confirm deducts the stock and releases the reservation together", async () => {
+    setupDb("share", "approved", {
+      stock: { requested: 3, onHand: 3, reserved: 3 },
+    });
+    await run("author", "completed");
+    expect(
+      sqls().some(
+        (q) =>
+          q.includes("SET quantity = quantity - ?") &&
+          q.includes("GREATEST(reserved_quantity - ?, 0)"),
+      ),
+    ).toBe(true);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+
   it("partial confirm rejects early when stock is short, without deducting", async () => {
     setupDb("share", "approved", {
-      stock: { requested: 3, available: 2 },
+      stock: { requested: 3, onHand: 2 },
       bothConfirmed: false,
     });
     await expect(run("author", "completed")).rejects.toMatchObject({
@@ -325,7 +409,7 @@ describe("approveWeave inventory checks", () => {
   });
 
   it("final confirm locks items FOR UPDATE and deducts when stock is enough", async () => {
-    setupDb("share", "approved", { stock: { requested: 2, available: 2 } });
+    setupDb("share", "approved", { stock: { requested: 2, onHand: 2 } });
     await expect(run("author", "completed")).resolves.toMatchObject({
       fullyCompleted: true,
     });
@@ -333,7 +417,7 @@ describe("approveWeave inventory checks", () => {
       (q) => q.includes("FROM items") && q.includes("FOR UPDATE"),
     );
     const deductIdx = sqls().findIndex((q) =>
-      q.includes("UPDATE items SET quantity = quantity - ?"),
+      q.includes("SET quantity = quantity - ?"),
     );
     expect(lockIdx).toBeGreaterThan(-1);
     expect(deductIdx).toBeGreaterThan(lockIdx);
@@ -341,7 +425,7 @@ describe("approveWeave inventory checks", () => {
   });
 
   it("final confirm with insufficient stock rolls back and stays approved", async () => {
-    setupDb("share", "approved", { stock: { requested: 3, available: 2 } });
+    setupDb("share", "approved", { stock: { requested: 3, onHand: 2 } });
     const err = await run("author", "completed").catch((e) => e);
     expect(err).toBeInstanceOf(WeaveError);
     expect((err as WeaveError).httpStatus).toBe(400);

@@ -409,7 +409,7 @@ async function queryItemRows(
             d.org_category, d.quantity, d.unit_weight_kg, d.weight_is_default,
             d.asset_number, d.estimated_value_twd, d.auto_release_override, d.auto_release_days, d.pending_public_due_at,
             (SELECT GROUP_CONCAT(i.s3_key ORDER BY i.id) FROM images i WHERE i.post_id = p.id) AS s3_keys,
-            (SELECT SUM(it.quantity) FROM items it WHERE it.post_id = p.id) AS remaining_quantity,
+            (SELECT SUM(GREATEST(it.quantity - it.reserved_quantity, 0)) FROM items it WHERE it.post_id = p.id) AS remaining_quantity,
             (SELECT COUNT(*) FROM weaves w WHERE w.post_id = p.id AND w.status = 'requested') AS pending_request_count
      FROM posts p
      JOIN org_units u ON u.id = p.org_unit_id

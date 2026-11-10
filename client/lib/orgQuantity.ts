@@ -1,4 +1,5 @@
-//* 組織物品的數量要怎麼顯示：remainingQuantity 是還能領的數量（交織完成時扣減），
+//* 組織物品的數量要怎麼顯示：remainingQuantity 是還能領的數量（交織核准時預留、完成時扣減，
+//* 已預留的不算），
 //* quantity 是上架登記的總數（報表用，不會變）。純函式，元件只負責排版
 
 interface QuantityFields {

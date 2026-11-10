@@ -3,7 +3,7 @@
 // 對外介面：requestWeave() 和 approveWeave()
 
 import { RowDataPacket, ResultSetHeader } from "mysql2";
-import { Pool, PoolConnection } from "mysql2/promise";
+import { PoolConnection } from "mysql2/promise";
 import { Server } from "socket.io";
 import dbPool from "./db";
 import { acquireConnection } from "./acquireConnection";
@@ -150,17 +150,37 @@ async function validatePost(
 }
 
 /**
- * 軟檢查：庫存是否足夠（無鎖，只做早期回饋；真正保證在 deductInventory）
+ * 庫存模型（migration 2026-11-13-add-item-reserved-quantity）：
+ * - items.quantity：還沒交出去的庫存，交織完成才扣
+ * - items.reserved_quantity：其中已被 Approved 交織預留的數量
+ * - 可申請數量 = quantity - reserved_quantity
+ * 預留的增減都在 items 列的 FOR UPDATE 鎖底下做，兩筆核准搶同一批庫存時會排隊
+ */
+function availableOf(row: RowDataPacket): number {
+  return Math.max(0, Number(row.quantity) - Number(row.reserved_quantity));
+}
+
+function insufficientStock(title: string, requested: number, available: number) {
+  return new WeaveError(
+    400,
+    "INSUFFICIENT_STOCK",
+    `Insufficient stock for "${title}": requested ${requested}, available ${available}`,
+    { title, available },
+  );
+}
+
+/**
+ * 軟檢查：送出申請時，數量是否超過可申請數量（扣掉已預留的；無鎖，只做早期回饋，
+ * 真正保證在 reserveInventory）
  */
 async function validateItems(
   items: Array<{ itemId: number | null; quantity: number }>,
   postId: number,
-  db: Pool | PoolConnection = dbPool,
 ): Promise<void> {
   for (const item of items) {
     if (!item.itemId) continue;
-    const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT quantity, title FROM items WHERE id = ? AND post_id = ?`,
+    const [rows] = await dbPool.execute<RowDataPacket[]>(
+      `SELECT quantity, reserved_quantity, title FROM items WHERE id = ? AND post_id = ?`,
       [item.itemId, postId],
     );
     if (rows.length === 0)
@@ -169,13 +189,9 @@ async function validateItems(
         "ITEM_UNAVAILABLE",
         `Item ${item.itemId} does not exist in this post`,
       );
-    if (rows[0].quantity < item.quantity)
-      throw new WeaveError(
-        400,
-        "INSUFFICIENT_STOCK",
-        `Requested quantity (${item.quantity}) exceeds available stock (${rows[0].quantity}) for "${rows[0].title}"`,
-        { title: rows[0].title, available: Number(rows[0].quantity) },
-      );
+    const available = availableOf(rows[0]);
+    if (available < item.quantity)
+      throw insufficientStock(rows[0].title, item.quantity, available);
   }
 }
 
@@ -197,19 +213,19 @@ async function getWeaveStockItems(
 }
 
 /**
- * 硬檢查 + 扣庫存：FOR UPDATE 鎖住 items 列後再比對，避免多筆 Weave 同時完成而扣成負數。
- * 不足時拋 WeaveError(400)，由呼叫端 rollback（Weave 維持 approved，雙方可再溝通）。
+ * 鎖住這筆 Weave 的 items 列（依 id 排序，避免多筆交易互鎖）。
+ * 品項已被刪除（貼文編輯會重建 items）時，weave_items.item_id 已是 NULL，不會出現在這裡
  */
-async function deductInventory(
+async function lockWeaveStock(
   connection: PoolConnection,
   weaveId: string | number,
-): Promise<void> {
+) {
   const items = await getWeaveStockItems(connection, weaveId);
-  if (items.length === 0) return;
+  if (items.length === 0) return [];
 
   const ids = items.map((it) => it.itemId);
   const [stockRows] = await connection.execute<RowDataPacket[]>(
-    `SELECT id, title, quantity FROM items
+    `SELECT id, title, quantity, reserved_quantity FROM items
      WHERE id IN (${ids.map(() => "?").join(", ")})
      ORDER BY id
      FOR UPDATE`,
@@ -217,7 +233,7 @@ async function deductInventory(
   );
   const stockById = new Map(stockRows.map((r) => [Number(r.id), r]));
 
-  for (const item of items) {
+  return items.map((item) => {
     const stock = stockById.get(item.itemId);
     if (!stock)
       throw new WeaveError(
@@ -225,19 +241,72 @@ async function deductInventory(
         "ITEM_UNAVAILABLE",
         `Item ${item.itemId} is no longer available`,
       );
-    if (Number(stock.quantity) < item.quantity)
-      throw new WeaveError(
-        400,
-        "INSUFFICIENT_STOCK",
-        `Insufficient stock for "${stock.title}": requested ${item.quantity}, available ${stock.quantity}`,
-        { title: stock.title, available: Number(stock.quantity) },
-      );
-  }
+    return { ...item, stock };
+  });
+}
 
-  for (const item of items) {
+/**
+ * 核准時預留：可申請數量（扣掉其他已核准的）不夠就拋 INSUFFICIENT_STOCK，由呼叫端 rollback，
+ * Weave 維持 requested
+ */
+async function reserveInventory(
+  connection: PoolConnection,
+  weaveId: string | number,
+): Promise<void> {
+  const items = await lockWeaveStock(connection, weaveId);
+  for (const { stock, quantity } of items) {
+    const available = availableOf(stock);
+    if (available < quantity)
+      throw insufficientStock(stock.title, quantity, available);
+  }
+  for (const { itemId, quantity } of items) {
     await connection.execute(
-      `UPDATE items SET quantity = quantity - ? WHERE id = ?`,
-      [item.quantity, item.itemId],
+      `UPDATE items SET reserved_quantity = reserved_quantity + ? WHERE id = ?`,
+      [quantity, itemId],
+    );
+  }
+}
+
+/** 已核准的 Weave 取消：把預留還回去 */
+async function releaseInventory(
+  connection: PoolConnection,
+  weaveId: string | number,
+): Promise<void> {
+  const items = await lockWeaveStock(connection, weaveId);
+  for (const { itemId, quantity } of items) {
+    await connection.execute(
+      `UPDATE items SET reserved_quantity = GREATEST(reserved_quantity - ?, 0) WHERE id = ?`,
+      [quantity, itemId],
+    );
+  }
+}
+
+/** 已核准的 Weave：預留已含在 reserved_quantity，只需確認手上庫存還夠 */
+function assertOnHand(
+  items: Awaited<ReturnType<typeof lockWeaveStock>>,
+): void {
+  for (const { stock, quantity } of items) {
+    if (Number(stock.quantity) < quantity)
+      throw insufficientStock(stock.title, quantity, Number(stock.quantity));
+  }
+}
+
+/**
+ * 完成時扣庫存並釋放預留。核准時已預留，正常不會不足；不足只會發生在核准後
+ * 庫存被改小，此時拋 INSUFFICIENT_STOCK，由呼叫端 rollback（Weave 維持 approved，雙方可再溝通）
+ */
+async function deductInventory(
+  connection: PoolConnection,
+  weaveId: string | number,
+): Promise<void> {
+  const items = await lockWeaveStock(connection, weaveId);
+  assertOnHand(items);
+  for (const { itemId, quantity } of items) {
+    await connection.execute(
+      `UPDATE items
+       SET quantity = quantity - ?, reserved_quantity = GREATEST(reserved_quantity - ?, 0)
+       WHERE id = ?`,
+      [quantity, quantity, itemId],
     );
   }
 }
@@ -245,7 +314,7 @@ async function deductInventory(
 /**
  * 這筆交織是否等於「整篇貼文的全部物品」：沒指定物品，或每一種物品都選了而且數量拿滿。
  * 只有一種物品的貼文選 2 張（剩 5 張）不算全部。
- * 庫存在完成交織時才扣，所以送出請求當下 `postItems` 的數量就是可領的數量。
+ * `postItems` 的數量要傳可申請數量（quantity - reserved_quantity），不是手上庫存。
  */
 export function isWholePostRequest(
   items: Array<{ itemId: number | null; quantity: number }>,
@@ -269,7 +338,7 @@ async function buildSystemMessageMeta(
   postOwnerId: number,
 ) {
   const [postItems] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT id, title, quantity FROM items WHERE post_id = ?`,
+    `SELECT id, title, quantity, reserved_quantity FROM items WHERE post_id = ?`,
     [postId],
   );
 
@@ -277,7 +346,7 @@ async function buildSystemMessageMeta(
     items,
     postItems.map((pi) => ({
       id: Number(pi.id),
-      quantity: Number(pi.quantity),
+      quantity: availableOf(pi),
     })),
   );
 
@@ -752,11 +821,7 @@ export async function approveWeave(
             "FORBIDDEN",
             "Only post author can approve",
           );
-        await validateItems(
-          await getWeaveStockItems(connection, weaveId),
-          weave.post_id,
-          connection,
-        );
+        await reserveInventory(connection, weaveId);
         await connection.execute(
           `UPDATE weaves SET status = 'approved' WHERE id = ?`,
           [weaveId],
@@ -791,6 +856,7 @@ export async function approveWeave(
       }
     } else if (weave.status === "approved") {
       if (newStatus === "cancelled") {
+        await releaseInventory(connection, weaveId);
         await connection.execute(
           `UPDATE weaves SET status = 'cancelled' WHERE id = ?`,
           [weaveId],
@@ -819,12 +885,8 @@ export async function approveWeave(
           );
           orgEventAction = "completed";
         } else {
-          // 單邊確認不扣庫存，先做軟檢查提早告知庫存不足
-          await validateItems(
-            await getWeaveStockItems(connection, weaveId),
-            weave.post_id,
-            connection,
-          );
+          // 單邊確認不扣庫存；核准後庫存若被改小，先提早告知不足
+          assertOnHand(await lockWeaveStock(connection, weaveId));
           isPartialConfirm = true;
           orgEventAction = "confirmed";
         }

@@ -174,13 +174,18 @@ async function startServer() {
       );
     });
 
+    let shuttingDown = false;
     const shutdown = async (signal: string) => {
+      //* 第二次收到訊號（例如再按一次 Ctrl+C）就不再等，直接結束；
+      //* 不然每按一次都重跑一次 server.close，掛上一堆 close listener
+      if (shuttingDown) {
+        console.error(`\n${signal} received again, exiting now`);
+        process.exit(1);
+      }
+      shuttingDown = true;
       console.log(`\n${signal} received, shutting down gracefully...`);
 
-      //* Close Socket.IO server
-      io.close();
-
-      // 1. 停止接受新請求
+      // 1. 停止接受新請求；server.close 要等每條連線都結束才會回呼
       server.close(async () => {
         console.log("✅ server closed");
 
@@ -215,6 +220,12 @@ async function startServer() {
           process.exit(1);
         }
       });
+
+      //* 瀏覽器的 keep-alive 連線與 Socket.IO 的 WebSocket 不會自己斷，server.close 會一直等到逾時：
+      //* 先斷閒置連線、關掉 Socket.IO（斷開所有 socket），留 5 秒讓進行中的請求回完，再強制斷掉剩下的
+      server.closeIdleConnections();
+      void io.close();
+      setTimeout(() => server.closeAllConnections(), 5000).unref();
 
       // 如果 30 秒內還沒關閉，強制退出
       setTimeout(() => {

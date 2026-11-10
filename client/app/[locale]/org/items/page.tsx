@@ -10,7 +10,7 @@
 //* 去向與時間軸（#141，E9-1、E9-3）：每件物品交給了哪個單位或個人；展開看從上架到交接完成的每一步
 //* 版面：一列一件物品，單位、財產編號、狀態收在名稱下方；數量格大字是剩幾件，小字是共幾件與單件重量；
 //* 申請與時間軸展開在下一列。窄螢幕時表格在自己的框裡橫向捲動，物品欄固定在左側
-import { Fragment, Suspense, useState, type ReactNode } from "react";
+import { Fragment, Suspense, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import useSWR, { useSWRConfig } from "swr";
 import toast from "react-hot-toast";
@@ -51,6 +51,7 @@ import {
   useSelectedOrg,
 } from "@/lib/orgApi";
 import { isOrgListingKey, orgItemsKey } from "@/lib/orgSwrKeys";
+import { quantityCellText } from "@/lib/orgQuantity";
 
 const ALL = "all";
 
@@ -549,40 +550,22 @@ function ItemRow({
   );
 }
 
-//* 數量欄：大字是還能領的數量（剩 2／已領完），小字是上架登記的總數與每件重量。
-//* 剩餘與總數相同時只寫「5 件」，免得還沒人領就出現「剩 5」
+//* 數量欄：大字是還能領的數量（剩 2／已領完），小字是上架登記的總數與每件重量（規則見 lib/orgQuantity）
 function QuantityCell({ item }: { item: OrgItem }) {
   const t = useTranslations("Org.manage");
-  const { quantity, remainingQuantity: remaining } = item;
-  const perPiece =
-    item.unitWeightKg !== null
-      ? t("perPieceKg", { kg: item.unitWeightKg })
-      : null;
-
-  let main: ReactNode;
-  let total: string | null = null;
-  if (remaining === null || quantity === null || remaining === quantity) {
-    const shown = remaining ?? quantity;
-    main =
-      shown === null ? (
-        <span className="text-muted-foreground">—</span>
-      ) : (
-        t("pieces", { count: shown })
-      );
-  } else if (remaining === 0) {
-    main = <span className="text-muted-foreground">{t("allTaken")}</span>;
-    total = t("listedTotal", { count: quantity });
-  } else {
-    main = t("remaining", { count: remaining });
-    total = t("listedTotal", { count: quantity });
-  }
-
-  const detail = [total, perPiece].filter(Boolean).join(" · ");
+  const { main, muted, detail } = quantityCellText(item, t);
   return (
     <>
-      <span className="text-base font-semibold text-dark">{main}</span>
+      <span
+        className={cn(
+          "text-base font-semibold",
+          main === null || muted ? "text-muted-foreground" : "text-dark",
+        )}
+      >
+        {main ?? "—"}
+      </span>
       <span className="mt-1 block text-xs text-muted-foreground">
-        {detail || "—"}
+        {detail ?? "—"}
       </span>
     </>
   );

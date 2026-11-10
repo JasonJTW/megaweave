@@ -225,6 +225,13 @@ export interface OrgReport {
       locator: string;
       source: { title: string; url: string };
     };
+    /** 壽命比 L：二手使用年限 ÷ 新品使用年限 */
+    lifetimeRatio: {
+      value: number;
+      status: "assumed" | "surveyed";
+      locator: string;
+      source: { title: string; url: string };
+    };
     countedQuantity: number;
     uncountedQuantity: number;
     byCategory: {

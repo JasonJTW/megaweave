@@ -3,6 +3,7 @@ import path from "path";
 import {
   CATEGORIES,
   CATEGORY_IDS,
+  DEFAULT_LIFETIME_RATIO,
   DEFAULT_REPLACEMENT_RATE,
   FACTOR_TABLE_VERSION,
   MATERIAL_FACTORS,
@@ -221,10 +222,47 @@ describe("estimateItem", () => {
     expect(result.weightSource).toBe("entered");
     expect(result.weightKg).toBe(60);
     expect(result.potentialKgCO2e).toBeCloseTo(60 * factor, 10);
+    expect(result.lifetimeRatio).toBe(DEFAULT_LIFETIME_RATIO.value);
     expect(result.estimatedKgCO2e).toBeCloseTo(
-      60 * factor * DEFAULT_REPLACEMENT_RATE.value,
+      60 *
+        factor *
+        DEFAULT_REPLACEMENT_RATE.value *
+        DEFAULT_LIFETIME_RATIO.value,
       10,
     );
+  });
+
+  it("defaults the lifetime ratio to 1 (WRAP 2011 like-for-like)", () => {
+    expect(DEFAULT_LIFETIME_RATIO).toMatchObject({
+      value: 1,
+      status: "assumed",
+      sourceId: "wrap-2011-furniture",
+    });
+  });
+
+  it("multiplies the estimate by a given lifetime ratio", () => {
+    const result = estimateItem(
+      { categoryId: "office_chair", quantity: 1, unitWeightKg: 10 },
+      { lifetimeRatios: { office_chair: 0.5 } },
+    );
+    expect(result.lifetimeRatio).toBe(0.5);
+    expect(result.potentialKgCO2e).toBeCloseTo(
+      10 * getProductionFactor("office_chair").kgCO2ePerKg!,
+      10,
+    );
+    expect(result.estimatedKgCO2e).toBeCloseTo(
+      result.potentialKgCO2e * DEFAULT_REPLACEMENT_RATE.value * 0.5,
+      10,
+    );
+  });
+
+  it.each([0, 1.1, Number.NaN])("rejects a lifetime ratio of %p", (ratio) => {
+    expect(() =>
+      estimateItem(
+        { categoryId: "office_chair", quantity: 1 },
+        { lifetimeRatios: { office_chair: ratio } },
+      ),
+    ).toThrow(RangeError);
   });
 
   it("falls back to the category default weight", () => {

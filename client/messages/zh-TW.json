@@ -1495,8 +1495,8 @@
     "emissionsHeading": "估算重量、價值與避免排放量",
     "emissionsScope": "只計已完成交接的物品，每次交接算一次。",
     "estimatedKg": "估算避免排放量",
-    "estimatedKgHint": "理想值 × 取代率 R（{rate}）",
-    "potentialKg": "理想值（R = 1）",
+    "estimatedKgHint": "理想值 × 取代率 R（{rate}）× 壽命比 L（{lifetime}）",
+    "potentialKg": "理想值（R = 1、L = 1）",
     "potentialKgHint": "假設每件都取代一件新品",
     "kgCO2e": "{value} kgCO2e",
     "kg": "{value} 公斤",
@@ -1508,6 +1508,12 @@
     "replacementRate": "取代率 R",
     "replacementRateValue": "{rate}（{status}）",
     "replacementRateSource": "來源",
+    "lifetimeRatio": "壽命比 L（二手使用年限 ÷ 新品使用年限）",
+    "lifetimeRatioValue": "{ratio}（{status}）",
+    "lifetimeStatus": {
+      "assumed": "假設二手與新品用得一樣久，尚未實測",
+      "surveyed": "問卷實測"
+    },
     "rateStatus": {
       "assumed": "假設值，尚未以本平台問卷實測",
       "surveyed": "問卷實測"
@@ -1517,7 +1523,7 @@
     "uncounted": "不計入件數（類別無係數或缺重量）",
     "formulaHeading": "計算方法",
     "formulaPotential": "理想值 = 重量（公斤）× 類別新品生產排放係數（kgCO2e／公斤）",
-    "formulaEstimated": "估算避免排放量 = 理想值 × 取代率 R",
+    "formulaEstimated": "估算避免排放量 = 理想值 × 取代率 R × 壽命比 L",
     "formulaFactor": "家具類係數取「材質組成 × 環境部材質係數」與「參考產品 EPD 平均」兩者較低者；電子產品用 US EPA WARM 產品係數；找不到可引用係數的類別不計入。",
     "byCategoryHeading": "各類別",
     "colCategory": "類別",
@@ -1540,7 +1546,7 @@
       "material_bom": "採材質組成（較低）",
       "reference_epd": "採參考產品 EPD（較低）"
     },
-    "footnote": "本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 {version}。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。「待實現的避免排放量」是預估值，物品不一定會被接手，不得用於任何對外主張。",
+    "footnote": "本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測），且二手品與新品的使用年限相同（壽命比 L = 1，WRAP 2011 預設值，尚未實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 {version}。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。「待實現的避免排放量」是預估值，物品不一定會被接手，不得用於任何對外主張。",
     "colUnitEstimatedShort": "流出的避免排放量（kgCO2e）",
     "factorsSummary": "{count} 個類別的新品排放係數、計算方法與引用來源。",
     "unrealizedLabel": "待實現的避免排放量",
@@ -1548,7 +1554,7 @@
     "unrealizedNone": "架上沒有尚未交接的物品。",
     "unrealizedUncounted": "其中 {count} 件類別無係數或缺重量，未計入。",
     "unrealizedValue": "+{value} kgCO2e",
-    "formulaUnrealized": "待實現 = 在架物品剩下的件數（目前庫存與「上架件數 − 已交接件數」取較小者）× 單件重量 × 係數 × 取代率 R"
+    "formulaUnrealized": "待實現 = 在架物品剩下的件數（目前庫存與「上架件數 − 已交接件數」取較小者）× 單件重量 × 係數 × 取代率 R × 壽命比 L"
   },
   "Publisher": {
     "anonymous": "匿名"

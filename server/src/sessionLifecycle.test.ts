@@ -14,6 +14,9 @@ import {
 } from "./session";
 import { optionalAuth, requireAuth } from "./middleware/auth";
 import { errorMiddleware } from "./utils/errorHandler";
+import currentUserRouter from "./currentUser";
+import userprofileRouter from "./userprofile";
+import dbPool from "./utils/db";
 import type { UserSession } from "./schema";
 
 jest.mock("./utils/redis", () => {
@@ -28,6 +31,12 @@ jest.mock("./utils/redis", () => {
     isRedisConnected: () => !fake.down,
   };
 });
+
+jest.mock("./utils/db", () => ({
+  query: jest.fn(),
+  execute: jest.fn(),
+  getConnection: jest.fn(),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const redis: FakeSessionRedis = require("./utils/redis").__fake;
@@ -98,7 +107,10 @@ class CookieJar {
 
 function makeApp() {
   const app = express();
+  app.use(express.json());
   app.use(cookieParser());
+  app.use("/api/currentUser", currentUserRouter);
+  app.use("/api/userprofile", userprofileRouter);
   app.post("/login", async (req: Request, res: Response, next: NextFunction) => {
     try {
       await createUserSession(alice, req, res);
@@ -133,8 +145,14 @@ function makeApp() {
   return app;
 }
 
-async function send(jar: CookieJar, method: "get" | "post", path: string) {
-  const res = await request(makeApp())[method](path).set("Cookie", jar.header());
+async function send(
+  jar: CookieJar,
+  method: "get" | "post",
+  path: string,
+  body?: object,
+) {
+  const req = request(makeApp())[method](path).set("Cookie", jar.header());
+  const res = await (body ? req.send(body) : req);
   jar.absorb(res);
   return res;
 }
@@ -146,6 +164,7 @@ async function signedInBrowser() {
 }
 
 beforeEach(() => {
+  jest.clearAllMocks();
   now = START;
   redis.down = false;
   for (const key of redis.keys("")) void redis.del(key);
@@ -325,5 +344,70 @@ describe("updateSessionsForUser：更新某個 user 在所有裝置上的 sessio
 
     expect(await updateSessionsForUser(alice.userId, { role: "admin" })).toBe(1);
     expect((await send(active, "get", "/me")).body.user.role).toBe("admin");
+  });
+
+  it("其中一筆 session 資料壞掉時跳過它，其他 session 照樣更新", async () => {
+    await signedInBrowser();
+    const phone = await signedInBrowser();
+    const [firstKey] = redis.keys("session:");
+    await redis.setEx(firstKey, 60, "not json");
+
+    expect(await updateSessionsForUser(alice.userId, { role: "admin" })).toBe(1);
+    expect((await send(phone, "get", "/me")).body.user.role).toBe("admin");
+  });
+
+  it("寫回之前同一筆 session 被別的更新改過：重讀後再寫，兩邊的修改都保留", async () => {
+    const jar = await signedInBrowser();
+    redis.beforeNextWrite(async () => {
+      await updateSessionsForUser(alice.userId, { username: "alice-renamed" });
+    });
+
+    expect(await updateSessionsForUser(alice.userId, { role: "admin" })).toBe(1);
+
+    const me = await send(jar, "get", "/me");
+    expect(me.body.user).toMatchObject({ role: "admin", username: "alice-renamed" });
+  });
+});
+
+describe("同時寫入同一筆 session", () => {
+  it("續期讀完之後、寫回之前有人改了 role：續期不會把新 role 蓋回舊值", async () => {
+    const jar = await signedInBrowser();
+    advanceDays(8); // 這次請求會續期
+    redis.beforeNextWrite(async () => {
+      await updateSessionsForUser(alice.userId, { role: "admin" });
+    });
+
+    expect((await send(jar, "get", "/me")).status).toBe(200);
+
+    const next = await send(jar, "get", "/me");
+    expect(next.body.user.role).toBe("admin");
+    expect(jar.get("user-role")).toBe("admin");
+  });
+});
+
+describe("暱稱：MySQL 是正式來源，session 是快取", () => {
+  it("在一台裝置改暱稱，另一台裝置的 /api/currentUser 也拿到新暱稱", async () => {
+    (dbPool.query as jest.Mock).mockResolvedValue([{ affectedRows: 1 }]);
+    const laptop = await signedInBrowser();
+    const phone = await signedInBrowser();
+
+    const rename = await send(laptop, "post", "/api/userprofile/custom_name", {
+      custom_name: "Alice Chen ",
+    });
+
+    expect(rename.status).toBe(200);
+    const me = await send(phone, "get", "/api/currentUser");
+    expect(me.body.user.username).toBe("Alice Chen");
+  });
+
+  it("/api/currentUser 只讀 session，不查 MySQL", async () => {
+    const jar = await signedInBrowser();
+
+    const me = await send(jar, "get", "/api/currentUser");
+
+    expect(me.status).toBe(200);
+    expect(me.body.user.username).toBe(alice.username);
+    expect(dbPool.query).not.toHaveBeenCalled();
+    expect(dbPool.execute).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,8 @@
 // clock (jest.spyOn(Date, "now")) sees Redis drop keys the way a real server
 // would. `down = true` makes every command reject, like a lost connection.
 
+import { COMPARE_AND_SET_SCRIPT } from "../utils/sessionScripts";
+
 type Entry = { value: string | Set<string>; expiresAt: number | null };
 
 export class FakeSessionRedis {
@@ -10,6 +12,21 @@ export class FakeSessionRedis {
   isReady = true;
   down = false;
   private store = new Map<string, Entry>();
+  private pendingBeforeWrite: (() => Promise<void>) | null = null;
+
+  /**
+   * 下一次寫入 session 值之前先跑 fn（只跑一次），用來重現「讀完、還沒寫回」之間
+   * 有別的請求改了同一筆 session 的競態。
+   */
+  beforeNextWrite(fn: () => Promise<void>) {
+    this.pendingBeforeWrite = fn;
+  }
+
+  private async runBeforeWrite() {
+    const fn = this.pendingBeforeWrite;
+    this.pendingBeforeWrite = null;
+    if (fn) await fn();
+  }
 
   private check() {
     if (this.down) throw new Error("Redis connection lost");
@@ -48,18 +65,24 @@ export class FakeSessionRedis {
 
   async setEx(key: string, seconds: number, value: string) {
     this.check();
+    await this.runBeforeWrite();
     this.store.set(key, { value, expiresAt: this.setFromSeconds(seconds) });
     return "OK";
   }
 
-  async set(key: string, value: string, options?: { KEEPTTL?: boolean; EX?: number }) {
+  //* 只支援 session.ts 用到的 compare-and-set script，照它的語意在記憶體裡執行
+  async eval(script: string, options: { keys: string[]; arguments: string[] }) {
+    if (script !== COMPARE_AND_SET_SCRIPT) throw new Error("Unknown script");
     this.check();
-    const prev = this.entry(key);
-    let expiresAt: number | null = null;
-    if (options?.EX !== undefined) expiresAt = this.setFromSeconds(options.EX);
-    else if (options?.KEEPTTL) expiresAt = prev?.expiresAt ?? null;
-    this.store.set(key, { value, expiresAt });
-    return "OK";
+    await this.runBeforeWrite();
+    const [key] = options.keys;
+    const [expected, next, ttlSeconds] = options.arguments;
+    const current = this.entry(key);
+    if (!current || current.value !== expected) return 0;
+    const expiresAt =
+      ttlSeconds === "" ? current.expiresAt : this.setFromSeconds(Number(ttlSeconds));
+    this.store.set(key, { value: next, expiresAt });
+    return 1;
   }
 
   async del(key: string) {
@@ -67,14 +90,6 @@ export class FakeSessionRedis {
     const existed = this.entry(key) !== undefined;
     this.store.delete(key);
     return existed ? 1 : 0;
-  }
-
-  async ttl(key: string) {
-    this.check();
-    const e = this.entry(key);
-    if (!e) return -2;
-    if (e.expiresAt === null) return -1;
-    return Math.ceil((e.expiresAt - Date.now()) / 1000);
   }
 
   async expire(key: string, seconds: number) {

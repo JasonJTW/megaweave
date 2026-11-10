@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { getCacheRedisClient, connectRedis, isRedisConnected } from "./utils/redis";
 import { CookieOptions, Request, Response } from "express";
 import { sessionSchema } from "./schema";
+import { COMPARE_AND_SET_SCRIPT } from "./utils/sessionScripts";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -144,17 +145,57 @@ export async function updateSessionsForUser(
   const indexKey = userSessionsKey(userId);
   let updated = 0;
   for (const sessionId of await redisClient.sMembers(indexKey)) {
-    const key = `${REDIS_SESSION_KEY}:${sessionId}`;
-    const raw = await redisClient.get(key);
-    if (!raw) {
-      await redisClient.sRem(indexKey, sessionId);
-      continue;
+    try {
+      const result = await updateStoredSession(
+        `${REDIS_SESSION_KEY}:${sessionId}`,
+        updates,
+      );
+      if (result === null) {
+        await redisClient.sRem(indexKey, sessionId);
+      } else {
+        updated += 1;
+      }
+    } catch (error) {
+      //* 一筆資料壞掉的 session 不該擋住其他 session（例如降權時其他裝置還留著舊 role）；
+      //* 其他錯誤（Redis 斷線等）照樣往上丟，讓呼叫端知道沒有全部更新到
+      if (!(error instanceof SyntaxError || error instanceof z.ZodError)) {
+        throw error;
+      }
+      console.error(`Skipping invalid session for user ${userId}:`, error);
     }
-    const { stored } = mergeSession(JSON.parse(raw), updates);
-    await redisClient.set(key, stored, { KEEPTTL: true });
-    updated += 1;
   }
   return updated;
+}
+
+const MAX_UPDATE_ATTEMPTS = 5;
+
+//* 讀 → 合併 → compare-and-set，到期時間不變；寫回前被別的請求改過就重讀再合併。
+//* key 不存在回 null；資料無效時丟 SyntaxError / ZodError
+async function updateStoredSession(
+  key: string,
+  updates: Partial<UserSession>,
+): Promise<UserSession | null> {
+  for (let attempt = 0; attempt < MAX_UPDATE_ATTEMPTS; attempt += 1) {
+    const raw = await redisClient.get(key);
+    if (raw === null) return null;
+    const { validated, stored } = mergeSession(JSON.parse(raw), updates);
+    if (await compareAndSet(key, raw, stored)) return validated;
+  }
+  throw new UpdateSessionError("Session kept changing during update");
+}
+
+//* 只有 key 的值還是 expected 時才寫入 next；ttlSeconds 省略代表沿用原本的 TTL
+async function compareAndSet(
+  key: string,
+  expected: string,
+  next: string,
+  ttlSeconds?: number,
+): Promise<boolean> {
+  const result = await redisClient.eval(COMPARE_AND_SET_SCRIPT, {
+    keys: [key],
+    arguments: [expected, next, ttlSeconds === undefined ? "" : String(ttlSeconds)],
+  });
+  return result === 1;
 }
 
 // ✅ Redis 連線檢查輔助函數
@@ -332,8 +373,8 @@ export async function authenticateRequest(
   await ensureRedisConnection();
   try {
     const raw = await redisClient.get(key);
-    const stored = raw ? parseStoredSession(raw) : null;
-    if (!stored) {
+    const stored = raw === null ? null : parseStoredSession(raw);
+    if (raw === null || !stored) {
       clearSessionCookies(res);
       return null;
     }
@@ -357,8 +398,11 @@ export async function authenticateRequest(
 
     if (renew) {
       const renewed: StoredSession = { ...user, ...meta, renewedAt: now };
-      await redisClient.setEx(key, ttlSeconds, JSON.stringify(renewed));
-      setSessionCookies(res, sessionId, user.role, ttlSeconds);
+      //* 讀完之後若有別的請求改了這筆 session（例如 sync-role），這次就不續期，免得蓋掉新值；
+      //* renewedAt 沒更新，下一個請求會再續一次
+      if (await compareAndSet(key, raw, JSON.stringify(renewed), ttlSeconds)) {
+        setSessionCookies(res, sessionId, user.role, ttlSeconds);
+      }
     } else if (req.cookies?.["user-role"] !== user.role) {
       //* role 改過（或 cookie 被竄改）時讓 Next middleware 看到的 role 跟 session 一致
       setRoleCookie(res, user.role, ttlSeconds);
@@ -401,16 +445,13 @@ export async function updateUserSession(
     // ✅ 檢查 Redis 連線
     await ensureRedisConnection();
 
-    const key = `${REDIS_SESSION_KEY}:${sessionId}`;
-    const raw = await redisClient.get(key);
-
-    if (!raw) {
+    const validated = await updateStoredSession(
+      `${REDIS_SESSION_KEY}:${sessionId}`,
+      updates,
+    );
+    if (!validated) {
       throw new UpdateSessionError("Session not found in Redis");
     }
-
-    //* Merge existing session data with updates（Zod 驗證）；KEEPTTL 讓更新內容不影響到期時間
-    const { validated, stored } = mergeSession(JSON.parse(raw), updates);
-    await redisClient.set(key, stored, { KEEPTTL: true });
 
     console.log("Updated session data:", validated);
     return validated;

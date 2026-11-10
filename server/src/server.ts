@@ -177,7 +177,9 @@ async function startServer() {
     let shuttingDown = false;
     const shutdown = async (signal: string) => {
       //* 第二次收到訊號（例如再按一次 Ctrl+C）就不再等，直接結束；
-      //* 不然每按一次都重跑一次 server.close，掛上一堆 close listener
+      //* 不然每按一次都重跑一次 server.close，掛上一堆 close listener。
+      //* 這是刻意的：直接結束會跳過 server.close 回呼裡的 Redis、資料庫與 inline worker 收尾，
+      //* 連線由 OS 收回；要乾淨關閉就只送一次訊號
       if (shuttingDown) {
         console.error(`\n${signal} received again, exiting now`);
         process.exit(1);

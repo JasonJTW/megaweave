@@ -429,6 +429,59 @@ describe("POST /api/orgs/:orgId/items", () => {
   });
 });
 
+describe("GET /api/orgs/:orgId/posts: what is left of each item", () => {
+  //* 上架 4 張椅子與 2 張書桌，再直接改 items 的庫存，模擬完成的交織扣掉的數量
+  async function listChairAndDesk() {
+    signInAs(UNIT_CONTACT);
+    const chair = await api().post(`/api/orgs/${ORG}/items`).send(CHAIR).expect(201);
+    const desk = await api()
+      .post(`/api/orgs/${ORG}/items`)
+      .send({ ...CHAIR, title: "書桌", orgCategory: "desk_table", quantity: 2 })
+      .expect(201);
+    const stockOf = (publicId: string) => {
+      const postId = fakeDb.posts.find((p) => p.public_id === publicId)!.id;
+      return fakeDb.items.find((i) => i.post_id === postId)!;
+    };
+    return { chair: stockOf(chair.body.item.id), desk: stockOf(desk.body.item.id) };
+  }
+
+  it("lists an item with some left, with its listed and remaining quantity", async () => {
+    const { chair } = await listChairAndDesk();
+    chair.quantity = 1;
+
+    const res = await api().get(`/api/orgs/${ORG}/posts`);
+    expect(res.status).toBe(200);
+    expect(
+      res.body.posts.find((p: { title: string }) => p.title === "人體工學辦公椅"),
+    ).toMatchObject({ quantity: 4, remainingQuantity: 1 });
+  });
+
+  it("leaves out an item with nothing left, but keeps it in the back office", async () => {
+    const { desk } = await listChairAndDesk();
+    desk.quantity = 0;
+
+    const page = await api().get(`/api/orgs/${ORG}/posts`);
+    expect(page.body.posts.map((p: { title: string }) => p.title)).toEqual([
+      "人體工學辦公椅",
+    ]);
+
+    const office = await api().get(`/api/orgs/${ORG}/items`);
+    expect(
+      office.body.items.find((i: { title: string }) => i.title === "書桌"),
+    ).toMatchObject({ quantity: 2, remainingQuantity: 0 });
+  });
+
+  it("still lists an item with no stock rows, with remainingQuantity null", async () => {
+    const { desk } = await listChairAndDesk();
+    fakeDb.items.splice(fakeDb.items.indexOf(desk), 1);
+
+    const res = await api().get(`/api/orgs/${ORG}/posts`);
+    expect(
+      res.body.posts.find((p: { title: string }) => p.title === "書桌"),
+    ).toMatchObject({ quantity: 2, remainingQuantity: null });
+  });
+});
+
 describe("GET /api/orgs/:orgId/items (back office)", () => {
   beforeEach(async () => {
     signInAs(ORG_ADMIN);

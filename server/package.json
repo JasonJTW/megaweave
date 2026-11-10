@@ -15,6 +15,7 @@
     "sync:vectors": "dotenv -e .env.development -- ts-node src/scripts/syncVectorsToRedis.ts",
     "backfill:vector-scopes": "dotenv -e .env.development -- ts-node src/scripts/backfillVectorScopes.ts",
     "check:emission-factors": "dotenv -e .env.development -- ts-node src/scripts/checkEmissionFactors.ts",
+    "session:sync-role": "dotenv -e .env.development -- ts-node src/scripts/syncSessionRole.ts",
     "benchmark": "dotenv -o -e benchmark.env -- ts-node src/scripts/benchmark.ts",
     "benchmark:api": "dotenv -o -e benchmark.env -v APP_ROLE=api -v PORT=18443 -v ENABLE_HTTPS=false -v RATE_LIMIT_DISABLED=true -v BENCHMARK_TARGET_MARKER=megaweave-isolated -- sh -c 'tsc -p tsconfig.build.json && node ./dist/server.js'",
     "benchmark:worker": "dotenv -o -e benchmark.env -v APP_ROLE=worker -- sh -c 'tsc -p tsconfig.build.json && node ./dist/worker.js'",

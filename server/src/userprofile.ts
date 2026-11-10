@@ -5,7 +5,7 @@ dotenv.config();
 
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
-import { updateUserSession } from "./session";
+import { updateSessionsForUser } from "./session";
 import { HttpError } from "./utils/httpError";
 const router = Router();
 
@@ -166,8 +166,9 @@ router.post(
       query = `Insert into user_profiles (user_id, custom_name) values (?, ?) on duplicate key update custom_name = values(custom_name)`;
       const updateResult = await dbPool.query(query, [userId, newCustomName]);
       if (newCustomName) {
-        await updateUserSession(req, { username: newCustomName }).catch(
-          (err) => console.error("Failed to update user session with new custom_name:", err)
+        //* 更新這個 user 所有裝置上的 session，/api/currentUser 不再從 DB 補同步暱稱
+        await updateSessionsForUser(userId, { username: String(newCustomName).trim() }).catch(
+          (err) => console.error("Failed to update user sessions with new custom_name:", err)
         );
       }
       res

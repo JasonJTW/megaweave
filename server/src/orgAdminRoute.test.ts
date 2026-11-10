@@ -26,10 +26,9 @@ jest.mock("./utils/db", () => ({
   },
 }));
 
-jest.mock("./session", () => ({
-  getUserFromCookie: jest.fn(),
-  updateUserSession: jest.fn(),
-}));
+jest.mock("./session", () =>
+  jest.requireActual("./testUtils/mockSessionModule").mockSessionModule(),
+);
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const OTHER_ORG = "22222222-2222-4222-8222-222222222222";

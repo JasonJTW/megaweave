@@ -283,6 +283,8 @@ export function buildOrgReport(input: ReportInput): OrgReport {
     .reduce((sum, x) => sum + x.remaining, 0);
 
   const rateSource = SOURCES[DEFAULT_REPLACEMENT_RATE.sourceId];
+  //* estimateReport 沒有傳 replacementRates／lifetimeRatios，所以全部物品都用預設的 R 與 L，揭露的值與計算一致；
+  //* 之後改傳實測值時，這裡的揭露也要改成按類別列出
   const lifetimeSource = SOURCES[DEFAULT_LIFETIME_RATIO.sourceId];
   return {
     listing: { itemCount: input.posts.length, quantity: listedQuantity },

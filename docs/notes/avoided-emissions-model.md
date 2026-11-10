@@ -3,7 +3,7 @@
 > **用途**：E6-2「估算減碳量（CO2e）」報表（GitHub #136、#143；PRD 0001 §E6-2、§5.1）的計算方法、係數來源與方法學論證。研究背景見 [avoided-emissions-reuse-research.md](avoided-emissions-reuse-research.md)。
 > **實作**：`server/src/services/avoidedEmissions/`（`factorTable.ts` 係數表、`avoidedEmissions.ts` 計算、`avoidedEmissions.test.ts` 26 項單元測試）；`server/src/scripts/checkEmissionFactors.ts` 對照環境部 API。
 > **原始資料快照**：`docs/notes/data/moenv-cfp-p-02-2026-11-08.json`（環境部 CFP_P_02 全表 1,188 筆）、`docs/notes/data/epa-warm-v16-exhibit-1-1-excerpt-2026-11-08.csv`（WARM v16 Exhibit 1-1 摘錄）、`docs/notes/data/unu-ewaste-guidelines-ed3-annex6-average-weights-2026-11-08.csv`（UNU 指引第 3 版每台平均重量）與同版 UNU-KEY 定義表。EPD 與其他 PDF 只存在 session scratchpad，數值逐筆抄進 `factorTable.ts` 並註明表號。
-> **係數表版本**：`FACTOR_TABLE_VERSION = "2026-11-10"`，每筆報表結果都帶這個版本號。2026-11-09 版把辦公椅參考產品從 4 份擴充為 9 份（新增 5 份亞洲製造或平價品牌 EPD，§4.4），辦公椅係數 4.122 → 3.441。2026-11-10 版把 BOM 中指名的 PU、POM、ABS、PVC 從 PP 代理改為環境部各自的係數（§4.2；先前誤記為「庫內無係數」，見 [moenv-open-data-api.md](moenv-open-data-api.md) §5.1），辦公椅 3.441 → 3.594、沙發 1.553 → 1.843。
+> **係數表版本**：`FACTOR_TABLE_VERSION = "2026-11-10"`，每筆報表結果都帶這個版本號。2026-11-09 版把辦公椅參考產品從 4 份擴充為 9 份（新增 5 份亞洲製造或平價品牌 EPD，§4.4），辦公椅係數 4.122 → 3.441。2026-11-10 版把 BOM 中指名的 PU、POM、ABS、PVC 從 PP 代理改為環境部各自的係數（§4.2；先前誤記為「庫內無係數」，見 [moenv-open-data-api.md](moenv-open-data-api.md) §5.1），辦公椅 3.441 → 3.594、沙發 1.553 → 1.843。同日把壽命比 L 列為算式的獨立一項（§6.8），預設 1，報表數字不變，所以沿用同一版本號。
 
 ---
 
@@ -349,7 +349,7 @@ WBCSD 2023 §5.5.4：避免排放不做價值鏈分攤（「no allocation of avo
 
 報表頁與日後 CSV 註腳建議原文：
 
-> 本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測），且二手品與新品的使用年限相同（壽命比 L = 1，WRAP 2011 預設值，尚未實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 2026-11-09。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。
+> 本數字為「估算避免排放量」：假設接手者若沒有取得這件物品，有 50% 機率會購買同類新品（取代率 R = 0.5，WRAP 2011 預設值，尚未以本平台問卷實測），且二手品與新品的使用年限相同（壽命比 L = 1，WRAP 2011 預設值，尚未實測）。新品生產排放係數來自環境部碳足跡排放係數資料庫（2026-11-08 快照）、US EPA WARM v16（2023-12）與第三方查證的產品環境宣告（EPD），係數表版本 2026-11-10。未計入使用階段、廢棄處置與面交往返交通；小家電與「其他」類別未計入。本數字屬比較性估計，非碳權、非減量額度，不得用於抵減組織溫室氣體盤查或作為碳中和、淨零主張，未經第三方查證。
 
 | WBCSD 原則 | 本模型落點 |
 |---|---|

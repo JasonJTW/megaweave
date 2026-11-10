@@ -1,10 +1,22 @@
 //* middleware/auth.ts
 import { Request, Response, NextFunction } from "express";
 import { UserRole, UserSession } from "../schema";
-import { getUserFromCookie } from "../session";
+import { authenticateRequest, RedisConnectionError } from "../session";
 import dotenv from "dotenv";
 import { HttpError } from "../utils/httpError";
 dotenv.config();
+
+//* session store 連不上是暫時故障：回 503，不要讓 client 當成「沒登入」
+function sessionStoreError(error: unknown) {
+  if (error instanceof RedisConnectionError) {
+    return new HttpError(
+      503,
+      "SERVICE_UNAVAILABLE",
+      "Service temporarily unavailable. Please try again later.",
+    );
+  }
+  return error;
+}
 
 // 擴展 Express Request 類型以包含 user 屬性
 declare global {
@@ -22,11 +34,11 @@ declare global {
  */
 export async function requireAuth(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ) {
   try {
-    const user = await getUserFromCookie(req);
+    const user = await authenticateRequest(req, res);
 
     if (!user) {
       return next(new HttpError(401, "UNAUTHENTICATED", "Please login first"));
@@ -47,7 +59,7 @@ export async function requireAuth(
     req.user = user;
     next();
   } catch (error) {
-    return next(error);
+    return next(sessionStoreError(error));
   }
 }
 
@@ -57,11 +69,11 @@ export async function requireAuth(
  */
 export async function optionalAuth(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ) {
   try {
-    const user = await getUserFromCookie(req);
+    const user = await authenticateRequest(req, res);
     if (user) {
       req.user = user;
     }
@@ -80,11 +92,11 @@ export async function optionalAuth(
  * 權威角色來源：始終以 Redis session 中的 req.user.role 為準，完全忽略客戶端可能偽造的 user-role cookie
  */
 export function requireRole(...allowedRoles: UserRole[]) {
-  return async (req: Request, _res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     // 若尚未經由 requireAuth 注入 req.user，嘗試從權威 session 載入
     if (!req.user) {
       try {
-        const user = await getUserFromCookie(req);
+        const user = await authenticateRequest(req, res);
         if (user && user.userId && user.email) {
           req.user = user;
         }

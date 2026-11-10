@@ -31,10 +31,9 @@ jest.mock("./utils/db", () => ({
   },
 }));
 
-jest.mock("./session", () => ({
-  getUserFromCookie: jest.fn(),
-  updateUserSession: jest.fn(),
-}));
+jest.mock("./session", () =>
+  jest.requireActual("./testUtils/mockSessionModule").mockSessionModule(),
+);
 
 jest.mock("./queue/queues", () => ({
   enqueuePostUploadImages: jest.fn().mockResolvedValue(undefined),

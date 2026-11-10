@@ -1444,7 +1444,8 @@
         "other": "Other record",
         "public_pending_started": "Sent to pending public",
         "public_pending_cancelled": "Pending public cancelled",
-        "public_pending_skipped": "Pending period skipped"
+        "public_pending_skipped": "Pending period skipped",
+        "public_pending_blocked": "Publication blocked: listing information is incomplete"
       },
       "listedDetail": "{unit}",
       "assetNumber": "Asset number {asset}",

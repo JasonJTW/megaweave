@@ -493,10 +493,19 @@ describe("the pending period running out", () => {
     expect(await runPendingPublic(minutesFromNow(11))).toEqual({ published: 0 });
     expect(postRow(postId).audience_tier).toBe("internal");
     expect(fakeDb.tierEvents).toHaveLength(0);
+    expect(fakeDb.pendingEvents.map((e) => e.action)).toEqual(["started", "blocked"]);
     //* 不再每分鐘重試：待公開狀態清掉，管理員要重新送出
     signInAs(ORG_ADMIN);
     const list = await api().get(`/api/orgs/${ORG}/items`);
     expect(list.body.items[0].pendingPublic).toBeNull();
+
+    const timeline = await api().get(`/api/orgs/${ORG}/items/${publicId}/timeline`);
+    expect((timeline.body.timeline as { kind: string }[]).filter((e) =>
+      e.kind.startsWith("public_pending"),
+    )).toEqual([
+      expect.objectContaining({ kind: "public_pending_started" }),
+      expect.objectContaining({ kind: "public_pending_blocked" }),
+    ]);
   });
 
   it("drops a pending item that was deleted meanwhile", async () => {

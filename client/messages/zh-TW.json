@@ -1444,7 +1444,8 @@
         "other": "其他紀錄",
         "public_pending_started": "送出待公開",
         "public_pending_cancelled": "取消待公開",
-        "public_pending_skipped": "跳過待公開期"
+        "public_pending_skipped": "跳過待公開期",
+        "public_pending_blocked": "公開未完成：公開資訊不完整"
       },
       "listedDetail": "{unit}",
       "assetNumber": "財產編號 {asset}",

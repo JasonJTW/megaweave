@@ -30,7 +30,7 @@ export const PENDING_PUBLIC_DELAY_MS = 10 * 60 * 1000;
 //* 一次排程最多處理的到期物品；沒處理到的下一輪再看
 const BATCH_LIMIT = 200;
 
-export type PendingPublicAction = "started" | "cancelled" | "skipped";
+export type PendingPublicAction = "started" | "cancelled" | "skipped" | "blocked";
 
 /** 呼叫者在組織的身分（orgItemService.OrgAccess 的子集，避免循環 import） */
 export interface PendingPublicAccess {
@@ -312,7 +312,13 @@ async function publishOne(due: DueRow, now: Date): Promise<boolean> {
     if (row.tier === "public") return null;
     //* 待公開期間被改掉（到期日過了、地點被清掉）：不公開，維持原層級，管理員要重新送出
     if (!isPublicListingComplete(row, now)) {
-      console.warn(`Pending Public skipped for post #${row.postId}: public listing incomplete`);
+      await recordEvent(connection, {
+        postId: row.postId,
+        orgId: due.orgId,
+        action: "blocked",
+        actorUserId: row.by,
+      });
+      console.warn(`Pending Public blocked for post #${row.postId}: public listing incomplete`);
       return null;
     }
     return changePostTier(connection, {

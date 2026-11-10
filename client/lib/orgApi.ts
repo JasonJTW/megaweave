@@ -66,7 +66,10 @@ export interface OrgPagePost {
   createdAt: string;
   unit: OrgUnitRef;
   orgCategory: string | null;
+  /** 上架時登記的數量；交織完成後不變 */
   quantity: number | null;
+  /** 目前還能交織的數量（交織完成時扣減）；沒有物品列為 null */
+  remainingQuantity: number | null;
   s3Keys: string[];
 }
 

@@ -25,6 +25,7 @@ import { startWorkers, stopWorkers } from "./queue/workers";
 import { initHotScoreCron } from "./queue/queues";
 import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
+import { createShutdown } from "./utils/gracefulShutdown";
 import { registerSocketHandlers } from "./socketHandlers";
 import { globalRateLimiter } from "./middleware/rateLimiter";
 import { getBenchmarkHealthFields, isBenchmarkTarget } from "./benchmark/targetMarker";
@@ -174,67 +175,31 @@ async function startServer() {
       );
     });
 
-    let shuttingDown = false;
-    const shutdown = async (signal: string) => {
-      //* 第二次收到訊號（例如再按一次 Ctrl+C）就不再等，直接結束；
-      //* 不然每按一次都重跑一次 server.close，掛上一堆 close listener。
-      //* 這是刻意的：直接結束會跳過 server.close 回呼裡的 Redis、資料庫與 inline worker 收尾，
-      //* 連線由 OS 收回；要乾淨關閉就只送一次訊號
-      if (shuttingDown) {
-        console.error(`\n${signal} received again, exiting now`);
-        process.exit(1);
-      }
-      shuttingDown = true;
-      console.log(`\n${signal} received, shutting down gracefully...`);
+    //* 關機順序與逾時見 utils/gracefulShutdown.ts；這裡只提供要收尾的連線
+    const shutdown = createShutdown({
+      server,
+      io,
+      cleanup: async () => {
+        console.log("\n=== Starting graceful shutdown sequence ===");
 
-      // 1. 停止接受新請求；server.close 要等每條連線都結束才會回呼
-      server.close(async () => {
-        console.log("✅ server closed");
+        //* Step 0: Disconnect subClient for Socket.IO adapter
+        console.log("\n📍 Step 0/2: Disconnecting Socket.IO Redis subscriber...");
+        await subClient.quit();
 
-        // 2. 按順序關閉連接
-        try {
-          console.log("\n=== Starting graceful shutdown sequence ===");
-
-          //* Step 0: Disconnect subClient for Socket.IO adapter
-          console.log(
-            "\n📍 Step 0/2: Disconnecting Socket.IO Redis subscriber...",
-          );
-          await subClient.quit();
-
-          if (process.env.RUN_WORKERS_INLINE === "true") {
-            console.log("\n📍 Stopping inline BullMQ workers...");
-            await stopWorkers();
-          }
-
-          // Step 1: 關閉 Redis
-          console.log("\n📍 Step 1/2: Closing Redis...");
-          await disconnectRedis();
-
-          // Step 2: 關閉資料庫
-          console.log("\n📍 Step 2/2: Closing database...");
-          await closeDatabase();
-
-          console.log("\n✅ All connections closed successfully");
-          console.log("=== Server Shutdown complete ===\n");
-          process.exit(0);
-        } catch (error) {
-          console.error("\n❌ Error during server shutdown:", error);
-          process.exit(1);
+        if (process.env.RUN_WORKERS_INLINE === "true") {
+          console.log("\n📍 Stopping inline BullMQ workers...");
+          await stopWorkers();
         }
-      });
 
-      //* 瀏覽器的 keep-alive 連線與 Socket.IO 的 WebSocket 不會自己斷，server.close 會一直等到逾時：
-      //* 先斷閒置連線、關掉 Socket.IO（斷開所有 socket），留 5 秒讓進行中的請求回完，再強制斷掉剩下的
-      server.closeIdleConnections();
-      void io.close();
-      setTimeout(() => server.closeAllConnections(), 5000).unref();
+        // Step 1: 關閉 Redis
+        console.log("\n📍 Step 1/2: Closing Redis...");
+        await disconnectRedis();
 
-      // 如果 30 秒內還沒關閉，強制退出
-      setTimeout(() => {
-        console.error("\n⚠️  Forced shutdown after 30s timeout");
-        process.exit(1);
-      }, 30000);
-    };
+        // Step 2: 關閉資料庫
+        console.log("\n📍 Step 2/2: Closing database...");
+        await closeDatabase();
+      },
+    });
 
     // ✅ 只在這裡監聽信號
     process.on("SIGINT", () => shutdown("SIGINT"));

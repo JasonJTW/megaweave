@@ -1,6 +1,12 @@
 import dbPool from "./db";
 import { createNotification } from "./notificationService";
-import { approveWeave, requestWeave, WeaveError, type WeaveStatus } from "./weaveService";
+import {
+  approveWeave,
+  isWholePostRequest,
+  requestWeave,
+  WeaveError,
+  type WeaveStatus,
+} from "./weaveService";
 
 jest.mock("./db", () => ({
   __esModule: true,
@@ -373,5 +379,45 @@ describe("requestWeave on an org post outside the initiator's tier", () => {
     await expect(attempt).rejects.toMatchObject({ statusCode: 404, code: "POST_NOT_FOUND" });
     expect(execute.mock.calls.some(([sql]) => String(sql).startsWith("INSERT"))).toBe(false);
     expect(createNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("isWholePostRequest", () => {
+  const chair = { id: 123, quantity: 5 };
+  const desk = { id: 124, quantity: 2 };
+
+  it("counts a weave with no specific item as the whole post", () => {
+    expect(isWholePostRequest([], [chair])).toBe(true);
+    expect(isWholePostRequest([{ itemId: null, quantity: 1 }], [chair])).toBe(true);
+  });
+
+  it("does not count part of the only item as the whole post", () => {
+    expect(isWholePostRequest([{ itemId: 123, quantity: 2 }], [chair])).toBe(false);
+  });
+
+  it("counts every unit of the only item as the whole post", () => {
+    expect(isWholePostRequest([{ itemId: 123, quantity: 5 }], [chair])).toBe(true);
+  });
+
+  it("needs every item at full quantity when the post has several", () => {
+    expect(
+      isWholePostRequest(
+        [
+          { itemId: 123, quantity: 5 },
+          { itemId: 124, quantity: 1 },
+        ],
+        [chair, desk],
+      ),
+    ).toBe(false);
+    expect(
+      isWholePostRequest(
+        [
+          { itemId: 123, quantity: 5 },
+          { itemId: 124, quantity: 2 },
+        ],
+        [chair, desk],
+      ),
+    ).toBe(true);
+    expect(isWholePostRequest([{ itemId: 123, quantity: 5 }], [chair, desk])).toBe(false);
   });
 });

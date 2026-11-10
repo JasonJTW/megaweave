@@ -1401,7 +1401,11 @@
       "pendingTotal": "{count} awaiting review",
       "clearFilters": "Clear filters",
       "emptyAll": "No items yet. Items you list will appear here.",
-      "colActions": "Actions"
+      "colActions": "Actions",
+      "pieces": "{count, plural, one {# item} other {# items}}",
+      "remaining": "{count} left",
+      "listedTotal": "of {count}",
+      "allTaken": "All taken"
     },
     "weaveStatus": {
       "requested": "Awaiting review",

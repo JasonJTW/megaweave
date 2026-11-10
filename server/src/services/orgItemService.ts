@@ -115,7 +115,10 @@ export interface OrgItem {
   createdAt: string;
   unit: OrgUnitRef;
   orgCategory: OrgItemCategoryId | null;
+  /** 上架時登記的數量（報表用）；交織完成後不變 */
   quantity: number | null;
+  /** 目前還能交織的數量：items 的庫存加總，交織完成時扣減；沒有 items 列為 null */
+  remainingQuantity: number | null;
   unitWeightKg: number | null;
   weightIsDefault: boolean | null;
   assetNumber: string | null;
@@ -146,7 +149,7 @@ export interface ManagedOrgItem extends OrgItem {
 /** 組織頁卡片：不含財產編號與估算價值 */
 export type OrgPagePost = Pick<
   OrgItem,
-  "id" | "title" | "audienceTier" | "createdAt" | "unit" | "orgCategory" | "quantity" | "s3Keys"
+  "id" | "title" | "audienceTier" | "createdAt" | "unit" | "orgCategory" | "quantity" | "remainingQuantity" | "s3Keys"
 >;
 
 const LIST_LIMIT = 500;
@@ -304,6 +307,8 @@ function toOrgItem(row: RowDataPacket): OrgItem {
     unit: { id: Number(row.org_unit_id), name: row.unit_name },
     orgCategory: row.org_category ?? null,
     quantity: row.quantity === null ? null : Number(row.quantity),
+    remainingQuantity:
+      row.remaining_quantity == null ? null : Number(row.remaining_quantity),
     unitWeightKg: row.unit_weight_kg === null ? null : Number(row.unit_weight_kg),
     weightIsDefault:
       row.weight_is_default === null ? null : Boolean(Number(row.weight_is_default)),
@@ -404,6 +409,7 @@ async function queryItemRows(
             d.org_category, d.quantity, d.unit_weight_kg, d.weight_is_default,
             d.asset_number, d.estimated_value_twd, d.auto_release_override, d.auto_release_days, d.pending_public_due_at,
             (SELECT GROUP_CONCAT(i.s3_key ORDER BY i.id) FROM images i WHERE i.post_id = p.id) AS s3_keys,
+            (SELECT SUM(it.quantity) FROM items it WHERE it.post_id = p.id) AS remaining_quantity,
             (SELECT COUNT(*) FROM weaves w WHERE w.post_id = p.id AND w.status = 'requested') AS pending_request_count
      FROM posts p
      JOIN org_units u ON u.id = p.org_unit_id
@@ -428,14 +434,17 @@ export const orgItemService = {
     return access;
   },
 
-  /** 組織頁：這個組織中呼叫者層級看得到、仍上架中的物品 */
+  /**
+   * 組織頁：這個組織中呼叫者層級看得到、仍上架中、還有剩的物品。
+   * 拿完的（剩餘 0）只留在後台清單；沒有 items 列的（remainingQuantity 為 null）照常列出
+   */
   async listOrgPagePosts(access: OrgAccess): Promise<OrgPagePost[]> {
     const items = await queryItems(access.orgId, {
       tiers: visibleTiers(access.accessLevel),
       status: "active",
     });
-    return items.map(
-      ({ id, title, audienceTier, createdAt, unit, orgCategory, quantity, s3Keys }) => ({
+    return items.filter((item) => item.remainingQuantity !== 0).map(
+      ({
         id,
         title,
         audienceTier,
@@ -443,6 +452,17 @@ export const orgItemService = {
         unit,
         orgCategory,
         quantity,
+        remainingQuantity,
+        s3Keys,
+      }) => ({
+        id,
+        title,
+        audienceTier,
+        createdAt,
+        unit,
+        orgCategory,
+        quantity,
+        remainingQuantity,
         s3Keys,
       }),
     );

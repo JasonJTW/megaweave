@@ -8,7 +8,7 @@
 //* 自動升級（#139）：Internal 物品可覆寫組織設定（跟組織、自訂天數、手動）；其他層級不會自動升級，不顯示
 //* 公開（#140）：Org Admin 送出 10 分鐘待公開（有財產編號要確認處分）、可取消；演示組織可跳過；可從 Public 降回
 //* 去向與時間軸（#141，E9-1、E9-3）：每件物品交給了哪個單位或個人；展開看從上架到交接完成的每一步
-//* 版面：一列一件物品，單位、財產編號、狀態收在名稱下方；數量與單件重量疊在同一格；
+//* 版面：一列一件物品，單位、財產編號、狀態收在名稱下方；數量格大字是剩幾件，小字是共幾件與單件重量；
 //* 申請與時間軸展開在下一列。窄螢幕時表格在自己的框裡橫向捲動，物品欄固定在左側
 import { Fragment, Suspense, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -51,6 +51,7 @@ import {
   useSelectedOrg,
 } from "@/lib/orgApi";
 import { isOrgListingKey, orgItemsKey } from "@/lib/orgSwrKeys";
+import { quantityCellText } from "@/lib/orgQuantity";
 
 const ALL = "all";
 
@@ -467,14 +468,7 @@ function ItemRow({
           />
         </td>
         <td className={cn(cell, "whitespace-nowrap text-right tabular-nums")}>
-          <span className="font-medium">
-            {item.quantity ?? <span className="text-muted-foreground">—</span>}
-          </span>
-          <span className="mt-1 block text-xs text-muted-foreground">
-            {item.unitWeightKg !== null
-              ? t("manage.perPieceKg", { kg: item.unitWeightKg })
-              : "—"}
-          </span>
+          <QuantityCell item={item} />
         </td>
         <td
           className={cn(cell, "min-w-[140px]")}
@@ -503,7 +497,8 @@ function ItemRow({
           )}
         </td>
         <td className={cn(cell, "text-right")}>
-          <div className="flex justify-end gap-1.5">
+          {/* 上下排：並排時這欄要 170px，加上層級欄就把表格撐出最寬版面，冒出橫向捲軸 */}
+          <div className="flex flex-col items-end gap-1">
             <Button
               size="sm"
               variant={pending > 0 && open !== "requests" ? "default" : "ghost"}
@@ -552,6 +547,27 @@ function ItemRow({
         </tr>
       )}
     </Fragment>
+  );
+}
+
+//* 數量欄：大字是還能領的數量（剩 2／已領完），小字是上架登記的總數與每件重量（規則見 lib/orgQuantity）
+function QuantityCell({ item }: { item: OrgItem }) {
+  const t = useTranslations("Org.manage");
+  const { main, muted, detail } = quantityCellText(item, t);
+  return (
+    <>
+      <span
+        className={cn(
+          "text-base font-semibold",
+          main === null || muted ? "text-muted-foreground" : "text-dark",
+        )}
+      >
+        {main ?? "—"}
+      </span>
+      <span className="mt-1 block text-xs text-muted-foreground">
+        {detail ?? "—"}
+      </span>
+    </>
   );
 }
 

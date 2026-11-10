@@ -1401,7 +1401,11 @@
       "pendingTotal": "{count} 筆待核可",
       "clearFilters": "清除篩選",
       "emptyAll": "還沒有物品。上架後會出現在這裡。",
-      "colActions": "操作"
+      "colActions": "操作",
+      "pieces": "{count} 件",
+      "remaining": "剩 {count} 件",
+      "listedTotal": "共 {count} 件",
+      "allTaken": "已領完"
     },
     "weaveStatus": {
       "requested": "待核可",

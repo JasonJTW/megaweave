@@ -21,6 +21,7 @@ import {
   useSelectedOrg,
 } from "@/lib/orgApi";
 import { orgPostsKey } from "@/lib/orgSwrKeys";
+import { shownQuantity } from "@/lib/orgQuantity";
 
 const ALL = "all";
 
@@ -159,8 +160,9 @@ function OrgPosts({ org }: { org: OrgAccess }) {
                   </h2>
                   <p className="text-sm text-muted-foreground">
                     {post.unit.name}
-                    {post.quantity !== null &&
-                      ` · ${t("quantity", { count: post.quantity })}`}
+                    {/* 顯示還能領的數量；交織完成後會減少，登記數量只留給報表 */}
+                    {shownQuantity(post) !== null &&
+                      ` · ${t("quantity", { count: shownQuantity(post) ?? 0 })}`}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 pt-1">
                     <TierPill tier={post.audienceTier} />
@@ -198,9 +200,8 @@ function OrgPageContent() {
           : []
       }
       current="items"
-      title={org ? org.name : t("title")}
+      title={org ? t("nav.items") : t("title")}
       subtitle={t("subtitle")}
-      showSingleOrg={false}
       actions={
         org &&
         org.manageableUnits.length > 0 && (

@@ -171,15 +171,23 @@ describe("vectorIndexService", () => {
       );
     });
 
-    it("leaves an index that already has the scope TAG alone", async () => {
+    it("does not alter an index that already has the scope TAG, but still backfills scopes", async () => {
+      //* 補欄位那次的回填失敗或中斷時，之後每次開機都要能補回缺 scope 的文件
       mockRedis.sendCommand.mockResolvedValue(
         ftInfo(10, [...FIELDS_BEFORE_SCOPE, attribute("scope", "TAG")]),
       );
+      (dbPool.execute as jest.Mock).mockResolvedValue([[]]);
 
       await ensureVectorIndexExists();
 
       expect(mockRedis.sendCommand).toHaveBeenCalledTimes(1);
-      expect(dbPool.execute).not.toHaveBeenCalled();
+      expect(mockRedis.sendCommand).not.toHaveBeenCalledWith(
+        expect.arrayContaining(["FT.ALTER"]),
+      );
+      expect(dbPool.execute).toHaveBeenCalledWith(
+        expect.stringContaining("SELECT id, org_id, audience_tier FROM posts"),
+        [0],
+      );
     });
 
     it("checks existing index and triggers autoSync when num_docs is 0", async () => {

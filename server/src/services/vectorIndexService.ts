@@ -225,16 +225,19 @@ export async function ensureVectorIndexExists(): Promise<void> {
     indexReady = true;
 
     if (!ftInfoHasField(info, "scope")) {
-      //* 舊索引沒有 scope：補欄位並回填，否則 `@scope:{public}` 預先過濾會選不到任何貼文
+      //* 舊索引沒有 scope：補欄位，否則 `@scope:{public}` 預先過濾會選不到任何貼文
       console.log("⚙️  Adding scope TAG to Redis Vector Index (idx:posts_v)...");
       await addScopeFieldToPostVectorIndex(redis);
-      const { updated } = await backfillPostVectorScopes(dbPool, redis);
-      console.log(`✅ Backfilled scope on ${updated} vector document(s).`);
     }
 
     const numDocs = getNumDocsFromFtInfo(info);
     if (numDocs === 0) {
       await autoSyncVectorsIfEmpty();
+    } else {
+      //* 每次開機都回填（冪等）：只在「補欄位」那次回填的話，那次失敗或中斷後就永遠不會再補，
+      //* 缺 scope 的貼文從公開 KNN 消失，Feed 只剩後來才寫入 scope 的那幾篇
+      const { updated } = await backfillPostVectorScopes(dbPool, redis);
+      console.log(`✅ Backfilled scope on ${updated} vector document(s).`);
     }
   } catch (err: unknown) {
     const error = err as Error;

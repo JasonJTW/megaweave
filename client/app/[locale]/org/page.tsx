@@ -10,6 +10,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getImageUrl } from "@/utils/imageUtils";
+import { useImageWithRetry } from "@/hooks/useImageWithRetry";
 import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
 import { TierPill } from "@/components/org/TierPill";
 import {
@@ -24,6 +25,47 @@ import { orgPostsKey } from "@/lib/orgSwrKeys";
 import { shownQuantity } from "@/lib/orgQuantity";
 
 const ALL = "all";
+
+//* 卡片封面用 Lambda 產的 medium 縮圖（寬 800）；剛建立的物品縮圖可能還沒好，
+//* 先退避重試，再退回原圖
+function ItemCover({
+  s3Key,
+  placeholder,
+}: {
+  s3Key: string | undefined;
+  placeholder: string;
+}) {
+  const { src, status, onError, onLoad } = useImageWithRetry(
+    s3Key ? getImageUrl(s3Key, "medium") : undefined,
+    s3Key ? getImageUrl(s3Key, "original") : undefined,
+  );
+
+  if (!src || status === "failed") {
+    return (
+      <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-primary-75">
+        {placeholder}
+      </span>
+    );
+  }
+  return (
+    <>
+      {status === "retrying" && (
+        <span
+          aria-hidden
+          className="absolute inset-0 animate-pulse bg-primary-30 motion-reduce:animate-none"
+        />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        onError={onError}
+        onLoad={onLoad}
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+      />
+    </>
+  );
+}
 
 function PostCardSkeleton() {
   return (
@@ -141,18 +183,10 @@ function OrgPosts({ org }: { org: OrgAccess }) {
                 className="group block h-full overflow-hidden rounded-2xl bg-white transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-primary-15">
-                  {cover ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={getImageUrl(cover, "original")}
-                      alt=""
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                    />
-                  ) : (
-                    <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-primary-75">
-                      {categoryName ?? t("noPhoto")}
-                    </span>
-                  )}
+                  <ItemCover
+                    s3Key={cover}
+                    placeholder={categoryName ?? t("noPhoto")}
+                  />
                 </div>
                 <div className="space-y-1.5 p-4">
                   <h2 className="line-clamp-2 text-lg font-bold leading-snug text-megaweave-forest-dark group-hover:underline group-hover:underline-offset-4">

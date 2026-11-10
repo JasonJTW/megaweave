@@ -173,26 +173,49 @@ export function createFakeOrgWeavesDb(
       return [rows, []];
     }
 
-    //* deductInventory：鎖住品項列後比對、再扣庫存
-    if (/^SELECT id, title, quantity FROM items WHERE id IN \((\?, )*\?\) ORDER BY id FOR UPDATE$/.test(sql)) {
+    //* lockWeaveStock：核准預留、取消釋放、完成扣庫存前先鎖住品項列
+    if (/^SELECT id, title, quantity, reserved_quantity FROM items WHERE id IN \((\?, )*\?\) ORDER BY id FOR UPDATE$/.test(sql)) {
       const ids = params.map(Number);
       const rows = base.items
         .filter((i) => ids.includes(i.id))
         .sort((a, b) => a.id - b.id)
-        .map((i) => ({ id: i.id, title: i.title, quantity: i.quantity }));
+        .map((i) => ({
+          id: i.id,
+          title: i.title,
+          quantity: i.quantity,
+          reserved_quantity: i.reserved_quantity ?? 0,
+        }));
       return [rows, []];
     }
 
-    if (sql === "UPDATE items SET quantity = quantity - ? WHERE id = ?") {
+    if (sql === "UPDATE items SET reserved_quantity = reserved_quantity + ? WHERE id = ?") {
       const item = base.items.find((i) => i.id === Number(params[1]));
-      if (item) item.quantity -= Number(params[0]);
+      if (item) item.reserved_quantity = (item.reserved_quantity ?? 0) + Number(params[0]);
       return [{ affectedRows: item ? 1 : 0 }, []];
     }
 
-    if (sql === "SELECT quantity, title FROM items WHERE id = ? AND post_id = ?") {
+    if (sql === "UPDATE items SET reserved_quantity = GREATEST(reserved_quantity - ?, 0) WHERE id = ?") {
+      const item = base.items.find((i) => i.id === Number(params[1]));
+      if (item) item.reserved_quantity = Math.max((item.reserved_quantity ?? 0) - Number(params[0]), 0);
+      return [{ affectedRows: item ? 1 : 0 }, []];
+    }
+
+    if (
+      sql ===
+      "UPDATE items SET quantity = quantity - ?, reserved_quantity = GREATEST(reserved_quantity - ?, 0) WHERE id = ?"
+    ) {
+      const item = base.items.find((i) => i.id === Number(params[2]));
+      if (item) {
+        item.quantity -= Number(params[0]);
+        item.reserved_quantity = Math.max((item.reserved_quantity ?? 0) - Number(params[1]), 0);
+      }
+      return [{ affectedRows: item ? 1 : 0 }, []];
+    }
+
+    if (sql === "SELECT quantity, reserved_quantity, title FROM items WHERE id = ? AND post_id = ?") {
       const rows = base.items
         .filter((i) => i.id === Number(params[0]) && i.post_id === Number(params[1]))
-        .map((i) => ({ quantity: i.quantity, title: i.title }));
+        .map((i) => ({ quantity: i.quantity, reserved_quantity: i.reserved_quantity ?? 0, title: i.title }));
       return [rows, []];
     }
 

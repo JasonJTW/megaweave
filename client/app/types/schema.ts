@@ -71,7 +71,10 @@ export interface Item {
   id: number;
   post_id: number;
   title: string;
+  /** 手上庫存（交織完成才扣） */
   quantity: number;
+  /** 已核准、尚未完成的交織預留的數量；可申請數量 = quantity - reserved_quantity */
+  reserved_quantity?: number;
   created_at: string;
   updated_at: string;
 }

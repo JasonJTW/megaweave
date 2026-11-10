@@ -349,6 +349,7 @@ CREATE TABLE `items` (
   `post_id` bigint unsigned NOT NULL,
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `quantity` int DEFAULT '1',
+  `reserved_quantity` int NOT NULL DEFAULT '0' COMMENT '已核准、尚未完成的交織預留的數量；可申請數量 = quantity - reserved_quantity',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

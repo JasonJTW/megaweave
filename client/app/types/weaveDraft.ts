@@ -24,6 +24,14 @@ export interface WeaveDraft {
   items: WeaveDraftItem[];
 }
 
+/** 還能申請的數量：手上庫存扣掉已核准交織預留的 */
+export function requestableQuantity(item: {
+  quantity?: number | null;
+  reserved_quantity?: number | null;
+}): number {
+  return Math.max(0, (item.quantity ?? 0) - (item.reserved_quantity ?? 0));
+}
+
 /**
  * 根據 Post 與進入聊天時的初始 item 建立初始 WeaveDraft
  */
@@ -54,7 +62,7 @@ export function createInitialDraft(
       postId: post.id,
       postTitle: post.title,
       items: postItems.map((it) => {
-        const left = it.quantity ?? 0;
+        const left = requestableQuantity(it);
         const hasStock = left > 0;
         return {
           id: it.id,
@@ -75,7 +83,7 @@ export function createInitialDraft(
     postId: post.id,
     postTitle: post.title,
     items: postItems.map((it) => {
-      const left = it.quantity ?? 0;
+      const left = requestableQuantity(it);
       const isTarget = it.id === targetId && left > 0;
       return {
         id: it.id,

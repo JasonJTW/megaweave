@@ -31,6 +31,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 
 ## Build & Run
 - **Dev**:
+  - All at once: `make dev` starts Redis, then client, server and worker in one terminal (`concurrently`, prefixed output); Ctrl+C stops all three, Redis keeps running (`make redis-stop`)
   - Redis: `make redis` (or `docker compose -f docker-compose.dev.yml up -d`)
   - Backend: `make dev-server` (or `cd server && npm run dev`) — runs nodemon with HTTPS/HTTP on port 8443
   - Frontend: `make dev-client` (or `cd client && npm run dev`) — Next.js dev server on port 3000

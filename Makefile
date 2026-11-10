@@ -14,7 +14,7 @@ help:
 	@echo "Megaweave 開發指令"
 	@echo "──────────────────────────────────────────"
 	@echo "  make install      安裝所有依賴（client + server）"
-	@echo "  make dev          顯示啟動 client / server / worker 的方式（需要三個 terminal）"
+	@echo "  make dev          一鍵啟動 Redis + client + server + worker（Ctrl+C 全部關閉）"
 	@echo "  make dev-client   啟動 Next.js 開發伺服器（:3000）"
 	@echo "  make dev-server   啟動 API 開發伺服器（:8443）"
 	@echo "  make dev-worker   啟動 BullMQ worker（email、embedding、S3、hot score）"
@@ -50,14 +50,15 @@ install:
 # -----------------------------------------------------------------------------
 # 開發（請在不同 terminal 分別執行）
 # -----------------------------------------------------------------------------
-dev:
-	@echo "⚡ 請在三個 terminal 分別執行："
-	@echo "   make dev-client"
-	@echo "   make dev-server"
-	@echo "   make dev-worker"
-	@echo ""
-	@echo "或使用 tmux / 並行工具（如 concurrently）一次啟動："
-	@echo "   npx concurrently \"cd client && npm run dev\" \"cd server && npm run dev\" \"cd server && npm run dev:worker\""
+# 一個 terminal 起 Redis + client + server + worker；Ctrl+C 一次關掉三個行程（Redis 容器保留，用 make redis-stop 關）
+# 任一行程掛掉時其餘一起停，避免只剩半套在跑
+dev: redis
+	@test -x node_modules/.bin/concurrently || npm ci
+	node_modules/.bin/concurrently --kill-others-on-fail --handle-input \
+		--names "client,server,worker" --prefix-colors "cyan,green,magenta" \
+		"$(MAKE) --no-print-directory dev-client" \
+		"$(MAKE) --no-print-directory dev-server" \
+		"$(MAKE) --no-print-directory dev-worker"
 
 dev-client:
 	cd client && npm run dev

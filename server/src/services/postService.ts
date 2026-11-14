@@ -3,6 +3,7 @@ import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { PoolConnection } from "mysql2/promise";
 import { randomUUID } from "crypto";
 import dbPool from "../utils/db";
+import { buildPostKeywordSearchCondition } from "./postKeywordSearch";
 import { HttpError } from "../utils/httpError";
 import { shouldIncrementView } from "../utils/viewCounter";
 import {
@@ -452,15 +453,12 @@ export class PostService {
       queryParams.push(...condition.params);
     }
 
-    if (params.search) {
-      whereConditions.push(
-        "(p.title LIKE ? OR p.content LIKE ? OR p.tags LIKE ?)",
-      );
-      queryParams.push(
-        `%${params.search}%`,
-        `%${params.search}%`,
-        `%${params.search}%`,
-      );
+    const searchCondition = params.search
+      ? buildPostKeywordSearchCondition(params.search)
+      : null;
+    if (searchCondition) {
+      whereConditions.push(searchCondition.sql);
+      queryParams.push(...searchCondition.params);
     }
 
     if (params.type) {

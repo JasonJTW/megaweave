@@ -133,7 +133,7 @@ else
 Every degraded path ends in `getFilteredFeed` (MySQL). Redis and OpenAI improve quality; MySQL is the only hard dependency.
 
 ```
-getSemanticSearchFeed  query embedding fails / vector search throws  → getFilteredFeed(params, null)  (keyword LIKE search)
+getSemanticSearchFeed  query embedding fails / vector search throws  → getFilteredFeed(params, null)  (keyword search: ngram FULLTEXT, LIKE for 1-char terms)
 getPersonalizedFeed    FT.SEARCH throws / KNN returns 0               → getFilteredFeed(params, userVector)
 getTrendingFeed        feed:trending empty or read error              → getFilteredFeed(params, null)
 getFilteredFeed        a candidate vector read fails                  → that post scores with neutral similarity 0.5

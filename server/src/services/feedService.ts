@@ -6,6 +6,7 @@ import { RESP_TYPES } from "@redis/client";
 import dbPool from "../utils/db";
 import { getCacheRedisClient, getVectorRedisClient } from "../utils/redis";
 import { locationService } from "./locationService";
+import { buildPostKeywordSearchCondition } from "./postKeywordSearch";
 import { fetchQueryEmbedding } from "./embeddingService";
 import { requestHotScoreRebuild } from "../queue/queues";
 import { publicSurfaceCondition } from "./postVisibility";
@@ -433,15 +434,12 @@ export class FeedService {
       queryParams.push(...condition.params);
     }
 
-    if (params.search) {
-      whereConditions.push(
-        "(p.title LIKE ? OR p.content LIKE ? OR p.tags LIKE ?)",
-      );
-      queryParams.push(
-        `%${params.search}%`,
-        `%${params.search}%`,
-        `%${params.search}%`,
-      );
+    const searchCondition = params.search
+      ? buildPostKeywordSearchCondition(params.search)
+      : null;
+    if (searchCondition) {
+      whereConditions.push(searchCondition.sql);
+      queryParams.push(...searchCondition.params);
     }
 
     // 距離半徑篩選 (Radius filter via MySQL ST_Distance_Sphere)

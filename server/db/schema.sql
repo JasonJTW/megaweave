@@ -9,6 +9,9 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+-- posts.idx_search is an ngram index; the default stopwords would drop every bigram
+-- containing a stopword such as `a` or `i` (see migrations/2026-11-14-posts-search-ngram.sql).
+SET SESSION innodb_ft_enable_stopword = OFF;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `categories` (
@@ -738,7 +741,7 @@ CREATE TABLE `posts` (
   KEY `idx_posts_org_tier` (`org_id`,`audience_tier`),
   KEY `idx_posts_audience_tier` (`audience_tier`),
   KEY `fk_posts_org_unit` (`org_id`,`org_unit_id`),
-  FULLTEXT KEY `idx_search` (`title`,`content`,`tags`),
+  FULLTEXT KEY `idx_search` (`title`,`content`,`tags`) /*!50100 WITH PARSER `ngram` */ ,
   CONSTRAINT `fk_post_location` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_posts_condition_level` FOREIGN KEY (`condition_level`) REFERENCES `conditions` (`level`),
   CONSTRAINT `fk_posts_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),

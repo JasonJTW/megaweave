@@ -213,7 +213,8 @@ Megaweave/
 │   └── image-resizer/           # AWS Lambda function for generating WebP thumbnails via Sharp
 ├── docs/                        # Architecture documentation, ADRs, and agent rules
 ├── Makefile                     # Developer command runner
-└── CLAUDE.md                    # Agent & developer project instructions
+├── AGENTS.md                    # Agent & developer project instructions
+└── CLAUDE.md                    # Imports AGENTS.md for Claude Code
 ```
 
 ---

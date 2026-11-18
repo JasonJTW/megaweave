@@ -42,7 +42,9 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
-import PostFormModal, { PostFormSubmitData } from "@/app/components/PostFormModal";
+import PostFormModal, {
+  PostFormSubmitData,
+} from "@/app/components/PostFormModal";
 
 import {
   RefractiveDiv,
@@ -178,7 +180,9 @@ const PostsApp = () => {
     setSubmittedSearchTerm("");
   };
   const hasSearch = Boolean(searchTerm || submittedSearchTerm);
-  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     // 注音／拼音等 IME 用 Enter 選字時仍在 composition 中，不可誤送出搜尋。
     // keyCode 229 是部分瀏覽器在 IME 組字期間的相容訊號。
     if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -235,6 +239,10 @@ const PostsApp = () => {
   const { data, size, setSize, isValidating, mutate } =
     useSWRInfinite<PostsResponse>(getKey, fetcher, {
       revalidateFirstPage: false,
+      // A new key (the location arriving after the first load, or a filter change) keeps
+      // the current cards on screen under the top spinner until the new list arrives.
+      // Without it the Feed unmounts for the centre spinner and every card remounts.
+      keepPreviousData: true,
     });
 
   const posts = useMemo(() => {
@@ -536,8 +544,14 @@ const PostsApp = () => {
         city: data.city || undefined,
         route: data.route || undefined,
         zip: data.zip_code || data.zip || undefined,
-        lat: data.lat !== undefined && data.lat !== null ? Number(data.lat) : undefined,
-        lng: data.lng !== undefined && data.lng !== null ? Number(data.lng) : undefined,
+        lat:
+          data.lat !== undefined && data.lat !== null
+            ? Number(data.lat)
+            : undefined,
+        lng:
+          data.lng !== undefined && data.lng !== null
+            ? Number(data.lng)
+            : undefined,
         expiresAt: data.expires_at ? data.expires_at.toISOString() : undefined,
         items: data.items && data.items.length > 0 ? data.items : undefined,
         stagingKeys,
@@ -1027,9 +1041,7 @@ const PostsApp = () => {
                   setLocationInput(""); // Clear the input too as it's likely a direct text search
                 }}
               >
-                <span>
-                  {t("locationFilter", { value: selectedLocation })}
-                </span>
+                <span>{t("locationFilter", { value: selectedLocation })}</span>
                 <X className="h-3 w-3 transition-colors hover:text-red-300" />
               </Badge>
             )}

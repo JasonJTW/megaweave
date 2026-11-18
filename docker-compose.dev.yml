@@ -1,3 +1,9 @@
+# MegaWeaving 本機開發環境：make dev-services（make dev / make redis 會一併啟動）
+# 本機 MySQL + S3 mock 取代 production 資料庫與 bucket；連線設定見 server/.env.example。
+# 清空 MySQL 與 S3 資料並重新初始化：make dev-db-reset    建立測試帳號與 fixture：make dev-seed
+# 固定 project name：從任何 worktree 啟動都操作同一組容器與 volume。
+name: megaweave
+
 services:
   # 1. 快取實例：Session, Socket.IO, 防刷冷卻, Trending 排行榜
   # 2GB 伺服器配置：上限 128MB，volatile-lru 確保過期 key 主動淘汰
@@ -30,3 +36,76 @@ services:
     ports:
       - "6381:6379"
       - "8001:8001" # Redis Insight UI
+
+  # 4. MySQL 8.0（與 production 相同主版本），首次建立 volume 時匯入 schema 與參考資料。
+  # 只綁 127.0.0.1；用 3307 避免與本機原生 MySQL (3306) 及 E2E (23306) / benchmark (13306) 衝突。
+  # 帶有隔離標記，make dev-seed（重置後建立 fixture）只會清空帶標記的資料庫，永遠碰不到 production。
+  mysql:
+    container_name: megaweave-mysql-dev
+    image: mysql:8.0
+    command: ["--default-time-zone=+00:00", "--max_allowed_packet=64M"]
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: megaweave_dev
+      MYSQL_USER: megaweave
+      MYSQL_PASSWORD: megaweave
+      MYSQL_ROOT_PASSWORD: megaweave-root
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - dev-mysql-data:/var/lib/mysql
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./server/db/reference-data.sql:/docker-entrypoint-initdb.d/02-reference-data.sql:ro
+      - ./server/db/isolated-marker.sql:/docker-entrypoint-initdb.d/03-isolated-marker.sql:ro
+    healthcheck:
+      # 走 TCP：初始化期間暫時 server 不開放網路，確保匯入完成前不會回報 healthy
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pmegaweave-root"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  # 5. S3 相容儲存（Adobe S3Mock，與 E2E 相同）：支援 presigned URL 與 CORS，不驗證簽章，物件可匿名讀取。
+  # HTTP :9000 為預設（server 不需關閉 TLS 驗證；Chrome / Firefox 允許 https 頁面存取 http loopback）。
+  # HTTPS :9443 為自簽憑證，供 Safari 使用（見 docs/development.md）。資料存在 volume，make dev-db-reset 一併清空。
+  s3:
+    container_name: megaweave-s3-dev
+    image: adobe/s3mock:5
+    restart: unless-stopped
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: megaweave-dev,megaweave-dev-staging
+      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /s3mockroot
+      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
+    ports:
+      - "127.0.0.1:9000:9090"
+      - "127.0.0.1:9443:9191"
+    volumes:
+      - dev-s3-data:/s3mockroot
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/"]
+      interval: 2s
+      retries: 30
+
+  # 一次性工作：在每個 Redis 寫入隔離標記，讓 make dev-seed 可以重置開發資料（由 make dev-services 執行）
+  dev-marker:
+    image: redis:7-alpine
+    restart: "no"
+    profiles: ["init"]
+    depends_on:
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+      redis-vector:
+        condition: service_started
+    command:
+      - sh
+      - -c
+      - |
+        for host in redis-cache redis-queue redis-vector; do
+          until redis-cli -h "$$host" ping >/dev/null 2>&1; do sleep 1; done
+          redis-cli -h "$$host" SET isolated:environment megaweave-isolated || exit 1
+        done
+
+volumes:
+  dev-mysql-data:
+  dev-s3-data:

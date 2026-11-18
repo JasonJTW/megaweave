@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { Resend } from "resend";
 import type { ReactElement } from "react";
 import dbPool from "../../utils/db";
-import { processSendEmail, SendEmailJobData } from "./email";
+import { getEmailTransport, processSendEmail, SendEmailJobData } from "./email";
 
 jest.mock("../../utils/db");
 jest.mock("resend");
@@ -57,6 +57,7 @@ describe("email worker", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.RESEND_API_KEY = "test-resend-key";
+    delete process.env.EMAIL_TRANSPORT;
     send.mockResolvedValue({ data: { id: "email-1" }, error: null });
     (Resend as unknown as jest.Mock).mockImplementation(() => ({ emails: { send } }));
   });
@@ -165,5 +166,55 @@ describe("email worker", () => {
     send.mockResolvedValueOnce({ data: null, error: { message: "rate limited" } });
 
     await expect(processSendEmail(mockJob(weaveApproved))).rejects.toThrow("rate limited");
+  });
+
+  describe("EMAIL_TRANSPORT=log", () => {
+    let consoleLog: jest.SpyInstance;
+
+    beforeEach(() => {
+      process.env.EMAIL_TRANSPORT = "log";
+      consoleLog = jest.spyOn(console, "log").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      delete process.env.EMAIL_TRANSPORT;
+      consoleLog.mockRestore();
+    });
+
+    it("logs the recipient and subject instead of calling Resend", async () => {
+      delete process.env.RESEND_API_KEY;
+      (dbPool.execute as jest.Mock).mockResolvedValueOnce([[recipient({ locale: "en" })]]);
+
+      await processSendEmail(mockJob(weaveApproved));
+
+      expect(Resend).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+      const logged = consoleLog.mock.calls.map((args) => args.join(" ")).join("\n");
+      expect(logged).toContain("alice@example.com");
+      expect(logged).toContain("Weave Request Approved");
+    });
+  });
+});
+
+describe("getEmailTransport", () => {
+  it("defaults to Resend when EMAIL_TRANSPORT is unset or blank", () => {
+    expect(getEmailTransport({ NODE_ENV: "production" })).toBe("resend");
+    expect(getEmailTransport({ NODE_ENV: "production", EMAIL_TRANSPORT: " " })).toBe("resend");
+  });
+
+  it("accepts log outside production", () => {
+    expect(getEmailTransport({ NODE_ENV: "development", EMAIL_TRANSPORT: "log" })).toBe("log");
+  });
+
+  it("refuses log in production", () => {
+    expect(() =>
+      getEmailTransport({ NODE_ENV: "production", EMAIL_TRANSPORT: "log" }),
+    ).toThrow("not allowed in production");
+  });
+
+  it("rejects an unknown transport", () => {
+    expect(() => getEmailTransport({ EMAIL_TRANSPORT: "smtp" })).toThrow(
+      'EMAIL_TRANSPORT must be "resend" or "log"',
+    );
   });
 });

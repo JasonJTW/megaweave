@@ -4,7 +4,7 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
-// E2E only (npm run dev:e2e): images come from the local S3 mock, see docs/e2e.md
+// Local only (E2E and dev): images come from the local S3 mock, see docs/e2e.md and docs/development.md
 const e2eImageOrigin = process.env.E2E_IMAGE_ORIGIN
   ? new URL(process.env.E2E_IMAGE_ORIGIN)
   : undefined;

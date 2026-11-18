@@ -4,7 +4,7 @@
 # =============================================================================
 
 .PHONY: help dev dev-client dev-server dev-worker build build-dev test e2e lint typecheck install \
-        redis redis-stop logs clean \
+        dev-services dev-db-reset dev-seed redis redis-stop logs clean \
         benchmark-up benchmark-down benchmark-reset \
         e2e-up e2e-down e2e-reset e2e-seed
 
@@ -14,12 +14,15 @@ help:
 	@echo "Megaweave 開發指令"
 	@echo "──────────────────────────────────────────"
 	@echo "  make install      安裝所有依賴（client + server）"
-	@echo "  make dev          一鍵啟動 Redis + client + server + worker（Ctrl+C 全部關閉）"
+	@echo "  make dev          一鍵啟動開發服務 + client + server + worker（Ctrl+C 全部關閉）"
 	@echo "  make dev-client   啟動 Next.js 開發伺服器（:3000）"
 	@echo "  make dev-server   啟動 API 開發伺服器（:8443）"
 	@echo "  make dev-worker   啟動 BullMQ worker（email、embedding、S3、hot score）"
-	@echo "  make redis        啟動開發用 3-Instance Redis（Cache:6379, Queue:6380, Vector:6381）"
-	@echo "  make redis-stop   停止開發用 Redis 容器群"
+	@echo "  make dev-services 啟動開發用 Docker 服務（Redis:6379-6381, MySQL:3307, S3 mock:9000）"
+	@echo "  make redis        同 make dev-services"
+	@echo "  make redis-stop   停止開發用 Docker 服務（保留資料）"
+	@echo "  make dev-db-reset 刪除開發用 MySQL / S3 / Redis 資料並重新初始化"
+	@echo "  make dev-seed     清空開發資料並建立測試帳號與 fixture（與 E2E 相同）"
 	@echo "  make benchmark-up    啟動 benchmark 隔離環境（MySQL:13306, Redis:16379-16381）"
 	@echo "  make benchmark-down  停止 benchmark 環境（保留 MySQL 資料）"
 	@echo "  make benchmark-reset 刪除 benchmark MySQL 資料並重新初始化"
@@ -50,9 +53,9 @@ install:
 # -----------------------------------------------------------------------------
 # 開發（請在不同 terminal 分別執行）
 # -----------------------------------------------------------------------------
-# 一個 terminal 起 Redis + client + server + worker；Ctrl+C 一次關掉三個行程（Redis 容器保留，用 make redis-stop 關）
+# 一個 terminal 起開發服務 + client + server + worker；Ctrl+C 一次關掉三個行程（容器保留，用 make redis-stop 關）
 # 任一行程掛掉時其餘一起停，避免只剩半套在跑
-dev: redis
+dev: dev-services
 	@test -x node_modules/.bin/concurrently || npm ci
 	node_modules/.bin/concurrently --kill-others-on-fail --handle-input \
 		--names "client,server,worker" --prefix-colors "cyan,green,magenta" \
@@ -70,19 +73,30 @@ dev-worker:
 	cd server && npm run dev:worker
 
 # -----------------------------------------------------------------------------
-# Redis（開發用）
+# 開發用 Docker 服務（Redis x3、MySQL、S3 mock；詳見 docs/development.md）
 # -----------------------------------------------------------------------------
-redis:
-	@echo "🔴 啟動開發用 3-Instance Redis (Cache, Queue, Vector)..."
-	docker compose -f docker-compose.dev.yml up -d
-	@echo "✅ 3-Instance Redis 已啟動："
+dev-services:
+	docker compose -f docker-compose.dev.yml up -d --wait redis-cache redis-queue redis-vector mysql s3
+	docker compose -f docker-compose.dev.yml run --rm dev-marker
+	@echo "✅ 開發服務已啟動："
 	@echo "   [Cache]  redis://localhost:6379 (Session, Socket.IO, Cooldowns, Trending)"
 	@echo "   [Queue]  redis://localhost:6380 (BullMQ, AOF enabled)"
 	@echo "   [Vector] redis://localhost:6381 (HNSW Index, Embeddings)"
 	@echo "   [Insight] UI：http://localhost:8001"
+	@echo "   [MySQL]  127.0.0.1:3307 (megaweave_dev, user megaweave)"
+	@echo "   [S3]     http://127.0.0.1:9000 (buckets megaweave-dev, megaweave-dev-staging)"
+
+redis: dev-services
 
 redis-stop:
 	docker compose -f docker-compose.dev.yml down
+
+dev-db-reset:
+	docker compose -f docker-compose.dev.yml down -v
+	$(MAKE) dev-services
+
+dev-seed:
+	cd server && npm run dev:seed
 
 # -----------------------------------------------------------------------------
 # Benchmark 隔離環境（詳見 docs/benchmark-runner.md）

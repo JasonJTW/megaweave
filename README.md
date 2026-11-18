@@ -80,7 +80,7 @@ make test
 ```bash
 git clone --recurse-submodules https://github.com/JasonJTW/megaweave.git
 cd megaweave && make install
-make redis        # three Redis instances
+make dev-services # Redis x3, MySQL, S3 mock
 make dev-server   # API on :8443 (separate terminal)
 make dev-client   # Next.js on :3000 (separate terminal)
 ```

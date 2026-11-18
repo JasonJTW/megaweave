@@ -12,6 +12,7 @@
     "dev:api": "dotenv -e .env.development -v APP_ROLE=api -- nodemon ./src/server.ts",
     "dev:worker": "dotenv -e .env.development -v APP_ROLE=worker -- nodemon ./src/worker.ts",
     "dev:inline": "dotenv -e .env.development -v APP_ROLE=api -v RUN_WORKERS_INLINE=true -- nodemon ./src/server.ts",
+    "dev:seed": "dotenv -e .env.development -- ts-node --transpile-only src/scripts/e2eSeed.ts",
     "sync:vectors": "dotenv -e .env.development -- ts-node src/scripts/syncVectorsToRedis.ts",
     "backfill:vector-scopes": "dotenv -e .env.development -- ts-node src/scripts/backfillVectorScopes.ts",
     "check:emission-factors": "dotenv -e .env.development -- ts-node src/scripts/checkEmissionFactors.ts",

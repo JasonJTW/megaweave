@@ -2,6 +2,7 @@ import { Job } from "bullmq";
 import type { ReactElement } from "react";
 import { Resend } from "resend";
 import { RowDataPacket } from "mysql2/promise";
+import { z } from "zod";
 import dbPool from "../../utils/db";
 import EmailTemplate, { WeaveItem } from "../../emails/EmailTemplate";
 import DeliveryNoticeEmail from "../../emails/DeliveryNoticeEmail";
@@ -64,6 +65,31 @@ const WEAVE_EMAIL_STATUS: Record<WeaveActionType, WeaveStatus> = {
   confirmed: "approved",
   completed: "completed",
 };
+
+const emailTransportSchema = z.enum(["resend", "log"]);
+
+export type EmailTransport = z.infer<typeof emailTransportSchema>;
+
+/**
+ * EMAIL_TRANSPORT selects how the email job delivers mail. Unset means Resend, so
+ * production keeps sending without new config; `log` (local development) prints the
+ * recipient and subject instead of calling Resend. `log` is refused in production so
+ * a misconfigured deploy fails its jobs loudly instead of silently dropping mail.
+ */
+export function getEmailTransport(env: NodeJS.ProcessEnv = process.env): EmailTransport {
+  const raw = env.EMAIL_TRANSPORT?.trim();
+  if (!raw) return "resend";
+  const parsed = emailTransportSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(
+      `Configuration Error: EMAIL_TRANSPORT must be "resend" or "log", got "${raw}".`,
+    );
+  }
+  if (parsed.data === "log" && env.NODE_ENV === "production") {
+    throw new Error("Configuration Error: EMAIL_TRANSPORT=log is not allowed in production.");
+  }
+  return parsed.data;
+}
 
 let resendClient: Resend | null = null;
 
@@ -164,6 +190,13 @@ export async function processSendEmail(
   await job.log(
     `Starting to send ${template} email (${recipient.locale}) to ${recipient.email}, subject: ${subject}`,
   );
+
+  if (getEmailTransport() === "log") {
+    const summary = `${template} email (${recipient.locale}) to ${recipient.email}, subject: ${subject}`;
+    console.log(`[email] EMAIL_TRANSPORT=log, not sent: ${summary}`);
+    await job.log(`EMAIL_TRANSPORT=log: logged instead of sending ${summary}`);
+    return;
+  }
 
   const resend = getResendClient();
   const { data, error } = await resend.emails.send({

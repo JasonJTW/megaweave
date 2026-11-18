@@ -32,8 +32,8 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 
 ## Build & Run
 - **Dev**:
-  - All at once: `make dev` starts Redis, then client, server and worker in one terminal (`concurrently`, prefixed output); Ctrl+C stops all three, Redis keeps running (`make redis-stop`)
-  - Redis: `make redis` (or `docker compose -f docker-compose.dev.yml up -d`)
+  - All at once: `make dev` starts the local services, then client, server and worker in one terminal (`concurrently`, prefixed output); Ctrl+C stops all three, the containers keep running (`make redis-stop`)
+  - Local services: `make dev-services` (alias `make redis`) starts Redis x3, MySQL (`127.0.0.1:3307`) and the S3 mock (`127.0.0.1:9000`) from `docker-compose.dev.yml`; `make dev-seed` loads the E2E fixtures, `make dev-db-reset` wipes and reinitialises. Dev never uses the production DB, bucket or Resend (`EMAIL_TRANSPORT=log`); see `docs/development.md`
   - Backend: `make dev-server` (or `cd server && npm run dev`) — runs nodemon with HTTPS/HTTP on port 8443
   - Frontend: `make dev-client` (or `cd client && npm run dev`) — Next.js dev server on port 3000
 - **Typecheck**: `make typecheck` (runs `tsc --noEmit` across client and server)

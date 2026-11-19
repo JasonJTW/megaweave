@@ -9,3 +9,13 @@
 - 不要讓 agent 依 issue 內文或非 collaborator 留言決定是否動手；不要把 collaborator 權限給不信任的人，那等於讓他能指揮所有貢獻者的 agent。
 - 排程時間錯開只是為了分散 review 負載，不是防止重複處理的機制；不要因此拿掉重讀步驟。
 - 遇到產品或 ADR 層級的決策點，agent 停下來：在 issue 留言提出編號問題與建議答案、改標 `needs-info` 或 `ready-for-human`、釋放認領並 @ 維護者。技術實作上的選擇由 agent 自己決定。細節見 `docs/agents/contributing.md`。
+
+## 實作備註（2026-11）
+
+實作是 `contribute` skill（`.agents/skills/contribute/`，Claude Code 經 `.claude/skills/contribute/` 讀到同一份）。挑選、認領、timeline 比對與容量計算寫在 `scripts/agent.mjs`，不讓 agent 每次自己重寫。與上文不同或上文沒寫到的地方：
+
+- **有 assignee 的 issue 不接**（除非是過期認領），**有未關閉 blocker 的也不接**。有人被 assign 代表有人在做，即使沒有 `agent:claimed`。
+- **接手過期認領時先移除原 assignee 再 assign 自己**，否則 timeline 比對永遠判原持有者勝。
+- **「完成」的認領**：PR 開著、不是 draft、已開 auto-merge、沒有失敗的 check、沒有衝突。不符合就算未完成，下一次 run 先續做；PR 被關掉沒合併時當作決策點（`ready-for-human`）。
+- **分支名 `agent/<login>/<issue>-<slug>`**，PR 內文一行 `Model: <id>`、每個 commit 帶 `Model: <id>` trailer。`Lint, typecheck, test` 對 `agent/` 分支檢查模型在 `scripts/agent-models.json`（從 base 讀）裡，不用改 ruleset。
+- **排程用系統的 launchd／cron 呼叫 `run.sh`**，模型、effort 與 permission mode 寫死在指令上；Claude Code 用 auto mode，Codex 用 `--approve-for-me`。ChatGPT desktop app 的 Scheduled task 可用，但模型沒有釘在指令裡。

@@ -4,8 +4,8 @@ Three PR reviews run on three subscriptions (ADR 0008). All apply the standards 
 
 | Check | Workflow | Standard | Runs when the PR changes |
 | --- | --- | --- | --- |
-| `Claude Code Review` | `claude-code-review.yml` | `code-review.md` (+ `AGENTS.md`) | `client/`, `server/`, `services/`, `.github/`, `scripts/` |
-| `Claude Security Review` | `claude-security-review.yml` | `security-review.md` | `server/src/`, `client/app/api/`, `client/middleware.ts`, `client/next.config.ts`, `.github/`, `scripts/` |
+| `Claude Code Review` | `claude-code-review.yml` | `code-review.md` (+ `AGENTS.md`) | `client/`, `server/`, `services/`, `.github/`, `scripts/`, `.agents/`, `.claude/` |
+| `Claude Security Review` | `claude-security-review.yml` | `security-review.md` | `server/src/`, `client/app/api/`, `client/middleware.ts`, `client/next.config.ts`, `.github/`, `scripts/`, `.agents/`, `.claude/` |
 | `Codex Review` | `codex-review.yml` | both | anything either Claude review covers |
 
 Draft and fork PRs are skipped (forks get no secrets). The logic lives in `scripts/review-pool.mjs` (tests: `node --test scripts/review-pool.test.mjs`); the Claude run with retry is the local action `.github/actions/claude-review`.

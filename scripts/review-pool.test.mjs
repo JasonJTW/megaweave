@@ -70,6 +70,7 @@ describe("isRelevant", () => {
     assert.equal(isRelevant("code", ["client/app/page.tsx"]), true);
     assert.equal(isRelevant("code", [".github/workflows/ci.yml"]), true);
     assert.equal(isRelevant("code", ["scripts/setup-repo.sh"]), true);
+    assert.equal(isRelevant("code", [".agents/skills/contribute/scripts/agent.mjs"]), true);
     assert.equal(isRelevant("code", ["docs/development.md", "README.md"]), false);
   });
 
@@ -78,6 +79,8 @@ describe("isRelevant", () => {
     assert.equal(isRelevant("security", [".github/actions/claude-review/action.yml"]), true);
     assert.equal(isRelevant("security", ["scripts/review-pool.mjs"]), true);
     assert.equal(isRelevant("security", ["client/middleware.ts"]), true);
+    assert.equal(isRelevant("security", [".agents/skills/contribute/SKILL.md"]), true);
+    assert.equal(isRelevant("security", [".claude/settings.json"]), true);
     assert.equal(isRelevant("security", ["client/components/Button.tsx"]), false);
     assert.equal(isRelevant("security", ["client/middleware.tsx"]), false);
   });

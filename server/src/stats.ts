@@ -176,10 +176,12 @@ router.get(
       ]);
 
       // 公開個人頁：只列個人貼文（ADR 0003）。組織物品（含 Public）屬於組織，列在這裡會曝光經手的窗口（#140、ADR 0004）
-      // **修正: 參考 posts.ts，使用 GROUP_CONCAT 獲取 URL 字串，避免 JSON 解析錯誤**
+      // 公開介面只選個人頁 Drawer 與貼文頁側欄卡片用到的欄位：不能用 p.*，會帶出 embedding、location_id 等內部欄位
       const postsQuery = `
       SELECT 
-        p.*, 
+        p.id, p.public_id, p.title, p.content, p.type, p.status, p.tags,
+        p.category_id, p.condition_level, p.expires_at, p.view_count,
+        p.likes_count, p.created_at,
         GROUP_CONCAT(i.s3_key ORDER BY i.id ASC) as s3_keys
       FROM posts p
       LEFT JOIN images i ON p.id = i.post_id
@@ -191,9 +193,6 @@ router.get(
       const [posts] = await dbPool.execute<RowDataPacket[]>(postsQuery, [
         userId,
       ]);
-
-      // **修正: 移除原有的 postsWithImages 映射和 JSON.parse 邏輯**
-      // 直接使用 posts 變數。
 
       if (statsRows.length === 0) {
         return res.status(200).json({

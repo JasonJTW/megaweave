@@ -1005,6 +1005,7 @@ paths:
       tags: [stats]
       operationId: getPublicStats
       summary: A user's public stats and public posts
+      description: Lists personal posts only (ADR 0003, ADR 0004), with only the columns a post card renders.
       parameters:
         - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string, format: uuid } }
       responses:
@@ -1012,7 +1013,7 @@ paths:
           description: Stats (all zero when not calculated yet)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DetailedUserStats" }
+              schema: { $ref: "#/components/schemas/PublicUserStats" }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
   /api/user/stats/refresh:
@@ -3068,6 +3069,33 @@ components:
         giveSuccessRate: { type: number }
         lastCalculatedAt: { type: [string, "null"], format: date-time }
         posts: { type: array, items: { $ref: "#/components/schemas/Post" } }
+    PublicUserStats:
+      description: DetailedUserStats whose posts carry only public card fields
+      allOf:
+        - { $ref: "#/components/schemas/DetailedUserStats" }
+        - type: object
+          properties:
+            posts: { type: array, items: { $ref: "#/components/schemas/PublicPostSummary" } }
+    PublicPostSummary:
+      type: object
+      description: A personal post on a public profile. Internal columns (embedding, location_id, user_id, org fields) are never returned.
+      required: [id, public_id, title, content, type, status, category_id, condition_level, view_count, likes_count, created_at]
+      properties:
+        id: { type: integer }
+        public_id: { type: string, format: uuid }
+        title: { type: string }
+        content: { type: string }
+        type: { $ref: "#/components/schemas/PostType" }
+        status: { type: [string, "null"], enum: [active, inactive, null] }
+        tags: { type: [string, "null"] }
+        category_id: { type: integer }
+        condition_level: { type: integer }
+        expires_at: { type: [string, "null"], format: date-time }
+        view_count: { type: [integer, "null"] }
+        likes_count: { type: [integer, "null"] }
+        created_at: { type: [string, "null"], format: date-time }
+        s3_keys: { type: [string, "null"], description: Comma-separated image keys, oldest first }
+      additionalProperties: false
     PostType:
       type: string
       enum: [wish, share, commons]

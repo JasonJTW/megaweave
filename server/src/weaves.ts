@@ -477,7 +477,11 @@ router.get(
       const processed = await processWeaveRows(weaveRows, {
         includeReceiverOrgUnit: false,
       });
-      return res.status(200).json({ weaves: processed });
+      //* 備註與對話 id 只屬於兩造，公開介面不給
+      const weaves = processed.map(
+        ({ notes: _notes, conversation_id: _conversationId, ...weave }) => weave,
+      );
+      return res.status(200).json({ weaves });
     } catch (error) {
       return next(error);
     }

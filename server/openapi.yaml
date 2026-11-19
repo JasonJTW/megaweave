@@ -1005,6 +1005,7 @@ paths:
       tags: [stats]
       operationId: getPublicStats
       summary: A user's public stats and public posts
+      description: Lists personal posts only (ADR 0003, ADR 0004), with only the columns a post card renders.
       parameters:
         - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string, format: uuid } }
       responses:
@@ -1012,7 +1013,7 @@ paths:
           description: Stats (all zero when not calculated yet)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/DetailedUserStats" }
+              schema: { $ref: "#/components/schemas/PublicUserStats" }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
   /api/user/stats/refresh:
@@ -1323,7 +1324,7 @@ paths:
       tags: [weaves]
       operationId: listPublicWeaves
       summary: A user's public weave history
-      description: Only personal and Public org posts (ADR 0003); handovers given as an org contact are omitted (ADR 0004).
+      description: Only personal and Public org posts (ADR 0003); handovers given as an org contact are omitted (ADR 0004). `notes` and `conversation_id` belong to the two parties and are never returned.
       parameters:
         - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string } }
       responses:
@@ -1335,7 +1336,7 @@ paths:
                 type: object
                 required: [weaves]
                 properties:
-                  weaves: { type: array, items: { $ref: "#/components/schemas/Weave" } }
+                  weaves: { type: array, items: { $ref: "#/components/schemas/PublicWeave" } }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
   /api/weaves/{id}:
@@ -1602,9 +1603,9 @@ paths:
       tags: [lalamove]
       operationId: getLalamoveServiceTypes
       summary: Lalamove Taiwan market cities and vehicle types
+      description: Market info is cached for 30 minutes; callers cannot bypass the cache.
       parameters:
         - { name: city, in: query, description: Filter cities by id or name substring, schema: { type: string } }
-        - { name: refresh, in: query, description: "`true` bypasses the market info cache", schema: { type: string, enum: ["true", "false"] } }
       responses:
         "200":
           description: Market info
@@ -1625,7 +1626,7 @@ paths:
                         id: { type: string }
                         name: { type: string }
                       additionalProperties: true
-                  allSupportedTypes: { type: array, items: { type: string } }
+                  allSupportedTypes: { type: array, items: { $ref: "#/components/schemas/LalamoveServiceType" } }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
   /api/lalamove/quotation:
@@ -1633,7 +1634,7 @@ paths:
       tags: [lalamove]
       operationId: requestLalamoveQuotation
       summary: Delivery quotations for one or more service types
-      description: Calls the paid Lalamove API once per service type, so a session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`).
+      description: Calls the paid Lalamove API once per service type, so a session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`). An unsupported, duplicated or empty service type list is refused with `INVALID_REQUEST`.
       security: [{ sessionCookie: [] }]
       requestBody:
         required: true
@@ -1643,8 +1644,13 @@ paths:
               type: object
               required: [stops]
               properties:
-                serviceType: { type: string }
-                serviceTypes: { type: array, items: { type: string } }
+                serviceType: { $ref: "#/components/schemas/LalamoveServiceType" }
+                serviceTypes:
+                  type: array
+                  minItems: 1
+                  maxItems: 8
+                  uniqueItems: true
+                  items: { $ref: "#/components/schemas/LalamoveServiceType" }
                 stops:
                   type: array
                   minItems: 2
@@ -3068,6 +3074,33 @@ components:
         giveSuccessRate: { type: number }
         lastCalculatedAt: { type: [string, "null"], format: date-time }
         posts: { type: array, items: { $ref: "#/components/schemas/Post" } }
+    PublicUserStats:
+      description: DetailedUserStats whose posts carry only public card fields
+      allOf:
+        - { $ref: "#/components/schemas/DetailedUserStats" }
+        - type: object
+          properties:
+            posts: { type: array, items: { $ref: "#/components/schemas/PublicPostSummary" } }
+    PublicPostSummary:
+      type: object
+      description: A personal post on a public profile. Internal columns (embedding, location_id, user_id, org fields) are never returned.
+      required: [id, public_id, title, content, type, status, category_id, condition_level, view_count, likes_count, created_at]
+      properties:
+        id: { type: integer }
+        public_id: { type: string, format: uuid }
+        title: { type: string }
+        content: { type: string }
+        type: { $ref: "#/components/schemas/PostType" }
+        status: { type: [string, "null"], enum: [active, inactive, null] }
+        tags: { type: [string, "null"] }
+        category_id: { type: integer }
+        condition_level: { type: integer }
+        expires_at: { type: [string, "null"], format: date-time }
+        view_count: { type: [integer, "null"] }
+        likes_count: { type: [integer, "null"] }
+        created_at: { type: [string, "null"], format: date-time }
+        s3_keys: { type: [string, "null"], description: Comma-separated image keys, oldest first }
+      additionalProperties: false
     PostType:
       type: string
       enum: [wish, share, commons]
@@ -3294,6 +3327,14 @@ components:
         receiver_confirmed: { type: boolean }
         conversation_id: { type: integer }
         post: { $ref: "#/components/schemas/Post" }
+    PublicWeave:
+      description: A Weave on a public profile, without the parties' `notes` and `conversation_id`
+      allOf:
+        - { $ref: "#/components/schemas/Weave" }
+        - not:
+            anyOf:
+              - { required: [notes] }
+              - { required: [conversation_id] }
     Notification:
       type: object
       properties:
@@ -3377,6 +3418,10 @@ components:
         name: { type: string }
         phone: { type: string }
       additionalProperties: true
+    LalamoveServiceType:
+      type: string
+      description: Supported Lalamove TW vehicle types (`ALL_SUPPORTED_SERVICE_TYPES`)
+      enum: [MOTORCYCLE, MOTORCYCLE_INTERCITY, MOTORCYCLE_LARGELALABAG, VAN, SUV, TRUCK175, TRUCK330, TRUCK500]
     LalamoveQuotation:
       type: object
       description: Lalamove quotation plus the requested `serviceName`

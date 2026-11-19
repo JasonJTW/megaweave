@@ -728,6 +728,7 @@ paths:
       tags: [profile]
       operationId: getPublicProfile
       summary: A user's public profile
+      description: Public, so it never carries the account email; `contact_email` and `contact_phone` are the contact details the user chose to publish.
       parameters:
         - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string, format: uuid } }
       responses:
@@ -741,7 +742,6 @@ paths:
                 properties:
                   public_id: { type: string, format: uuid }
                   username: { type: string, description: custom_name when set, else username }
-                  email: { type: string }
                   avatar_url: { type: [string, "null"] }
                   avatar_key: { type: [string, "null"] }
                   role: { $ref: "#/components/schemas/UserRole" }
@@ -1633,7 +1633,8 @@ paths:
       tags: [lalamove]
       operationId: requestLalamoveQuotation
       summary: Delivery quotations for one or more service types
-      description: No session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`).
+      description: Calls the paid Lalamove API once per service type, so a session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`).
+      security: [{ sessionCookie: [] }]
       requestBody:
         required: true
         content:

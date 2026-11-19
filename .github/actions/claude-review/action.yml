@@ -26,6 +26,14 @@ inputs:
   label:
     description: Check name used in log messages
     required: true
+  github_token:
+    description: >-
+      Empty to use the Claude GitHub App (default). github.token when the calling workflow
+      differs from main: the App token exchange refuses such runs (claude-code-action
+      requires the workflow file to match the default branch), so the review then posts
+      as github-actions and needs pull-requests: write.
+    required: false
+    default: ""
 
 outputs:
   verdict:
@@ -44,6 +52,7 @@ runs:
       uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
       with:
         claude_code_oauth_token: ${{ inputs.primary == 'ziyi' && inputs.ziyi_token || inputs.maintainer_token }}
+        github_token: ${{ inputs.github_token }}
         use_sticky_comment: true
         prompt: ${{ inputs.prompt }}
         claude_args: |
@@ -59,7 +68,6 @@ runs:
       env:
         OUTCOME: ${{ steps.primary.outcome }}
         VERDICT: ${{ steps.primary.outputs.structured_output }}
-        SKIPPED: ${{ steps.primary.outputs.skipped_due_to_workflow_validation_mismatch }}
         FALLBACK: ${{ inputs.fallback }}
       run: node "$GITHUB_WORKSPACE/scripts/review-pool.mjs" retry
 
@@ -70,6 +78,7 @@ runs:
       uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
       with:
         claude_code_oauth_token: ${{ inputs.fallback == 'ziyi' && inputs.ziyi_token || inputs.maintainer_token }}
+        github_token: ${{ inputs.github_token }}
         use_sticky_comment: true
         prompt: ${{ inputs.prompt }}
         claude_args: |

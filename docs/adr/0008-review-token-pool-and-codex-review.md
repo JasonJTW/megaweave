@@ -22,3 +22,4 @@
 - **快取鍵多雜湊 `AGENTS.md`**（code review 與 Codex）：`code-review.md` 的 Conventions 引用 `AGENTS.md`，它是標準的一部分。
 - **Security review 的範圍也擴大到 `.github/` 與 `scripts/`**：token 池的邏輯在 `.github/actions/` 與 `scripts/review-pool.mjs`，這些檔案碰得到 secrets。
 - OpenAI 的文件建議 ChatGPT 帳號的 `auth.json` 只用在私有、受信任的環境。這個 repo 是公開的，但 fork 的 PR 拿不到 secrets，能讀到的只有本文 Consequences 已接受的 write collaborator；另外 Codex 的輸出要等 token 都 mask 之後才印到（公開的）log，引用到 token 的判定會被丟棄。
+- **改到 review workflow 的 PR 用 `GITHUB_TOKEN` 跑 Claude。** `claude-code-action` 在 workflow 檔與 default branch 不同時拒發 Claude App token、直接跳過而不回傳判定，必要檢查就會卡住。所以 plan 步驟偵測到 workflow 檔有改時改傳 `github.token`，Claude review 的 job 因此需要 `pull-requests: write`。

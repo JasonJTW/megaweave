@@ -123,9 +123,8 @@ describe("needsRetry", () => {
     assert.equal(needsRetry({ outcome: "success", verdict: blocking, fallback: "ziyi" }), false);
   });
 
-  it("does not retry without a fallback token or after a workflow-validation skip", () => {
+  it("does not retry without a fallback token", () => {
     assert.equal(needsRetry({ outcome: "failure", verdict: "", fallback: "" }), false);
-    assert.equal(needsRetry({ outcome: "success", verdict: "", skipped: "true", fallback: "ziyi" }), false);
   });
 });
 
@@ -272,6 +271,11 @@ describe("CLI", () => {
     assert.equal(first.fallback, "");
     assert.equal(plan(main2, head2).cache_key, first.cache_key);
     assert.notEqual(plan(base, head1, { PROMPT_VERSION: "2" }).cache_key, first.cache_key);
+    assert.equal(first.workflow_changed, "false");
+    assert.equal(plan(main2, head2, { WORKFLOW_FILE: "README.md" }).workflow_changed, "false");
+    git("checkout", "-q", head1);
+    assert.equal(plan(base, head1, { WORKFLOW_FILE: "server/a.ts" }).workflow_changed, "true");
+    git("checkout", "-q", "pr");
 
     const noToken = spawnSync(process.execPath, [new URL("./review-pool.mjs", import.meta.url).pathname, "plan"], {
       cwd: repo,

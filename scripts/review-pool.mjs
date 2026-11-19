@@ -5,9 +5,10 @@
 // scripts/review-pool.test.mjs; the CLI reads env and writes $GITHUB_OUTPUT.
 //
 //   node scripts/review-pool.mjs plan     KIND, PR_NUMBER, BASE_SHA, HEAD_SHA, PROMPT_VERSION,
-//                                         HAS_MAINTAINER_TOKEN, HAS_ZIYI_TOKEN, [DIFF_FILE]
-//        -> relevant, cache_key, primary, fallback
-//   node scripts/review-pool.mjs retry    OUTCOME, VERDICT, SKIPPED, FALLBACK -> retry
+//                                         HAS_MAINTAINER_TOKEN, HAS_ZIYI_TOKEN, [WORKFLOW_FILE],
+//                                         [DIFF_FILE]
+//        -> relevant, cache_key, primary, fallback, workflow_changed
+//   node scripts/review-pool.mjs retry    OUTCOME, VERDICT, FALLBACK -> retry
 //   node scripts/review-pool.mjs result   PRIMARY, FALLBACK, PRIMARY_VERDICT, FALLBACK_VERDICT,
 //                                         FALLBACK_RAN, LABEL -> verdict, token
 //   node scripts/review-pool.mjs scrub    VERDICT_FILE, AUTH_FILE, [SEED_AUTH_JSON] -> verdict
@@ -89,12 +90,10 @@ export function parseVerdict(text) {
 
 /**
  * Retry with the fallback token when the primary run failed or returned no verdict.
- * A blocking verdict is a verdict, so it never retries. A run the action skipped because
- * the workflow is not on the default branch yet would skip again, so it does not retry.
+ * A blocking verdict is a verdict, so it never retries.
  */
-export function needsRetry({ outcome, verdict, skipped, fallback }) {
+export function needsRetry({ outcome, verdict, fallback }) {
   if (!fallback) return false;
-  if (skipped === "true") return false;
   return outcome !== "success" || parseVerdict(verdict) === null;
 }
 
@@ -210,7 +209,15 @@ function plan() {
     console.log(`::notice::The ${preferred} Claude token is not set; using ${primary} only.`);
   }
   console.log(`Cache key ${key}; Claude tokens: primary=${primary || "none"} fallback=${fallback || "none"}`);
+  // claude-code-action's App token is refused while the workflow differs from main
+  const workflow = process.env.WORKFLOW_FILE;
+  const workflowChanged =
+    Boolean(workflow) && spawnSync("git", ["diff", "--quiet", env("BASE_SHA"), "HEAD", "--", workflow]).status !== 0;
+  if (workflowChanged) {
+    console.log(`::notice::${workflow} differs from main; Claude posts with GITHUB_TOKEN on this PR.`);
+  }
   setOutput("relevant", "true");
+  setOutput("workflow_changed", String(workflowChanged));
   setOutput("cache_key", key);
   setOutput("primary", primary);
   setOutput("fallback", fallback);
@@ -221,7 +228,6 @@ function retry() {
   const decision = needsRetry({
     outcome: process.env.OUTCOME,
     verdict: process.env.VERDICT,
-    skipped: process.env.SKIPPED,
     fallback: process.env.FALLBACK,
   });
   setOutput("retry", String(decision));

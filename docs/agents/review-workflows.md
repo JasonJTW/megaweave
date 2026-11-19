@@ -68,4 +68,4 @@ OpenAI recommends this auth only for trusted private infrastructure. This repo i
 
 - Job names are required checks: renaming one means updating `scripts/main-ruleset.json` and `npm run setup:repo`.
 - `CODEX_VERSION` and the pinned action SHAs are updated by hand; pick releases at least 14 days old.
-- A PR that adds a new workflow using `claude-code-action` gets skipped by the action until the workflow exists on `main`.
+- `claude-code-action` refuses its Claude App token while the running workflow file differs from `main`. A PR that changes a review workflow is therefore reviewed with `GITHUB_TOKEN` (plan step notice `… differs from main`): comments come from `github-actions` and a new summary comment appears per run. That is why the Claude review jobs hold `pull-requests: write`.

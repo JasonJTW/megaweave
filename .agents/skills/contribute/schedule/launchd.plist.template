@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Rendered by .agents/skills/contribute/scripts/install-schedule.mjs; installed as
+     ~/Library/LaunchAgents/net.megaweaving.contribute.plist. A run missed while the Mac
+     slept starts once on wake. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>net.megaweaving.contribute</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__REPO__/.agents/skills/contribute/scripts/run.sh</string>
+    <string>__HARNESS__</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__REPO__</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>__PATH__</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <array>
+__CALENDAR__
+  </array>
+  <key>StandardOutPath</key>
+  <string>__LOG_DIR__/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>__LOG_DIR__/launchd.log</string>
+</dict>
+</plist>

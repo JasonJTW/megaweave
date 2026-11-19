@@ -1,0 +1,5 @@
+interface:
+  display_name: "Contribute"
+  short_description: "Set up or run scheduled contributor agents"
+policy:
+  allow_implicit_invocation: false

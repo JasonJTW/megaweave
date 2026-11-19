@@ -10,10 +10,10 @@ The prompt ends with `Model: <id>`; `run.sh` pinned that model on the command li
 
 ## 2. Get the next action
 
-Run `A next` and act on `action`:
+Run `A next` and act on `action`. Before picking, it releases each of your claims whose PR merged while the issue stayed open: it closes the issue when the PR is on the claim's `agent/` branch or has a closing keyword (`Closes #n`), and otherwise hands it to `ready-for-human` with a comment asking the maintainer to confirm. Those claims are listed in `finished`; print them before you continue.
 
 - `stop`: print the reason and end the run.
-- `closed-pr`: a maintainer closed your PR without merging. Read `A show <pr>`, then handle it as a Decision point (step 4) with `ready-for-human`, linking the PR.
+- `closed-pr`: a maintainer closed your PR without merging (its branch may be gone: `branchExists`). Read `A show <pr>`, then handle it as a Decision point (step 4) with `ready-for-human`, linking the PR.
 - `resume`: your claim still needs work (`reasons` says why). Continue with step 3.
 - `work`: you now hold a new claim. When `takeover` is non-empty, comment on the issue that you took over a stale claim from those logins. Continue with step 3.
 
@@ -61,7 +61,7 @@ Work test-first, following `AGENTS.md` and `.agents/skills/tdd/SKILL.md`: each a
 
   Push and comment again whenever you finish a criterion, so a run cut off by quota loses little. Hooks are the gate: when one fails, fix the cause and commit again.
 
-On `resume` with a PR: fix each failed check and each blocking review finding (the review bots' comments in `A show <pr>`), resolve conflicts with `origin/main` (`.agents/skills/resolving-merge-conflicts/SKILL.md`), push, and enable auto-merge if it is off. Then end the run; checks take their time and the next run looks again.
+On `resume` with a PR: fix each failed check and each blocking review finding (the review bots' comments in `A show <pr>`), resolve conflicts with `origin/main` (`.agents/skills/resolving-merge-conflicts/SKILL.md`), push, mark a draft ready (`gh pr ready <pr>`), and enable auto-merge if it is off. Then end the run; checks take their time and the next run looks again.
 
 The step is done when every acceptance criterion has a passing test, and `make lint`, `make typecheck` and `make test` pass.
 
@@ -86,4 +86,4 @@ The step is done when every acceptance criterion has a passing test, and `make l
 2. Check it: `HEAD_REF=<branch> PR_BODY="$(cat <file>)" node scripts/check-agent-pr.mjs` must pass.
 3. Push, then `gh pr create --base main --head <branch> --title "<conventional commit title>" --body-file <file>`, adding `--label needs-migration` for a schema change.
 4. `gh pr merge --auto --merge <pr>`.
-5. End the run. The `agent:claimed` label stays until the PR merges and closes the issue.
+5. End the run. The `agent:claimed` label stays until the PR merges and closes the issue; if the issue stays open after the merge, the next `A next` releases the claim.

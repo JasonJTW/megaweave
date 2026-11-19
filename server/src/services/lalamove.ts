@@ -209,12 +209,9 @@ let marketCacheTimestamp = 0;
 /**
  * 取得 Lalamove 官方 Market / City Info（Source of Truth）
  */
-export async function getLalamoveMarketInfo(
-  forceRefresh = false,
-): Promise<LalamoveMarketInfo> {
+export async function getLalamoveMarketInfo(): Promise<LalamoveMarketInfo> {
   const now = Date.now();
   if (
-    !forceRefresh &&
     cachedMarketInfo &&
     now - marketCacheTimestamp < 30 * 60 * 1000
   ) {

@@ -1603,9 +1603,9 @@ paths:
       tags: [lalamove]
       operationId: getLalamoveServiceTypes
       summary: Lalamove Taiwan market cities and vehicle types
+      description: Market info is cached for 30 minutes; callers cannot bypass the cache.
       parameters:
         - { name: city, in: query, description: Filter cities by id or name substring, schema: { type: string } }
-        - { name: refresh, in: query, description: "`true` bypasses the market info cache", schema: { type: string, enum: ["true", "false"] } }
       responses:
         "200":
           description: Market info

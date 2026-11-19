@@ -125,7 +125,8 @@ router.get(
   "/service-types",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const market = await getLalamoveMarketInfo(req.query.refresh === "true");
+      //* 不開放 ?refresh：匿名呼叫者不能繞過 30 分鐘快取打到 Lalamove
+      const market = await getLalamoveMarketInfo();
       const requestedCity = req.query.city as string | undefined;
 
       let cities = market?.cities || [];

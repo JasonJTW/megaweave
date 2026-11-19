@@ -46,7 +46,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 - `lefthook.yml` (installed by the root `npm ci`): pre-commit formats `client/` with Prettier, runs ESLint `--fix` on staged files, then `make typecheck` and `make test`. Pre-push refuses pushes to `main`, then runs `make e2e-up && E2E_BUILD=1 make e2e` against the production build, as CI does (needs Docker). Worktrees share one E2E stack, so `make e2e` waits for another worktree's run to finish (`scripts/e2e-lock.sh`). Fix failures; never bypass a hook with `--no-verify`.
 
 ## Pull Requests
-- Changes reach `main` only through a PR. The `main` ruleset requires `Lint, typecheck, test` (`ci.yml`), `DB migrations` (`db-migrations.yml`, ADR 0009), `E2E (Playwright)`, `Claude Code Review` and `Claude Security Review` to pass; a Claude review fails the check when it posts a blocking finding (`docs/agents/*.md` define blocking). Only merge commits are allowed.
+- Changes reach `main` only through a PR. The `main` ruleset requires `Lint, typecheck, test` (`ci.yml`), `DB migrations` (`db-migrations.yml`, ADR 0009; `migration-approved` counts only when an admin added it), `E2E (Playwright)`, `Claude Code Review` and `Claude Security Review` to pass; a Claude review fails the check when it posts a blocking finding (`docs/agents/*.md` define blocking). Only merge commits are allowed.
 - The ruleset and merge settings live on GitHub, not in git: `npm run setup:repo` applies `scripts/main-ruleset.json` (needs `gh` with admin rights; safe to re-run). If you add or rename a required job, update that file and re-run it.
 - After opening a PR, enable auto-merge: `gh pr merge --auto --merge <PR>`. GitHub merges it once the required checks pass. Skip this for draft PRs, or when the user says to hold the merge.
 - The ruleset requires a PR to be up to date with `main`, so it is verified on the latest `main` before merging. When `main` moves or a PR turns on auto-merge, `update-auto-merge-branches.yml` merges `main` into every auto-merge PR (pushing with the `AUTO_UPDATE_TOKEN` PAT so the checks run again). A PR that conflicts with `main` needs a manual merge.
@@ -68,6 +68,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 - **Async Processing**: Heavy tasks (OpenAI embeddings, email dispatch, S3 uploads/deletions, hot score crons) must be deferred to BullMQ queues.
 - **Tests**: A behaviour change ships with a test.
 - **Env**: Add every new variable to `server/.env.example` or `client/.env.example` (both tracked; see `docs/development.md`).
+- **Migrations**: `server/db/migrations/YYYY-MM-DD-slug.sql`, applied on deploy in filename order by `scripts/db-migrate.sh` once `AUTO_MIGRATE` is on (ADR 0009, `docs/deployment.md`); additive only, never edit a merged one.
 - **API contract**: once `server/openapi.yaml` exists, it is the API contract. Update it in the same change as any route.
 
 ## Design: deep modules

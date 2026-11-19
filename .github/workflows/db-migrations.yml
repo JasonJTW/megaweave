@@ -1,7 +1,7 @@
 name: DB migrations
 
 # ADR 0009: base schema.sql + the migrations a PR adds must equal the PR's schema.sql,
-# destructive statements need the `migration-approved` label, and schema changes need
+# destructive statements need the `migration-approved` label (added by an admin), and schema changes need
 # `needs-migration`. The logic lives in scripts/check-db-migrations.mjs (runs locally too).
 # No `paths` filter: "DB migrations" is a required check, and a required check that
 # never reports blocks the PR, so PRs without server/db/ changes pass in-job.
@@ -10,8 +10,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
 
+# issues/pull-requests: read the PR's label events, so `migration-approved` counts only
+# when a repository admin added it (scripts/check-db-migrations.mjs verifyApproval).
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 concurrency:
   group: db-migrations-${{ github.event.pull_request.number }}
@@ -33,6 +37,9 @@ jobs:
 
       - name: Unit-test the check
         run: node --test scripts/*.test.mjs
+        env:
+          # Also runs scripts/db-migrate.test.mjs (the deploy's migration runner) in Docker
+          DB_SCRIPTS_IT: "1"
 
       # The script starts a throwaway mysql:8.0 container with the E2E flags
       # (docker-compose.e2e.yml); a `services:` container cannot take mysqld flags.
@@ -42,4 +49,6 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/check-db-migrations.mjs

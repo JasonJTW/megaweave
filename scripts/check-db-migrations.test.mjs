@@ -2,12 +2,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  byteOrder,
   classifyChanges,
   findDestructive,
   normalizeDump,
   parseLabels,
   splitStatements,
-  upSection,
+  verifyApproval,
 } from "./check-db-migrations.mjs";
 
 const rules = (sql) => findDestructive(sql).map((hit) => hit.rule);
@@ -53,13 +54,6 @@ describe("findDestructive", () => {
       `),
       ["DROP"],
     );
-  });
-
-  it("checks only the up section of a dbmate migration", () => {
-    const sql = "-- migrate:up\nALTER TABLE t ADD c int;\n\n-- migrate:down\nALTER TABLE t DROP COLUMN c;\n";
-    assert.deepEqual(rules(sql), []);
-    assert.match(upSection(sql), /ADD c int/);
-    assert.doesNotMatch(upSection(sql), /DROP/);
   });
 });
 
@@ -119,5 +113,64 @@ describe("splitStatements", () => {
         { text: "UPDATE t SET a = 'x;y' WHERE id = 1", masked: "UPDATE t SET a = '' WHERE id = 1" },
       ],
     );
+  });
+});
+
+describe("byteOrder", () => {
+  it("sorts migration filenames as LC_ALL=C sort does", () => {
+    const names = ["2026-11-08-add-organizations.sql", "2026-11-08-add-org-post-details.sql", "2026-10-23-b.sql", "2026-11-08-Z.sql"];
+    assert.deepEqual([...names].sort(byteOrder), [
+      "2026-10-23-b.sql",
+      "2026-11-08-Z.sql",
+      "2026-11-08-add-org-post-details.sql",
+      "2026-11-08-add-organizations.sql",
+    ]);
+  });
+});
+
+describe("verifyApproval", () => {
+  const labeled = (login, created_at, id, name = "migration-approved") => ({
+    id,
+    event: "labeled",
+    created_at,
+    actor: { login },
+    label: { name },
+  });
+  const permissions = { owner: "admin", agent: "write", triager: "triage" };
+  const permissionOf = async (login) => permissions[login] ?? "none";
+  const decide = (events, labels = ["needs-migration", "migration-approved"]) =>
+    verifyApproval({ labels, events, permissionOf });
+
+  it("approves when an admin added the label last", async () => {
+    const result = await decide([labeled("agent", "2026-11-20T01:00:00Z", 1), labeled("owner", "2026-11-20T02:00:00Z", 2)]);
+    assert.equal(result.approved, true);
+  });
+
+  it("ignores the label when a non-admin added it last, even after an admin", async () => {
+    const result = await decide([labeled("owner", "2026-11-20T01:00:00Z", 1), labeled("agent", "2026-11-20T02:00:00Z", 2)]);
+    assert.equal(result.approved, false);
+    assert.match(result.reason, /agent.*write, not admin/);
+  });
+
+  it("orders events by time, not by array position", async () => {
+    const result = await decide([labeled("owner", "2026-11-20T03:00:00Z", 3), labeled("triager", "2026-11-20T01:00:00Z", 1)]);
+    assert.equal(result.approved, true);
+  });
+
+  it("ignores other labels and unlabeled events", async () => {
+    const result = await decide([
+      labeled("triager", "2026-11-20T01:00:00Z", 1),
+      labeled("owner", "2026-11-20T02:00:00Z", 2, "needs-migration"),
+      { id: 3, event: "unlabeled", created_at: "2026-11-20T03:00:00Z", actor: { login: "owner" }, label: { name: "migration-approved" } },
+    ]);
+    assert.equal(result.approved, false);
+    assert.match(result.reason, /triager/);
+  });
+
+  it("is not approved without the label, without an event, or for an unknown user", async () => {
+    assert.equal((await decide([labeled("owner", "2026-11-20T01:00:00Z", 1)], ["needs-migration"])).approved, false);
+    assert.equal((await decide([])).approved, false);
+    assert.equal((await decide([labeled("stranger", "2026-11-20T01:00:00Z", 1)])).approved, false);
+    assert.equal((await decide([{ id: 1, event: "labeled", created_at: "x", label: { name: "migration-approved" } }])).approved, false);
   });
 });

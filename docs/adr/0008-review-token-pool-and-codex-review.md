@@ -10,3 +10,16 @@
 - 重新命名或新增 review job 時，要同步 `scripts/main-ruleset.json` 並重跑 `npm run setup:repo`。
 - `auth.json` 寫回失敗時，下一次 Codex run 會因 refresh token 失效而失敗，轉由 Claude 代打；log 出現代打時要檢查寫回用的 PAT。
 - 任一 token 過期（`claude setup-token` 的 token 有效期一年）時，review 仍會靠另一個 token 通過，因此 token 失效不會自己浮現；workflow 要在換 token 時留下 warning。
+
+## 實作備註（2026-11）
+
+實作見 `docs/agents/review-workflows.md`。與上文不同或上文沒寫到的地方：
+
+- **Codex 的 job 被 concurrency 擠掉時也由 Claude 代打。** `codex-auth` group 同時只留一個等待中的 run，第三個 PR 進來時，排隊中的那個會被 GitHub 取消。為了不讓它變成紅燈，`auth.json` 只在獨立的 `Codex run` job 裡使用，必要檢查 `Codex Review` 是另一個 job，Codex 沒有給出判定（失敗、被取消）就代打。
+- **`CODEX_AUTH_JSON` 未設定時直接通過、不代打。** 在 Cyrus 完成設定前，不額外花維護者的 Claude 額度；`Codex Review` 也要等 secret 設好、跑過一次之後才加進 ruleset。
+- **Codex 的模型先用 `gpt-6.1-sol`。** 文件上最強的是 `gpt-6.2-astra`，但它 2026-11-17 才推出，支援它的 `@openai/codex` 版本都不滿 14 天；釘的 CLI 版本夠舊後再換（workflow 裡有 TODO）。
+- **Codex 的 findings 是一則 sticky 留言，不是 inline。** 這樣 job 只需要 `pull-requests: write`，不需要另外的 MCP 工具。
+- **快取鍵多雜湊 `AGENTS.md`**（code review 與 Codex）：`code-review.md` 的 Conventions 引用 `AGENTS.md`，它是標準的一部分。
+- **Security review 的範圍也擴大到 `.github/` 與 `scripts/`**：token 池的邏輯在 `.github/actions/` 與 `scripts/review-pool.mjs`，這些檔案碰得到 secrets。
+- OpenAI 的文件建議 ChatGPT 帳號的 `auth.json` 只用在私有、受信任的環境。這個 repo 是公開的，但 fork 的 PR 拿不到 secrets，能讀到的只有本文 Consequences 已接受的 write collaborator；另外 Codex 的輸出要等 token 都 mask 之後才印到（公開的）log，引用到 token 的判定會被丟棄。
+- **改到 review workflow 的 PR 用 `GITHUB_TOKEN` 跑 Claude。** `claude-code-action` 在 workflow 檔與 default branch 不同時拒發 Claude App token、直接跳過而不回傳判定，必要檢查就會卡住。所以 plan 步驟偵測到 workflow 檔有改時改傳 `github.token`，Claude review 的 job 因此需要 `pull-requests: write`。

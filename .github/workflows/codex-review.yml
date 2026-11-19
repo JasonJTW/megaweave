@@ -1,0 +1,304 @@
+name: Codex Review
+
+# Reviews against docs/agents/code-review.md and docs/agents/security-review.md with Codex,
+# signed in as a contributor's ChatGPT account (ADR 0008, docs/agents/review-workflows.md).
+# Auth follows OpenAI's "Maintain Codex account auth in CI/CD": CODEX_AUTH_JSON is restored
+# to $CODEX_HOME/auth.json, Codex refreshes it, and the refreshed file is written back to the
+# secret with CODEX_AUTH_WRITEBACK_TOKEN. The `codex-auth` concurrency group keeps one run
+# on the auth at a time, so refresh tokens never race.
+#
+#   CODEX_AUTH_JSON unset            -> notice, pass, no stand-in (saves the Claude quota)
+#   Codex fails / returns no verdict -> the Claude token pool stands in with the same task
+#
+# No workflow-level `paths` filter, so this can be a required status check. Logic lives in
+# scripts/review-pool.mjs.
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+# Never cancel a run mid-way: it may hold a freshly refreshed auth.json not yet written back.
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  # Bump when REVIEW_TASK or the Codex/Claude instructions below change, so cached verdicts expire.
+  PROMPT_VERSION: "1"
+  # TODO: switch to gpt-6.2-astra (the docs' strongest model, released 2026-11-17) once a
+  # @openai/codex release that supports it is at least 14 days old.
+  CODEX_MODEL: gpt-6.1-sol
+  CODEX_VERSION: 0.166.0
+  REVIEW_TASK: |
+    REPO: ${{ github.repository }}
+    PR NUMBER: ${{ github.event.pull_request.number }}
+
+    Review this PR against both docs/agents/code-review.md and docs/agents/security-review.md; read both first (code-review.md also applies sections of AGENTS.md).
+    Check every changed line against every code-review standard and every security checklist item.
+    Return blocking=true when any finding is blocking as defined in either file, with a one-line summary of the blocking findings; otherwise blocking=false with a one-line summary.
+
+jobs:
+  plan:
+    name: Codex Review (plan)
+    # Fork PRs never receive secrets.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      relevant: ${{ steps.plan.outputs.relevant }}
+      cache_key: ${{ steps.plan.outputs.cache_key }}
+      cache_hit: ${{ steps.cache.outputs.cache-hit }}
+      primary: ${{ steps.plan.outputs.primary }}
+      fallback: ${{ steps.plan.outputs.fallback }}
+      has_auth: ${{ steps.auth.outputs.has_auth }}
+      workflow_changed: ${{ steps.plan.outputs.workflow_changed }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Plan review
+        id: plan
+        env:
+          KIND: codex
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HAS_MAINTAINER_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          HAS_ZIYI_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_ZIYI != '' }}
+          WORKFLOW_FILE: .github/workflows/codex-review.yml
+        run: node scripts/review-pool.mjs plan
+
+      - name: Check Codex auth
+        id: auth
+        env:
+          HAS_AUTH: ${{ secrets.CODEX_AUTH_JSON != '' }}
+        run: echo "has_auth=$HAS_AUTH" >> "$GITHUB_OUTPUT"
+
+      - name: Look up cached verdict
+        id: cache
+        if: steps.plan.outputs.relevant == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .review-verdict
+          key: ${{ steps.plan.outputs.cache_key }}
+          lookup-only: true
+
+  codex:
+    name: Codex run
+    needs: plan
+    if: >-
+      needs.plan.outputs.relevant == 'true' &&
+      needs.plan.outputs.cache_hit != 'true' &&
+      needs.plan.outputs.has_auth == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # One run at a time on auth.json. A run displaced from the queue is cancelled; the
+    # `Codex Review` job then stands in with Claude rather than failing.
+    concurrency:
+      group: codex-auth
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    outputs:
+      verdict: ${{ steps.scrub.outputs.verdict }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Install Codex
+        run: npm install --global "@openai/codex@$CODEX_VERSION"
+
+      - name: Prepare diff and schema
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --no-color --no-ext-diff "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/pr.diff"
+          cat > "$RUNNER_TEMP/verdict.schema.json" <<'JSON'
+          {"type":"object","additionalProperties":false,"properties":{"blocking":{"type":"boolean"},"summary":{"type":"string"},"comment":{"type":"string"}},"required":["blocking","summary","comment"]}
+          JSON
+
+      # The secret travels through env; tokens are masked before Codex can print anything.
+      - name: Restore Codex auth
+        id: auth
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+        run: |
+          codex_home="$RUNNER_TEMP/codex-home"
+          echo "CODEX_HOME=$codex_home" >> "$GITHUB_ENV"
+          mkdir -p "$codex_home" && chmod 700 "$codex_home"
+          umask 077
+          printf '%s' "$CODEX_AUTH_JSON" > "$codex_home/auth.json"
+          chmod 600 "$codex_home/auth.json"
+          jq -r '.. | strings | select(length >= 16)' "$codex_home/auth.json" | while IFS= read -r value; do
+            echo "::add-mask::$value"
+          done
+          if ! jq -e '.auth_mode == "chatgpt" and ((.tokens.refresh_token // "") | length > 0)' "$codex_home/auth.json" >/dev/null; then
+            echo "::error::CODEX_AUTH_JSON is not a ChatGPT auth.json with a refresh token; reseed it (docs/agents/review-workflows.md)."
+            exit 1
+          fi
+          printf 'cli_auth_credentials_store = "file"\n' > "$codex_home/config.toml"
+          sha256sum "$codex_home/auth.json" | cut -d' ' -f1 > "$RUNNER_TEMP/auth.sha256"
+
+      # Codex output goes to a file and is printed only after the refreshed tokens are
+      # masked too, so a prompt-injected `cat auth.json` cannot reach the public log.
+      - name: Run Codex
+        id: codex
+        continue-on-error: true
+        run: |
+          prompt="$REVIEW_TASK
+          The PR's diff against its merge-base is in $RUNNER_TEMP/pr.diff; the working tree is the PR merged into main.
+          You have no network access and must not modify files.
+          Put the findings in \`comment\` as GitHub Markdown, one bullet per finding: \`path:line\`, blocking or advisory, the defect and its fix. At most 5 code-review findings, blocking first; write \"No findings.\" when there are none.
+          Never include credentials, environment variables, or the contents of files outside the repository."
+          set +e
+          codex exec --ephemeral --sandbox read-only --color never \
+            --model "$CODEX_MODEL" -c model_reasoning_effort='"high"' \
+            --output-schema "$RUNNER_TEMP/verdict.schema.json" \
+            --output-last-message "$RUNNER_TEMP/codex-verdict.json" \
+            "$prompt" < /dev/null > "$RUNNER_TEMP/codex.log" 2>&1
+          status=$?
+          set -e
+          jq -r '.. | strings | select(length >= 16)' "$CODEX_HOME/auth.json" | while IFS= read -r value; do
+            echo "::add-mask::$value"
+          done
+          cat "$RUNNER_TEMP/codex.log"
+          exit "$status"
+
+      - name: Check Codex verdict
+        id: scrub
+        if: steps.auth.outcome == 'success'
+        env:
+          VERDICT_FILE: ${{ runner.temp }}/codex-verdict.json
+          AUTH_FILE: ${{ runner.temp }}/codex-home/auth.json
+          SEED_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+        run: node scripts/review-pool.mjs scrub
+
+      # The refreshed file, not the seed, goes back (OpenAI's ephemeral-runner round trip).
+      - name: Write refreshed auth back
+        if: always() && steps.auth.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.CODEX_AUTH_WRITEBACK_TOKEN }}
+        run: |
+          auth="$CODEX_HOME/auth.json"
+          if [ "$(sha256sum "$auth" | cut -d' ' -f1)" = "$(cat "$RUNNER_TEMP/auth.sha256")" ]; then
+            echo "auth.json unchanged; nothing to write back."
+          elif [ -z "$GH_TOKEN" ]; then
+            echo "::warning::CODEX_AUTH_WRITEBACK_TOKEN is not set; the refreshed auth.json was not saved, so the next Codex run will need a reseed."
+          elif ! jq -e '.auth_mode == "chatgpt" and ((.tokens.refresh_token // "") | length > 0)' "$auth" >/dev/null; then
+            echo "::warning::Refreshed auth.json is not valid; kept the stored secret."
+          elif gh secret set CODEX_AUTH_JSON --repo "$GITHUB_REPOSITORY" < "$auth"; then
+            echo "Wrote the refreshed auth.json back to CODEX_AUTH_JSON."
+          else
+            echo "::warning::Could not write auth.json back to CODEX_AUTH_JSON; check CODEX_AUTH_WRITEBACK_TOKEN (Secrets: write on this repo)."
+          fi
+
+      - name: Remove Codex auth
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/codex-home"
+
+  review:
+    name: Codex Review
+    needs: [plan, codex]
+    # always(): runs when the Codex run failed, was skipped or was cancelled in the auth queue.
+    if: >-
+      always() &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write # sticky Codex comment; Claude stand-in while this file differs from main
+      issues: read
+      id-token: write # Claude stand-in
+    steps:
+      - name: Require plan
+        if: needs.plan.result != 'success'
+        run: |
+          echo "::error::The plan job did not succeed; see its log."
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Decide
+        id: mode
+        env:
+          RELEVANT: ${{ needs.plan.outputs.relevant }}
+          CACHE_HIT: ${{ needs.plan.outputs.cache_hit }}
+          HAS_AUTH: ${{ needs.plan.outputs.has_auth }}
+          CODEX_VERDICT: ${{ needs.codex.outputs.verdict }}
+          CODEX_RESULT: ${{ needs.codex.result }}
+        run: node scripts/review-pool.mjs codex-mode
+
+      - name: Post Codex findings
+        if: steps.mode.outputs.mode == 'codex'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          VERDICT: ${{ needs.codex.outputs.verdict }}
+        run: |
+          marker='<!-- codex-review -->'
+          jq -r --arg marker "$marker" \
+            '$marker + "\n### Codex Review\n\n" + .comment + "\n\n**" + (if .blocking then "Blocking" else "Not blocking" end) + ":** " + .summary' \
+            <<<"$VERDICT" > "$RUNNER_TEMP/comment.md"
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F "body=@$RUNNER_TEMP/comment.md" >/dev/null
+          else
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F "body=@$RUNNER_TEMP/comment.md" >/dev/null
+          fi
+
+      - name: Claude stand-in
+        id: standin
+        if: steps.mode.outputs.mode == 'stand-in'
+        uses: ./.github/actions/claude-review
+        with:
+          label: Codex Review (Claude stand-in)
+          primary: ${{ needs.plan.outputs.primary }}
+          fallback: ${{ needs.plan.outputs.fallback }}
+          maintainer_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ziyi_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_ZIYI }}
+          github_token: ${{ needs.plan.outputs.workflow_changed == 'true' && github.token || '' }}
+          prompt: |
+            ${{ env.REVIEW_TASK }}
+            You are standing in for the Codex review.
+            Batch tool calls: read every file you need in one turn, then post all inline comments in one turn.
+            Done when each finding is posted as an inline comment.
+
+      - name: Enforce verdict
+        id: enforce
+        if: contains(fromJSON('["codex","stand-in","cached"]'), steps.mode.outputs.mode)
+        env:
+          LABEL: Codex Review
+          VERDICT: ${{ steps.mode.outputs.mode == 'codex' && needs.codex.outputs.verdict || steps.standin.outputs.verdict }}
+          CACHE_HIT: ${{ steps.mode.outputs.mode == 'cached' }}
+        run: node scripts/review-pool.mjs enforce
+
+      - name: Cache verdict
+        if: steps.enforce.outputs.cacheable == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .review-verdict
+          key: ${{ needs.plan.outputs.cache_key }}

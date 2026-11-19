@@ -252,6 +252,10 @@ jobs:
     needs: [detect-changes, pre-deploy-cleanup, build-backend]
     if: needs.build-backend.result == 'success'
     runs-on: self-hosted
+    # Never two backend deploys (and so two migration runs) at once; never cancel one midway
+    concurrency:
+      group: deploy-server
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: read
@@ -298,6 +302,23 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ADR 0009: back up, then apply pending server/db/migrations before the new code starts.
+      # Off until the maintainer has run the baseline (docs/deployment.md "Turning on
+      # automatic migrations") and set the repository variable AUTO_MIGRATE=true.
+      # A failure here stops the job before `docker compose up`: the old containers keep running.
+      - name: Database migrations disabled
+        if: vars.AUTO_MIGRATE != 'true'
+        run: echo "::notice title=Migrations skipped::AUTO_MIGRATE is not 'true'; this deploy applies no migration. Apply new server/db/migrations by hand (docs/deployment.md)."
+
+      - name: Back up and migrate the database
+        if: vars.AUTO_MIGRATE == 'true'
+        timeout-minutes: 30
+        env:
+          # docker compose interpolates the whole file, Redis services included
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          BACKUP_S3_URI: ${{ vars.BACKUP_S3_URI }}
+        run: bash scripts/deploy-migrate.sh
 
       - name: Pull and deploy backend containers (API & Worker)
         env:

@@ -9,13 +9,17 @@
 //      branch's schema.sql;
 //   2. destructive statements (DROP, RENAME, MODIFY, CHANGE, TRUNCATE, DELETE without
 //      WHERE) in added migrations, and edits to migrations already on BASE, need the
-//      `migration-approved` label;
+//      `migration-approved` label, and in Actions it counts only when its latest `labeled`
+//      event was by a repository admin (verifyApproval);
 //   3. a change to schema.sql or an added migration needs the `needs-migration` label.
 //
 // Environment (all optional):
 //   BASE_SHA            base commit or ref (default origin/main)
 //   HEAD_SHA            branch commit (default HEAD)
 //   PR_LABELS           JSON array of label names (default [])
+//   GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER
+//                       verify who added `migration-approved` (required in Actions; a local
+//                       run without them trusts PR_LABELS)
 //   MYSQL_CONTAINER     running MySQL 8.0 container to use; when unset a throwaway
 //                       mysql:8.0 container with the E2E flags is started and removed
 //   MYSQL_ROOT_PASSWORD root password of MYSQL_CONTAINER
@@ -41,15 +45,6 @@ const DB_HEAD = "migration_check_head";
 // ---------------------------------------------------------------------------
 // SQL scanning (pure; covered by scripts/check-db-migrations.test.mjs)
 // ---------------------------------------------------------------------------
-
-/** dbmate files carry both directions; only the up section runs on deploy. */
-export function upSection(sql) {
-  const up = /^--\s*migrate:up\b.*$/m.exec(sql);
-  if (!up) return sql;
-  const rest = sql.slice(up.index + up[0].length);
-  const down = /^--\s*migrate:down\b/m.exec(rest);
-  return down ? rest.slice(0, down.index) : rest;
-}
 
 /**
  * Splits SQL into statements without comments. Each has `text` (for messages) and
@@ -128,7 +123,7 @@ const DESTRUCTIVE = [
 
 /** Destructive statements in a migration: [{ rule, statement }]. */
 export function findDestructive(sql) {
-  return splitStatements(upSection(sql)).flatMap(({ text, masked }) =>
+  return splitStatements(sql).flatMap(({ text, masked }) =>
     DESTRUCTIVE.filter((rule) => rule.test(masked)).map((rule) => ({ rule: rule.name, statement: text })),
   );
 }
@@ -161,8 +156,13 @@ export function classifyChanges(nameStatus) {
       result.editedExisting.push(...inMigrations.filter((p) => !result.editedExisting.includes(p)));
     }
   }
-  result.added.sort((a, b) => basename(a).localeCompare(basename(b)));
+  result.added.sort((a, b) => byteOrder(basename(a), basename(b)));
   return result;
+}
+
+/** Filename order: plain code-point order, as scripts/db-migrate.sh applies files (LC_ALL=C sort). */
+export function byteOrder(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 function basename(p) {
@@ -178,12 +178,87 @@ export function parseLabels(json) {
   return parsed;
 }
 
+/**
+ * Decides whether the `migration-approved` label counts (ADR 0009). Anyone with triage
+ * rights can add a label, so it counts only when its most recent `labeled` event was by a
+ * user whose repository permission is `admin`.
+ *
+ *   events        issue events of the PR (GET /repos/{repo}/issues/{n}/events)
+ *   permissionOf  async (login) => "admin" | "write" | "read" | "none" | ...
+ *
+ * Returns { approved, reason }.
+ */
+export async function verifyApproval({ labels, events, permissionOf }) {
+  if (!labels.includes(LABEL_APPROVED)) return { approved: false, reason: `the PR has no \`${LABEL_APPROVED}\` label` };
+  const labeled = events
+    .filter((e) => e?.event === "labeled" && e.label?.name === LABEL_APPROVED)
+    .sort((a, b) => byteOrder(String(a.created_at), String(b.created_at)) || (a.id ?? 0) - (b.id ?? 0));
+  const last = labeled[labeled.length - 1];
+  if (!last) return { approved: false, reason: `no \`labeled\` event found for \`${LABEL_APPROVED}\`` };
+  const login = last.actor?.login;
+  if (!login) return { approved: false, reason: `the latest \`${LABEL_APPROVED}\` event has no actor` };
+  const permission = await permissionOf(login);
+  if (permission !== "admin") {
+    return {
+      approved: false,
+      reason: `\`${LABEL_APPROVED}\` was last added by ${login}, whose repository permission is ${permission}, not admin; ask a maintainer to remove and re-add it`,
+    };
+  }
+  return { approved: true, reason: `\`${LABEL_APPROVED}\` added by admin ${login}` };
+}
+
+async function githubGet(path) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  });
+  return res;
+}
+
+/** Fetches the PR's issue events and checks the label's actor; any failure means "not approved". */
+export async function approvalFromGitHub(labels) {
+  if (!labels.includes(LABEL_APPROVED)) return { approved: false, reason: "label absent" };
+  const { GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER } = process.env;
+  if (!GITHUB_TOKEN || !GITHUB_REPOSITORY || !PR_NUMBER) {
+    if (inActions) return { approved: false, reason: "GITHUB_TOKEN, GITHUB_REPOSITORY or PR_NUMBER is not set, so the label cannot be verified" };
+    return { approved: true, reason: "local run: PR_LABELS trusted without verification" };
+  }
+  if (!/^[\w.-]+\/[\w.-]+$/.test(GITHUB_REPOSITORY) || !/^\d+$/.test(PR_NUMBER)) {
+    return { approved: false, reason: "GITHUB_REPOSITORY or PR_NUMBER is malformed" };
+  }
+  try {
+    const events = [];
+    for (let page = 1; page <= 30; page++) {
+      const res = await githubGet(`/repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/events?per_page=100&page=${page}`);
+      if (!res.ok) throw new Error(`listing issue events returned HTTP ${res.status}`);
+      const batch = await res.json();
+      events.push(...batch);
+      if (batch.length < 100) break;
+    }
+    return await verifyApproval({
+      labels,
+      events,
+      permissionOf: async (login) => {
+        const res = await githubGet(`/repos/${GITHUB_REPOSITORY}/collaborators/${encodeURIComponent(login)}/permission`);
+        if (res.status === 404) return "none";
+        if (!res.ok) throw new Error(`reading the permission of ${login} returned HTTP ${res.status}`);
+        return (await res.json()).permission ?? "none";
+      },
+    });
+  } catch (error) {
+    return { approved: false, reason: `the label could not be verified (${error.message})` };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // git and MySQL
 // ---------------------------------------------------------------------------
 
-function run(cmd, args, { input, allowFail = false } = {}) {
-  const res = spawnSync(cmd, args, { input, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+export function run(cmd, args, { input, allowFail = false, env } = {}) {
+  const res = spawnSync(cmd, args, { input, env, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (res.error) throw res.error;
   if (res.status !== 0 && !allowFail) {
     throw new Error(`${cmd} ${args.slice(0, 3).join(" ")} failed:\n${res.stderr.trim()}`);
@@ -193,7 +268,8 @@ function run(cmd, args, { input, allowFail = false } = {}) {
 
 const git = (...args) => run("git", args).stdout;
 
-class MySql {
+/** A MySQL 8.0 in Docker: a throwaway container, or MYSQL_CONTAINER when set. */
+export class MySql {
   constructor() {
     this.owned = !process.env.MYSQL_CONTAINER;
     this.password = this.owned ? "migration-check" : (process.env.MYSQL_ROOT_PASSWORD ?? "");
@@ -240,10 +316,9 @@ class MySql {
     return res.status === 0 ? null : res.stderr.trim();
   }
 
-  dump(db) {
+  dump(db, flags = ["--routines", "--events", "--triggers"]) {
     return this.exec("mysqldump", [
-      "--no-data", "--skip-comments", "--skip-dump-date", "--no-tablespaces",
-      "--routines", "--events", "--triggers", db,
+      "--no-data", "--skip-comments", "--skip-dump-date", "--no-tablespaces", ...flags, db,
     ]).stdout;
   }
 
@@ -276,7 +351,7 @@ function summary(markdown) {
   if (inActions && process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);
 }
 
-function diffText(a, b) {
+export function diffText(a, b, labels = ["base schema.sql + added migrations", "branch schema.sql"]) {
   const dir = mkdtempSync(join(tmpdir(), "migration-check-"));
   try {
     const left = join(dir, "migrations.sql");
@@ -285,7 +360,7 @@ function diffText(a, b) {
     writeFileSync(right, b);
     const res = run(
       "diff",
-      ["-u", "--label", "base schema.sql + added migrations", "--label", "branch schema.sql", left, right],
+      ["-u", "--label", labels[0], "--label", labels[1], left, right],
       { allowFail: true },
     );
     return res.stdout;
@@ -294,7 +369,7 @@ function diffText(a, b) {
   }
 }
 
-function main() {
+async function main() {
   const baseRef = process.env.BASE_SHA || "origin/main";
   const headRef = process.env.HEAD_SHA || "HEAD";
   const labels = parseLabels(process.env.PR_LABELS);
@@ -317,7 +392,12 @@ function main() {
   }
 
   // (b) destructive statements and edited migrations
-  const approved = labels.includes(LABEL_APPROVED);
+  const needsApproval = changes.editedExisting.length > 0 || changes.added.some((file) => findDestructive(git("show", `${headRef}:${file}`)).length > 0);
+  const approval = needsApproval ? await approvalFromGitHub(labels) : { approved: false, reason: "not needed" };
+  const approved = approval.approved;
+  if (needsApproval && labels.includes(LABEL_APPROVED)) {
+    log(approved ? `Approval verified: ${approval.reason}` : `${inActions ? "::warning::" : "WARNING: "}\`${LABEL_APPROVED}\` ignored: ${approval.reason}`);
+  }
   const contents = new Map(changes.added.map((file) => [file, git("show", `${headRef}:${file}`)]));
   for (const [file, sql] of contents) {
     for (const hit of findDestructive(sql)) {
@@ -342,7 +422,7 @@ function main() {
     if (baseError) throw new Error(`The base ${SCHEMA} failed to load:\n${baseError}`);
     let applied = true;
     for (const [file, sql] of contents) {
-      const error = mysql.apply(DB_BASE, upSection(sql));
+      const error = mysql.apply(DB_BASE, sql);
       if (error) {
         failures.push(`${basename(file)} failed to apply on the base schema:\n${block(error)}`);
         applied = false;
@@ -383,7 +463,7 @@ function main() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    process.exitCode = main();
+    process.exitCode = await main();
   } catch (error) {
     console.error(`${inActions ? "::error::" : "ERROR: "}${error.message}`);
     process.exitCode = 1;

@@ -40,3 +40,5 @@ Stop at a Decision point. Comment on the issue with numbered questions, each wit
 ## Migrations
 
 A schema change edits `server/db/schema.sql`, adds a dated file under `server/db/migrations/`, and carries the `needs-migration` label. The migration must work with the code currently deployed: add, never drop, rename or retype. A destructive change is two PRs (stop using the old structure, then remove it), and the second one is a Decision point.
+
+The `DB migrations` check enforces this: the base `schema.sql` plus the migrations the PR adds must equal the PR's `schema.sql`, the PR needs `needs-migration`, and a `DROP`, `RENAME`, `MODIFY`, `CHANGE`, `TRUNCATE` or `DELETE` without `WHERE` fails unless a maintainer adds `migration-approved`. Never add `migration-approved` yourself. Run the check locally before pushing (needs Docker): `PR_LABELS='["needs-migration"]' node scripts/check-db-migrations.mjs`.

@@ -29,7 +29,6 @@ router.get("/public/:uuid", async (req: Request, res: Response, next: NextFuncti
         id,
         public_id,
         username,
-        email,
         avatar_url,
         avatar_key,
         role,
@@ -62,7 +61,7 @@ router.get("/public/:uuid", async (req: Request, res: Response, next: NextFuncti
     const responseData = {
       public_id: user.public_id, // 🔥 返回 public_id (UUID)
       username: (profile.custom_name && profile.custom_name.trim()) || user.username,
-      email: user.email, // 可選：是否要公開 email
+      //* 不回帳號 email：任何人都能呼叫這支 API；要公開的聯絡方式是使用者自己填的 contact_email
       avatar_url: user.avatar_url,
       avatar_key: user.avatar_key,
       role: user.role,

@@ -309,6 +309,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
 
         const response = await fetch(`${hostName}/api/lalamove/quotation`, {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -367,8 +368,7 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
         }
       } catch (err: unknown) {
         console.error("Fetch quotation error:", err);
-        const message =
-          apiErrorMessage(err, t("quotation.quoteFailed"));
+        const message = apiErrorMessage(err, t("quotation.quoteFailed"));
         setErrorMsg(message);
         toast.error(message);
       } finally {

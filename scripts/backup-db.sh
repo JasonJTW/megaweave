@@ -50,10 +50,15 @@ if [ -n "${BACKUP_S3_URI:-}" ]; then
 fi
 
 umask 077
+created=""
+[ -d "$BACKUP_DIR" ] || created=1
 mkdir -p "$BACKUP_DIR"
 BACKUP_DIR="$(cd "$BACKUP_DIR" && pwd -P)"
 case "$BACKUP_DIR/" in
-  "$REPO"/*) die "BACKUP_DIR ($BACKUP_DIR) is inside the repo checkout; the next checkout would delete it" ;;
+  "$REPO"/*)
+    [ -z "$created" ] || rmdir "$BACKUP_DIR"
+    die "BACKUP_DIR ($BACKUP_DIR) is inside the repo checkout; the next checkout would delete it"
+    ;;
 esac
 
 # Backup files in BACKUP_DIR, oldest first (names sort by time)

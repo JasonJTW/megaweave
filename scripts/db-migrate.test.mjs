@@ -1,14 +1,16 @@
-// Integration test of scripts/db-migrate.sh against a throwaway mysql:8.0 container.
+// Integration test of scripts/db-migrate.sh, scripts/deploy-migrate.sh and
+// scripts/backup-db.sh against a throwaway mysql:8.0 container.
 // Needs Docker, so it runs only with DB_SCRIPTS_IT=1 (CI: .github/workflows/db-migrations.yml):
 //
 //   DB_SCRIPTS_IT=1 node --test scripts/db-migrate.test.mjs
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 
 const SCRIPTS = dirname(fileURLToPath(import.meta.url));
 const PASSWORD = "runner-test";
@@ -16,6 +18,7 @@ const skip = process.env.DB_SCRIPTS_IT === "1" ? false : "set DB_SCRIPTS_IT=1 to
 
 let container;
 let migrations;
+let backups;
 
 const docker = (args, input) => spawnSync("docker", args, { input, encoding: "utf8" });
 
@@ -33,12 +36,26 @@ function sql(statement) {
   return res.stdout.trim();
 }
 
+/** The deploy's DB_TOOLS, pointed at the test container instead of the db-tools service. */
+const dbTools = () =>
+  `docker exec -i -e DB_HOST=127.0.0.1 -e DB_USER=root -e DB_PASSWORD=${PASSWORD} -e DB_DATABASE=app -e MIGRATIONS_DIR=/m ${container}`;
+
+function script(name, env = {}) {
+  return spawnSync("bash", [join(SCRIPTS, name)], {
+    encoding: "utf8",
+    env: { ...process.env, DB_TOOLS: dbTools(), BACKUP_DIR: backups, BACKUP_MIN_FREE_MB: "1", ...env },
+  });
+}
+
+const backupFiles = () => (existsSync(backups) ? readdirSync(backups).filter((f) => f.endsWith(".sql.gz")).sort() : []);
+
 const write = (name, body) => writeFileSync(join(migrations, name), body);
 const recorded = () => sql("SELECT CONCAT(filename, ':', method) FROM schema_migrations ORDER BY filename").split("\n").filter(Boolean);
 
 describe("db-migrate.sh", { skip }, () => {
   before(() => {
     migrations = mkdtempSync(join(tmpdir(), "db-migrate-test-"));
+    backups = join(mkdtempSync(join(tmpdir(), "db-backup-test-")), "backups");
     const res = docker([
       "run", "-d", "--rm", "-e", `MYSQL_ROOT_PASSWORD=${PASSWORD}`, "-e", "MYSQL_DATABASE=app",
       "-v", `${SCRIPTS}:/scripts:ro`, "-v", `${migrations}:/m:ro`, "mysql:8.0", "--default-time-zone=+00:00",
@@ -59,6 +76,7 @@ describe("db-migrate.sh", { skip }, () => {
   after(() => {
     if (container) docker(["rm", "-f", container]);
     if (migrations) rmSync(migrations, { recursive: true, force: true });
+    if (backups) rmSync(dirname(backups), { recursive: true, force: true });
   });
 
   it("refuses up, pending and status before the baseline", () => {
@@ -67,6 +85,13 @@ describe("db-migrate.sh", { skip }, () => {
       assert.equal(res.status, 2, `${command}: ${res.stdout}${res.stderr}`);
     }
     assert.equal(sql("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='app' AND TABLE_NAME='schema_migrations'"), "0");
+  });
+
+  it("deploy-migrate refuses before the baseline, without a backup", () => {
+    const res = script("deploy-migrate.sh");
+    assert.equal(res.status, 1, res.stdout + res.stderr);
+    assert.match(res.stdout, /::error title=Migrations refused::/);
+    assert.deepEqual(backupFiles(), []);
   });
 
   it("refuses up while the tracking table is empty", () => {
@@ -139,5 +164,60 @@ describe("db-migrate.sh", { skip }, () => {
     const res = runner("up");
     assert.equal(res.status, 0, res.stderr);
     assert.ok(recorded().includes("2026-05-01-add-trigger.sql:applied"));
+  });
+
+  it("deploy-migrate does nothing, not even a backup, when nothing is pending", () => {
+    const res = script("deploy-migrate.sh");
+    assert.equal(res.status, 0, res.stdout + res.stderr);
+    assert.match(res.stdout, /No pending migrations/);
+    assert.deepEqual(backupFiles(), []);
+  });
+
+  it("deploy-migrate backs up, then applies the pending files", () => {
+    write("2026-06-01-add-sizes.sql", "CREATE TABLE sizes (id int PRIMARY KEY);\n");
+    const res = script("deploy-migrate.sh");
+    assert.equal(res.status, 0, res.stdout + res.stderr);
+    assert.match(res.stdout, /Backup written[\s\S]*Applied 2026-06-01-add-sizes\.sql/);
+    const files = backupFiles();
+    assert.equal(files.length, 1);
+    const dump = gunzipSync(readFileSync(join(backups, files[0]))).toString();
+    assert.match(dump, /CREATE TABLE `tags`/);
+    assert.doesNotMatch(dump, /CREATE TABLE `sizes`/, "the backup is taken before the migration");
+    assert.match(dump, /-- Dump completed/);
+    assert.ok(recorded().includes("2026-06-01-add-sizes.sql:applied"));
+  });
+
+  it("deploy-migrate fails after the backup when a migration fails", () => {
+    write("2026-07-01-broken.sql", "ALTER TABLE no_such_table ADD COLUMN x int;\n");
+    spawnSync("sleep", ["1"]); // backup names have one-second resolution
+    const res = script("deploy-migrate.sh");
+    assert.equal(res.status, 1);
+    assert.match(res.stdout, /::error title=Migration failed::/);
+    // MySQL's error text is indented, so it cannot start a workflow command
+    assert.match(res.stdout, /^ {4}.*no_such_table/m);
+    assert.equal(backupFiles().length, 2);
+    assert.ok(!recorded().some((row) => row.startsWith("2026-07-01")));
+    rmSync(join(migrations, "2026-07-01-broken.sql"));
+  });
+
+  it("backup-db keeps the newest BACKUP_KEEP and refuses a directory inside the checkout", () => {
+    spawnSync("sleep", ["1"]);
+    const res = script("backup-db.sh", { BACKUP_KEEP: "2" });
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(res.stdout, /Removed old backup/);
+    assert.equal(backupFiles().length, 2);
+
+    const inside = join(SCRIPTS, "..", ".backup-test-inside");
+    try {
+      const refused = script("backup-db.sh", { BACKUP_DIR: inside });
+      assert.equal(refused.status, 1);
+      assert.match(refused.stderr, /inside the repo checkout/);
+    } finally {
+      rmSync(inside, { recursive: true, force: true });
+    }
+
+    const tooSmall = script("backup-db.sh", { BACKUP_MIN_FREE_MB: "999999999" });
+    assert.equal(tooSmall.status, 1);
+    assert.match(tooSmall.stderr, /MB free/);
   });
 });

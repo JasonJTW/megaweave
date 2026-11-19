@@ -38,6 +38,12 @@ jobs:
           npm ci --prefix client
           npm ci --prefix server
 
+      # Fails on high/critical advisories in production dependencies
+      - name: Audit dependencies
+        run: |
+          npm audit --prefix client --omit=dev --audit-level=high
+          npm audit --prefix server --omit=dev --audit-level=high
+
       - name: Lint
         run: make lint
 

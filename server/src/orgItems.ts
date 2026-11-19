@@ -232,7 +232,7 @@ router.patch(
 //* 公開資訊（listing）是使用者填的表單，另外驗證，錯了 → VALIDATION_FAILED
 const PendingPublicSchema = z.object({
   assetDisposalConfirmed: z.boolean().default(false),
-  listing: z.unknown(),
+  listing: z.unknown().optional(),
 });
 
 /**
@@ -337,7 +337,7 @@ router.post(
 //* 模式是選單（client bug → INVALID_REQUEST），天數是使用者打字（VALIDATION_FAILED）
 //* `days` 只在 auto 模式出現：其他模式帶了天數是 client bug
 const AutoReleaseModeSchema = z
-  .object({ mode: z.enum(["org", "auto", "manual"]), days: z.unknown() })
+  .object({ mode: z.enum(["org", "auto", "manual"]), days: z.unknown().optional() })
   .refine((body) => body.mode === "auto" || body.days === undefined);
 const AutoReleaseDaysSchema = z.object({
   days: z.number({ error: "Days is required" }).int().min(1).max(AUTO_RELEASE_MAX_DAYS),

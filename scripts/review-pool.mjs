@@ -26,9 +26,11 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 // Bump a workflow's PROMPT_VERSION when its prompt changes, so cached verdicts expire.
-const CODE_PATHS = /^(client|server|services|\.github|scripts)\//;
+// .agents/ and .claude/ hold skills and settings that contributors' agents run unattended
+// with push access (the contribute skill's scripts, hooks), so both reviews cover them.
+const CODE_PATHS = /^(client|server|services|\.github|scripts|\.agents|\.claude)\//;
 const SECURITY_PATHS =
-  /^(server\/src\/|client\/app\/api\/|client\/middleware\.ts$|client\/next\.config\.ts$|\.github\/|scripts\/)/;
+  /^(server\/src\/|client\/app\/api\/|client\/middleware\.ts$|client\/next\.config\.ts$|\.github\/|scripts\/|\.agents\/|\.claude\/)/;
 
 // code-review.md applies the AGENTS.md sections by reference, so AGENTS.md is part of its standard.
 export const KINDS = {

@@ -4,14 +4,19 @@ name: CI
 # the pre-commit hook runs (lefthook.yml). megaweaving-cicd.yaml repeats them before deploy.
 # No `paths` filter: "Lint, typecheck, test" is a required check, and a required check
 # that never reports blocks the PR.
+# `edited` re-runs the job when a PR body changes, so a corrected `Model:` line
+# (agent PR check below) turns the check green without a new commit.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   workflow_dispatch:
 
+# pull-requests: read lists an agent PR's commits (scripts/check-agent-pr.mjs)
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -52,3 +57,20 @@ jobs:
 
       - name: Unit tests
         run: make test
+
+      # The contribute skill's issue picking and claiming (docs/agents/contributing.md)
+      - name: Contributor agent script tests
+        run: node --test .agents/skills/contribute/scripts/*.test.mjs
+
+      # Agent PRs (head branch agent/...) must declare an allowed model in the body and
+      # in every commit's trailer (scripts/check-agent-pr.mjs). The body travels through
+      # env, never interpolated into the script.
+      - name: Agent PR model declaration
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-agent-pr.mjs

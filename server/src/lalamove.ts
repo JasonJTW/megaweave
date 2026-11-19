@@ -152,9 +152,11 @@ router.get(
 /**
  * POST /api/lalamove/quotation
  * Request delivery quotation for one or multiple service types
+ * 每次都打付費的 Lalamove API，只給登入的人用（client 未登入時也不展開報價）
  */
 router.post(
   "/quotation",
+  requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { serviceType, serviceTypes, stops, language, scheduleAt } =

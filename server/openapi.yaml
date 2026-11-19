@@ -1324,7 +1324,7 @@ paths:
       tags: [weaves]
       operationId: listPublicWeaves
       summary: A user's public weave history
-      description: Only personal and Public org posts (ADR 0003); handovers given as an org contact are omitted (ADR 0004).
+      description: Only personal and Public org posts (ADR 0003); handovers given as an org contact are omitted (ADR 0004). `notes` and `conversation_id` belong to the two parties and are never returned.
       parameters:
         - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string } }
       responses:
@@ -1336,7 +1336,7 @@ paths:
                 type: object
                 required: [weaves]
                 properties:
-                  weaves: { type: array, items: { $ref: "#/components/schemas/Weave" } }
+                  weaves: { type: array, items: { $ref: "#/components/schemas/PublicWeave" } }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
   /api/weaves/{id}:
@@ -3322,6 +3322,14 @@ components:
         receiver_confirmed: { type: boolean }
         conversation_id: { type: integer }
         post: { $ref: "#/components/schemas/Post" }
+    PublicWeave:
+      description: A Weave on a public profile, without the parties' `notes` and `conversation_id`
+      allOf:
+        - { $ref: "#/components/schemas/Weave" }
+        - not:
+            anyOf:
+              - { required: [notes] }
+              - { required: [conversation_id] }
     Notification:
       type: object
       properties:

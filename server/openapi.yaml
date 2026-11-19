@@ -1,0 +1,3603 @@
+openapi: 3.1.0
+info:
+  title: Megaweave API
+  version: 1.0.0
+  description: |
+    HTTP contract of the Express server (`server/src/app.ts`, `server/src/api.ts`).
+    `server/src/openapiContract.test.ts` fails when a registered route is missing here
+    or a documented operation is no longer registered.
+
+    Conventions:
+    - Errors: every 4xx/5xx JSON error has the `ApiError` shape. Error codes live in
+      `server/src/utils/errorCodes.ts` and are deliberately not listed per operation.
+    - Auth: `sessionCookie` is the session id cookie set by signin/signup. Operations
+      without `security` are public; `optionalAuth` operations accept the cookie and
+      personalise the response when it is present.
+    - `x-dev-only: true` marks operations that only do anything outside production
+      (Lalamove sandbox) or are only mounted on an isolated benchmark instance.
+    - Row-shaped responses (posts, weaves, messages, org items) mirror MySQL rows and
+      allow additional properties; only fields the route code sets explicitly are listed.
+servers:
+  - url: https://localhost:8443
+    description: Local development (`make dev-server`)
+tags:
+  - name: health
+  - name: auth
+    description: Signup, signin, signout and the current session
+  - name: me
+    description: The signed-in user's aggregate page data and settings
+  - name: posts
+  - name: reference
+    description: Categories and condition levels
+  - name: profile
+    description: User profile fields, avatar and member cards
+  - name: stats
+  - name: comments
+  - name: weaves
+    description: Item handover requests between giver and receiver
+  - name: notifications
+  - name: messages
+  - name: lalamove
+    description: Delivery quotes, orders, tracking and the Lalamove webhook
+  - name: payments
+    description: ECPay checkout and callbacks
+  - name: admin
+    description: Platform admin (role `admin`)
+  - name: org-admin
+    description: Organisation administration (org admins)
+  - name: orgs
+    description: Organisation items, tiers and handovers for org members
+  - name: benchmark
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Liveness check
+      responses:
+        "200":
+          description: Server is up. Benchmark instances add `benchmarkEnvironment` and `benchmarkMetrics`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, uptime, timestamp, ssl]
+                properties:
+                  status: { type: string, const: OK }
+                  uptime: { type: number, description: Process uptime in seconds }
+                  timestamp: { type: string, format: date-time }
+                  ssl: { type: boolean }
+                  benchmarkEnvironment: { type: string, const: isolated }
+                  benchmarkMetrics: { type: object, additionalProperties: true }
+  /benchmark/feed-caches/reset:
+    post:
+      tags: [benchmark]
+      operationId: resetBenchmarkFeedCaches
+      summary: Clear the in-memory feed vector caches
+      description: Mounted only when `BENCHMARK_TARGET_MARKER=megaweave-isolated`.
+      x-dev-only: true
+      responses:
+        "200":
+          description: Cache sizes after the reset
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [feedVectorCaches]
+                properties:
+                  feedVectorCaches: { type: object, additionalProperties: true }
+  /api/signup:
+    post:
+      tags: [auth]
+      operationId: signup
+      summary: Create a native account and start a session
+      description: Rate limited (auth limiter). Sets the session and `user-role` cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username: { type: string, minLength: 3 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Account created and signed in
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, user]
+                properties:
+                  message: { type: string }
+                  user:
+                    type: object
+                    description: The submitted user without password and salt. `id` is always 0.
+                    properties:
+                      id: { type: integer }
+                      username: { type: string }
+                      email: { type: string }
+                      public_id: { type: string, format: uuid }
+                      created_at: { type: string, format: date-time }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/signin:
+    post:
+      tags: [auth]
+      operationId: signin
+      summary: Sign in with email and password
+      description: Rate limited (auth limiter). Sets the session and `user-role` cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/signin/google:
+    post:
+      tags: [auth]
+      operationId: signinGoogle
+      summary: Sign in or sign up with a Google ID token
+      description: Rate limited (auth limiter). Sets the session and `user-role` cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credential]
+              properties:
+                credential: { type: string, description: Google ID token }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/signin/facebook:
+    post:
+      tags: [auth]
+      operationId: signinFacebook
+      summary: Sign in or sign up with a Facebook access token
+      description: Rate limited (auth limiter). Sets the session and `user-role` cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accessToken]
+              properties:
+                accessToken: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/signout:
+    post:
+      tags: [auth]
+      operationId: signout
+      summary: End the session and clear its cookies
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/currentUser:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: The session's user
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Session user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: "#/components/schemas/UserSession" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/currentUser/update:
+    post:
+      tags: [auth]
+      operationId: updateCurrentUserSession
+      summary: Merge fields into the session
+      description: Changing `role` or `userId` is refused (403).
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                updates:
+                  type: object
+                  description: Partial `UserSession`
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Updated session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updatedUser]
+                properties:
+                  updatedUser: { $ref: "#/components/schemas/UserSession" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: Everything the user page needs in one request
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Profile, stats, own posts, weaves and (contributor/admin) member card
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile, stats, posts, weaves, member]
+                properties:
+                  profile:
+                    type: object
+                    required: [bio, custom_name, contact_email, contact_phone]
+                    properties:
+                      bio: { type: string }
+                      custom_name: { type: string }
+                      contact_email: { type: [string, "null"] }
+                      contact_phone: { type: [string, "null"] }
+                  stats: { $ref: "#/components/schemas/UserStats" }
+                  posts:
+                    type: array
+                    items: { $ref: "#/components/schemas/Post" }
+                  weaves:
+                    type: array
+                    items: { $ref: "#/components/schemas/Weave" }
+                  member:
+                    description: "`members` row; null unless the user is a contributor or admin"
+                    oneOf:
+                      - { $ref: "#/components/schemas/Member" }
+                      - { type: "null" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/me/locale:
+    put:
+      tags: [me]
+      operationId: updateMyLocale
+      summary: Set the account language used for emails
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale]
+              properties:
+                locale: { $ref: "#/components/schemas/Locale" }
+      responses:
+        "200":
+          description: Saved locale
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locale]
+                properties:
+                  locale: { $ref: "#/components/schemas/Locale" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts/presigned-urls:
+    post:
+      tags: [posts]
+      operationId: createPostImageUploadUrls
+      summary: Presigned S3 staging upload URLs for post images
+      description: Each URL is valid for 300 seconds. At most `UPLOAD_IMAGE_LIMIT` (default 5) files.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [filename, contentType]
+                    properties:
+                      filename: { type: string, minLength: 1 }
+                      contentType: { type: string, pattern: "^image/" }
+      responses:
+        "200":
+          description: One URL per file, in request order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [urls]
+                properties:
+                  urls:
+                    type: array
+                    items:
+                      type: object
+                      required: [stagingKey, presignedUrl]
+                      properties:
+                        stagingKey: { type: string }
+                        presignedUrl: { type: string, format: uri }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts:
+    get:
+      tags: [posts]
+      operationId: listPosts
+      summary: Public post list with filters
+      description: Internal and Members org posts are excluded (ADR 0003); org posts show the org as publisher (ADR 0004).
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { name: limit, in: query, schema: { type: integer, default: 10 } }
+        - { name: category_id, in: query, schema: { type: string } }
+        - { name: location, in: query, schema: { type: string } }
+        - { name: city, in: query, schema: { type: string } }
+        - { name: province, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, default: active } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: type, in: query, schema: { $ref: "#/components/schemas/PostType" } }
+      responses:
+        "200":
+          description: Page of posts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [posts]
+      operationId: createPost
+      summary: Create a post
+      description: |
+        Accepts JSON or urlencoded fields; `categoryId`/`conditionLevel`/`lat`/`lng` may be
+        numeric strings and `items`/`stagingKeys` JSON-encoded strings. `expires_at` is accepted
+        as an alias of `expiresAt`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePostInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, post]
+                properties:
+                  message: { type: string }
+                  post: { $ref: "#/components/schemas/Post" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts/feed:
+    get:
+      tags: [posts]
+      operationId: getFeed
+      summary: Unified hybrid recommendation feed
+      description: |
+        Personalised when the session cookie is present. A non-empty `search` switches to semantic
+        search (at most 300 characters). Responds with a `Server-Timing` header.
+      security: [{}, { sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - { name: type, in: query, schema: { $ref: "#/components/schemas/PostType" } }
+        - { name: category_id, in: query, schema: { type: integer } }
+        - { name: search, in: query, schema: { type: string, maxLength: 300 } }
+        - { name: location, in: query, schema: { type: string } }
+        - { name: city, in: query, schema: { type: string } }
+        - { name: province, in: query, schema: { type: string } }
+        - { name: lat, in: query, schema: { type: number } }
+        - { name: lng, in: query, schema: { type: number } }
+        - { name: radius, in: query, schema: { type: number }, description: Kilometres }
+        - { name: mode, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Page of ranked posts
+          headers:
+            Server-Timing: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/PostPage" }
+                  - type: object
+                    required: [isPersonalized]
+                    properties:
+                      isPersonalized: { type: boolean }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts/history:
+    get:
+      tags: [posts]
+      operationId: getViewedPosts
+      summary: Posts the user has viewed
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        "200":
+          description: Page of viewed posts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Post `public_id`
+        schema: { type: string }
+    get:
+      tags: [posts]
+      operationId: getPost
+      summary: Post detail
+      description: Counts a view. `id` must be a UUID. Visibility follows the viewer's org tier.
+      security: [{}, { sessionCookie: [] }]
+      responses:
+        "200":
+          description: Post
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [post]
+                properties:
+                  post: { $ref: "#/components/schemas/Post" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    put:
+      tags: [posts]
+      operationId: updatePost
+      summary: Edit a post (owner or admin)
+      description: Same field coercions as create; `deletedImageIds` is accepted as an alias of `deleteImageIds`, and `expiresAt` `""` clears the expiry.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePostInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, post]
+                properties:
+                  message: { type: string }
+                  post: { $ref: "#/components/schemas/Post" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [posts]
+      operationId: deletePost
+      summary: Soft-delete a post (owner or admin)
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts/{id}/embedding:
+    post:
+      tags: [posts]
+      operationId: generatePostEmbedding
+      summary: Generate and save a post embedding now (admin)
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric post id or `public_id`
+          schema: { type: string }
+      responses:
+        "200":
+          description: Embedding saved; other fields come from the embedding service
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, postId]
+                properties:
+                  message: { type: string }
+                  postId: { type: integer }
+                additionalProperties: true
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/posts/{postId}/like:
+    parameters:
+      - name: postId
+        in: path
+        required: true
+        description: Post `public_id`
+        schema: { type: string }
+    get:
+      tags: [posts]
+      operationId: getLikeStatus
+      summary: Whether the user likes the post
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Like state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [liked]
+                properties:
+                  liked: { type: boolean }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    put:
+      tags: [posts]
+      operationId: setLike
+      summary: Set the like state (idempotent)
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [liked]
+              properties:
+                liked: { type: boolean }
+      responses:
+        "200":
+          description: New like state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [liked, likesCount]
+                properties:
+                  liked: { type: boolean }
+                  likesCount: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [posts]
+      operationId: toggleLike
+      summary: Toggle the like state (legacy; prefer PUT)
+      deprecated: true
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: New like state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [liked]
+                properties:
+                  liked: { type: boolean }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/categories:
+    get:
+      tags: [reference]
+      operationId: listCategories
+      summary: Active categories
+      responses:
+        "200":
+          description: Categories ordered by id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, categories]
+                properties:
+                  message: { type: string }
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/Category" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/categories/{id}:
+    get:
+      tags: [reference]
+      operationId: getCategory
+      summary: One category (any status)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Category
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, category]
+                properties:
+                  message: { type: string }
+                  category: { $ref: "#/components/schemas/Category" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/conditions:
+    get:
+      tags: [reference]
+      operationId: listConditions
+      summary: Active condition levels
+      responses:
+        "200":
+          description: Conditions ordered by level
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, conditions]
+                properties:
+                  message: { type: string }
+                  conditions:
+                    type: array
+                    items: { $ref: "#/components/schemas/Condition" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/conditions/{level}:
+    get:
+      tags: [reference]
+      operationId: getCondition
+      summary: One active condition level
+      parameters:
+        - { name: level, in: path, required: true, schema: { type: integer, minimum: 1, maximum: 5 } }
+      responses:
+        "200":
+          description: Condition
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, condition]
+                properties:
+                  message: { type: string }
+                  condition: { $ref: "#/components/schemas/Condition" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/avatar:
+    post:
+      tags: [profile]
+      operationId: uploadAvatar
+      summary: Upload a new avatar
+      description: Image file up to 10 MB; replaces and deletes the previous avatar.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar: { type: string, format: binary }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, avatarUrl, avatarKey]
+                properties:
+                  message: { type: string }
+                  avatarUrl: { type: string }
+                  avatarKey: { type: string }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [profile]
+      operationId: deleteAvatar
+      summary: Remove the avatar
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/userprofile/public/{uuid}:
+    get:
+      tags: [profile]
+      operationId: getPublicProfile
+      summary: A user's public profile
+      parameters:
+        - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [public_id, username, bio]
+                properties:
+                  public_id: { type: string, format: uuid }
+                  username: { type: string, description: custom_name when set, else username }
+                  email: { type: string }
+                  avatar_url: { type: [string, "null"] }
+                  avatar_key: { type: [string, "null"] }
+                  role: { $ref: "#/components/schemas/UserRole" }
+                  created_at: { type: string, format: date-time }
+                  bio: { type: string }
+                  contact_email: { type: [string, "null"] }
+                  contact_phone: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/member/all:
+    get:
+      tags: [profile]
+      operationId: listMembers
+      summary: Team member cards for the about page
+      parameters:
+        - { name: userId, in: query, description: Only this user's card, schema: { type: integer } }
+      responses:
+        "200":
+          description: "`members` rows ordered by sort_order"
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Member" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/member:
+    post:
+      tags: [profile]
+      operationId: updateMyMemberCard
+      summary: Update the signed-in contributor's or admin's member card
+      security: [{ sessionCookie: [] }]
+      x-required-role: [admin, contributor]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                updates:
+                  type: object
+                  description: Other keys are ignored; at least one listed key is required.
+                  properties:
+                    member_name: { type: string, minLength: 1 }
+                    location: { type: string }
+                    email: { type: string }
+                    member_bio: { type: string }
+                    websites: { type: array, items: { $ref: "#/components/schemas/MemberWebsite" } }
+                    title: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/userprofile/bio:
+    get:
+      tags: [profile]
+      operationId: getMyBio
+      summary: Bio of the signed-in user
+      description: Also backfills an empty custom_name with the username.
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Current value (absent when there is no profile row)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bio: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [profile]
+      operationId: setMyBio
+      summary: Set the signed-in user's bio
+      description: A `user_id`/`userId` in the body that is not the session user's is refused (403).
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bio: { type: [string, "null"] }
+                user_id: { type: integer }
+                userId: { type: integer }
+      responses:
+        "200":
+          description: Saved. `data` is the raw MySQL result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+                  data: { description: mysql2 query result }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/userprofile/custom_name:
+    get:
+      tags: [profile]
+      operationId: getMyCustomName
+      summary: Display name of the signed-in user
+      description: Reads `user_profiles`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Current value (absent when there is no profile row)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  custom_name: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [profile]
+      operationId: setMyCustomName
+      summary: Set the signed-in user's display name
+      description: A `user_id`/`userId` in the body that is not the session user's is refused (403). A non-empty name also updates every session of the user.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                custom_name: { type: [string, "null"] }
+                user_id: { type: integer }
+                userId: { type: integer }
+      responses:
+        "200":
+          description: Saved. `data` is the raw MySQL result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+                  data: { description: mysql2 query result }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/userprofile/contact_email:
+    get:
+      tags: [profile]
+      operationId: getMyContactEmail
+      summary: Contact email of the signed-in user
+      description: Reads `user_profiles`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Current value (absent when there is no profile row)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contactEmail: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [profile]
+      operationId: setMyContactEmail
+      summary: Set the signed-in user's contact email
+      description: A `user_id`/`userId` in the body that is not the session user's is refused (403).
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_email: { type: [string, "null"] }
+                user_id: { type: integer }
+                userId: { type: integer }
+      responses:
+        "200":
+          description: Saved. `data` is the raw MySQL result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+                  data: { description: mysql2 query result }
+                  newContactEmail: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/userprofile/contact_phone:
+    get:
+      tags: [profile]
+      operationId: getMyContactPhone
+      summary: Contact phone of the signed-in user
+      description: Reads `user_profiles`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Current value (absent when there is no profile row)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contactPhone: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [profile]
+      operationId: setMyContactPhone
+      summary: Set the signed-in user's contact phone
+      description: A `user_id`/`userId` in the body that is not the session user's is refused (403).
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact_phone: { type: [string, "null"] }
+                user_id: { type: integer }
+                userId: { type: integer }
+      responses:
+        "200":
+          description: Saved. `data` is the raw MySQL result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+                  data: { description: mysql2 query result }
+                  newContactPhone: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/user/stats:
+    get:
+      tags: [stats]
+      operationId: getMyStats
+      summary: The signed-in user's stats and posts
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Stats (all zero when not calculated yet)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetailedUserStats" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/user/stats/public/{uuid}:
+    get:
+      tags: [stats]
+      operationId: getPublicStats
+      summary: A user's public stats and public posts
+      parameters:
+        - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Stats (all zero when not calculated yet)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetailedUserStats" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/user/stats/refresh:
+    post:
+      tags: [stats]
+      operationId: refreshMyStats
+      summary: Recalculate the signed-in user's stats
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Recalculated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+                  stats: { type: object, additionalProperties: true }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/user/stats/leaderboard:
+    get:
+      tags: [stats]
+      operationId: getLeaderboard
+      summary: Top users by a stat
+      parameters:
+        - name: type
+          in: query
+          description: Unknown values sort by points but are echoed back
+          schema: { type: string, enum: [points, givers, weaves, posts], default: points }
+        - { name: limit, in: query, schema: { type: integer, default: 10, maximum: 100 } }
+      responses:
+        "200":
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [type, leaderboard]
+                properties:
+                  type: { type: string }
+                  leaderboard:
+                    type: array
+                    items:
+                      type: object
+                      required: [rank, userId, username]
+                      properties:
+                        rank: { type: integer }
+                        userId: { type: string, format: uuid, description: User `public_id` }
+                        username: { type: string }
+                        avatarUrl: { type: [string, "null"] }
+                        postCount: { type: integer }
+                        weaveCount: { type: integer }
+                        weaveAsGiver: { type: integer }
+                        totalQuantityGiven: { type: integer }
+                        totalQuantityReceived: { type: integer }
+                        points: { type: number }
+                        giveSuccessRate: { type: number }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/comments:
+    get:
+      tags: [comments]
+      operationId: listComments
+      summary: Comment tree of a post, grouped by item
+      description: 404 when the viewer cannot see the post.
+      security: [{}, { sessionCookie: [] }]
+      parameters:
+        - { name: post_id, in: query, required: true, description: Numeric post id, schema: { type: integer } }
+        - { name: item_id, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: Root comments keyed by `all` (post-level) or `item_<id>`, each with nested `children`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [post_id, total, comments]
+                properties:
+                  post_id: { type: integer }
+                  total: { type: integer }
+                  comments:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items: { $ref: "#/components/schemas/CommentNode" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [comments]
+      operationId: createComment
+      summary: Comment on a post or reply to a comment
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [post_id, content]
+              properties:
+                post_id:
+                  description: Numeric post id (number or decimal string)
+                  oneOf:
+                    - { type: integer, minimum: 1 }
+                    - { type: string, pattern: "^\\d+$" }
+                item_id: { type: [integer, "null"] }
+                parent_id: { type: [integer, "null"] }
+                user_id: { type: [integer, "null"], description: Must be the session user when present }
+                content: { type: string, minLength: 1 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, comment]
+                properties:
+                  message: { type: string }
+                  comment: { $ref: "#/components/schemas/Comment" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/comments/counts:
+    get:
+      tags: [comments]
+      operationId: getCommentCounts
+      summary: Comment counts per item of a post
+      security: [{}, { sessionCookie: [] }]
+      parameters:
+        - { name: post_id, in: query, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Counts keyed by `all` or `item_<id>`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [post_id, counts]
+                properties:
+                  post_id: { type: integer }
+                  counts:
+                    type: object
+                    additionalProperties: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/comments/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [comments]
+      operationId: getComment
+      summary: Locate a comment (its post and item)
+      security: [{}, { sessionCookie: [] }]
+      responses:
+        "200":
+          description: Comment location
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [comment]
+                properties:
+                  comment:
+                    type: object
+                    required: [id, post_id, item_id]
+                    properties:
+                      id: { type: integer }
+                      post_id: { type: integer }
+                      item_id: { type: [integer, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    put:
+      tags: [comments]
+      operationId: updateComment
+      summary: Edit own comment
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, commentId, content]
+                properties:
+                  message: { type: string }
+                  commentId: { type: integer }
+                  content: { type: string }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [comments]
+      operationId: deleteComment
+      summary: Soft-delete a comment (owner or admin)
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, commentId]
+                properties:
+                  message: { type: string }
+                  commentId: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/weaves:
+    get:
+      tags: [weaves]
+      operationId: listMyWeaves
+      summary: Weaves where the user is giver or receiver
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: role, in: query, schema: { $ref: "#/components/schemas/WeaveRole" } }
+        - { name: postId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/WeaveStatus" } }
+      responses:
+        "200":
+          description: Newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [weaves]
+                properties:
+                  weaves: { type: array, items: { $ref: "#/components/schemas/Weave" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [weaves]
+      operationId: requestWeave
+      summary: Request items of a post
+      description: "`items` takes precedence over the legacy single-item `itemId`/`quantity` fields."
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [postId]
+              properties:
+                postId: { type: integer, description: Numeric post id }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      itemId: { type: integer }
+                      item_id: { type: integer }
+                      quantity: { type: integer, default: 1 }
+                itemId: { type: integer, deprecated: true }
+                quantity: { type: integer, default: 1, deprecated: true }
+                notes: { type: [string, "null"] }
+                actingUnitId:
+                  type: [integer, "null"]
+                  minimum: 1
+                  description: Org unit the user requests on behalf of; null or omitted means personally (ADR 0004)
+      responses:
+        "201":
+          description: Requested
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, weaveId, notificationSent]
+                properties:
+                  message: { type: string }
+                  weaveId: { type: integer }
+                  notificationSent: { type: boolean }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/weaves/acting-units:
+    get:
+      tags: [weaves]
+      operationId: listActingUnits
+      summary: Org units the user may request a post on behalf of
+      description: An empty list means the client hides the "on behalf of" choice (ADR 0004).
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: postId, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Units
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [units]
+                properties:
+                  units: { type: array, items: { $ref: "#/components/schemas/OrgUnitRef" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/weaves/public/{uuid}:
+    get:
+      tags: [weaves]
+      operationId: listPublicWeaves
+      summary: A user's public weave history
+      description: Only personal and Public org posts (ADR 0003); handovers given as an org contact are omitted (ADR 0004).
+      parameters:
+        - { name: uuid, in: path, required: true, description: User `public_id`, schema: { type: string } }
+      responses:
+        "200":
+          description: Newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [weaves]
+                properties:
+                  weaves: { type: array, items: { $ref: "#/components/schemas/Weave" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/weaves/{id}:
+    get:
+      tags: [weaves]
+      operationId: getWeave
+      summary: One of the user's weaves
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: Weave
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [weave]
+                properties:
+                  weave: { $ref: "#/components/schemas/Weave" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/weaves/{id}/status:
+    patch:
+      tags: [weaves]
+      operationId: updateWeaveStatus
+      summary: Move a weave through its approval and two-sided completion flow
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/WeaveStatus" }
+      responses:
+        "200":
+          description: "`message` is `Success` once both sides confirmed completion, else `Waiting`"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, newStatus, fullyCompleted]
+                properties:
+                  message: { type: string, enum: [Success, Waiting] }
+                  newStatus: { $ref: "#/components/schemas/WeaveStatus" }
+                  fullyCompleted: { type: boolean }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: The user's notifications, newest first
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        "200":
+          description: Page of notifications and the total unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [notifications, unreadCount]
+                properties:
+                  notifications: { type: array, items: { $ref: "#/components/schemas/Notification" } }
+                  unreadCount: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/notifications/{id}/read:
+    patch:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Mark one of the user's notifications read
+      description: Succeeds even when the id is not the user's (nothing changes).
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/notifications/read-all:
+    put:
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all of the user's notifications read
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/send:
+    post:
+      tags: [admin]
+      operationId: enqueueTestEmail
+      summary: Enqueue a transactional email (manual testing, admin)
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [props]
+              properties:
+                props:
+                  oneOf:
+                    - type: object
+                      required: [template, recipientId, action, actorName, postTitle, weaveId, items, recipientRole, ctaUrl]
+                      properties:
+                        template: { const: weave-status }
+                        recipientId: { type: integer, minimum: 1 }
+                        action: { type: string, enum: [requested, approved, declined, cancelled, withdrawn, confirmed, completed] }
+                        actorName: { type: string }
+                        postTitle: { type: string }
+                        weaveId: { type: integer, minimum: 1 }
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required: [title, quantity]
+                            properties:
+                              title: { type: [string, "null"] }
+                              quantity: { type: [integer, "null"], minimum: 1 }
+                        recipientRole: { $ref: "#/components/schemas/WeaveRole" }
+                        ctaUrl: { type: string, format: uri }
+                    - type: object
+                      required: [template, recipientId, event, merchantTradeNo, amount, ctaUrl]
+                      properties:
+                        template: { const: delivery-notice }
+                        recipientId: { type: integer, minimum: 1 }
+                        event: { type: string, enum: [DISPATCH_FAILED, PAID_AFTER_ORDER_CLOSED, REFUNDED, REFUND_FAILED] }
+                        reason: { type: string }
+                        merchantTradeNo: { type: string }
+                        amount: { type: number, minimum: 0 }
+                        ctaUrl: { type: string, format: uri }
+      responses:
+        "202": { $ref: "#/components/responses/Message" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/messages:
+    post:
+      tags: [messages]
+      operationId: sendMessage
+      summary: Send a message, optionally with images
+      description: |
+        `recipient_public_id` is a user `public_id`, or an org contact token (`org-post:<post>`,
+        `org-conv:<conversation>`, ADR 0004). Needs `content` or at least one image (max 10, 10 MB each).
+        With `post_id` and an item a system message about the item may be written first.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/SendMessageInput" }
+          application/json:
+            schema: { $ref: "#/components/schemas/SendMessageInput" }
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, conversationId]
+                properties:
+                  message: { $ref: "#/components/schemas/Message" }
+                  conversationId: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/messages/start:
+    post:
+      tags: [messages]
+      operationId: startConversation
+      summary: Get or create the conversation with a recipient
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient_public_id]
+              properties:
+                recipient_public_id: { type: string, minLength: 1, maxLength: 64 }
+      responses:
+        "200":
+          description: Conversation id
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversationId]
+                properties:
+                  conversationId: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/messages/conversations:
+    get:
+      tags: [messages]
+      operationId: listConversations
+      summary: The user's conversations
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations: { type: array, items: { $ref: "#/components/schemas/Conversation" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/messages/conversations/{id}:
+    get:
+      tags: [messages]
+      operationId: getConversationMessages
+      summary: Messages of a conversation, 20 per page
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: before_id, in: query, description: Return messages older than this message id, schema: { type: integer } }
+      responses:
+        "200":
+          description: Messages and the conversation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [messages, conversation, hasMore]
+                properties:
+                  messages: { type: array, items: { $ref: "#/components/schemas/Message" } }
+                  conversation:
+                    oneOf:
+                      - { $ref: "#/components/schemas/Conversation" }
+                      - { type: "null" }
+                  hasMore: { type: boolean }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/messages/conversations/{id}/read:
+    patch:
+      tags: [messages]
+      operationId: markConversationRead
+      summary: Mark a conversation read for the user
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/service-types:
+    get:
+      tags: [lalamove]
+      operationId: getLalamoveServiceTypes
+      summary: Lalamove Taiwan market cities and vehicle types
+      parameters:
+        - { name: city, in: query, description: Filter cities by id or name substring, schema: { type: string } }
+        - { name: refresh, in: query, description: "`true` bypasses the market info cache", schema: { type: string, enum: ["true", "false"] } }
+      responses:
+        "200":
+          description: Market info
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, market, cities, allSupportedTypes]
+                properties:
+                  success: { type: boolean, const: true }
+                  market: { type: string, const: TW }
+                  cities:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                      additionalProperties: true
+                  allSupportedTypes: { type: array, items: { type: string } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/quotation:
+    post:
+      tags: [lalamove]
+      operationId: requestLalamoveQuotation
+      summary: Delivery quotations for one or more service types
+      description: No session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stops]
+              properties:
+                serviceType: { type: string }
+                serviceTypes: { type: array, items: { type: string } }
+                stops:
+                  type: array
+                  minItems: 2
+                  description: Pickup first, then drop-off; both need an address
+                  items:
+                    type: object
+                    required: [address]
+                    properties:
+                      address: { type: string }
+                      coordinates:
+                        type: object
+                        properties:
+                          lat: { type: string }
+                          lng: { type: string }
+                    additionalProperties: true
+                language: { type: string, default: zh_TW }
+                scheduleAt: { type: string, format: date-time }
+      responses:
+        "200":
+          description: One quotation per service type; `primary` is the first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, quotations, primary]
+                properties:
+                  success: { type: boolean, const: true }
+                  quotations: { type: array, items: { $ref: "#/components/schemas/LalamoveQuotation" } }
+                  primary: { $ref: "#/components/schemas/LalamoveQuotation" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/orders:
+    post:
+      tags: [lalamove]
+      operationId: createLalamoveOrder
+      summary: Place a Lalamove order from a quotation
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quotationId, sender, recipients]
+              properties:
+                quotationId: { type: string }
+                sender: { $ref: "#/components/schemas/LalamoveContact" }
+                recipients: { type: array, minItems: 1, items: { $ref: "#/components/schemas/LalamoveContact" } }
+                isPODEnabled: { type: boolean }
+                isRecipientSmsEnabled: { type: boolean }
+                partner: { type: string }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        "201":
+          description: Order placed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, order]
+                properties:
+                  success: { type: boolean, const: true }
+                  order: { type: object, description: Lalamove order result, additionalProperties: true }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/orders/{orderId}:
+    parameters:
+      - { $ref: "#/components/parameters/DeliveryOrderId" }
+    get:
+      tags: [lalamove]
+      operationId: getLalamoveOrder
+      summary: Delivery order detail from the database (buyer, seller or admin)
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, order]
+                properties:
+                  success: { type: boolean, const: true }
+                  order: { $ref: "#/components/schemas/DeliveryOrderDetail" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [lalamove]
+      operationId: cancelLalamoveOrder
+      summary: Cancel a delivery order (creator or admin)
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/DeliveryCancelled" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/orders/{orderId}/cancel:
+    post:
+      tags: [lalamove]
+      operationId: cancelLalamoveOrderViaPost
+      summary: Cancel a delivery order (POST alias of DELETE)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/DeliveryOrderId" }
+      responses:
+        "200": { $ref: "#/components/responses/DeliveryCancelled" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/orders/{orderId}/driver:
+    get:
+      tags: [lalamove]
+      operationId: getLalamoveDriver
+      summary: Driver detail and location (buyer, seller or admin)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/DeliveryOrderId" }
+        - { name: driverId, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Driver
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, driver]
+                properties:
+                  success: { type: boolean, const: true }
+                  driver: { type: object, description: Lalamove driver detail, additionalProperties: true }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/lalamove/webhook:
+    post:
+      tags: [lalamove]
+      operationId: receiveLalamoveWebhook
+      summary: Lalamove webhook (order status, driver assignment, driver location)
+      description: |
+        Parsed as a raw body for HMAC verification. The signature comes from
+        `Authorization: hmac <key>:<timestamp>:<signature>`, or `payload.signature`/`payload.timestamp`,
+        or the `x-llm-signature`/`x-signature`/`x-lalamove-signature` and `x-llm-timestamp` headers.
+        Responses are the Lalamove protocol replies below, not `ApiError`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                eventType: { type: string }
+                timestamp: { type: [integer, string] }
+                signature: { type: string }
+                data: { type: object, additionalProperties: true }
+              additionalProperties: true
+      responses:
+        "200":
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties:
+                  received: { type: boolean, const: true }
+        "400": { $ref: "#/components/responses/WebhookError" }
+        "401": { $ref: "#/components/responses/WebhookError" }
+        "500": { $ref: "#/components/responses/WebhookError" }
+  /api/lalamove/sandbox/driver-location:
+    put:
+      tags: [lalamove]
+      operationId: sandboxUpdateDriverLocation
+      summary: "[Sandbox] Move the simulated driver"
+      description: |
+        Always registered, but answers 403 unless `LALAMOVE_ENV` is `sandbox` (the default) and
+        `NODE_ENV` is not `production`. No session is checked. Errors use `SandboxError`, not `ApiError`.
+      x-dev-only: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, lat, lng]
+              properties:
+                orderId: { type: string }
+                lat: { type: string }
+                lng: { type: string }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: { type: boolean, const: true }
+                  result: { description: Lalamove sandbox response }
+        "400": { $ref: "#/components/responses/SandboxError" }
+        "403": { $ref: "#/components/responses/SandboxError" }
+        "500": { $ref: "#/components/responses/SandboxError" }
+  /api/lalamove/sandbox/match-driver:
+    put:
+      tags: [lalamove]
+      operationId: sandboxMatchDriver
+      summary: "[Sandbox] Simulate a driver accepting the order (ON_GOING)"
+      description: |
+        Always registered, but answers 403 unless `LALAMOVE_ENV` is `sandbox` (the default) and
+        `NODE_ENV` is not `production`. No session is checked. Errors use `SandboxError`, not `ApiError`.
+      x-dev-only: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, message]
+                properties:
+                  success: { type: boolean, const: true }
+                  message: { type: string }
+        "400": { $ref: "#/components/responses/SandboxError" }
+        "403": { $ref: "#/components/responses/SandboxError" }
+        "500": { $ref: "#/components/responses/SandboxError" }
+  /api/lalamove/sandbox/pickup:
+    put:
+      tags: [lalamove]
+      operationId: sandboxPickup
+      summary: "[Sandbox] Simulate pickup (PICKED_UP)"
+      description: |
+        Always registered, but answers 403 unless `LALAMOVE_ENV` is `sandbox` (the default) and
+        `NODE_ENV` is not `production`. No session is checked. Errors use `SandboxError`, not `ApiError`.
+      x-dev-only: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: { type: boolean, const: true }
+                  result: { description: Lalamove sandbox response }
+        "400": { $ref: "#/components/responses/SandboxError" }
+        "403": { $ref: "#/components/responses/SandboxError" }
+        "500": { $ref: "#/components/responses/SandboxError" }
+  /api/lalamove/sandbox/deliver:
+    put:
+      tags: [lalamove]
+      operationId: sandboxDeliver
+      summary: "[Sandbox] Simulate delivery (COMPLETED)"
+      description: |
+        Always registered, but answers 403 unless `LALAMOVE_ENV` is `sandbox` (the default) and
+        `NODE_ENV` is not `production`. No session is checked. Errors use `SandboxError`, not `ApiError`.
+      x-dev-only: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId]
+              properties:
+                orderId: { type: string }
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: { type: boolean, const: true }
+                  result: { description: Lalamove sandbox response }
+        "400": { $ref: "#/components/responses/SandboxError" }
+        "403": { $ref: "#/components/responses/SandboxError" }
+        "500": { $ref: "#/components/responses/SandboxError" }
+  /api/payments/checkout:
+    post:
+      tags: [payments]
+      operationId: createCheckout
+      summary: Create a delivery payment and the ECPay auto-submit form
+      description: "`pickup` and `dropoff` take an existing `locationId` or an address object (created on the fly)."
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [postId, serviceType, quotationId, feeTotal, expiresAt, pickup, dropoff, senderName, senderPhone, recipientName, recipientPhone]
+              properties:
+                postId: { type: integer, minimum: 1 }
+                serviceType: { type: string, minLength: 1 }
+                quotationId: { type: string, minLength: 1 }
+                feeTotal: { type: integer, minimum: 1, description: TWD }
+                expiresAt: { type: string, description: Quotation expiry (date string) }
+                pickup: { $ref: "#/components/schemas/CheckoutLocation" }
+                pickupRemarks: { type: string, maxLength: 255 }
+                dropoff: { $ref: "#/components/schemas/CheckoutLocation" }
+                dropoffRemarks: { type: string, maxLength: 255 }
+                senderName: { type: string, minLength: 1, maxLength: 100 }
+                senderPhone: { type: string, minLength: 1, maxLength: 50 }
+                recipientName: { type: string, minLength: 1, maxLength: 100 }
+                recipientPhone: { type: string, minLength: 1, maxLength: 50 }
+                simulatePaid: { type: boolean }
+      responses:
+        "200":
+          description: Payment session for the browser to post to ECPay
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, session]
+                properties:
+                  success: { type: boolean, const: true }
+                  session:
+                    type: object
+                    required: [provider, paymentMethod, checkoutActionUrl, formData]
+                    properties:
+                      provider: { type: string }
+                      paymentMethod: { type: string }
+                      checkoutActionUrl: { type: string }
+                      formData: { type: object, additionalProperties: { type: string } }
+                      htmlForm: { type: string }
+                      token: { type: string }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/payments/status/{merchantTradeNo}:
+    get:
+      tags: [payments]
+      operationId: getPaymentStatus
+      summary: Payment and dispatch state of one of the user's payments
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: merchantTradeNo, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: State; `outcome` is what the result page shows
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, isPaid, paymentStatus, outcome, amount, lalamoveOrderId]
+                properties:
+                  success: { type: boolean, const: true }
+                  isPaid: { type: boolean }
+                  paymentStatus: { type: string }
+                  deliveryStatus: { type: [string, "null"] }
+                  outcome:
+                    type: string
+                    enum: [AWAITING_PAYMENT, PAYMENT_FAILED, PLACING, DISPATCHED, REFUNDING, REFUNDED]
+                  amount: { type: number }
+                  lalamoveOrderId: { type: [string, "null"] }
+                  rtnMsg: { type: [string, "null"] }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/payments/ecpay/order-result:
+    post:
+      tags: [payments]
+      operationId: ecpayOrderResult
+      summary: ECPay OrderResultURL (browser form post after payment)
+      description: Redirects the browser to the client's `/delivery/payment-result` page. Not called by the client app.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                RtnCode: { type: string }
+                RtnMsg: { type: string }
+                MerchantTradeNo: { type: string }
+              additionalProperties: true
+      responses:
+        "303":
+          description: Redirect to `<client>/delivery/payment-result?RtnCode=&MerchantTradeNo=&RtnMsg=`
+          headers:
+            Location: { schema: { type: string } }
+  /api/payments/ecpay/callback:
+    post:
+      tags: [payments]
+      operationId: ecpayCallback
+      summary: ECPay ReturnURL (server-to-server payment result)
+      description: |
+        Verified by CheckMacValue inside the payment service; idempotent. Replies in the ECPay
+        protocol: `1|OK` when processed or already processed, `0|<reason>` otherwise. A 500 makes
+        ECPay retry.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: ECPay AIO callback fields (MerchantTradeNo, RtnCode, CheckMacValue, ...)
+              additionalProperties: { type: string }
+      responses:
+        "200":
+          description: Processed or already processed
+          content:
+            text/html:
+              schema: { type: string, const: "1|OK" }
+        "400":
+          description: Rejected (for example a bad CheckMacValue)
+          content:
+            text/html:
+              schema: { type: string, pattern: "^0\\|" }
+        "500":
+          description: Processing failed; ECPay retries
+          content:
+            text/html:
+              schema: { type: string, const: "0|Internal Error" }
+  /api/admin/metrics:
+    get:
+      tags: [admin]
+      operationId: getAdminMetrics
+      summary: Process, database and Redis status
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      responses:
+        "200":
+          description: Metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uptime, memory, dbStatus, redisStatus, timestamp]
+                properties:
+                  uptime: { type: number }
+                  memory:
+                    type: object
+                    required: [rss, heapTotal, heapUsed]
+                    properties:
+                      rss: { type: integer }
+                      heapTotal: { type: integer }
+                      heapUsed: { type: integer }
+                  dbStatus: { type: string, enum: [connected, disconnected] }
+                  redisStatus: { type: string, enum: [connected, disconnected] }
+                  timestamp: { type: string, format: date-time }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/admin/cleanup:
+    post:
+      tags: [admin]
+      operationId: runAdminCleanup
+      summary: Run the admin cleanup job (currently a no-op)
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, timestamp]
+                properties:
+                  message: { type: string }
+                  timestamp: { type: string, format: date-time }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/admin/orgs:
+    get:
+      tags: [admin]
+      operationId: listOrganizations
+      summary: All organisations with their org admins
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      responses:
+        "200":
+          description: Organisations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orgs]
+                properties:
+                  orgs: { type: array, items: { $ref: "#/components/schemas/OrgSummary" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [admin]
+      operationId: createOrganization
+      summary: Create an organisation and its first org admin (ADR 0003)
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, orgAdminEmail]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                publisherDisplay: { $ref: "#/components/schemas/PublisherDisplay" }
+                isDemo: { type: boolean, default: false }
+                autoReleaseEnabled: { type: boolean, default: true }
+                autoReleaseDays: { type: integer, minimum: 1, maximum: 365, default: 30 }
+                orgAdminEmail: { type: string, format: email, description: Email of a registered account }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org]
+                properties:
+                  org: { $ref: "#/components/schemas/OrgSummary" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/admin/orgs/{id}:
+    parameters:
+      - { name: id, in: path, required: true, description: Organisation `public_id`, schema: { type: string, format: uuid } }
+    get:
+      tags: [admin]
+      operationId: getOrganization
+      summary: One organisation
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      responses:
+        "200":
+          description: Organisation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org]
+                properties:
+                  org: { $ref: "#/components/schemas/OrgSummary" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    patch:
+      tags: [admin]
+      operationId: updateOrganization
+      summary: Update organisation settings (only the fields sent)
+      security: [{ sessionCookie: [] }]
+      x-required-role: admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                publisherDisplay: { $ref: "#/components/schemas/PublisherDisplay" }
+                isDemo: { type: boolean }
+                autoReleaseEnabled: { type: boolean }
+                autoReleaseDays: { type: integer, minimum: 1, maximum: 365 }
+      responses:
+        "200":
+          description: Updated organisation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org]
+                properties:
+                  org: { $ref: "#/components/schemas/OrgSummary" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs:
+    get:
+      tags: [org-admin]
+      operationId: listAdministeredOrgs
+      summary: Organisations the caller administers (platform admins see all)
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Organisations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orgs]
+                properties:
+                  orgs:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}:
+    get:
+      tags: [org-admin]
+      operationId: getAdministeredOrg
+      summary: Units and members of an organisation
+      description: Every `/api/org-admin/orgs/{orgId}` operation answers 404 unless the caller is an org admin of it or a platform admin.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrgId" }
+      responses:
+        "200":
+          description: Organisation, units and members
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org, units, members]
+                properties:
+                  org:
+                    type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
+                  units: { type: array, items: { $ref: "#/components/schemas/OrgUnitRef" } }
+                  members: { type: array, items: { $ref: "#/components/schemas/OrgMember" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}/settings:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+    get:
+      tags: [org-admin]
+      operationId: getOrgSettings
+      summary: Auto Release and publisher display settings
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/OrgSettings" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    patch:
+      tags: [org-admin]
+      operationId: updateOrgSettings
+      summary: Update Auto Release and publisher display (only the fields sent)
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                autoReleaseEnabled: { type: boolean }
+                autoReleaseDays: { type: integer, minimum: 1, maximum: 365 }
+                publisherDisplay: { $ref: "#/components/schemas/PublisherDisplay" }
+      responses:
+        "200": { $ref: "#/components/responses/OrgSettings" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}/units:
+    post:
+      tags: [org-admin]
+      operationId: createOrgUnit
+      summary: Create a unit (one level)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrgId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unit]
+                properties:
+                  unit: { $ref: "#/components/schemas/OrgUnitRef" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}/members:
+    post:
+      tags: [org-admin]
+      operationId: addOrgMember
+      summary: Add a registered account as org admin or org member
+      description: "`unitIds` are the units the member becomes Unit Contact of (ADR 0004)."
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrgId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: "#/components/schemas/OrgRole" }
+                unitIds: { type: array, maxItems: 100, default: [], items: { type: integer, minimum: 1 } }
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [member]
+                properties:
+                  member: { $ref: "#/components/schemas/OrgMember" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}/members/{memberId}:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { name: memberId, in: path, required: true, description: Membership id, schema: { type: integer, minimum: 1 } }
+    patch:
+      tags: [org-admin]
+      operationId: updateOrgMember
+      summary: Replace a member's role and contact units
+      description: The org keeps at least one org admin. Requests sent on behalf of removed units are auto-declined.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, unitIds]
+              properties:
+                role: { $ref: "#/components/schemas/OrgRole" }
+                unitIds: { type: array, maxItems: 100, items: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [member]
+                properties:
+                  member: { $ref: "#/components/schemas/OrgMember" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [org-admin]
+      operationId: removeOrgMember
+      summary: Remove a membership (the account stays)
+      description: The org keeps at least one org admin. Requests the person no longer qualifies for are auto-declined; held items wait for a handover.
+      security: [{ sessionCookie: [] }]
+      responses:
+        "204": { description: Removed }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}/report:
+    get:
+      tags: [org-admin]
+      operationId: getOrgReport
+      summary: Organisation report (circulation, tiers, units, value, avoided emissions)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrgId" }
+      responses:
+        "200":
+          description: Report (`server/src/services/orgReport.ts` `OrgReport`)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [report]
+                properties:
+                  report:
+                    type: object
+                    required: [listing, circulation, tiers, units, value, emissions]
+                    properties:
+                      listing:
+                        type: object
+                        properties:
+                          itemCount: { type: integer }
+                          quantity: { type: integer }
+                      circulation:
+                        type: object
+                        properties:
+                          weaveCount: { type: integer }
+                          quantity: { type: integer }
+                          rate: { type: [number, "null"] }
+                      tiers: { type: array, items: { type: object, additionalProperties: true } }
+                      units: { type: array, items: { type: object, additionalProperties: true } }
+                      value:
+                        type: object
+                        properties:
+                          estimatedValueTwd: { type: number }
+                          valuedQuantity: { type: integer }
+                          unvaluedQuantity: { type: integer }
+                      emissions: { type: object, additionalProperties: true }
+                    additionalProperties: true
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/org-admin/orgs/{orgId}/handovers:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+    get:
+      tags: [org-admin]
+      operationId: listPendingHandovers
+      summary: People still holding a unit's items who are no longer its contact
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Pending handovers by unit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [handovers]
+                properties:
+                  handovers:
+                    type: array
+                    items:
+                      type: object
+                      required: [user, unit, itemCount, openWeaveCount]
+                      properties:
+                        user:
+                          type: object
+                          required: [id, email, isMember]
+                          properties:
+                            id: { type: string, format: uuid, description: User `public_id` }
+                            email: { type: string }
+                            isMember: { type: boolean }
+                        unit: { $ref: "#/components/schemas/OrgUnitRef" }
+                        itemCount: { type: integer }
+                        openWeaveCount: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [org-admin]
+      operationId: handOverOrgItems
+      summary: Move a person's items and open weaves in a unit to another contact of it
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fromUserId, unitId, toMemberId]
+              properties:
+                fromUserId: { type: string, format: uuid, description: User `public_id` }
+                unitId: { type: integer, minimum: 1 }
+                toMemberId: { type: integer, minimum: 1, description: Membership id }
+      responses:
+        "200":
+          description: Counts moved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, weaves]
+                properties:
+                  items: { type: integer }
+                  weaves: { type: integer }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/item-categories:
+    get:
+      tags: [orgs]
+      operationId: listOrgItemCategories
+      summary: Org item categories with default weights and their sources
+      responses:
+        "200":
+          description: Categories from the avoided-emissions factor table
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [factorTableVersion, categories]
+                properties:
+                  factorTableVersion: { type: string }
+                  categories:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { $ref: "#/components/schemas/OrgItemCategoryId" }
+                        name: { type: string }
+                        examples: { type: string }
+                        defaultWeightKg: { type: [number, "null"] }
+                        defaultWeightSource: { type: [object, "null"], additionalProperties: true }
+                      additionalProperties: true
+  /api/orgs:
+    get:
+      tags: [orgs]
+      operationId: listMyOrgs
+      summary: Organisations the user belongs to, with manageable units
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: Organisations
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orgs]
+                properties:
+                  orgs: { type: array, items: { $ref: "#/components/schemas/OrgAccess" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}:
+    get:
+      tags: [orgs]
+      operationId: getMyOrgAccess
+      summary: The user's access in an organisation
+      description: Every `/api/orgs/{orgId}` operation answers 404 unless the caller is a member of the organisation or a platform admin.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrgId" }
+      responses:
+        "200":
+          description: Access
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [org]
+                properties:
+                  org: { $ref: "#/components/schemas/OrgAccess" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/posts:
+    get:
+      tags: [orgs]
+      operationId: listOrgPagePosts
+      summary: Listed items the user's tier can see (organisation page)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrgId" }
+      responses:
+        "200":
+          description: Item cards (no asset number or estimated value)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [posts]
+                properties:
+                  posts: { type: array, items: { type: object, additionalProperties: true } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+    get:
+      tags: [orgs]
+      operationId: listManagedOrgItems
+      summary: Back-office item list (unit contacts see their units, org admins everything)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: unitId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: tier, in: query, schema: { $ref: "#/components/schemas/AudienceTier" } }
+        - { name: status, in: query, schema: { type: string, enum: [active, inactive] } }
+        - { name: weaveStatus, in: query, schema: { type: string, enum: [requested, approved, completed] } }
+      responses:
+        "200":
+          description: Items with their outcomes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      allOf:
+                        - { $ref: "#/components/schemas/OrgItem" }
+                        - type: object
+                          required: [outcomes]
+                          properties:
+                            outcomes: { type: array, items: { type: object, additionalProperties: true } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [orgs]
+      operationId: createOrgItem
+      summary: List a Share item on behalf of a unit (starts Internal)
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unitId, orgCategory, conditionLevel, title, quantity, unitWeightKg]
+              properties:
+                unitId: { type: integer, minimum: 1 }
+                orgCategory: { $ref: "#/components/schemas/OrgItemCategoryId" }
+                conditionLevel: { type: integer, minimum: 1, maximum: 5 }
+                stagingKeys:
+                  type: array
+                  default: []
+                  description: At most `UPLOAD_IMAGE_LIMIT` (default 5)
+                  items: { type: string, pattern: "^staging/posts/[\\w.-]+$" }
+                title: { type: string, minLength: 1, maxLength: 60 }
+                content: { type: string, maxLength: 1000, default: "" }
+                quantity: { type: integer, minimum: 1, maximum: 10000 }
+                unitWeightKg: { type: number, exclusiveMinimum: 0, maximum: 100000 }
+                assetNumber: { type: [string, "null"], maxLength: 100 }
+                estimatedValueTwd: { type: [integer, "null"], minimum: 0, maximum: 2000000000 }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item: { $ref: "#/components/schemas/OrgItem" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/requests:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    get:
+      tags: [orgs]
+      operationId: listOrgItemRequests
+      summary: "Requests for one item (contacts of its unit or org admins)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests]
+                properties:
+                  requests: { type: array, items: { $ref: "#/components/schemas/OrgItemRequest" } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/tier:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    patch:
+      tags: [orgs]
+      operationId: changeOrgItemTier
+      summary: "Change an item's audience tier"
+      description: "Unit contacts may only raise their unit's items from Internal to Members; org admins may raise and lower. Going Public uses `pending-public` (ADR 0003)."
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier]
+              properties:
+                tier: { $ref: "#/components/schemas/AudienceTier" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item: { $ref: "#/components/schemas/OrgItem" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/public-listing:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    get:
+      tags: [orgs]
+      operationId: getOrgItemPublicListing
+      summary: "Prefill for the go-public dialog (org admins)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [listing]
+                properties:
+                  listing: { $ref: "#/components/schemas/PublicListing" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/pending-public:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    post:
+      tags: [orgs]
+      operationId: startOrgItemPendingPublic
+      summary: "Start the 10-minute pending-public period (org admins)"
+      description: "Items with an asset number need `assetDisposalConfirmed: true`."
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listing]
+              properties:
+                assetDisposalConfirmed: { type: boolean, default: false }
+                listing: { $ref: "#/components/schemas/PublicListingInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item: { $ref: "#/components/schemas/OrgItem" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+    delete:
+      tags: [orgs]
+      operationId: cancelOrgItemPendingPublic
+      summary: "Cancel pending-public; the item keeps its tier"
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item: { $ref: "#/components/schemas/OrgItem" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/pending-public/skip:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    post:
+      tags: [orgs]
+      operationId: skipOrgItemPendingPublic
+      summary: "Go Public immediately (demo organisations only)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item: { $ref: "#/components/schemas/OrgItem" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/auto-release:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    patch:
+      tags: [orgs]
+      operationId: setOrgItemAutoRelease
+      summary: "Override Auto Release for one item"
+      description: "`days` is only allowed (and required) with `mode: auto`."
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: [org, auto, manual] }
+                days: { type: integer, minimum: 1, maximum: 365 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [item]
+                properties:
+                  item: { $ref: "#/components/schemas/OrgItem" }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/tier-events:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    get:
+      tags: [orgs]
+      operationId: listOrgItemTierEvents
+      summary: "Tier change history of an item"
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events: { type: array, items: { type: object, additionalProperties: true } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+  /api/orgs/{orgId}/items/{itemId}/timeline:
+    parameters:
+      - { $ref: "#/components/parameters/OrgId" }
+      - { $ref: "#/components/parameters/OrgItemId" }
+    get:
+      tags: [orgs]
+      operationId: getOrgItemTimeline
+      summary: "Item lifecycle timeline (listing, tiers, handovers, requests, approvals, completion)"
+      security: [{ sessionCookie: [] }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [timeline]
+                properties:
+                  timeline: { type: array, items: { type: object, additionalProperties: true } }
+        "4XX": { $ref: "#/components/responses/ClientError" }
+        "5XX": { $ref: "#/components/responses/ServerError" }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session-id
+      description: |
+        httpOnly session id cookie set by signup/signin and resolved against the Redis session
+        store. The name is `COOKIE_SESSION_KEY` (default `session-id`). Role checks always use
+        the session's role, never the client-readable `user-role` cookie.
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    DeliveryOrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Lalamove order id or local `delivery_orders.id`
+      schema: { type: string }
+    OrgId:
+      name: orgId
+      in: path
+      required: true
+      description: Organisation `public_id`
+      schema: { type: string, format: uuid }
+    OrgItemId:
+      name: itemId
+      in: path
+      required: true
+      description: Item (post) `public_id`
+      schema: { type: string, format: uuid }
+  responses:
+    ClientError:
+      description: Client error (validation, auth, not found, conflict, rate limit)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    ServerError:
+      description: Server or upstream error; `errorMessage` never carries internals
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    Message:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message: { type: string }
+    Success:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success: { type: boolean, const: true }
+    DeliveryCancelled:
+      description: Cancelled at Lalamove and locally
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success: { type: boolean, const: true }
+              result: { description: Lalamove cancel response }
+    OrgSettings:
+      description: Settings
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [settings]
+            properties:
+              settings:
+                type: object
+                required: [autoReleaseEnabled, autoReleaseDays, publisherDisplay]
+                properties:
+                  autoReleaseEnabled: { type: boolean }
+                  autoReleaseDays: { type: integer }
+                  publisherDisplay: { $ref: "#/components/schemas/PublisherDisplay" }
+    SandboxError:
+      description: Sandbox error (dev-only protocol, not `ApiError`)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string }
+              message: { type: string }
+    WebhookError:
+      description: Webhook rejected or failed (Lalamove protocol, not `ApiError`)
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error: { type: string }
+  schemas:
+    ApiError:
+      type: object
+      description: |
+        Shape every route error takes (`server/src/utils/errorHandler.ts`). `code` is one of
+        `server/src/utils/errorCodes.ts`; clients translate it and never show `errorMessage`.
+        Zod failures (`VALIDATION_FAILED`) add the zod issues as `errorDetails`.
+      required: [code, errorMessage]
+      properties:
+        code: { type: string, examples: [VALIDATION_FAILED, INVALID_REQUEST, UNAUTHENTICATED, NOT_FOUND] }
+        errorMessage: { type: string }
+        params:
+          type: object
+          description: Values for the translated message
+          additionalProperties: true
+        errorDetails:
+          type: array
+          items: { type: object, additionalProperties: true }
+    UserRole:
+      type: string
+      enum: [user, admin, contributor]
+    Locale:
+      type: string
+      enum: [zh-TW, en]
+    UserSession:
+      type: object
+      required: [userId, role, username, email, public_id, joined_at]
+      properties:
+        userId: { type: integer }
+        role: { $ref: "#/components/schemas/UserRole" }
+        username: { type: string, minLength: 3 }
+        email: { type: string, format: email }
+        provider: { type: string }
+        avatar_url: { type: [string, "null"], format: uri }
+        avatar_key: { type: [string, "null"] }
+        public_id: { type: string }
+        joined_at: { type: string, format: date-time }
+    UserStats:
+      type: object
+      required: [postCount, weaveCount, points, giveSuccessRate, totalLikes, totalViews, lastCalculatedAt]
+      properties:
+        postCount: { type: integer }
+        weaveCount: { type: integer }
+        points: { type: number }
+        giveSuccessRate: { type: number }
+        totalLikes: { type: integer }
+        totalViews: { type: integer }
+        lastCalculatedAt: { type: [string, "null"], format: date-time }
+    DetailedUserStats:
+      type: object
+      required: [postCount, weaveCount, points, giveSuccessRate, posts]
+      properties:
+        postCount: { type: integer }
+        itemCount: { type: integer }
+        totalItemQuantity: { type: integer }
+        postsWithItems: { type: integer }
+        weaveCount: { type: integer }
+        weaveAsGiver: { type: integer }
+        weaveAsReceiver: { type: integer }
+        totalQuantityGiven: { type: integer }
+        totalQuantityReceived: { type: integer }
+        totalLikes: { type: integer }
+        totalComments: { type: integer }
+        totalViews: { type: integer }
+        points: { type: number }
+        giveSuccessRate: { type: number }
+        lastCalculatedAt: { type: [string, "null"], format: date-time }
+        posts: { type: array, items: { $ref: "#/components/schemas/Post" } }
+    PostType:
+      type: string
+      enum: [wish, share, commons]
+    PostItem:
+      type: object
+      required: [title, quantity]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 20 }
+        quantity: { type: integer, minimum: 1 }
+    Post:
+      type: object
+      description: |
+        Post row with joined author, category, location, items and images. The exact columns
+        differ between list, feed and detail queries; org posts show the organisation as the
+        publisher (ADR 0004).
+      properties:
+        id: { type: integer }
+        public_id: { type: string, format: uuid }
+        user_id: { type: [integer, "null"] }
+        title: { type: string }
+        content: { type: string }
+        type: { $ref: "#/components/schemas/PostType" }
+        status: { type: string }
+        tags: { type: [string, "null"] }
+        category_id: { type: integer }
+        condition_level: { type: integer }
+        expires_at: { type: [string, "null"], format: date-time }
+        view_count: { type: integer }
+        likes_count: { type: integer }
+        comment_count: { type: integer }
+        org_id: { type: [integer, "null"] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      additionalProperties: true
+    PostPage:
+      type: object
+      required: [posts, pagination]
+      properties:
+        posts: { type: array, items: { $ref: "#/components/schemas/Post" } }
+        pagination:
+          type: object
+          required: [currentPage, totalPages, totalPosts, postsPerPage]
+          properties:
+            currentPage: { type: integer }
+            totalPages: { type: integer }
+            totalPosts: { type: integer }
+            postsPerPage: { type: integer }
+    PostLocationFields:
+      type: object
+      properties:
+        place_id: { type: string }
+        location_name: { type: string }
+        location_url: { type: string }
+        full_address: { type: string }
+        province: { type: string }
+        city: { type: string }
+        route: { type: string }
+        zip: { type: string }
+        zip_code: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+    CreatePostInput:
+      allOf:
+        - { $ref: "#/components/schemas/PostLocationFields" }
+        - type: object
+          required: [title, content, type, categoryId, conditionLevel, expiresAt]
+          properties:
+            title: { type: string, minLength: 5, maxLength: 60 }
+            content: { type: string, minLength: 3, maxLength: 1000 }
+            status: { type: string, enum: [active, inactive], default: active }
+            type: { $ref: "#/components/schemas/PostType" }
+            tags: { type: string, maxLength: 500 }
+            categoryId: { type: integer, minimum: 1 }
+            conditionLevel: { type: integer, minimum: 1, maximum: 5 }
+            expiresAt: { type: string, format: date-time }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 20
+              description: Titles must be unique (case-insensitive)
+              items: { $ref: "#/components/schemas/PostItem" }
+            stagingKeys:
+              type: array
+              description: Keys from `POST /api/posts/presigned-urls`; at most `UPLOAD_IMAGE_LIMIT`
+              items: { type: string }
+    UpdatePostInput:
+      allOf:
+        - { $ref: "#/components/schemas/PostLocationFields" }
+        - type: object
+          description: Every field optional
+          properties:
+            title: { type: string, minLength: 5, maxLength: 60 }
+            content: { type: string, minLength: 3, maxLength: 1000 }
+            status: { type: string, enum: [active, inactive] }
+            type: { $ref: "#/components/schemas/PostType" }
+            tags: { type: string, maxLength: 500 }
+            categoryId: { type: integer, minimum: 1 }
+            conditionLevel: { type: integer, minimum: 1, maximum: 5 }
+            expiresAt: { type: [string, "null"], format: date-time }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 20
+              items: { $ref: "#/components/schemas/PostItem" }
+            deleteImageIds: { type: array, items: { type: integer, minimum: 1 } }
+            stagingKeys: { type: array, items: { type: string } }
+    Category:
+      type: object
+      required: [id, name_en, status]
+      properties:
+        id: { type: integer }
+        name_en: { type: [string, "null"] }
+        description: { type: [string, "null"] }
+        status: { type: string, enum: [active, inactive] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Condition:
+      type: object
+      required: [id, level, name, status]
+      properties:
+        id: { type: integer }
+        level: { type: integer, minimum: 1, maximum: 5 }
+        name: { type: string, description: English source string; the UI shows its own wording by level }
+        description: { type: [string, "null"] }
+        status: { type: string, enum: [active, inactive] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MemberWebsite:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        type: { type: string }
+    Member:
+      type: object
+      description: "`members` row (about-page team card)"
+      properties:
+        user_id: { type: integer }
+        member_name: { type: [string, "null"] }
+        member_bio: { type: [string, "null"] }
+        user_role: { type: [string, "null"] }
+        location: { type: [string, "null"] }
+        email: { type: [string, "null"] }
+        websites: { type: [array, "null"], items: { $ref: "#/components/schemas/MemberWebsite" } }
+        avatar_url: { type: [string, "null"] }
+        avatar_key: { type: [string, "null"] }
+        title: { type: [string, "null"] }
+        sort_order: { type: integer }
+      additionalProperties: true
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        post_id: { type: integer }
+        item_id: { type: [integer, "null"] }
+        parent_id: { type: [integer, "null"] }
+        user_id: { type: integer }
+        content: { type: string }
+        root_id: { type: [integer, "null"] }
+        depth: { type: integer }
+        path: { type: string }
+        created_at: { type: string, format: date-time }
+        username: { type: string }
+        avatar_url: { type: [string, "null"] }
+        public_id: { type: string }
+        like_count: { type: integer }
+        reply_count: { type: integer }
+      additionalProperties: true
+    CommentNode:
+      allOf:
+        - { $ref: "#/components/schemas/Comment" }
+        - type: object
+          required: [children]
+          properties:
+            children: { type: array, items: { $ref: "#/components/schemas/CommentNode" } }
+    WeaveStatus:
+      type: string
+      enum: [requested, approved, completed, declined, cancelled, withdrawn]
+    WeaveRole:
+      type: string
+      enum: [giver, receiver]
+    OrgUnitRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    Weave:
+      type: object
+      description: Item handover between giver and receiver (CONTEXT.md). Org givers show as the organisation (ADR 0004).
+      required: [id, post_id, items, giver_id, receiver_id, status, giver_confirmed, receiver_confirmed, post]
+      properties:
+        id: { type: integer }
+        post_id: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              weave_id: { type: integer }
+              item_id: { type: [integer, "null"] }
+              quantity: { type: integer }
+              title: { type: [string, "null"] }
+        item_id: { type: [integer, "null"], deprecated: true, description: First item (legacy) }
+        item_title: { type: [string, "null"], deprecated: true }
+        quantity: { type: integer, deprecated: true }
+        giver_id: { type: [integer, "null"] }
+        receiver_id: { type: integer }
+        status: { $ref: "#/components/schemas/WeaveStatus" }
+        notes: { type: [string, "null"] }
+        completed_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        giver_name: { type: [string, "null"] }
+        giver_avatar: { type: [string, "null"] }
+        receiver_name: { type: string }
+        receiver_avatar: { type: [string, "null"] }
+        receiver_org_unit:
+          oneOf:
+            - { $ref: "#/components/schemas/OrgUnitRef" }
+            - { type: "null" }
+        giver_confirmed: { type: boolean }
+        receiver_confirmed: { type: boolean }
+        conversation_id: { type: integer }
+        post: { $ref: "#/components/schemas/Post" }
+    Notification:
+      type: object
+      properties:
+        id: { type: integer }
+        recipient_id: { type: integer }
+        sender_id: { type: [integer, "null"] }
+        type: { type: string }
+        title: { type: string }
+        content: { type: string }
+        params: { type: [object, "null"], additionalProperties: true }
+        link: { type: [string, "null"] }
+        is_read: { type: integer, enum: [0, 1] }
+        created_at: { type: string, format: date-time }
+        sender_name: { type: [string, "null"] }
+        sender_avatar: { type: [string, "null"] }
+      additionalProperties: true
+    SendMessageInput:
+      type: object
+      required: [recipient_public_id]
+      properties:
+        recipient_public_id: { type: string, minLength: 1, maxLength: 64 }
+        content: { type: string }
+        post_id:
+          description: Numeric post id the message is about
+          oneOf:
+            - { type: integer, minimum: 1 }
+            - { type: string, pattern: "^\\d+$" }
+        item_id: { type: integer }
+        item_title: { type: string }
+        images:
+          type: array
+          maxItems: 10
+          description: multipart only; image files up to 10 MB each
+          items: { type: string, format: binary }
+    Message:
+      type: object
+      required: [id, conversation_id, content, created_at]
+      properties:
+        id: { type: integer }
+        conversation_id: { type: integer }
+        sender_public_id: { type: string }
+        content: { type: string }
+        is_read: { type: boolean }
+        message_type: { type: string }
+        metadata: {}
+        created_at: { type: string, format: date-time }
+        sender_name: { type: string }
+        sender_avatar: { type: [string, "null"] }
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              message_id: { type: integer }
+              file_url: { type: string }
+              file_type: { type: string, enum: [image, video, file] }
+              created_at: { type: string, format: date-time }
+    Conversation:
+      type: object
+      required: [id, last_message_at, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        org_id: { type: [integer, "null"] }
+        org_user_id: { type: [integer, "null"] }
+        last_message_id: { type: [integer, "null"] }
+        last_message_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        other_public_id: { type: string }
+        other_username: { type: string }
+        other_avatar_url: { type: [string, "null"] }
+        last_message_content: { type: string }
+        is_read: { type: integer, enum: [0, 1] }
+        unread_count: { type: integer }
+      additionalProperties: true
+    LalamoveContact:
+      type: object
+      required: [name, phone]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+      additionalProperties: true
+    LalamoveQuotation:
+      type: object
+      description: Lalamove quotation plus the requested `serviceName`
+      required: [serviceName]
+      properties:
+        serviceName: { type: string }
+      additionalProperties: true
+    DeliveryOrderDetail:
+      type: object
+      required: [orderId, status, priceBreakdown, stops, _source]
+      properties:
+        orderId: { type: string }
+        status: { type: string }
+        serviceType: { type: [string, "null"] }
+        shareLink: { type: [string, "null"] }
+        priceBreakdown:
+          type: object
+          required: [total, currency]
+          properties:
+            total: { type: string }
+            currency: { type: string, const: TWD }
+        driver:
+          oneOf:
+            - type: object
+              required: [id, name, phone, plateNumber]
+              properties:
+                id: { type: string }
+                name: { type: string }
+                phone: { type: string }
+                plateNumber: { type: string }
+            - { type: "null" }
+        stops:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: object
+            required: [address, coordinates]
+            properties:
+              address: { type: string }
+              coordinates:
+                type: object
+                properties:
+                  lat: { type: string }
+                  lng: { type: string }
+              name: { type: [string, "null"] }
+              phone: { type: [string, "null"] }
+        updatedAt: { type: string, format: date-time }
+        _source: { type: string, const: db }
+    CheckoutLocation:
+      oneOf:
+        - type: object
+          required: [locationId]
+          properties:
+            locationId: { type: integer, minimum: 1 }
+        - type: object
+          required: [fullAddress, lat, lng]
+          properties:
+            fullAddress: { type: string, minLength: 1 }
+            lat: { type: number }
+            lng: { type: number }
+            placeId: { type: string }
+            name: { type: string }
+            province: { type: string }
+            city: { type: string }
+            route: { type: string }
+            zipCode: { type: string }
+            zip: { type: string }
+            url: { type: string }
+    PublisherDisplay:
+      type: string
+      enum: [org, org_unit, anonymous]
+      description: How org items appear on public surfaces (ADR 0004)
+    OrgRole:
+      type: string
+      enum: [admin, member]
+    AudienceTier:
+      type: string
+      enum: [internal, members, public]
+      description: ADR 0003
+    OrgSummary:
+      type: object
+      required: [id, name, publisherDisplay, isDemo, autoReleaseEnabled, autoReleaseDays, orgAdmins]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        publisherDisplay: { $ref: "#/components/schemas/PublisherDisplay" }
+        isDemo: { type: boolean }
+        autoReleaseEnabled: { type: boolean }
+        autoReleaseDays: { type: integer }
+        orgAdmins:
+          type: array
+          items:
+            type: object
+            required: [email]
+            properties:
+              email: { type: string }
+    OrgMember:
+      type: object
+      required: [id, email, role, unitIds]
+      properties:
+        id: { type: integer, description: Membership id }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/OrgRole" }
+        unitIds: { type: array, items: { type: integer } }
+    OrgAccess:
+      type: object
+      required: [id, name, accessLevel, isAdmin, isPlatformAdmin, manageableUnits, autoRelease, isDemo]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        accessLevel: { type: string, enum: [internal, member] }
+        isAdmin: { type: boolean }
+        isPlatformAdmin: { type: boolean }
+        manageableUnits: { type: array, items: { $ref: "#/components/schemas/OrgUnitRef" } }
+        autoRelease:
+          type: object
+          required: [enabled, days]
+          properties:
+            enabled: { type: boolean }
+            days: { type: integer }
+        isDemo: { type: boolean }
+    OrgItemCategoryId:
+      type: string
+      description: Category id from `server/src/services/avoidedEmissions/factorTable.ts` (`CATEGORY_IDS`), e.g. `office_chair`
+    OrgItem:
+      type: object
+      description: Back-office item row (`server/src/services/orgItemService.ts` `OrgItem`)
+      required: [id, title, type, audienceTier, status, createdAt, unit, s3Keys, pendingRequestCount, autoRelease, pendingPublic]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        type: { type: string }
+        audienceTier: { $ref: "#/components/schemas/AudienceTier" }
+        status: { type: string, enum: [active, inactive] }
+        createdAt: { type: string, format: date-time }
+        unit: { $ref: "#/components/schemas/OrgUnitRef" }
+        orgCategory:
+          oneOf:
+            - { $ref: "#/components/schemas/OrgItemCategoryId" }
+            - { type: "null" }
+        quantity: { type: [integer, "null"] }
+        remainingQuantity: { type: [integer, "null"] }
+        unitWeightKg: { type: [number, "null"] }
+        weightIsDefault: { type: [boolean, "null"] }
+        assetNumber: { type: [string, "null"] }
+        estimatedValueTwd: { type: [integer, "null"] }
+        s3Keys: { type: array, items: { type: string } }
+        pendingRequestCount: { type: integer }
+        autoRelease:
+          type: object
+          required: [override, days]
+          properties:
+            override: { type: [string, "null"], enum: [auto, manual, null] }
+            days: { type: [integer, "null"] }
+        pendingPublic:
+          oneOf:
+            - type: object
+              required: [dueAt]
+              properties:
+                dueAt: { type: string, format: date-time }
+            - { type: "null" }
+      additionalProperties: true
+    OrgItemRequest:
+      type: object
+      required: [id, status, createdAt, quantity, receiver, receiverUnit]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [requested, approved, completed] }
+        createdAt: { type: string, format: date-time }
+        quantity: { type: integer }
+        receiver:
+          type: object
+          required: [name]
+          properties:
+            name: { type: string }
+        receiverUnit:
+          oneOf:
+            - { $ref: "#/components/schemas/OrgUnitRef" }
+            - { type: "null" }
+    PublicListing:
+      type: object
+      required: [categoryId, tags, expiresAt, location]
+      description: Current public fields; null where never filled
+      properties:
+        categoryId: { type: [integer, "null"] }
+        tags: { type: [string, "null"] }
+        expiresAt: { type: [string, "null"], format: date-time }
+        location:
+          oneOf:
+            - type: object
+              required: [placeId, fullAddress, lat, lng]
+              properties:
+                placeId: { type: string }
+                name: { type: [string, "null"] }
+                url: { type: [string, "null"] }
+                fullAddress: { type: string }
+                province: { type: [string, "null"] }
+                city: { type: [string, "null"] }
+                route: { type: [string, "null"] }
+                zipCode: { type: [string, "null"] }
+                lat: { type: number }
+                lng: { type: number }
+            - { type: "null" }
+    PublicListingInput:
+      type: object
+      required: [categoryId, expiresAt, location]
+      properties:
+        categoryId: { type: integer, minimum: 1 }
+        tags: { type: [string, "null"], maxLength: 500 }
+        expiresAt: { type: string, format: date-time, description: Must be in the future }
+        location:
+          type: object
+          required: [place_id, full_address, lat, lng]
+          properties:
+            place_id: { type: string, minLength: 1, maxLength: 255 }
+            full_address: { type: string, minLength: 1, maxLength: 500 }
+            lat: { type: number, minimum: -90, maximum: 90 }
+            lng: { type: number, minimum: -180, maximum: 180 }
+            name: { type: [string, "null"], maxLength: 255 }
+            url: { type: [string, "null"], maxLength: 500 }
+            province: { type: [string, "null"], maxLength: 100 }
+            city: { type: [string, "null"], maxLength: 100 }
+            route: { type: [string, "null"], maxLength: 255 }
+            zip_code: { type: [string, "null"], maxLength: 20 }

@@ -69,7 +69,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 - **Tests**: A behaviour change ships with a test.
 - **Env**: Add every new variable to `server/.env.example` or `client/.env.example` (both tracked; see `docs/development.md`).
 - **Migrations**: `server/db/migrations/YYYY-MM-DD-slug.sql`, applied on deploy in filename order by `scripts/db-migrate.sh` once `AUTO_MIGRATE` is on (ADR 0009, `docs/deployment.md`); additive only, never edit a merged one.
-- **API contract**: once `server/openapi.yaml` exists, it is the API contract. Update it in the same change as any route.
+- **API contract**: `server/openapi.yaml` (OpenAPI 3.1) is the API contract. Update it in the same change as any route; `server/src/openapiContract.test.ts` fails when a registered route and the spec disagree. Errors are documented once as `ApiError`, not per route.
 
 ## Design: deep modules
 

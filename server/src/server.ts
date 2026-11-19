@@ -3,11 +3,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express from "express";
-import cookieParser from "cookie-parser";
-import apiRoutes from "./api";
-import { errorMiddleware } from "./utils/errorHandler";
-import cors from "cors";
+import { createApp } from "./app";
 import https from "https";
 import http from "http";
 import path from "path";
@@ -27,69 +23,15 @@ import { ensureVectorIndexExists } from "./services/vectorIndexService";
 import { setSocketIO } from "./utils/socket";
 import { createShutdown } from "./utils/gracefulShutdown";
 import { registerSocketHandlers } from "./socketHandlers";
-import { globalRateLimiter } from "./middleware/rateLimiter";
-import { getBenchmarkHealthFields, isBenchmarkTarget } from "./benchmark/targetMarker";
-import {
-  getCandidateVectorReadStats,
-  getFeedVectorCacheSizes,
-  resetFeedVectorCaches,
-} from "./services/feedService";
 
-const app = express();
-app.set("trust proxy", 1);
 const CORS_ORIGINS = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((origin) => origin.trim())
   : ["https://localhost:3000"];
 const PORT = parseInt(process.env.PORT || "8443");
 const ENABLE_HTTPS = process.env.ENABLE_HTTPS === "true";
-// Lalamove webhook 需以原始 body 驗簽，必須在 express.json() 之前解析為 Buffer
-app.use("/api/lalamove/webhook", express.raw({ type: "*/*", limit: "1mb" }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(
-  cors({
-    origin: CORS_ORIGINS,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  }),
-);
 
 console.log("Cors Origins:", CORS_ORIGINS);
-// Apply the distributed rate limiting middleware to all requests.
-app.use(globalRateLimiter);
-
-app.get("/health", (_req, res) => {
-  res.json({
-    status: "OK",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    ssl: ENABLE_HTTPS,
-    ...getBenchmarkHealthFields(process.env, () => {
-      const cpu = process.cpuUsage();
-      const memory = process.memoryUsage();
-      return {
-        feedCandidateVectorReads: getCandidateVectorReadStats(),
-        feedVectorCaches: getFeedVectorCacheSizes(),
-        process: {
-          cpuUserMicros: cpu.user,
-          cpuSystemMicros: cpu.system,
-          rssBytes: memory.rss,
-          heapUsedBytes: memory.heapUsed,
-        },
-      };
-    }),
-  });
-});
-
-// Benchmark 專用：清空 API 記憶體向量快取以建立 cold-cache 情境；只在帶隔離標記的 instance 掛載
-if (isBenchmarkTarget()) {
-  app.post("/benchmark/feed-caches/reset", (_req, res) => {
-    resetFeedVectorCaches();
-    res.json({ feedVectorCaches: getFeedVectorCacheSizes() });
-  });
-}
+const app = createApp({ corsOrigins: CORS_ORIGINS, enableHttps: ENABLE_HTTPS });
 
 async function startServer() {
   try {
@@ -154,19 +96,9 @@ async function startServer() {
     //* 4.Socket.IO 驗證與 connection handling（handshake 讀 session，只能加入有權限的 room）
     registerSocketHandlers(io);
     //* 5.將 io 實例存入 app，讓以後的 API Route 可以透過 req.app.get("io") 取得
+    //* app.ts 的 middleware 再把它放進 res.locals.io
     app.set("io", io);
     setSocketIO(io);
-
-    //* 6. Add middleware to inject io into res.locals for all routes
-    app.use((_req, res, next) => {
-      res.locals.io = io;
-      next();
-    });
-
-    app.use("/api", apiRoutes);
-
-    //* 必須掛在所有路由之後
-    app.use(errorMiddleware);
 
     //* start server
     server.listen(PORT, () => {

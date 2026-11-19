@@ -13,7 +13,7 @@ Apply every standard to every changed line:
 
 ## Blocking
 
-A finding is **blocking** when it is a correctness defect, a behaviour change without a test, a route that no longer matches `server/openapi.yaml` (once it exists), or a contradiction of an ADR. Blocking findings fail the PR check. Every other finding is advisory: post it, and the PR can still merge.
+A finding is **blocking** when it is a correctness defect, a behaviour change without a test, a route that no longer matches `server/openapi.yaml` (path, method, auth, parameters, request or response shape), or a contradiction of an ADR. Blocking findings fail the PR check. Every other finding is advisory: post it, and the PR can still merge.
 
 ## Scope
 

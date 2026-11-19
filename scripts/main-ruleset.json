@@ -50,6 +50,12 @@
           },
           {
             "context": "Claude Security Review"
+          },
+          {
+            "context": "Lint, typecheck, test"
+          },
+          {
+            "context": "DB migrations"
           }
         ]
       }

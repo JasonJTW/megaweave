@@ -13,3 +13,11 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
+
+## Other labels
+
+| Label                | Applied to | Meaning                                                                                               |
+| -------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
+| `agent:claimed`      | Issue      | An agent holds the issue (`docs/agents/contributing.md`, ADR 0007)                                     |
+| `needs-migration`    | PR         | The PR changes `server/db/schema.sql` and adds a migration; the `DB migrations` check requires it      |
+| `migration-approved` | PR         | Maintainer only: lets the `DB migrations` check pass a destructive migration (ADR 0009)               |

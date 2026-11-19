@@ -1626,7 +1626,7 @@ paths:
                         id: { type: string }
                         name: { type: string }
                       additionalProperties: true
-                  allSupportedTypes: { type: array, items: { type: string } }
+                  allSupportedTypes: { type: array, items: { $ref: "#/components/schemas/LalamoveServiceType" } }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
   /api/lalamove/quotation:
@@ -1634,7 +1634,7 @@ paths:
       tags: [lalamove]
       operationId: requestLalamoveQuotation
       summary: Delivery quotations for one or more service types
-      description: Calls the paid Lalamove API once per service type, so a session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`).
+      description: Calls the paid Lalamove API once per service type, so a session is required. `serviceTypes` wins over `serviceType` (default `MOTORCYCLE`). An unsupported, duplicated or empty service type list is refused with `INVALID_REQUEST`.
       security: [{ sessionCookie: [] }]
       requestBody:
         required: true
@@ -1644,8 +1644,13 @@ paths:
               type: object
               required: [stops]
               properties:
-                serviceType: { type: string }
-                serviceTypes: { type: array, items: { type: string } }
+                serviceType: { $ref: "#/components/schemas/LalamoveServiceType" }
+                serviceTypes:
+                  type: array
+                  minItems: 1
+                  maxItems: 8
+                  uniqueItems: true
+                  items: { $ref: "#/components/schemas/LalamoveServiceType" }
                 stops:
                   type: array
                   minItems: 2
@@ -3413,6 +3418,10 @@ components:
         name: { type: string }
         phone: { type: string }
       additionalProperties: true
+    LalamoveServiceType:
+      type: string
+      description: Supported Lalamove TW vehicle types (`ALL_SUPPORTED_SERVICE_TYPES`)
+      enum: [MOTORCYCLE, MOTORCYCLE_INTERCITY, MOTORCYCLE_LARGELALABAG, VAN, SUV, TRUCK175, TRUCK330, TRUCK500]
     LalamoveQuotation:
       type: object
       description: Lalamove quotation plus the requested `serviceName`

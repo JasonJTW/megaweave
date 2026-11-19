@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
+import { z } from "zod";
 import { Server } from "socket.io";
 import dbPool from "./utils/db";
 import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
@@ -115,7 +116,22 @@ export const ALL_SUPPORTED_SERVICE_TYPES = [
   "TRUCK175",
   "TRUCK330",
   "TRUCK500",
-];
+] as const;
+
+const ServiceTypeSchema = z.enum(ALL_SUPPORTED_SERVICE_TYPES);
+
+//* 每個 service type 都是一次付費的 Lalamove 呼叫：只收支援的車型，不重複，最多每種一次
+const QuotationServiceTypesSchema = z.object({
+  serviceType: ServiceTypeSchema.optional(),
+  serviceTypes: z
+    .array(ServiceTypeSchema)
+    .min(1)
+    .max(ALL_SUPPORTED_SERVICE_TYPES.length)
+    .refine((types) => new Set(types).size === types.length, {
+      message: "serviceTypes must be unique",
+    })
+    .optional(),
+});
 
 /**
  * GET /api/lalamove/service-types
@@ -160,8 +176,13 @@ router.post(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { serviceType, serviceTypes, stops, language, scheduleAt } =
-        req.body;
+      const { stops, language, scheduleAt } = req.body;
+
+      const parsedTypes = QuotationServiceTypesSchema.safeParse(req.body);
+      if (!parsedTypes.success) {
+        return next(new HttpError(400, "INVALID_REQUEST", "Invalid service types"));
+      }
+      const { serviceType, serviceTypes } = parsedTypes.data;
 
       if (!stops || !Array.isArray(stops) || stops.length < 2) {
         return next(new HttpError(400, "INVALID_REQUEST", "Stops are required and must have at least 2 locations (pickup and drop-off)"));
@@ -173,10 +194,7 @@ router.post(
       }
 
       // Determine target service types
-      const typesToFetch: string[] =
-        serviceTypes && Array.isArray(serviceTypes) && serviceTypes.length > 0
-          ? serviceTypes
-          : [serviceType || "MOTORCYCLE"];
+      const typesToFetch: string[] = serviceTypes ?? [serviceType ?? "MOTORCYCLE"];
 
       const quotations = await Promise.all(
         typesToFetch.map(async (st: string) => {

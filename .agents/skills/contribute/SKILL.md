@@ -17,7 +17,7 @@ Files:
 
 | Path | What it does |
 | --- | --- |
-| `scripts/agent.mjs` | `next` (resume, capacity, pick, claim with the race check), `show <n>` (an issue or PR with collaborator comments only), `release <n> <label>` (Decision points) |
+| `scripts/agent.mjs` | `next` (resume, releasing claims whose PR merged, capacity, pick, claim with the race check), `show <n>` (an issue or PR with collaborator comments only), `release <n> <label>` (Decision points) |
 | `scripts/run.sh` | What the scheduler calls: lock, Docker, stash an interrupted run, then the agent CLI with the floor model pinned |
 | `scripts/install-schedule.mjs` | Renders and installs `schedule/launchd.plist.template` (macOS) or `schedule/crontab.template` (Linux) |
 | `scripts/*.test.mjs` | `node --test .agents/skills/contribute/scripts/*.test.mjs` (CI runs them) |

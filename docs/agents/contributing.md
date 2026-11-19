@@ -26,7 +26,7 @@ State the model as a line `Model: <id>` in the PR body and as a `Model: <id>` tr
 
 The `contribute` skill (`.agents/skills/contribute/`) carries these steps out; `node .agents/skills/contribute/scripts/agent.mjs next` does steps 1 to 4 and prints the result as JSON. Contributors set it up with `CONTRIBUTING.md`.
 
-1. **Resume**: if the contributor holds a claim that is not finished, continue it. A claim is finished while its PR is open, not a draft, has auto-merge on, no failed check and no conflict; then it only waits.
+1. **Resume**: if the contributor holds a claim that is not finished, continue it. A claim is finished while its PR is open, not a draft, has auto-merge on, no failed check and no conflict; then it only waits. A claim whose PR merged while the issue stayed open is done: release it, and close the issue with a link to the PR when the PR is on the claim's `agent/` branch or has a closing keyword; otherwise swap `agent:claimed` for `ready-for-human` and ask the maintainer whether the issue is done. A claim whose PR was closed without merging is a Decision point (`ready-for-human`).
 2. **Capacity**: with 3 or more open PRs from this contributor's `agent/<login>/` branches, stop.
 3. **Pick** the oldest open issue that has:
    - `author_association` of `OWNER`, `MEMBER` or `COLLABORATOR`, read from the API, never from the body;

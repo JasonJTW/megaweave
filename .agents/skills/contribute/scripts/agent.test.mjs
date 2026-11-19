@@ -1,13 +1,16 @@
 // node --test .agents/skills/contribute/scripts/*.test.mjs
 // Fixtures are recorded from JasonJTW/megaweave (issues-open.json with bodies trimmed,
-// timeline-121.json, pr-list-merged.json); the claim timelines are written in the same
-// shape, since no issue has been claimed yet.
+// timeline-121.json, pr-list-merged.json, and timeline-merged-pr.json from issue 147's
+// cross-reference by PR 149); the claim events are written in the same shape, since no
+// issue has been claimed yet.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   branchName,
+  claimOutcome,
   claimWinner,
+  closesIssue,
   hasAcceptanceCriteria,
   isStaleClaim,
   next,
@@ -42,8 +45,9 @@ const issue = (overrides = {}) => ({
 });
 
 /**
- * A fake `gh`: reads come from `routes` (exact joined args, or "paginate:<path>"),
- * writes (`issue edit`) are recorded in `writes` and may mutate state via `onWrite`.
+ * A fake `gh`: reads come from `routes` (exact joined args, "paginate:<path>", or
+ * "pr-list" for `gh pr list`); writes (`issue edit|close|comment`) are recorded in
+ * `writes` without the leading `issue` and may mutate state via `onWrite`.
  */
 function fakeGh({ login = "imcyrusss", routes = {}, onWrite = () => {} }) {
   const writes = [];
@@ -51,9 +55,9 @@ function fakeGh({ login = "imcyrusss", routes = {}, onWrite = () => {} }) {
     const key = args.join(" ");
     if (key === "api user") return { login };
     if (key === "repo view --json nameWithOwner") return { nameWithOwner: REPO };
-    if (args[0] === "issue" && args[1] === "edit") {
-      writes.push(args.slice(2));
-      onWrite(args.slice(2));
+    if (args[0] === "issue" && ["edit", "close", "comment"].includes(args[1])) {
+      writes.push(args.slice(1));
+      onWrite(args.slice(1));
       return null;
     }
     if (args[0] === "api" && args[1] === "--paginate") {
@@ -61,7 +65,7 @@ function fakeGh({ login = "imcyrusss", routes = {}, onWrite = () => {} }) {
       const route = Object.entries(routes).find(([k]) => k.startsWith("paginate:") && path.startsWith(k.slice(9)));
       return [typeof route?.[1] === "function" ? route[1]() : (route?.[1] ?? [])];
     }
-    if (args[0] === "pr" && args[1] === "list") return routes[`pr:${args[3]}`] ?? [];
+    if (args[0] === "pr" && args[1] === "list") return routes["pr-list"] ?? [];
     const route = routes[key];
     if (route === undefined) throw new Error(`unexpected gh call: ${key}`);
     return typeof route === "function" ? route() : route;
@@ -216,6 +220,65 @@ describe("trustedComments", () => {
   });
 });
 
+describe("closesIssue", () => {
+  it("matches GitHub's closing keywords for this issue only", () => {
+    assert.equal(closesIssue("Closes #147\n\n## Summary", 147), true);
+    assert.equal(closesIssue("this fixes: #147.", 147), true);
+    assert.equal(closesIssue("Resolved JasonJTW/megaweave#147", 147), true);
+    assert.equal(closesIssue("Closes #1470", 147), false);
+    assert.equal(closesIssue("Related to #147", 147), false);
+    assert.equal(closesIssue(null, 147), false);
+  });
+});
+
+describe("claimOutcome", () => {
+  const ctx = { login: "imcyrusss", repo: REPO };
+  const own = (state, extra = {}) => ({
+    number: 160, url: `https://github.com/${REPO}/pull/160`, state, isDraft: false,
+    headRefName: "agent/imcyrusss/147-fix", isCrossRepository: false, body: "Model: x", ...extra,
+  });
+  const timeline = fixture("timeline-merged-pr.json");
+
+  it("prefers an open PR, then a merged one, then a closed one", () => {
+    assert.equal(claimOutcome(147, [own("CLOSED"), own("OPEN", { number: 161 })], [], ctx).pr.number, 161);
+    assert.equal(claimOutcome(147, [own("CLOSED"), own("MERGED", { number: 162 })], [], ctx).kind, "merged");
+    assert.equal(claimOutcome(147, [own("CLOSED")], [], ctx).kind, "closed");
+    assert.deepEqual(claimOutcome(147, [], [], ctx), { kind: "none" });
+  });
+
+  it("confirms a merged PR on the issue's agent branch even without a closing keyword", () => {
+    assert.deepEqual(claimOutcome(147, [own("MERGED")], [], ctx), {
+      kind: "merged", pr: { number: 160, url: own("MERGED").url }, confirmed: true,
+    });
+  });
+
+  it("finds a merged PR from the timeline and confirms it by its closing keyword", () => {
+    assert.deepEqual(claimOutcome(147, [], timeline, ctx), {
+      kind: "merged", pr: { number: 149, url: `https://github.com/${REPO}/pull/149` }, confirmed: true,
+    });
+  });
+
+  it("leaves a merged mention without a closing keyword unconfirmed", () => {
+    const mention = timeline.map((e) =>
+      e.source ? { ...e, source: { ...e.source, issue: { ...e.source.issue, body: "Part of #147" } } } : e,
+    );
+    assert.equal(claimOutcome(147, [], mention, ctx).confirmed, false);
+  });
+
+  it("ignores PRs merged before the claim, other repos, forks and other issues' branches", () => {
+    const early = timeline.map((e) =>
+      e.source ? { ...e, source: { ...e.source, issue: { ...e.source.issue, pull_request: { ...e.source.issue.pull_request, merged_at: "2026-11-01T00:00:00Z" } } } } : e,
+    );
+    assert.deepEqual(claimOutcome(147, [], early, ctx), { kind: "none" });
+    const elsewhere = timeline.map((e) =>
+      e.source ? { ...e, source: { ...e.source, issue: { ...e.source.issue, repository: { full_name: "x/y" } } } } : e,
+    );
+    assert.deepEqual(claimOutcome(147, [], elsewhere, ctx), { kind: "none" });
+    assert.deepEqual(claimOutcome(147, [own("MERGED", { isCrossRepository: true })], [], ctx), { kind: "none" });
+    assert.deepEqual(claimOutcome(147, [own("MERGED", { headRefName: "agent/imcyrusss/1470-x" })], [], ctx), { kind: "none" });
+  });
+});
+
 describe("next", () => {
   const issuesPath = `paginate:repos/${REPO}/issues?state=open&sort=created`;
   const claimsPath = `paginate:repos/${REPO}/issues?state=open&assignee=`;
@@ -250,7 +313,7 @@ describe("next", () => {
       routes: {
         [claimsPath]: [mine],
         [`paginate:repos/${REPO}/git/matching-refs/heads/agent/imcyrusss/77-`]: [{ ref: "refs/heads/agent/imcyrusss/77-x" }],
-        "pr:agent/imcyrusss/77-x": [{ ...waiting, state: "OPEN" }],
+        "pr-list": [{ ...waiting, state: "OPEN", headRefName: "agent/imcyrusss/77-x" }],
         [`paginate:repos/${REPO}/pulls?state=open`]: [pr(77), pr(78), pr(79)],
       },
     });
@@ -279,7 +342,7 @@ describe("next", () => {
       branch: "agent/imcyrusss/12-fix-weave-something",
       takeover: [],
     });
-    assert.deepEqual(writes, [["12", "--add-assignee", "@me", "--add-label", "agent:claimed"]]);
+    assert.deepEqual(writes, [["edit", "12", "--add-assignee", "@me", "--add-label", "agent:claimed"]]);
   });
 
   it("backs off when another agent was assigned first, then picks the next issue", () => {
@@ -300,14 +363,14 @@ describe("next", () => {
           assigned21.map((a) => ({ event: "assigned", assignee: a })),
       },
       onWrite: (args) => {
-        if (args[0] === "21" && args.includes("--add-assignee")) assigned21 = [{ login: "imcyrusss" }];
+        if (args[1] === "21" && args.includes("--add-assignee")) assigned21 = [{ login: "imcyrusss" }];
       },
     });
     assert.equal(next({ gh, now: NOW }).issue, 21);
     assert.deepEqual(writes, [
-      ["20", "--add-assignee", "@me", "--add-label", "agent:claimed"],
-      ["20", "--remove-assignee", "@me"],
-      ["21", "--add-assignee", "@me", "--add-label", "agent:claimed"],
+      ["edit", "20", "--add-assignee", "@me", "--add-label", "agent:claimed"],
+      ["edit", "20", "--remove-assignee", "@me"],
+      ["edit", "21", "--add-assignee", "@me", "--add-label", "agent:claimed"],
     ]);
   });
 
@@ -336,7 +399,65 @@ describe("next", () => {
     const result = next({ gh, now: NOW });
     assert.equal(result.action, "work");
     assert.deepEqual(result.takeover, ["coldsheepTW"]);
-    assert.deepEqual(writes[0], ["30", "--remove-assignee", "coldsheepTW"]);
+    assert.deepEqual(writes[0], ["edit", "30", "--remove-assignee", "coldsheepTW"]);
+  });
+
+  const claimed147 = issue({ number: 147, labels: [{ name: "agent:claimed" }], assignees: [{ login: "imcyrusss" }] });
+
+  it("closes a claim whose agent-branch PR merged (branch deleted), then picks the next issue", () => {
+    const [merged] = fixture("pr-list-merged.json");
+    const pr = { ...merged, number: 160, url: `https://github.com/${REPO}/pull/160`, headRefName: "agent/imcyrusss/147-fix", isCrossRepository: false, body: "Model: x" };
+    const { gh, writes } = fakeGh({
+      routes: { [claimsPath]: [claimed147], "pr-list": [pr], [issuesPath]: [] },
+    });
+    assert.deepEqual(next({ gh, now: NOW }), {
+      action: "stop",
+      reason: "no-eligible-issue",
+      finished: [{ issue: 147, pr: 160, closed: true }],
+    });
+    assert.deepEqual(writes.slice(0, 1), [["edit", "147", "--remove-label", "agent:claimed", "--remove-assignee", "@me"]]);
+    assert.deepEqual(writes[1].slice(0, 4), ["close", "147", "--reason", "completed"]);
+    assert.match(writes[1][5], /merged in https:\/\/github\.com\/JasonJTW\/megaweave\/pull\/160/);
+    assert.equal(writes.length, 2);
+  });
+
+  it("asks a maintainer when a merged PR only mentions the issue, and does not close it", () => {
+    const mention = fixture("timeline-merged-pr.json").map((e) =>
+      e.source ? { ...e, source: { ...e.source, issue: { ...e.source.issue, body: "Part of #147" } } } : e,
+    );
+    const { gh, writes } = fakeGh({
+      routes: { [claimsPath]: [claimed147], [`paginate:repos/${REPO}/issues/147/timeline`]: mention, [issuesPath]: [] },
+    });
+    assert.deepEqual(next({ gh, now: NOW }).finished, [{ issue: 147, pr: 149, closed: false }]);
+    assert.deepEqual(writes[0], ["edit", "147", "--remove-label", "agent:claimed", "--add-label", "ready-for-human", "--remove-assignee", "@me"]);
+    assert.deepEqual(writes[1].slice(0, 3), ["comment", "147", "--body"]);
+    assert.match(writes[1][3], /pull\/149[\s\S]*@JasonJTW/);
+    assert.ok(!writes.some((w) => w[0] === "close"));
+  });
+
+  it("reports a closed PR whose branch was deleted as closed-pr", () => {
+    const [merged] = fixture("pr-list-merged.json");
+    const pr = { ...merged, number: 160, state: "CLOSED", headRefName: "agent/imcyrusss/147-fix", isCrossRepository: false };
+    const { gh, writes } = fakeGh({ routes: { [claimsPath]: [claimed147], "pr-list": [pr] } });
+    assert.deepEqual(next({ gh, now: NOW }), {
+      action: "closed-pr", issue: 147, title: claimed147.title, branch: "agent/imcyrusss/147-fix", branchExists: false, pr: 160,
+    });
+    assert.deepEqual(writes, []);
+  });
+
+  it("resumes a draft PR", () => {
+    const [merged] = fixture("pr-list-merged.json");
+    const pr = { ...merged, number: 160, state: "OPEN", isDraft: true, headRefName: "agent/imcyrusss/147-fix", isCrossRepository: false };
+    const { gh } = fakeGh({
+      routes: {
+        [claimsPath]: [claimed147],
+        [`paginate:repos/${REPO}/git/matching-refs/heads/agent/imcyrusss/147-`]: [{ ref: "refs/heads/agent/imcyrusss/147-fix" }],
+        "pr-list": [pr],
+      },
+    });
+    const result = next({ gh, now: NOW });
+    assert.equal(result.action, "resume");
+    assert.deepEqual(result.reasons, ["draft"]);
   });
 
   it("leaves a fresh claim alone and stops when nothing is eligible", () => {
@@ -385,7 +506,7 @@ describe("release", () => {
     const { gh, writes } = fakeGh({});
     release(9, "ready-for-human", { gh });
     assert.deepEqual(writes, [
-      ["9", "--remove-label", "agent:claimed", "--add-label", "ready-for-human", "--remove-assignee", "@me"],
+      ["edit", "9", "--remove-label", "agent:claimed", "--add-label", "ready-for-human", "--remove-assignee", "@me"],
     ]);
     assert.throws(() => release(9, "wontfix", { gh }));
   });

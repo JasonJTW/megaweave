@@ -4,9 +4,12 @@
 //   node scripts/check-db-migrations.mjs
 //
 // Compares HEAD with its merge-base on BASE and, when server/db/ changed:
-//   1. schema: a database built from the base server/db/schema.sql plus the migrations
-//      this branch adds (filename order) must dump the same as one built from the
-//      branch's schema.sql;
+//   0. format: every migration is a dbmate file named YYYYMMDDHHMMSS_slug.sql with an
+//      `-- migrate:up` section and an empty `-- migrate:down`, and an added one's version is
+//      newer than every other migration's (the deploy runs `dbmate migrate --strict`);
+//   1. schema: a database built from the base server/db/schema.sql, with the other
+//      migrations recorded as applied and the added ones applied by dbmate (as the deploy
+//      does), must dump the same as one built from the branch's schema.sql;
 //   2. destructive statements (DROP, RENAME, MODIFY, CHANGE, TRUNCATE, DELETE without
 //      WHERE) in added migrations, and edits to migrations already on BASE, need the
 //      `migration-approved` label, and in Actions it counts only when its latest `labeled`
@@ -27,8 +30,8 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const LABEL_NEEDS_MIGRATION = "needs-migration";
 export const LABEL_APPROVED = "migration-approved";
@@ -41,6 +44,14 @@ const MYSQL_IMAGE = "mysql:8.0";
 const MYSQL_FLAGS = ["--default-time-zone=+00:00", "--max_allowed_packet=64M"];
 const DB_BASE = "migration_check_base";
 const DB_HEAD = "migration_check_head";
+const SCRIPTS = dirname(fileURLToPath(import.meta.url));
+
+// Must equal the `dbmate` service image in docker-compose.yml (check-db-migrations.test.mjs)
+export const DBMATE_IMAGE =
+  "ghcr.io/amacneil/dbmate:2.37.0@sha256:0101fcc9999596f4a6930e5627296cd91f3bfa225e3e8c1699fc00881e439cc6";
+export const TRACKING_TABLE = "schema_migrations";
+/** dbmate reads the version from the leading digits; the slug is lowercase words joined by `_`. */
+export const MIGRATION_NAME = /^(\d{14})_[a-z0-9]+(?:_[a-z0-9]+)*\.sql$/;
 
 // ---------------------------------------------------------------------------
 // SQL scanning (pure; covered by scripts/check-db-migrations.test.mjs)
@@ -128,6 +139,74 @@ export function findDestructive(sql) {
   );
 }
 
+const MARKER = /^--\s*migrate:(up|down)\b/;
+
+/**
+ * Reads a dbmate migration: { up, errors }. The file starts with `-- migrate:up` (options such
+ * as `transaction:false` may follow on that line) and ends with an `-- migrate:down` section
+ * holding only comments: migrations are fixed forward, never rolled back.
+ */
+export function parseMigration(sql) {
+  const errors = [];
+  const lines = sql.split("\n");
+  const markers = lines.flatMap((line, index) => {
+    const match = MARKER.exec(line);
+    return match ? [{ kind: match[1], index }] : [];
+  });
+  const firstLine = lines.findIndex((line) => line.trim() !== "");
+  const ups = markers.filter((m) => m.kind === "up");
+  const downs = markers.filter((m) => m.kind === "down");
+  if (ups.length !== 1 || downs.length !== 1 || ups[0].index !== firstLine || downs[0].index < ups[0].index) {
+    errors.push("must start with `-- migrate:up` and have one `-- migrate:down` section after it");
+    return { up: "", errors };
+  }
+  const up = lines.slice(ups[0].index + 1, downs[0].index).join("\n");
+  const down = lines.slice(downs[0].index + 1).join("\n");
+  if (splitStatements(down).length > 0) errors.push("the `-- migrate:down` section must be empty: fix forward with a new migration instead");
+  if (/^\s*DELIMITER\b/im.test(up)) {
+    errors.push("dbmate sends the file to MySQL as is, so `DELIMITER` fails; write the trigger or routine without it (BEGIN ... END with plain `;` works)");
+  }
+  if (splitStatements(up).length === 0) errors.push("the `-- migrate:up` section has no statement");
+  return { up, errors };
+}
+
+/**
+ * Format and order rules for the branch's migrations. `added` are this branch's new files,
+ * `existing` every other migration on the branch (basenames). Returns failure messages.
+ */
+export function checkMigrationFiles({ added, existing, contents = new Map() }) {
+  const failures = [];
+  const versionOf = (name) => MIGRATION_NAME.exec(name)?.[1];
+  for (const name of [...existing, ...added]) {
+    if (!versionOf(name)) {
+      failures.push(`${name} is not named YYYYMMDDHHMMSS_slug.sql (lowercase slug words joined by _); create one with: date -u +%Y%m%d%H%M%S`);
+    }
+  }
+  const seen = new Map();
+  for (const name of [...existing, ...added]) {
+    const version = versionOf(name);
+    if (!version) continue;
+    if (seen.has(version)) failures.push(`${name} and ${seen.get(version)} share the version ${version}; dbmate needs a unique one`);
+    else seen.set(version, name);
+  }
+  const newest = existing.map(versionOf).filter(Boolean).sort(byteOrder).pop();
+  for (const name of added) {
+    const version = versionOf(name);
+    if (version && newest && byteOrder(version, newest) <= 0) {
+      failures.push(
+        `${name} is not newer than the latest migration (${newest}); the deploy applies with dbmate --strict and refuses it. Rename it with a current timestamp: date -u +%Y%m%d%H%M%S`,
+      );
+    }
+    for (const error of parseMigration(contents.get(name) ?? "").errors) failures.push(`${name}: ${error}`);
+  }
+  return failures;
+}
+
+/** Writes a migration per name that records the version without running anything (the baseline). */
+export function writeBaselineStubs(dir, names) {
+  for (const name of names) writeFileSync(join(dir, name), "-- migrate:up\n-- migrate:down\n");
+}
+
 /** Drops what differs between two identical schemas: counters and definers. */
 export function normalizeDump(dump) {
   return dump
@@ -160,7 +239,7 @@ export function classifyChanges(nameStatus) {
   return result;
 }
 
-/** Filename order: plain code-point order, as scripts/db-migrate.sh applies files (LC_ALL=C sort). */
+/** Plain code-point order; for migration names it is dbmate's version order. */
 export function byteOrder(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
@@ -318,8 +397,23 @@ export class MySql {
 
   dump(db, flags = ["--routines", "--events", "--triggers"]) {
     return this.exec("mysqldump", [
-      "--no-data", "--skip-comments", "--skip-dump-date", "--no-tablespaces", ...flags, db,
+      "--no-data", "--skip-comments", "--skip-dump-date", "--no-tablespaces", ...flags,
+      `--ignore-table=${db}.${TRACKING_TABLE}`, db,
     ]).stdout;
+  }
+
+  /** Runs scripts/dbmate.sh against `db` with the migrations in `dir`; returns { status, stdout, stderr }. */
+  dbmate(db, dir, args) {
+    return run(
+      "docker",
+      [
+        "run", "--rm", "--network", `container:${this.container}`,
+        "-v", `${SCRIPTS}:/scripts:ro`, "-v", `${dir}:/migrations:ro`,
+        "-e", "DB_HOST=127.0.0.1", "-e", "DB_USER=root", "-e", "DB_PASSWORD", "-e", `DB_DATABASE=${db}`,
+        "--entrypoint", "sh", DBMATE_IMAGE, "/scripts/dbmate.sh", ...args,
+      ],
+      { env: { ...process.env, DB_PASSWORD: this.password }, allowFail: true },
+    );
   }
 
   resetDatabase(db) {
@@ -391,17 +485,26 @@ async function main() {
     );
   }
 
+  // (0) dbmate format and version order
+  const contents = new Map(changes.added.map((file) => [basename(file), git("show", `${headRef}:${file}`)]));
+  const addedNames = [...contents.keys()];
+  const existingNames = git("ls-tree", "--name-only", `${headRef}:${MIGRATIONS_DIR}`)
+    .split("\n")
+    .filter((name) => name.endsWith(".sql") && !contents.has(name));
+  const formatFailures = checkMigrationFiles({ added: addedNames, existing: existingNames, contents });
+  failures.push(...formatFailures);
+  const ups = new Map(addedNames.map((name) => [name, parseMigration(contents.get(name)).up]));
+
   // (b) destructive statements and edited migrations
-  const needsApproval = changes.editedExisting.length > 0 || changes.added.some((file) => findDestructive(git("show", `${headRef}:${file}`)).length > 0);
+  const needsApproval = changes.editedExisting.length > 0 || [...ups.values()].some((up) => findDestructive(up).length > 0);
   const approval = needsApproval ? await approvalFromGitHub(labels) : { approved: false, reason: "not needed" };
   const approved = approval.approved;
   if (needsApproval && labels.includes(LABEL_APPROVED)) {
     log(approved ? `Approval verified: ${approval.reason}` : `${inActions ? "::warning::" : "WARNING: "}\`${LABEL_APPROVED}\` ignored: ${approval.reason}`);
   }
-  const contents = new Map(changes.added.map((file) => [file, git("show", `${headRef}:${file}`)]));
-  for (const [file, sql] of contents) {
-    for (const hit of findDestructive(sql)) {
-      const message = `${basename(file)}: ${hit.rule} in \`${hit.statement.slice(0, 160)}\``;
+  for (const [name, up] of ups) {
+    for (const hit of findDestructive(up)) {
+      const message = `${name}: ${hit.rule} in \`${hit.statement.slice(0, 160)}\``;
       if (approved) log(`Approved destructive statement (${LABEL_APPROVED}): ${message}`);
       else failures.push(`Destructive statement needs the \`${LABEL_APPROVED}\` label from a maintainer (ADR 0009 expand/contract): ${message}`);
     }
@@ -412,23 +515,32 @@ async function main() {
     else failures.push(message);
   }
 
-  // (a) schema.sql vs base + added migrations
+  // (a) schema.sql vs base + added migrations, applied by dbmate as the deploy does
+  if (formatFailures.length > 0) {
+    log("Skipping the schema comparison until the migration files are valid dbmate migrations.");
+    return report(failures);
+  }
   const mysql = new MySql();
+  const dir = mkdtempSync(join(tmpdir(), "migration-check-dbmate-"));
   try {
     mysql.start();
     mysql.resetDatabase(DB_BASE);
     mysql.resetDatabase(DB_HEAD);
     const baseError = mysql.apply(DB_BASE, git("show", `${mergeBase}:${SCHEMA}`));
     if (baseError) throw new Error(`The base ${SCHEMA} failed to load:\n${baseError}`);
+    // The base schema already has every other migration: record them, as the production baseline does
+    writeBaselineStubs(dir, existingNames);
+    const baseline = mysql.dbmate(DB_BASE, dir, ["migrate"]);
+    if (baseline.status !== 0) throw new Error(`Recording the existing migrations failed:\n${baseline.stderr.trim()}`);
     let applied = true;
-    for (const [file, sql] of contents) {
-      const error = mysql.apply(DB_BASE, sql);
-      if (error) {
-        failures.push(`${basename(file)} failed to apply on the base schema:\n${block(error)}`);
+    if (addedNames.length > 0) {
+      for (const [name, sql] of contents) writeFileSync(join(dir, name), sql);
+      const res = mysql.dbmate(DB_BASE, dir, ["migrate", "--strict"]);
+      log(block(res.stdout.trim()));
+      if (res.status !== 0) {
+        failures.push(`dbmate could not apply the added migrations on the base schema:\n${block(res.stderr.trim())}`);
         applied = false;
-        break;
       }
-      log(`Applied ${basename(file)}`);
     }
     const headError = mysql.apply(DB_HEAD, git("show", `${headRef}:${SCHEMA}`));
     if (headError) failures.push(`The branch's ${SCHEMA} failed to load:\n${block(headError)}`);
@@ -447,8 +559,12 @@ async function main() {
     mysql.sql(`DROP DATABASE IF EXISTS \`${DB_BASE}\`; DROP DATABASE IF EXISTS \`${DB_HEAD}\`;`);
   } finally {
     mysql.stop();
+    rmSync(dir, { recursive: true, force: true });
   }
+  return report(failures);
+}
 
+function report(failures) {
   if (failures.length === 0) {
     log("DB migration check passed.");
     return 0;

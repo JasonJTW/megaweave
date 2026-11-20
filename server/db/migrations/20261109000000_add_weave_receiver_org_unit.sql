@@ -1,3 +1,4 @@
+-- migrate:up
 -- Receiving unit of an org Weave (#137, PRD 0001 §5.1, ADR 0004).
 --
 -- `receiver_id` stays the person who handles the hand-over; `receiver_org_unit_id` is the
@@ -16,3 +17,6 @@ ALTER TABLE `weaves`
     COMMENT '物品流向的單位（申請人送出時選擇；個人 Weave 為 NULL，見 ADR 0004）' AFTER `receiver_id`,
   ADD KEY `idx_weaves_receiver_org_unit` (`receiver_org_unit_id`),
   ADD CONSTRAINT `fk_weaves_receiver_org_unit` FOREIGN KEY (`receiver_org_unit_id`) REFERENCES `org_units` (`id`);
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

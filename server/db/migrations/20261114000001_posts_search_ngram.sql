@@ -1,3 +1,4 @@
+-- migrate:up
 -- Rebuild posts.idx_search with the ngram parser so keyword search can use it
 -- (server/src/services/postKeywordSearch.ts).
 --
@@ -19,3 +20,6 @@ SET SESSION innodb_ft_enable_stopword = OFF;
 ALTER TABLE `posts` DROP INDEX `idx_search`;
 ALTER TABLE `posts` ADD FULLTEXT KEY `idx_search` (`title`, `content`, `tags`) WITH PARSER ngram;
 SET SESSION innodb_ft_enable_stopword = ON;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

@@ -10,7 +10,7 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 -- posts.idx_search is an ngram index; the default stopwords would drop every bigram
--- containing a stopword such as `a` or `i` (see migrations/2026-11-14-posts-search-ngram.sql).
+-- containing a stopword such as `a` or `i` (see migrations/20261114000001_posts_search_ngram.sql).
 SET SESSION innodb_ft_enable_stopword = OFF;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

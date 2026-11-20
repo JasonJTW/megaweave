@@ -150,7 +150,7 @@ async function validatePost(
 }
 
 /**
- * 庫存模型（migration 2026-11-13-add-item-reserved-quantity）：
+ * 庫存模型（migration 20261113000000_add_item_reserved_quantity）：
  * - items.quantity：還沒交出去的庫存，交織完成才扣
  * - items.reserved_quantity：其中已被 Approved 交織預留的數量
  * - 可申請數量 = quantity - reserved_quantity

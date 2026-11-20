@@ -1,3 +1,4 @@
+-- migrate:up
 -- Pending Public for org items (#140, PRD 0001 §5.1 E2-7, E4-2; ADR 0003).
 --
 -- Only an Org Admin can move an item to Public, and it waits 10 minutes first ("待公開"):
@@ -38,3 +39,6 @@ CREATE TABLE `org_pending_public_events` (
   CONSTRAINT `fk_org_pending_public_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
   CONSTRAINT `fk_org_pending_public_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

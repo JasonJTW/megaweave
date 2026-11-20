@@ -1,3 +1,4 @@
+-- migrate:up
 -- Unit Contact handover log (#142, PRD 0001 §5.1 E8-1, ADR 0003, ADR 0004).
 --
 -- An org item belongs to its unit (posts.org_unit_id); posts.user_id is only its current
@@ -34,3 +35,6 @@ CREATE TABLE `org_handover_events` (
   CONSTRAINT `fk_org_handover_events_to` FOREIGN KEY (`to_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_org_handover_events_operator` FOREIGN KEY (`operator_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

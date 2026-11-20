@@ -15,18 +15,17 @@
 // so a target on the host (an SSH tunnel, the dev or E2E MySQL) is DB_HOST=host.docker.internal.
 // DB_DOCKER_NETWORK joins a Docker network instead (e.g. to reach a MySQL container by name).
 // The password reaches mysqldump through MYSQL_PWD, never on a command line.
-// `schema_migrations` (the runner's tracking table) is left out of the comparison.
+// `schema_migrations` (dbmate's tracking table) is left out of the comparison.
 // Steps and the read-only grants: docs/deployment.md "Turning on automatic migrations".
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { MySql, diffText, normalizeDump, run } from "./check-db-migrations.mjs";
+import { MySql, TRACKING_TABLE, diffText, normalizeDump, run } from "./check-db-migrations.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SCHEMA = join(REPO, "server/db/schema.sql");
 const MYSQL_IMAGE = "mysql:8.0";
-export const TRACKING_TABLE = "schema_migrations";
 // Same on both sides. --events is left out: it needs the EVENT privilege and the schema has none.
 const DUMP_FLAGS = ["--routines", "--triggers", "--column-statistics=0", "--set-gtid-purged=OFF"];
 const THROWAWAY_DB = "prod_schema_check";
@@ -73,15 +72,18 @@ export function targetFromEnv(env = process.env) {
 }
 
 /**
- * `docker run` arguments for a mysql:8.0 client container that reaches the target.
+ * `docker run` arguments for a container (mysql:8.0 unless `image`) that reaches the target.
  * Secrets go in `env` (passed by name with -e), never in the arguments.
  */
-export function clientContainer(target, { volumes = [], env = {} } = {}) {
-  const args = ["run", "--rm", "-i", "--add-host=host.docker.internal:host-gateway"];
+export function clientContainer(target, { volumes = [], env = {}, image = MYSQL_IMAGE, entrypoint } = {}) {
+  const args = ["run", "--rm", "-i"];
+  // A container's network namespace (tests) already has its hosts; Docker rejects --add-host there
+  if (!target.network.startsWith("container:")) args.push("--add-host=host.docker.internal:host-gateway");
   if (target.network) args.push("--network", target.network);
   for (const volume of volumes) args.push("-v", volume);
   for (const key of Object.keys(env)) args.push("-e", key);
-  args.push(MYSQL_IMAGE);
+  if (entrypoint) args.push("--entrypoint", entrypoint);
+  args.push(image);
   return { args, env: { ...process.env, ...env } };
 }
 

@@ -38,7 +38,7 @@ jobs:
       - name: Unit-test the check
         run: node --test scripts/*.test.mjs
         env:
-          # Also runs scripts/db-migrate.test.mjs (the deploy's migration runner) in Docker
+          # Also runs scripts/dbmate.test.mjs (dbmate, the deploy script, baseline and backup) in Docker
           DB_SCRIPTS_IT: "1"
 
       # The script starts a throwaway mysql:8.0 container with the E2E flags

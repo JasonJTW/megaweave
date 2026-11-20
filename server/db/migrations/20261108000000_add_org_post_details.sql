@@ -1,3 +1,4 @@
+-- migrate:up
 -- Org item details (#136, PRD 0001 §5.1 E3/E4/E6, ADR 0005).
 -- One row per org post (posts.org_id IS NOT NULL). Personal posts have no row.
 --
@@ -28,3 +29,6 @@ CREATE TABLE `org_post_details` (
   CONSTRAINT `org_post_details_chk_quantity` CHECK ((`quantity` >= 1)),
   CONSTRAINT `org_post_details_chk_weight` CHECK ((`unit_weight_kg` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

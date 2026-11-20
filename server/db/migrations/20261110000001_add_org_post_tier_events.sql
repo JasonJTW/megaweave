@@ -1,3 +1,4 @@
+-- migrate:up
 -- Tier change log for org posts (#138, PRD 0001 §5.1 E2-2/E2-6/E9-1, ADR 0003).
 --
 -- One row per change of posts.audience_tier: who (a user, or the system for Auto Release #139),
@@ -27,3 +28,6 @@ CREATE TABLE `org_post_tier_events` (
   CONSTRAINT `org_post_tier_events_chk_actor` CHECK (((`actor_type` = 'system') = (`actor_user_id` is null))),
   CONSTRAINT `org_post_tier_events_chk_change` CHECK ((`from_tier` <> `to_tier`))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

@@ -1,3 +1,4 @@
+-- migrate:up
 -- Weave review / hand-over log for org items (#141, PRD 0001 §5.1 E9-1, ADR 0003, ADR 0004).
 --
 -- weaves only keeps the current status, so nothing said who approved, declined or confirmed a
@@ -30,3 +31,6 @@ CREATE TABLE `org_weave_events` (
   CONSTRAINT `fk_org_weave_events_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
   CONSTRAINT `fk_org_weave_events_actor` FOREIGN KEY (`actor_user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

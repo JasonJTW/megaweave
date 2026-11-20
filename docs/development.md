@@ -42,7 +42,7 @@ make dev-seed       # optional: wipe the dev data and create the test accounts a
 - **Seed data**: `make dev-seed` runs the E2E seed (`server/src/scripts/e2eSeed.ts`) against the dev stores, using the `E2E_*` accounts from `server/.env.development`. It only runs against stores that carry the isolation marker that `docker-compose.dev.yml` and `make dev-services` write, so it can never wipe production.
 - **Reset**: `make dev-db-reset` deletes the MySQL, S3 and Redis volumes and reinitialises them; `make redis-stop` stops the containers and keeps the data.
 
-`schema.sql` is always current. An existing database is upgraded by applying the files in `server/db/migrations/` that it has not run yet, in filename order; `make dev-db-reset` rebuilds the dev database from the current schema instead.
+`schema.sql` is always current. An existing database is upgraded by applying the files in `server/db/migrations/` that it has not run yet, in version order (dbmate, ADR 0009); `make dev-db-reset` rebuilds the dev database from the current schema instead.
 
 ## Local HTTPS
 

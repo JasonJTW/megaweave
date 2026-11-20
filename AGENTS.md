@@ -68,7 +68,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 - **Async Processing**: Heavy tasks (OpenAI embeddings, email dispatch, S3 uploads/deletions, hot score crons) must be deferred to BullMQ queues.
 - **Tests**: A behaviour change ships with a test.
 - **Env**: Add every new variable to `server/.env.example` or `client/.env.example` (both tracked; see `docs/development.md`).
-- **Migrations**: `server/db/migrations/YYYY-MM-DD-slug.sql`, applied on deploy in filename order by `scripts/db-migrate.sh` once `AUTO_MIGRATE` is on (ADR 0009, `docs/deployment.md`); additive only, never edit a merged one.
+- **Migrations**: dbmate files `server/db/migrations/YYYYMMDDHHMMSS_slug.sql` (`-- migrate:up`, then an empty `-- migrate:down`; format in `docs/agents/contributing.md`), applied on deploy by `dbmate migrate --strict` once `AUTO_MIGRATE` is on (ADR 0009, `docs/deployment.md`); additive only, never edit a merged one.
 - **API contract**: `server/openapi.yaml` (OpenAPI 3.1) is the API contract. Update it in the same change as any route; `server/src/openapiContract.test.ts` fails when a registered route and the spec disagree. Errors are documented once as `ApiError`, not per route.
 
 ## Design: deep modules

@@ -1,3 +1,4 @@
+-- migrate:up
 -- Approving a Weave reserves stock (server/src/utils/weaveService.ts).
 --
 -- items.quantity stays the stock still on hand (not handed over yet); it drops only when a
@@ -25,3 +26,6 @@ JOIN (
   GROUP BY wi.item_id
 ) r ON r.item_id = i.id
 SET i.reserved_quantity = r.reserved;
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

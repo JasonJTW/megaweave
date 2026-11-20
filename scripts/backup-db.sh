@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pre-migration backup of the production database (ADR 0009), run by the backend deploy in
-# .github/workflows/megaweaving-cicd.yaml before scripts/db-migrate.sh applies migrations.
+# .github/workflows/megaweaving-cicd.yaml before dbmate applies migrations (scripts/deploy-migrate.sh).
 #
 # Contract (what the deploy relies on): exit 0 only after a complete, restorable backup of
 # the production database taken now exists; any other outcome exits non-zero and the deploy

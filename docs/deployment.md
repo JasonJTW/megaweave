@@ -25,11 +25,11 @@ The backend deploy can apply new files in `server/db/migrations/` before it star
 
 When it is on, the `Back up and migrate the database` step of the backend deploy runs [`scripts/deploy-migrate.sh`](../scripts/deploy-migrate.sh) on the production host, before `docker compose up`:
 
-1. It refuses (the deploy fails, the running containers keep the old version) when `schema_migrations` is missing or empty, i.e. the baseline below was not done.
+1. It runs `dbmate status` and refuses (the deploy fails, the running containers keep the old version) when no migration is applied, i.e. `schema_migrations` is missing or empty because the baseline below was not done. Without this guard dbmate would create the table and run every file.
 2. With no pending migration it does nothing else.
-3. Otherwise it backs up the database ([`scripts/backup-db.sh`](../scripts/backup-db.sh)) and applies the pending files in filename order ([`scripts/db-migrate.sh`](../scripts/db-migrate.sh) `up`). A file that fails is not recorded, no later file runs, and the deploy stops before `docker compose up`.
+3. Otherwise it backs up the database ([`scripts/backup-db.sh`](../scripts/backup-db.sh)) and runs `dbmate migrate --strict`, which applies the pending files in version order. A file that fails is not recorded, no later file runs, and the deploy stops before `docker compose up`. `--strict` also refuses a pending file whose version is older than the newest applied one (the CI check catches that before merge).
 
-`schema_migrations` records each applied file by name (`method` is `baseline` or `applied`); a recorded file never runs again. Every database command runs in the `db-tools` service of `docker-compose.yml` (the `mysql:8.0` client with `server/.env.production`, the backend's `extra_hosts` and network), so it reaches the database exactly as the backend does and the credentials stay inside that container. It uses `DB_USER` / `DB_PASSWORD` from `server/.env.production`; if that user lacks DDL rights, add `MIGRATION_DB_USER` and `MIGRATION_DB_PASSWORD` for a user that has them to `~/megaweave/server/.env.production` on the host (the backup uses them too).
+[dbmate](https://github.com/amacneil/dbmate) records each applied file's version (the 14 leading digits of its name) in `schema_migrations`; a recorded version never runs again. Migrations run in the `dbmate` service of `docker-compose.yml` and the backup in `db-tools` (the `mysql:8.0` client); both use `server/.env.production`, the backend's `extra_hosts` and network, so they reach the database exactly as the backend does and the credentials stay inside the containers. [`scripts/dbmate.sh`](../scripts/dbmate.sh) builds dbmate's `DATABASE_URL` from `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` and `DB_DATABASE`; if that user lacks DDL rights, add `MIGRATION_DB_USER` and `MIGRATION_DB_PASSWORD` for a user that has them to `~/megaweave/server/.env.production` on the host (the backup uses them too). The dbmate image is pinned by digest (`DBMATE_IMAGE` in `scripts/check-db-migrations.mjs`, the same in `docker-compose.yml`).
 
 Backups are `mysqldump --single-transaction --routines --triggers` (a consistent InnoDB snapshot without table locks), gzipped to `~/megaweave-backups/megaweave-<UTC time>.sql.gz` on the host, newest 5 kept. The script refuses to start with less than 2 GB free (or twice the last backup), and refuses a directory inside the repo checkout. `BACKUP_DIR`, `BACKUP_KEEP` and `BACKUP_MIN_FREE_MB` override the defaults. When the repository variable `BACKUP_S3_URI` (e.g. `s3://bucket/megaweave-db`) is set, each backup is also uploaded with `aws s3 cp --sse AES256`; that needs the aws CLI on the host and credentials allowed to `s3:PutObject` there (an instance role is best), and a failed upload fails the backup. After the move to RDS only `scripts/backup-db.sh` changes (to an RDS snapshot).
 
@@ -66,17 +66,17 @@ DB_HOST=host.docker.internal DB_PORT=13306 DB_USER=<user> DB_DATABASE=<db> \
   node scripts/baseline-db.mjs
 ```
 
-It refuses when `schema_migrations` already has rows, and runs the step 1 check itself and refuses when it fails. Then it creates `schema_migrations` and records every file in `server/db/migrations/` as applied (`method = 'baseline'`) without running any, in one transaction, and lists them. `DROP USER 'schema_check'@'%';` afterwards.
+It refuses when dbmate already reports an applied migration, and runs the step 1 check itself and refuses when it fails. Then it records every file in `server/db/migrations/` as applied without running any: dbmate applies an empty migration under each file's name, which creates `schema_migrations` and inserts the versions. It ends with `dbmate status`, every file marked `[X]`. `DROP USER 'schema_check'@'%';` afterwards.
 
 Before step 3, check that the deploy's user can run DDL. On the host, in the runner's checkout of this repo (the deploy job's working directory, e.g. `~/actions-runner/_work/Megaweave/Megaweave`, which has `server/.env.production` after a deploy):
 
 ```bash
 docker compose --profile tools run --rm -T db-tools sh -c \
   'MYSQL_PWD="${MIGRATION_DB_PASSWORD:-$DB_PASSWORD}" mysql --protocol=TCP -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "${MIGRATION_DB_USER:-$DB_USER}" -e "SHOW GRANTS"'
-docker compose --profile tools run --rm -T db-tools sh /scripts/db-migrate.sh status
+docker compose --profile tools run --rm -T dbmate status
 ```
 
-The grants need `ALTER, CREATE, INDEX, REFERENCES, TRIGGER` on `<db>` besides the usual `SELECT, INSERT, UPDATE, DELETE` (and `DROP` for an approved destructive migration). `status` lists the baseline rows and `Pending: none`.
+The grants need `ALTER, CREATE, INDEX, REFERENCES, TRIGGER` on `<db>` besides the usual `SELECT, INSERT, UPDATE, DELETE` (and `DROP` for an approved destructive migration). `status` marks every file `[X]` and ends with `Pending: 0`.
 
 **3. Turn it on.**
 
@@ -85,7 +85,7 @@ gh variable set AUTO_MIGRATE --body true
 gh variable set BACKUP_S3_URI --body s3://<bucket>/<prefix>   # optional, see above
 ```
 
-**4. Verify on the next backend deploy.** In the `Deploy Backend (Docker)` job, `Back up and migrate the database` runs instead of the "Migrations skipped" notice and prints `No pending migrations` (or the pending files, the backup path and `Applied <file>` for each). On the host, `ls -lh ~/megaweave-backups` shows the backup when a migration ran, and `db-migrate.sh status` (step 2) lists the new rows with `method = applied`.
+**4. Verify on the next backend deploy.** In the `Deploy Backend (Docker)` job, `Back up and migrate the database` runs instead of the "Migrations skipped" notice and prints `No pending migrations` (or the pending files, the backup path and `Applied: <file>` for each). On the host, `ls -lh ~/megaweave-backups` shows the backup when a migration ran, and `dbmate status` (step 2) marks the new files `[X]`.
 
 To pause, `gh variable set AUTO_MIGRATE --body false`; deploys go back to skipping migrations.
 
@@ -94,7 +94,7 @@ To pause, `gh variable set AUTO_MIGRATE --body false`; deploys go back to skippi
 The deploy stopped before `docker compose up`, so the old containers still run, and the backup taken just before is in `~/megaweave-backups`. The step log shows the file and the MySQL error. The failed file is not in `schema_migrations`.
 
 - A file of only DML (INSERT, UPDATE, DELETE) ran in one transaction and was rolled back: fix it in a new PR and redeploy.
-- A file with DDL may have applied the statements before the failing one (MySQL commits DDL implicitly). Compare with `SHOW CREATE TABLE`, then either finish the remaining statements by hand and record the file, `INSERT INTO schema_migrations (filename, method) VALUES ('<file>', 'applied');`, or undo the applied statements and fix the file in a PR. Re-run the failed jobs of the workflow run to deploy.
+- A file with DDL may have applied the statements before the failing one (MySQL commits DDL implicitly). Compare with `SHOW CREATE TABLE`, then either finish the remaining statements by hand and record the file, `INSERT INTO schema_migrations (version) VALUES ('<14-digit version>');`, or undo the applied statements and fix the file in a PR. Re-run the failed jobs of the workflow run to deploy.
 
 ### Restoring a backup
 

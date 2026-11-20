@@ -1,3 +1,4 @@
+-- migrate:up
 -- Organizations, units and memberships (ADR 0003, PRD 0001 §5.1).
 -- Accounts stay platform-wide: org identity is a membership on the account.
 -- `access_level` decides what a member can see, `org_role` what they can manage.
@@ -81,3 +82,6 @@ ALTER TABLE `posts`
   ADD CONSTRAINT `fk_posts_org_unit` FOREIGN KEY (`org_id`,`org_unit_id`) REFERENCES `org_units` (`org_id`,`id`),
   ADD CONSTRAINT `posts_chk_org_unit` CHECK (((`org_id` IS NULL) = (`org_unit_id` IS NULL))),
   ADD CONSTRAINT `posts_chk_personal_public` CHECK (((`org_id` IS NOT NULL) OR (`audience_tier` = 'public')));
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

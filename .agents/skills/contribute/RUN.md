@@ -44,7 +44,7 @@ Use the branch name from `A next` unchanged: the `Model:` check keys on `agent/`
 
 Work test-first, following `AGENTS.md` and `.agents/skills/tdd/SKILL.md`: each acceptance criterion becomes a test that goes red, then green. Develop against the E2E stack only (`make e2e-up`, `server/e2e.env`).
 
-- **Schema changes** follow `docs/agents/contributing.md` (Migrations): `schema.sql` plus a new `server/db/migrations/YYYY-MM-DD-slug.sql`, additive only; `make e2e-reset`; `PR_LABELS='["needs-migration"]' node scripts/check-db-migrations.mjs`.
+- **Schema changes** follow `docs/agents/contributing.md` (Migrations): `schema.sql` plus a new dbmate file `server/db/migrations/$(date -u +%Y%m%d%H%M%S)_<slug>.sql` (`-- migrate:up` ... empty `-- migrate:down`), additive only; `make e2e-reset`; `PR_LABELS='["needs-migration"]' node scripts/check-db-migrations.mjs`.
 - **Commits** are Conventional Commits in English, committed whenever the tests are green (the pre-commit hook runs typecheck and tests). End every commit message with this trailer block, `<id>` being the run's model:
 
   ```

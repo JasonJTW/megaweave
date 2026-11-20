@@ -1,3 +1,4 @@
+-- migrate:up
 -- Org conversations (#140, ADR 0004).
 --
 -- People who message or request a Public org item talk to the handling Unit Contact's personal
@@ -21,3 +22,6 @@ ALTER TABLE `conversations`
   ADD CONSTRAINT `fk_conv_org` FOREIGN KEY (`org_id`) REFERENCES `organizations` (`id`),
   ADD CONSTRAINT `fk_conv_org_user` FOREIGN KEY (`org_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `check_conv_org_user` CHECK (((`org_id` is null) = (`org_user_id` is null)));
+
+-- migrate:down
+-- Never rolled back: fix forward with a new migration (ADR 0009).

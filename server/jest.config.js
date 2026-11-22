@@ -14,5 +14,7 @@ module.exports = {
   setupFiles: ["<rootDir>/src/jest.setup.ts"],
   // npm run build / benchmark:api 會輸出 dist/，其中的 __mocks__ 會與 src 重複
   modulePathIgnorePatterns: ["<rootDir>/dist/"],
+  //* 需要真 MySQL 的測試走 `npm run test:db`（jest.db.config.js）
+  testPathIgnorePatterns: ["/node_modules/", "\\.db\\.test\\.ts$"],
   forceExit: true,
 };

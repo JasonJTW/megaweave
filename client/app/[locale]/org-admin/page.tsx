@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/apiError";
+import { api, type ApiPath } from "@/lib/api";
 import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { useUser } from "@/app/contexts/UserContext";
@@ -36,8 +36,6 @@ import {
   OrgShell,
   orgTabs,
 } from "@/components/org/OrgShell";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 const MEMBER_ROLES = ["admin", "member"] as const;
 type MemberRole = (typeof MEMBER_ROLES)[number];
@@ -79,19 +77,6 @@ const EMPTY_MEMBER_FORM: MemberForm = {
   role: "member",
   unitIds: [],
 };
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    credentials: "include",
-    cache: "no-store",
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(body, res.status);
-  return body as T;
-}
 
 function toggleId(ids: number[], id: number, checked: boolean): number[] {
   return checked ? [...ids, id] : ids.filter((other) => other !== id);
@@ -221,10 +206,8 @@ function handoverKey(handover: PendingHandover): string {
   return `${handover.user.id}:${handover.unit.id}`;
 }
 
-function useHandovers(orgUrl: string) {
-  return useSWR(`${orgUrl}/handovers`, (url: string) =>
-    requestJson<{ handovers: PendingHandover[] }>(url),
-  );
+function useHandovers(orgUrl: ApiPath) {
+  return useSWR<{ handovers: PendingHandover[] }>(`${orgUrl}/handovers`);
 }
 
 /**
@@ -236,7 +219,7 @@ function HandoverSection({
   members,
   onDone,
 }: {
-  orgUrl: string;
+  orgUrl: ApiPath;
   members: OrgMember[];
   onDone: () => Promise<unknown>;
 }) {
@@ -252,15 +235,15 @@ function HandoverSection({
     if (!toMemberId) return;
     setSubmitting(key);
     try {
-      const result = await requestJson<{ items: number; weaves: number }>(
+      const result = await api<{ items: number; weaves: number }>(
         `${orgUrl}/handovers`,
         {
           method: "POST",
-          body: JSON.stringify({
+          body: {
             fromUserId: handover.user.id,
             unitId: handover.unit.id,
             toMemberId,
-          }),
+          },
         },
       );
       toast.success(t("done", result));
@@ -374,14 +357,14 @@ function PublisherDisplaySection({
   orgName,
   sampleUnit,
 }: {
-  orgUrl: string;
+  orgUrl: ApiPath;
   orgName: string;
   sampleUnit: string | null;
 }) {
   const t = useTranslations("OrgAdmin.publisherDisplay");
   const errorMessage = useApiErrorMessage();
-  const { data, error, mutate } = useSWR(`${orgUrl}/settings`, (url: string) =>
-    requestJson<{ settings: OrgSettings }>(url),
+  const { data, error, mutate } = useSWR<{ settings: OrgSettings }>(
+    `${orgUrl}/settings`,
   );
   const [saving, setSaving] = useState(false);
   const { mutate: revalidate } = useSWRConfig();
@@ -391,14 +374,14 @@ function PublisherDisplaySection({
     if (value === current) return;
     setSaving(true);
     try {
-      const result = await requestJson<{ settings: OrgSettings }>(
+      const result = await api<{ settings: OrgSettings }>(
         `${orgUrl}/settings`,
-        { method: "PATCH", body: JSON.stringify({ publisherDisplay: value }) },
+        { method: "PATCH", body: { publisherDisplay: value } },
       );
       await mutate(result, { revalidate: false });
       //* 公開物品的卡片、詳情都換了名稱
       await revalidate(
-        (key) => typeof key === "string" && key.startsWith(`${hostName}/api/`),
+        (key) => typeof key === "string" && key.startsWith("/api/"),
       );
       toast.success(t("saved"));
     } catch (err) {
@@ -454,11 +437,11 @@ function PublisherDisplaySection({
 }
 
 /** 組織的自動升級設定：自動（天數）或手動 */
-function AutoReleaseSection({ orgUrl }: { orgUrl: string }) {
+function AutoReleaseSection({ orgUrl }: { orgUrl: ApiPath }) {
   const t = useTranslations("OrgAdmin.settings");
   const errorMessage = useApiErrorMessage();
-  const { data, error, mutate } = useSWR(`${orgUrl}/settings`, (url: string) =>
-    requestJson<{ settings: OrgSettings }>(url),
+  const { data, error, mutate } = useSWR<{ settings: OrgSettings }>(
+    `${orgUrl}/settings`,
   );
   const [draft, setDraft] = useState<{ enabled: boolean; days: string } | null>(
     null,
@@ -474,23 +457,20 @@ function AutoReleaseSection({ orgUrl }: { orgUrl: string }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const result = await requestJson<{ settings: OrgSettings }>(
+      const result = await api<{ settings: OrgSettings }>(
         `${orgUrl}/settings`,
         {
           method: "PATCH",
-          body: JSON.stringify(
-            enabled
-              ? { autoReleaseEnabled: true, autoReleaseDays: Number(days) }
-              : { autoReleaseEnabled: false },
-          ),
+          body: enabled
+            ? { autoReleaseEnabled: true, autoReleaseDays: Number(days) }
+            : { autoReleaseEnabled: false },
         },
       );
       await mutate(result, { revalidate: false });
       setDraft(null);
       //* /org/items 的「跟組織設定」標示來自 GET /api/orgs
       await revalidate(
-        (key) =>
-          typeof key === "string" && key.startsWith(`${hostName}/api/orgs`),
+        (key) => typeof key === "string" && key.startsWith("/api/orgs"),
       );
       toast.success(t("saved"));
     } catch (err) {
@@ -572,23 +552,21 @@ function OrgAdminContent() {
   const [submitting, setSubmitting] = useState(false);
   const { mutate: revalidate } = useSWRConfig();
 
-  const { data: orgList, error: orgListError } = useSWR(
-    `${hostName}/api/org-admin/orgs`,
-    (url) => requestJson<{ orgs: OrgOption[] }>(url),
+  const { data: orgList, error: orgListError } = useSWR<{ orgs: OrgOption[] }>(
+    "/api/org-admin/orgs",
   );
   const orgs = orgList?.orgs ?? [];
   const currentOrg = pickOrg(orgs, searchParams.get("org"));
   const orgId = currentOrg?.id ?? null;
-  const orgUrl = orgId ? `${hostName}/api/org-admin/orgs/${orgId}` : null;
+  const orgUrl: ApiPath | null = orgId ? `/api/org-admin/orgs/${orgId}` : null;
   const {
     data: overview,
     error: overviewError,
     mutate,
-  } = useSWR(orgUrl, (url: string) => requestJson<OrgOverview>(url));
+  } = useSWR<OrgOverview>(orgUrl);
   //* 和 HandoverSection 共用 SWR key：只用來決定這一區排在最上面還是最後
-  const { data: handovers } = useSWR(
+  const { data: handovers } = useSWR<{ handovers: PendingHandover[] }>(
     orgUrl ? `${orgUrl}/handovers` : null,
-    (url: string) => requestJson<{ handovers: PendingHandover[] }>(url),
   );
   const handoverFirst = (handovers?.handovers.length ?? 0) > 0;
 
@@ -614,9 +592,9 @@ function OrgAdminContent() {
     event.preventDefault();
     if (!orgUrl) return;
     void run(async () => {
-      await requestJson(`${orgUrl}/units`, {
+      await api(`${orgUrl}/units`, {
         method: "POST",
-        body: JSON.stringify({ name: unitName }),
+        body: { name: unitName },
       });
       setUnitName("");
     }, t("unitAdded"));
@@ -627,9 +605,9 @@ function OrgAdminContent() {
     if (!orgUrl) return;
     const { email, role, unitIds } = memberForm;
     void run(async () => {
-      await requestJson(`${orgUrl}/members`, {
+      await api(`${orgUrl}/members`, {
         method: "POST",
-        body: JSON.stringify({ email, role, unitIds }),
+        body: { email, role, unitIds },
       });
       setMemberForm(EMPTY_MEMBER_FORM);
       setAdding(false);
@@ -640,7 +618,7 @@ function OrgAdminContent() {
     if (!orgUrl) return;
     if (!window.confirm(t("removeConfirm", { email: member.email }))) return;
     void run(async () => {
-      await requestJson(`${orgUrl}/members/${member.id}`, {
+      await api(`${orgUrl}/members/${member.id}`, {
         method: "DELETE",
       });
     }, t("memberRemoved"));
@@ -651,9 +629,9 @@ function OrgAdminContent() {
     if (!orgUrl || !editing) return;
     const { memberId, identity } = editing;
     void run(async () => {
-      await requestJson(`${orgUrl}/members/${memberId}`, {
+      await api(`${orgUrl}/members/${memberId}`, {
         method: "PATCH",
-        body: JSON.stringify(identity),
+        body: identity,
       });
       setEditing(null);
     }, t("memberUpdated"));

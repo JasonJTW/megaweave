@@ -6,9 +6,9 @@ import { useState, useCallback, useEffect } from "react";
 import { usePost } from "@/app/contexts/PostContext";
 import { PostsResponse, Post } from "@/app/types/schema";
 import { useScroll } from "framer-motion";
+import { api } from "@/lib/api";
 const CardPage = () => {
   const router = useRouter();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const [posts, setPosts] = useState<Post[]>([]);
   const [currentPage] = useState(1);
   const { categories, conditions } = usePost();
@@ -25,16 +25,12 @@ const CardPage = () => {
         limit: "12",
       });
 
-      const response = await fetch(`${hostName}/api/posts?${params}`);
-      const data: PostsResponse = await response.json();
-
-      if (response.ok) {
-        setPosts(data.posts);
-      }
+      const data = await api<PostsResponse>(`/api/posts?${params}`);
+      setPosts(data.posts);
     } catch (error) {
       console.error("Internal server error:", error);
     }
-  }, [hostName, currentPage]);
+  }, [currentPage]);
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);

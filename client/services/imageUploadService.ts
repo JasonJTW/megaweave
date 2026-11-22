@@ -48,6 +48,7 @@ export async function uploadImagesToS3Staging(
       const { blob, filename } = images[index];
       const contentType = blob.type || "image/jpeg";
 
+      // eslint-disable-next-line no-restricted-globals -- presigned PUT straight to S3, not our API
       const uploadRes = await fetch(presignedUrl, {
         method: "PUT",
         headers: {

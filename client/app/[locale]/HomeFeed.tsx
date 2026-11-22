@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { api, type ApiPath } from "@/lib/api";
 import { parseGooglePlace } from "@/utils/locationUtils";
 import OverlayTour, { TourStep } from "@/app/components/OverlayTour";
 
@@ -64,7 +65,6 @@ const PostsApp = () => {
   const tTour = useTranslations("Onboarding");
   const categoryName = useCategoryName();
   const router = useRouter();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const { user } = useUser();
   const [isStuck, setIsStuck] = useState(false);
   // Ref on the desktop header — we watch its bottom edge to decide when to stick
@@ -217,11 +217,10 @@ const PostsApp = () => {
       }
 
       // 首頁所有的瀏覽與條件篩選（分類、Wish/Share、地點、關鍵字）統一走個人化推薦混合重排 API
-      return `${hostName}/api/posts/feed?${params.toString()}`;
+      return `/api/posts/feed?${params.toString()}` as ApiPath;
     },
     [
       isReady,
-      hostName,
       submittedSearchTerm,
       selectedCategory,
       selectedLocation,
@@ -233,11 +232,8 @@ const PostsApp = () => {
     ],
   );
 
-  const fetcher = (url: string) =>
-    fetch(url, { credentials: "include" }).then((res) => res.json());
-
   const { data, size, setSize, isValidating, mutate } =
-    useSWRInfinite<PostsResponse>(getKey, fetcher, {
+    useSWRInfinite<PostsResponse>(getKey, {
       revalidateFirstPage: false,
       // A new key (the location arriving after the first load, or a filter change) keeps
       // the current cards on screen under the top spinner until the new list arrives.
@@ -556,27 +552,10 @@ const PostsApp = () => {
         stagingKeys,
       };
 
-      const response = await fetch(`${hostName}/api/posts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(postPayload),
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        setShowCreateForm(false);
-        toast.success(t("postCreated"));
-        mutate(); // 重新獲取貼文列表
-      } else {
-        toast.error(
-          apiErrorMessage(
-            await response.json().catch(() => null),
-            t("postFailed"),
-          ),
-        );
-      }
+      await api("/api/posts", { method: "POST", body: postPayload });
+      setShowCreateForm(false);
+      toast.success(t("postCreated"));
+      mutate(); // 重新獲取貼文列表
     } catch (error: unknown) {
       console.error("Create post error:", error);
       toast.error(apiErrorMessage(error, t("postFailed")));

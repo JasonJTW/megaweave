@@ -448,8 +448,7 @@
     "replyCount": "{count} 則回覆",
     "signInToMessage": "請先登入才能私訊",
     "cannotMessageSelf": "無法私訊自己",
-    "messageFailed": "無法私訊 {username}",
-    "startConversationFailed": "無法開啟對話"
+    "messageFailed": "無法私訊 {username}"
   },
   "Tinder": {
     "radiusTitle": "搜尋半徑級距",
@@ -633,8 +632,7 @@
     "facebookNoToken": "Facebook 登入失敗：未取得存取權杖",
     "facebookNotAuthorized": "Facebook 登入失敗：未授權此應用程式",
     "facebookCancelled": "Facebook 登入已取消或失敗",
-    "facebookFailed": "Facebook 登入失敗",
-    "unexpectedError": "發生未預期的錯誤"
+    "facebookFailed": "Facebook 登入失敗"
   },
   "Profile": {
     "loading": "載入中⋯",

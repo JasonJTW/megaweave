@@ -72,6 +72,7 @@ export default function Page() {
                 op: "test",
               },
               async () => {
+                // eslint-disable-next-line no-restricted-globals -- same-origin Next route used to test Sentry
                 const res = await fetch("/api/sentry-example-api");
                 if (!res.ok) {
                   setHasSentError(true);

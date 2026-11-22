@@ -1682,40 +1682,6 @@ paths:
                   primary: { $ref: "#/components/schemas/LalamoveQuotation" }
         "4XX": { $ref: "#/components/responses/ClientError" }
         "5XX": { $ref: "#/components/responses/ServerError" }
-  /api/lalamove/orders:
-    post:
-      tags: [lalamove]
-      operationId: createLalamoveOrder
-      summary: Place a Lalamove order from a quotation
-      security: [{ sessionCookie: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [quotationId, sender, recipients]
-              properties:
-                quotationId: { type: string }
-                sender: { $ref: "#/components/schemas/LalamoveContact" }
-                recipients: { type: array, minItems: 1, items: { $ref: "#/components/schemas/LalamoveContact" } }
-                isPODEnabled: { type: boolean }
-                isRecipientSmsEnabled: { type: boolean }
-                partner: { type: string }
-                metadata: { type: object, additionalProperties: true }
-      responses:
-        "201":
-          description: Order placed
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [success, order]
-                properties:
-                  success: { type: boolean, const: true }
-                  order: { type: object, description: Lalamove order result, additionalProperties: true }
-        "4XX": { $ref: "#/components/responses/ClientError" }
-        "5XX": { $ref: "#/components/responses/ServerError" }
   /api/lalamove/orders/{orderId}:
     parameters:
       - { $ref: "#/components/parameters/DeliveryOrderId" }
@@ -3410,13 +3376,6 @@ components:
         last_message_content: { type: string }
         is_read: { type: integer, enum: [0, 1] }
         unread_count: { type: integer }
-      additionalProperties: true
-    LalamoveContact:
-      type: object
-      required: [name, phone]
-      properties:
-        name: { type: string }
-        phone: { type: string }
       additionalProperties: true
     LalamoveServiceType:
       type: string

@@ -5,7 +5,7 @@ import { dismissEnglishPrompt } from "@/i18n/languagePrompt";
 import type { Locale } from "@/i18n/routing";
 import { useUser } from "@/app/contexts/UserContext";
 
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { api } from "@/lib/api";
 
 /**
  * Explicit language switch: moves to the same page (path, query, hash) in the target
@@ -23,12 +23,10 @@ export function useSwitchLocale() {
 
     if (user) {
       // keepalive lets the request finish while the page navigates away
-      fetch(`${hostName}/api/me/locale`, {
+      api("/api/me/locale", {
         method: "PUT",
-        credentials: "include",
         keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locale }),
+        body: { locale },
       }).catch((error) =>
         console.error("Failed to save account language:", error),
       );

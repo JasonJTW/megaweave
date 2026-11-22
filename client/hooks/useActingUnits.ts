@@ -3,9 +3,7 @@
 //* 申請組織物品時可代表的單位（#137，ADR 0004）：server/src/weaves.ts `GET /api/weaves/acting-units`
 //* 空陣列代表只有一種身分，不顯示「代表誰」；個人貼文不發請求
 import useSWR from "swr";
-import { requestJson } from "@/lib/orgApi";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import type { ApiPath } from "@/lib/api";
 
 export interface ActingUnit {
   id: number;
@@ -18,10 +16,8 @@ export function useActingUnits(post: { id: number; org_id?: number | null }): {
 } {
   const key =
     post.org_id != null
-      ? `${hostName}/api/weaves/acting-units?postId=${post.id}`
+      ? (`/api/weaves/acting-units?postId=${post.id}` as ApiPath)
       : null;
-  const { data, isLoading } = useSWR(key, (url: string) =>
-    requestJson<{ units: ActingUnit[] }>(url),
-  );
+  const { data, isLoading } = useSWR<{ units: ActingUnit[] }>(key);
   return { units: data?.units ?? [], isLoading: key !== null && isLoading };
 }

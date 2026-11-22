@@ -24,7 +24,11 @@ import { useAppDispatch } from "@/app/store/hooks";
 import { openChat } from "@/app/store/chatPopupSlice";
 import { ArrowRight } from "lucide-react";
 import WeavingIcon from "@/app/components/icons/WeavingIcon";
-import { hasPendingWeaveForPost, getLalamoveAction } from "@/utils/weaveGuard";
+import {
+  hasPendingWeaveForPost,
+  getLalamoveAction,
+  type WeaveItemCheck,
+} from "@/utils/weaveGuard";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -42,6 +46,7 @@ import {
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 
 /**
  * Strip floor/unit info and fix the duplicate-號 bug from Google Geocoding API
@@ -112,7 +117,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   post,
   hasPendingWeave: hasPendingWeaveProp,
 }) => {
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
   const t = useTranslations("Lalamove");
   const apiErrorMessage = useApiErrorMessage();
   const router = useRouter();
@@ -154,15 +158,10 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   // Weaves query to check if there is a approved weave for this post
-  const { data: weavesData } = useSWR(
+  const { data: weavesData } = useSWR<{ weaves: WeaveItemCheck[] }>(
     user && hasPendingWeaveProp === undefined
-      ? `${hostName}/api/weaves?postId=${post.id}&status=approved`
+      ? `/api/weaves?postId=${post.id}&status=approved`
       : null,
-    async (url: string) => {
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
   );
 
   const hasPendingWeave =
@@ -181,16 +180,13 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     }
 
     try {
-      const res = await fetch(`${hostName}/api/messages/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ recipient_public_id: post.author_public_id }),
-      });
-
-      if (!res.ok) throw new Error("Failed to start conversation");
-
-      const data = await res.json();
+      const data = await api<{ conversationId: number }>(
+        "/api/messages/start",
+        {
+          method: "POST",
+          body: { recipient_public_id: post.author_public_id },
+        },
+      );
 
       dispatch(
         openChat({
@@ -206,7 +202,12 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
       );
     } catch (error) {
       console.error("Message error:", error);
-      toast.error(t("quotation.messageFailed", { username: post.username }));
+      toast.error(
+        apiErrorMessage(
+          error,
+          t("quotation.messageFailed", { username: post.username }),
+        ),
+      );
     }
   };
 
@@ -307,25 +308,18 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
           },
         ];
 
-        const response = await fetch(`${hostName}/api/lalamove/quotation`, {
+        const data = await api<{
+          success: boolean;
+          quotations: QuotationItem[];
+        }>("/api/lalamove/quotation", {
           method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+          body: {
             serviceTypes: targetTypes,
             stops,
             language: LALAMOVE_LANGUAGE,
-          }),
+          },
         });
-
-        const data = await response.json();
-        console.log("[Lalamove Client] Received quotation data:", data);
-
-        if (!response.ok || !data.success) {
-          throw new ApiError(data);
-        }
+        if (!data.success) throw new ApiError(data);
 
         const quotesMap: Record<string, QuotationItem> = {};
         data.quotations.forEach((q: QuotationItem) => {
@@ -378,7 +372,6 @@ export const LalamoveQuotation: React.FC<LalamoveQuotationProps> = ({
     [
       destinationAddress,
       destinationCoords,
-      hostName,
       originAddress,
       originLat,
       originLng,

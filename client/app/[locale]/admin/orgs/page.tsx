@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/apiError";
+import { api, type ApiPath } from "@/lib/api";
 import { PUBLISHER_DISPLAYS, type PublisherDisplay } from "@/lib/orgContact";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Link } from "@/i18n/navigation";
@@ -30,8 +30,6 @@ import {
   type MemberRequest,
   type OrgMemberIdentity,
 } from "@/lib/orgAdminRules";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 interface Org {
   id: string;
@@ -61,18 +59,6 @@ const EMPTY_FORM: OrgForm = {
   orgAdminEmail: "",
 };
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    credentials: "include",
-    cache: "no-store",
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(body, res.status);
-  return body as T;
-}
-
 /**
  * 組織管理員的增減。加入：已是成員就改成 Org Admin（保留窗口單位），否則以 Org Admin 身分加入；
  * 移除：降為 Org Member，帳號與成員身分保留。最後一位 Org Admin 由 server 擋下（ORG_LAST_ADMIN）
@@ -86,10 +72,8 @@ function OrgAdminsEditor({
 }) {
   const t = useTranslations("AdminOrgs");
   const errorMessage = useApiErrorMessage();
-  const url = `${hostName}/api/org-admin/orgs/${orgId}`;
-  const { data, error, mutate } = useSWR(url, (key: string) =>
-    requestJson<{ members: OrgMemberIdentity[] }>(key),
-  );
+  const url: ApiPath = `/api/org-admin/orgs/${orgId}`;
+  const { data, error, mutate } = useSWR<{ members: OrgMemberIdentity[] }>(url);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const admins = data?.members.filter((m) => m.role === "admin") ?? [];
@@ -110,9 +94,9 @@ function OrgAdminsEditor({
   }
 
   function send(request: MemberRequest) {
-    return requestJson(`${url}${request.path}`, {
+    return api(`${url}${request.path}`, {
       method: request.method,
-      body: JSON.stringify(request.body),
+      body: request.body,
     });
   }
 
@@ -204,9 +188,7 @@ export default function AdminOrgsPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const { data, error, mutate } = useSWR(`${hostName}/api/admin/orgs`, (url) =>
-    requestJson<{ orgs: Org[] }>(url),
-  );
+  const { data, error, mutate } = useSWR<{ orgs: Org[] }>("/api/admin/orgs");
 
   function update<K extends keyof OrgForm>(key: K, value: OrgForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -244,18 +226,18 @@ export default function AdminOrgsPage() {
     };
     try {
       if (editingId) {
-        await requestJson(`${hostName}/api/admin/orgs/${editingId}`, {
+        await api(`/api/admin/orgs/${editingId}`, {
           method: "PATCH",
-          body: JSON.stringify(settings),
+          body: settings,
         });
         toast.success(t("saved"));
       } else {
-        await requestJson(`${hostName}/api/admin/orgs`, {
+        await api("/api/admin/orgs", {
           method: "POST",
-          body: JSON.stringify({
+          body: {
             ...settings,
             orgAdminEmail: form.orgAdminEmail,
-          }),
+          },
         });
         toast.success(t("created"));
       }

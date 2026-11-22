@@ -23,7 +23,7 @@ import { LocationProvider } from "@/app/contexts/LocationContext";
 dotenv.config();
 // const publisherId = process.env.NEXT_PUBLIC_ADSENSE_PUBLISHER_ID!;
 import { UserProvider } from "@/app/contexts/UserContext";
-import { SWRConfig } from "swr";
+import { ApiSWRConfig } from "@/components/ApiSWRConfig";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -191,19 +191,19 @@ export default async function RootLayout({
           }}
         />
         <NextIntlClientProvider>
-        <SWRConfig value={{}}>
-          <UserProvider>
-            <LocationProvider>
-              <SocketProvider>
-                <NavbarProvider>
-                  <NotificationProvider>
-                    <StoreProvider>
-                      <Navbar />
-                      <ChatPopup />
+          <ApiSWRConfig>
+            <UserProvider>
+              <LocationProvider>
+                <SocketProvider>
+                  <NavbarProvider>
+                    <NotificationProvider>
+                      <StoreProvider>
+                        <Navbar />
+                        <ChatPopup />
 
-                      {/* Facebook SDK */}
-                      <Script id="facebook-sdk" strategy="afterInteractive">
-                        {`
+                        {/* Facebook SDK */}
+                        <Script id="facebook-sdk" strategy="afterInteractive">
+                          {`
                   window.fbAsyncInit = function() {
                     FB.init({
                       appId      : '${process.env.NEXT_PUBLIC_FACEBOOK_APP_ID}',
@@ -223,30 +223,30 @@ export default async function RootLayout({
                      fjs.parentNode.insertBefore(js, fjs);
                    }(document, 'script', 'facebook-jssdk'));
                 `}
-                      </Script>
-                      <Script
-                        id="google-maps"
-                        strategy="afterInteractive"
-                        src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
-                      />
-                      <GoogleOAuthProvider
-                        clientId={
-                          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
-                        }
-                      >
-                        <TeamProvider>
-                          <PostProvider>{children}</PostProvider>
-                        </TeamProvider>
-                      </GoogleOAuthProvider>
-                      <Footer />
-                      <SwitchToEnglishPrompt />
-                    </StoreProvider>
-                  </NotificationProvider>
-                </NavbarProvider>
-              </SocketProvider>
-            </LocationProvider>
-          </UserProvider>
-        </SWRConfig>
+                        </Script>
+                        <Script
+                          id="google-maps"
+                          strategy="afterInteractive"
+                          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&language=zh-TW&region=TW&loading=async`}
+                        />
+                        <GoogleOAuthProvider
+                          clientId={
+                            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
+                          }
+                        >
+                          <TeamProvider>
+                            <PostProvider>{children}</PostProvider>
+                          </TeamProvider>
+                        </GoogleOAuthProvider>
+                        <Footer />
+                        <SwitchToEnglishPrompt />
+                      </StoreProvider>
+                    </NotificationProvider>
+                  </NavbarProvider>
+                </SocketProvider>
+              </LocationProvider>
+            </UserProvider>
+          </ApiSWRConfig>
         </NextIntlClientProvider>
       </body>
     </html>

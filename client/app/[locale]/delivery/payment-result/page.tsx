@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 
 /** 由後端依付款 + 外送單狀態推導（server/src/payments.ts derivePaymentOutcome） */
 type PaymentOutcome =
@@ -55,7 +56,6 @@ function PaymentResultContent() {
   const t = useTranslations("PaymentResult");
   const apiErrorMessage = useApiErrorMessage();
   const searchParams = useSearchParams();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
   // 優先從 URL 讀取，若為 ClientBackURL 則從 sessionStorage 讀取
   const [merchantTradeNo, setMerchantTradeNo] = useState<string>("");
@@ -87,17 +87,10 @@ function PaymentResultContent() {
     pollStartedAtRef.current ??= Date.now();
 
     try {
-      const res = await fetch(
-        `${hostName}/api/payments/status/${encodeURIComponent(merchantTradeNo)}`,
-        {
-          credentials: "include",
-        },
+      const data = await api<PaymentStatusResponse>(
+        `/api/payments/status/${encodeURIComponent(merchantTradeNo)}`,
       );
-
-      const data: PaymentStatusResponse = await res.json();
-      if (!res.ok || !data.success) {
-        throw new ApiError(data);
-      }
+      if (!data.success) throw new ApiError(data);
 
       setStatusData(data);
       setLoading(false);
@@ -133,7 +126,7 @@ function PaymentResultContent() {
       setErrorMessage(msg);
       setLoading(false);
     }
-  }, [merchantTradeNo, hostName, router, t, apiErrorMessage]);
+  }, [merchantTradeNo, router, t, apiErrorMessage]);
 
   useEffect(() => {
     if (merchantTradeNo) {

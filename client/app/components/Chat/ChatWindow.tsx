@@ -48,11 +48,9 @@ import {
   type WeavingBanner,
 } from "@/utils/weavingBanner";
 
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
 import { User } from "@/app/types/schema";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
-import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 import { useDisplayName } from "@/hooks/useDisplayName";
 
 // Helper to parse date safely as UTC if needed
@@ -473,15 +471,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         // But strict "mark conversation read" is idempotent on server, so calling it is safe.
         // Let's call it to be safe whenever messages/focus changes.
 
-        await fetch(
-          `${hostName}/api/messages/conversations/${conversationId}/read`,
-          {
-            method: "PATCH",
-            credentials: "include",
-          },
-        );
+        await api(`/api/messages/conversations/${conversationId}/read`, {
+          method: "PATCH",
+        });
         // Trigger a revalidate of conversations to update unread counts globally
-        globalMutate(`${hostName}/api/messages/conversations`);
+        globalMutate("/api/messages/conversations");
       } catch (error) {
         console.error("Failed to mark as read", error);
       }
@@ -611,23 +605,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         formData.append("images", blobToUpload, "image.webp");
       }
 
-      const res = await fetch(`${hostName}/api/messages`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        // If the server responded with an error, revert optimistic update
-        mutate((currentData) => {
-          if (!currentData) return currentData;
-          return {
-            ...currentData,
-            messages: currentData.messages.filter((msg) => msg.id !== tempId),
-          };
-        }, false);
-        throw new ApiError(await res.json().catch(() => null), res.status);
-      }
+      //* 失敗時由下方 catch 撤回樂觀訊息
+      await api("/api/messages", { method: "POST", body: formData });
 
       // If successful, revalidate to get the actual message with real ID and status
       // This will replace the optimistic message
@@ -639,8 +618,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       // lose their weaving context.
       if (draftToSend) setDraft(draftToSend);
       sentDraftRef.current = null;
-      // If an error occurred, and the optimistic update was not reverted by !res.ok,
-      // ensure it's removed here. This handles network errors or other exceptions.
+      // Revert the optimistic message (server error or network failure)
       mutate((currentData) => {
         if (!currentData) return currentData;
         return {

@@ -65,11 +65,10 @@ type NavigationItem = {
   action?: "logout";
 };
 
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
 import { useNotification } from "../contexts/NotificationContext";
 import WeavingIcon from "./icons/WeavingIcon";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { api } from "@/lib/api";
 import { ApiError } from "@/lib/apiError";
 
 // cleaned up
@@ -101,22 +100,14 @@ const Navbar = () => {
         console.warn("Error during Google logout:", googleError);
       }
 
-      const response = await fetch(`${hostName}/api/signout`, {
-        cache: "no-store",
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
+      try {
+        await api("/api/signout", { method: "POST" });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
           toast.error(t("notSignedIn"));
           return;
         }
-
-        throw new ApiError(
-          await response.json().catch(() => null),
-          response.status,
-        );
+        throw error;
       }
 
       await mutate({ user: null }, false);

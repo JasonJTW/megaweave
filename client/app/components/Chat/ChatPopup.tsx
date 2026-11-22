@@ -76,14 +76,11 @@ export const ChatPopup = () => {
       // draft is the single source of truth — clearing it collapses the PostInfoCard
       dispatch(draftSet(null));
 
-      const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
       if (conversationId) {
-        globalMutate(
-          `${hostName}/api/messages/conversations/${conversationId}`,
-        );
+        globalMutate(`/api/messages/conversations/${conversationId}`);
       }
-      globalMutate(`${hostName}/api/messages/conversations`);
-      globalMutate(`${hostName}/api/weaves`);
+      globalMutate("/api/messages/conversations");
+      globalMutate("/api/weaves");
 
       toast.success(t("requestSent"));
     } catch (err: unknown) {

@@ -51,6 +51,7 @@ import {
 import { User } from "@/app/types/schema";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { api } from "@/lib/api";
+import { draftRole } from "@/lib/weave";
 import { useDisplayName } from "@/hooks/useDisplayName";
 
 // Helper to parse date safely as UTC if needed
@@ -843,8 +844,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                   itemTitle,
                   itemId: currentItemId,
                 });
-                const isGiver =
-                  banner.role === "give" || banner.role === "offer";
+                //* Weave 載入前的物品流向；載入後 WeavingCard 改看 viewer.role
+                const fallbackRole = postType
+                  ? draftRole(postType, isPostAuthor)
+                  : undefined;
 
                 const bannerText = weavingBannerText(banner);
 
@@ -876,7 +879,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
                               quantity,
                               imageUrl: imageUrl || undefined,
                               weaveId: weaveId!,
-                              isGiver,
+                              fallbackRole,
                               isPostAuthor,
                             }}
                           />

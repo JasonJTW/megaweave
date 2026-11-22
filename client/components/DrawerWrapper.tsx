@@ -7,7 +7,7 @@ import DrawerList from "@/app/components/DrawerList";
 import UserPostCard from "@/app/components/PostCard/UserPostCard";
 import { usePost } from "@/app/contexts/PostContext";
 import type { Condition, Post } from "@/app/types/schema";
-import type { Weave } from "@/services/weaveService";
+import type { Weave } from "@/lib/weave";
 import { useSearchParams } from "next/navigation";
 import React from "react";
 

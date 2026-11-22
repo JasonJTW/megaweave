@@ -18,7 +18,7 @@ import {
 import { useUser } from "@/app/contexts/UserContext";
 import { ChatWindow } from "./ChatWindow";
 import PostInfoCard, { SelectedWeaveItem } from "./PostInfoCard";
-import { createWeave } from "@/services/weaveService";
+import { invalidateWeave, requestWeave } from "@/lib/weave";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import toast from "react-hot-toast";
 import { useSWRConfig } from "swr";
@@ -63,7 +63,7 @@ export const ChatPopup = () => {
     }
 
     try {
-      const newWeave = await createWeave({
+      const { weaveId } = await requestWeave({
         postId: post.id,
         items: selectedItems.map((it) => ({
           itemId: it.itemId ?? null,
@@ -71,7 +71,6 @@ export const ChatPopup = () => {
         })),
         actingUnitId,
       });
-      void newWeave;
 
       // draft is the single source of truth — clearing it collapses the PostInfoCard
       dispatch(draftSet(null));
@@ -80,7 +79,8 @@ export const ChatPopup = () => {
         globalMutate(`/api/messages/conversations/${conversationId}`);
       }
       globalMutate("/api/messages/conversations");
-      globalMutate("/api/weaves");
+      //* 新的 Weave 出現在我的頁面與 Weave 清單（原本讓一個沒有人讀的 key 失效）
+      void invalidateWeave(globalMutate, weaveId);
 
       toast.success(t("requestSent"));
     } catch (err: unknown) {

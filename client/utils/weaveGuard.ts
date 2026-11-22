@@ -1,4 +1,4 @@
-import type { Weave } from "@/services/weaveService";
+import type { Weave } from "@/lib/weave";
 
 type WeaveStatus = Weave["status"];
 

@@ -6,7 +6,7 @@ import ExpandIcon from "./icons/ExpandIcon";
 import Feed from "./PostCard/Feed";
 import type { Post, Condition } from "../types/schema";
 import ExpandedIcon from "./icons/ExpandedIcon";
-import type { Weave } from "@/services/weaveService";
+import type { Weave } from "@/lib/weave";
 import { LucideRefreshCcw } from "lucide-react";
 
 export type DrawerKind = "weaving" | "share" | "wish";

@@ -49,6 +49,7 @@ import {
   useSelectedOrg,
 } from "@/lib/orgApi";
 import { api } from "@/lib/api";
+import { invalidateWeave, sendWeaveCommand } from "@/lib/weave";
 import { isOrgListingKey, orgItemsKey } from "@/lib/orgSwrKeys";
 import { quantityCellText } from "@/lib/orgQuantity";
 
@@ -115,18 +116,17 @@ function ItemRequests({
   const format = useFormatter();
   const apiErrorMessage = useApiErrorMessage();
   const [busyId, setBusyId] = useState<number | null>(null);
+  const { mutate: globalMutate } = useSWRConfig();
   const { data, error, mutate } = useSWR<{ requests: OrgItemRequest[] }>(
     `/api/orgs/${org.id}/items/${item.id}/requests`,
   );
 
-  async function review(weaveId: number, status: "approved" | "declined") {
+  //* Reviewer 不一定是兩造，讀不到單筆 Weave：直接下命令，再讓申請清單與依賴 Weave 的畫面重抓（lib/weave）
+  async function review(weaveId: number, command: "approve" | "decline") {
     setBusyId(weaveId);
     try {
-      await api(`/api/weaves/${weaveId}/status`, {
-        method: "PATCH",
-        body: { status },
-      });
-      await mutate();
+      await sendWeaveCommand(weaveId, command);
+      await Promise.all([mutate(), invalidateWeave(globalMutate, weaveId)]);
       onReviewed();
     } catch (err) {
       toast.error(apiErrorMessage(err, t("manage.reviewFailed")));
@@ -190,7 +190,7 @@ function ItemRequests({
                     size="sm"
                     className={compactButton}
                     disabled={busyId !== null}
-                    onClick={() => review(r.id, "approved")}
+                    onClick={() => review(r.id, "approve")}
                   >
                     {t("manage.approve")}
                   </Button>
@@ -199,7 +199,7 @@ function ItemRequests({
                     variant="outline"
                     className={compactButton}
                     disabled={busyId !== null}
-                    onClick={() => review(r.id, "declined")}
+                    onClick={() => review(r.id, "decline")}
                   >
                     {t("manage.decline")}
                   </Button>

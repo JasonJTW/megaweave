@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { useSWRConfig } from "swr";
 import { useUser } from "./UserContext";
+import { invalidateWeave } from "@/lib/weave";
 
 const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
@@ -30,6 +32,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
   const userId = user?.userId;
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const { mutate } = useSWRConfig();
 
   useEffect(() => {
     // Only connect if we have a user and aren't loading
@@ -61,6 +64,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsConnected(false);
     });
 
+    //* Weave 改變（任何一方的操作或系統婉拒）：全站只有這一個 listener，
+    //* 讓單筆、我的頁面與 Weave 清單重抓（lib/weave）
+    socketInstance.on("weave_status_updated", (data: { weaveId: number }) => {
+      void invalidateWeave(mutate, data.weaveId);
+    });
+
     setSocket(socketInstance);
 
     return () => {
@@ -68,7 +77,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({
       setSocket(null);
       setIsConnected(false);
     };
-  }, [userId, loading]);
+  }, [userId, loading, mutate]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

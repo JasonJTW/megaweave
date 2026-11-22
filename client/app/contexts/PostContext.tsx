@@ -10,12 +10,14 @@ import React, {
   useMemo,
 } from "react";
 import { Category, Condition } from "@/app/types/schema";
+import { api } from "@/lib/api";
 
 interface PostContextType {
   categories: Category[];
   conditions: Condition[];
   loading: boolean;
-  error: string | null;
+  //* ApiError 或網路錯誤；顯示時用 translateApiError
+  error: unknown;
   refetchPostContext: () => Promise<void>;
 }
 
@@ -26,37 +28,28 @@ interface MetaProviderProps {
 }
 
 export const PostProvider: React.FC<MetaProviderProps> = ({ children }) => {
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const [categories, setCategories] = useState<Category[]>([]);
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   const fetchPostContext = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [catRes, condRes] = await Promise.all([
-        fetch(`${hostName}/api/categories`),
-        fetch(`${hostName}/api/conditions`),
+      const [catData, condData] = await Promise.all([
+        api<{ categories: Category[] }>("/api/categories"),
+        api<{ conditions: Condition[] }>("/api/conditions"),
       ]);
-      const catData = await catRes.json();
-      const condData = await condRes.json();
-
-      if (catRes.ok) setCategories(catData.categories);
-      else
-        throw new Error(catData.errorMessage || "Failed to fetch categories");
-
-      if (condRes.ok) setConditions(condData.conditions);
-      else
-        throw new Error(condData.errorMessage || "Failed to fetch conditions");
+      setCategories(catData.categories);
+      setConditions(condData.conditions);
     } catch (err) {
       console.error("Error fetching meta data:", err);
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setError(err);
     } finally {
       setLoading(false);
     }
-  }, [hostName]);
+  }, []);
 
   useEffect(() => {
     fetchPostContext();

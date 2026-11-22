@@ -16,7 +16,7 @@ import { siFacebook, siGoogle } from "simple-icons";
 import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { api } from "@/lib/api";
 export default function Signup() {
   const router = useRouter();
   const t = useTranslations("Auth");
@@ -31,28 +31,15 @@ export default function Signup() {
   const [isFBReady, setIsFBReady] = useState(false);
   const sendToYourBackend = async (accessToken: string) => {
     try {
-      const response = await fetch(`${hostName}/api/signin/facebook`, {
+      await api(`/api/signin/facebook`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ accessToken }),
-        credentials: "include",
+        body: { accessToken },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Facebook backend signin failed:", data.errorMessage);
-        setSignupError(apiErrorMessage(data, t("facebookFailed")));
-        return;
-      }
-
-      console.log("Facebook backend response:", data);
       handleSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
-      setSignupError(t("unexpectedError"));
+      setSignupError(apiErrorMessage(error, t("facebookFailed")));
     } finally {
       setLoading(false);
     }
@@ -76,26 +63,15 @@ export default function Signup() {
     }
 
     try {
-      const response = await fetch(`${hostName}/api/signin/google`, {
+      await api(`/api/signin/google`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential: credentialResponse.credential }),
-        credentials: "include",
+        body: { credential: credentialResponse.credential },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Google sign in failed:", data.errorMessage);
-        setSignupError(apiErrorMessage(data, t("googleFailed")));
-        return;
-      }
-
-      console.log("Google sign in response data:", data);
       handleSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
-      setSignupError(t("unexpectedError"));
+      setSignupError(apiErrorMessage(error, t("googleFailed")));
     } finally {
       setLoading(false);
     }
@@ -131,25 +107,16 @@ export default function Signup() {
     };
 
     try {
-      const response = await fetch(`${hostName}/api/signup`, {
+      await api(`/api/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
-        credentials: "include", // Include cookies in the request
+        body: newUser,
       });
-
-      const data = await response.json();
-      // /// handle error
-      if (!response.ok) {
-        setSignupError(apiErrorMessage(data, t("signUpFailed")));
-        return;
-      }
       /// Sign up success
       toast.success(t("welcomeToast", { username }));
       handleSignupSuccess();
     } catch (error) {
       console.error("Error during sign up:", error);
-      setSignupError(t("unexpectedError"));
+      setSignupError(apiErrorMessage(error, t("signUpFailed")));
     } finally {
       setLoading(false);
     }

@@ -50,13 +50,13 @@ import User from "@/app/types/user";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 // 定義表單資料型別（無需 zod）
 type ContactSettingsValues = {
   email?: string; // 可選填的電子郵件
   phone?: string; // 可選填的電話號碼
 };
 
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 const processHostName = process.env.NEXT_PUBLIC_PROCESS_HOSTNAME;
 const userNameMaxLength =
   Number(process.env.NEXT_PUBLIC_USERNAME_MAX_LENGTH) || 30;
@@ -173,28 +173,15 @@ const UserPage = () => {
   const { conditions } = usePost();
 
   // ─── /api/me — replaces 7 individual mount fetches ───────────────────────
-  const meKey = user ? `${hostName}/api/me` : null;
+  const meKey = user ? "/api/me" : null;
   const {
     data: meData,
     isLoading: meLoading,
     mutate: mutateMeData,
-  } = useSWR(
-    meKey,
-    async (url: string) => {
-      const res = await fetch(url, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Failed to fetch /api/me");
-      const data = await res.json();
-      console.log("me:", data);
-      return data;
-    },
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 60_000,
-    },
-  );
+  } = useSWR(meKey, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
 
   // Derived state from /api/me
   const stats: UserStats = meData?.stats
@@ -276,20 +263,9 @@ const UserPage = () => {
     // Used only after a save action to refresh member data
     try {
       if (!options?.silent) setMemberLoading(true);
-      const response = await fetch(
-        `${hostName}/api/member/all?userId=${memberUserId}`,
-        {
-          cache: "no-store",
-          method: "GET",
-          credentials: "include",
-        },
+      const result = await api<Parameters<typeof normalizeTeamMember>[0][]>(
+        `/api/member/all?userId=${memberUserId}`,
       );
-
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), response.status);
-      }
-
-      const result = await response.json();
       if (!result[0]) {
         setMemberError(t("memberNotFound"));
         return;
@@ -300,9 +276,7 @@ const UserPage = () => {
       setMemberError(null);
     } catch (err) {
       console.error("Error fetching member data:", err);
-      setMemberError(
-        apiErrorMessage(err, t("memberFetchFailed")),
-      );
+      setMemberError(apiErrorMessage(err, t("memberFetchFailed")));
     } finally {
       if (!options?.silent) setMemberLoading(false);
     }
@@ -318,17 +292,10 @@ const UserPage = () => {
         : JSON.stringify([]),
     };
 
-    const response = await fetch(`${hostName}/api/member`, {
-      cache: "no-store",
+    await api(`/api/member`, {
       method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ updates }),
+      body: { updates },
     });
-
-    if (!response.ok) {
-      throw new ApiError(await response.json().catch(() => null), response.status);
-    }
 
     setMemberError(null);
   };
@@ -439,27 +406,16 @@ const UserPage = () => {
     // console.log("Sending updates:", updates);
     // console.log("Body:", JSON.stringify({ updates: updates }));
     try {
-      const response = await fetch(`${hostName}/api/currentUser/update`, {
-        cache: "no-store",
-        method: "POST",
-        credentials: "include",
-        body: JSON.stringify({ updates: updates }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        toast.error(
-          apiErrorMessage(
-            await response.json().catch(() => null),
-            t("sessionUpdateFailed"),
-          ),
-        );
+      let updatedUser: User;
+      try {
+        ({ updatedUser } = await api<{ updatedUser: User }>(
+          "/api/currentUser/update",
+          { method: "POST", body: { updates } },
+        ));
+      } catch (error) {
+        toast.error(apiErrorMessage(error, t("sessionUpdateFailed")));
         return;
       }
-      const result = await response.json();
-      const updatedUser = result.updatedUser;
       // alert(`User session updated: ${JSON.stringify(updatedUser)}`);
       await mutate(
         (data: { user: User | null } | undefined) =>
@@ -489,6 +445,7 @@ const UserPage = () => {
       const effectFormData = new FormData();
       effectFormData.append("image", blobToProcess, "avatar.webp");
 
+      // eslint-disable-next-line no-restricted-globals -- external image effect host, returns a blob
       const processedResponse = await fetch(`${processHostName}`, {
         method: "POST",
         credentials: "include",
@@ -509,17 +466,13 @@ const UserPage = () => {
       const uploadFormData = new FormData();
       uploadFormData.append("avatar", processedBlob, "avatar.webp");
 
-      const response = await fetch(`${hostName}/api/avatar`, {
-        method: "POST",
-        credentials: "include",
-        body: uploadFormData,
-      });
-
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), response.status);
-      }
-
-      const result = await response.json();
+      const result = await api<{ avatarUrl: string; avatarKey: string }>(
+        `/api/avatar`,
+        {
+          method: "POST",
+          body: uploadFormData,
+        },
+      );
       console.log("Avatar uploaded successfully:", result);
 
       // 更新本地 user 狀態 (顯示新的頭像)
@@ -560,9 +513,7 @@ const UserPage = () => {
       }
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      toast.error(
-        apiErrorMessage(error, t("avatarUploadFailed")),
-      );
+      toast.error(apiErrorMessage(error, t("avatarUploadFailed")));
     } finally {
       setUploadingAvatar(false);
     }
@@ -571,83 +522,48 @@ const UserPage = () => {
   // 其餘 API helpers 保持原樣
   const insertUsername = async (custom_name: string) => {
     try {
-      const response = await fetch(`${hostName}/api/userprofile/custom_name`, {
-        cache: "no-store",
+      const result = await api(`/api/userprofile/custom_name`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: {
           custom_name: custom_name,
-        }),
+        },
       });
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), response.status);
-      }
-      const result = await response.json();
       console.log("Update username Success: ", result);
     } catch (error) {
       console.error("Error update username: ", error);
-      toast.error(
-        apiErrorMessage(error, t("usernameUpdateFailed")),
-      );
+      toast.error(apiErrorMessage(error, t("usernameUpdateFailed")));
       throw error;
     }
   };
 
   const insertBio = async (bio: string) => {
     try {
-      const response = await fetch(`${hostName}/api/userprofile/bio`, {
-        cache: "no-store",
+      const result = await api(`/api/userprofile/bio`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: {
           bio: bio,
-        }),
+        },
       });
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), response.status);
-      }
-      const result = await response.json();
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      toast.error(
-        apiErrorMessage(error, t("bioUpdateFailed")),
-      );
+      toast.error(apiErrorMessage(error, t("bioUpdateFailed")));
       throw error;
     }
   };
 
   const insertContactEmail = async (contactEmail: string) => {
     try {
-      const response = await fetch(
-        `${hostName}/api/userprofile/contact_email`,
-        {
-          cache: "no-store",
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contact_email: contactEmail,
-          }),
+      const result = await api(`/api/userprofile/contact_email`, {
+        method: "POST",
+        body: {
+          contact_email: contactEmail,
         },
-      );
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), response.status);
-      }
-      const result = await response.json();
+      });
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      const errMsg =
-        apiErrorMessage(error, t("contactEmailUpdateFailed"));
+      const errMsg = apiErrorMessage(error, t("contactEmailUpdateFailed"));
       toast.error(errMsg);
       throw error;
     }
@@ -655,29 +571,16 @@ const UserPage = () => {
 
   const insertContactPhone = async (contactPhone: string) => {
     try {
-      const response = await fetch(
-        `${hostName}/api/userprofile/contact_phone`,
-        {
-          cache: "no-store",
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contact_phone: contactPhone,
-          }),
+      const result = await api(`/api/userprofile/contact_phone`, {
+        method: "POST",
+        body: {
+          contact_phone: contactPhone,
         },
-      );
-      if (!response.ok) {
-        throw new ApiError(await response.json().catch(() => null), response.status);
-      }
-      const result = await response.json();
+      });
       console.log("Update profile Success: ", result);
     } catch (error) {
       console.error("Error update profile: ", error);
-      const errMsg =
-        apiErrorMessage(error, t("contactPhoneUpdateFailed"));
+      const errMsg = apiErrorMessage(error, t("contactPhoneUpdateFailed"));
       toast.error(errMsg);
       throw error;
     }
@@ -773,13 +676,9 @@ const UserPage = () => {
   const handleRemoveAvatar = async () => {
     try {
       //* Delete avatar from DB
-      const res = await fetch(`${hostName}/api/avatar`, {
+      await api(`/api/avatar`, {
         method: "DELETE",
-        credentials: "include",
       });
-      if (!res.ok) {
-        throw new ApiError(await res.json().catch(() => null), res.status);
-      }
       //* Update user state
       await mutate((data: { user: User | null } | undefined) => {
         if (!data?.user) return data;
@@ -787,9 +686,7 @@ const UserPage = () => {
       }, false);
     } catch (err) {
       console.error(err);
-      toast.error(
-        apiErrorMessage(err, t("avatarRemoveFailed")),
-      );
+      toast.error(apiErrorMessage(err, t("avatarRemoveFailed")));
     }
   };
 
@@ -803,22 +700,14 @@ const UserPage = () => {
       }
 
       //* Sign out from the server
-      const response = await fetch(`${hostName}/api/signout`, {
-        cache: "no-store",
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
+      try {
+        await api("/api/signout", { method: "POST" });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
           toast.error(t("notSignedIn"));
           return;
         }
-
-        throw new ApiError(
-          await response.json().catch(() => null),
-          response.status,
-        );
+        throw error;
       }
 
       console.log("Sign out successful");
@@ -827,9 +716,7 @@ const UserPage = () => {
       window.location.href = localizePath(locale, "/");
     } catch (error) {
       console.error("Error signing out:", error);
-      toast.error(
-        apiErrorMessage(error, t("unexpectedError")),
-      );
+      toast.error(apiErrorMessage(error, t("unexpectedError")));
     }
   };
 

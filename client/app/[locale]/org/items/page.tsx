@@ -39,7 +39,6 @@ import { TierPill } from "@/components/org/TierPill";
 import {
   AUDIENCE_TIERS,
   AutoReleaseOverride,
-  hostName,
   ManagedOrgItem,
   ORG_ITEM_STATUSES,
   ORG_ITEM_WEAVE_STATUSES,
@@ -47,9 +46,9 @@ import {
   OrgItem,
   OrgItemRequest,
   OrgItemWeaveStatus,
-  requestJson,
   useSelectedOrg,
 } from "@/lib/orgApi";
+import { api } from "@/lib/api";
 import { isOrgListingKey, orgItemsKey } from "@/lib/orgSwrKeys";
 import { quantityCellText } from "@/lib/orgQuantity";
 
@@ -116,17 +115,16 @@ function ItemRequests({
   const format = useFormatter();
   const apiErrorMessage = useApiErrorMessage();
   const [busyId, setBusyId] = useState<number | null>(null);
-  const { data, error, mutate } = useSWR(
-    `${hostName}/api/orgs/${org.id}/items/${item.id}/requests`,
-    (url: string) => requestJson<{ requests: OrgItemRequest[] }>(url),
+  const { data, error, mutate } = useSWR<{ requests: OrgItemRequest[] }>(
+    `/api/orgs/${org.id}/items/${item.id}/requests`,
   );
 
   async function review(weaveId: number, status: "approved" | "declined") {
     setBusyId(weaveId);
     try {
-      await requestJson(`${hostName}/api/weaves/${weaveId}/status`, {
+      await api(`/api/weaves/${weaveId}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: { status },
       });
       await mutate();
       onReviewed();
@@ -242,15 +240,12 @@ function TierAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
     }
     setBusy(true);
     try {
-      await requestJson(
-        `${hostName}/api/orgs/${org.id}/items/${item.id}/tier`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ tier: target }),
-        },
-      );
+      await api(`/api/orgs/${org.id}/items/${item.id}/tier`, {
+        method: "PATCH",
+        body: { tier: target },
+      });
       //* 組織頁與所有篩選組合的清單都要重抓（SWR dedupe，見 orgSwrKeys）
-      await mutate(isOrgListingKey(hostName, org.id));
+      await mutate(isOrgListingKey(org.id));
       toast.success(target === "members" ? t("promoted") : t("demoted"));
     } catch (err) {
       toast.error(apiErrorMessage(err, t("tierChangeFailed")));
@@ -304,18 +299,12 @@ function AutoReleaseControl({ org, item }: { org: OrgAccess; item: OrgItem }) {
   async function save(next: AutoReleaseMode) {
     setBusy(true);
     try {
-      await requestJson(
-        `${hostName}/api/orgs/${org.id}/items/${item.id}/auto-release`,
-        {
-          method: "PATCH",
-          body: JSON.stringify(
-            next === "auto"
-              ? { mode: next, days: Number(days) }
-              : { mode: next },
-          ),
-        },
-      );
-      await mutate(isOrgListingKey(hostName, org.id));
+      await api(`/api/orgs/${org.id}/items/${item.id}/auto-release`, {
+        method: "PATCH",
+        body:
+          next === "auto" ? { mode: next, days: Number(days) } : { mode: next },
+      });
+      await mutate(isOrgListingKey(org.id));
       toast.success(t("autoReleaseSaved"));
     } catch (err) {
       toast.error(apiErrorMessage(err, t("autoReleaseFailed")));
@@ -605,9 +594,8 @@ function ItemTable({ org }: { org: OrgAccess }) {
   if (weaveStatus !== ALL) query.set("weaveStatus", weaveStatus);
   const qs = query.toString();
   const filtered = qs !== "";
-  const { data, error, mutate } = useSWR(
-    orgItemsKey(hostName, org.id, qs),
-    (url: string) => requestJson<{ items: ManagedOrgItem[] }>(url),
+  const { data, error, mutate } = useSWR<{ items: ManagedOrgItem[] }>(
+    orgItemsKey(org.id, qs),
     { keepPreviousData: true },
   );
 

@@ -20,6 +20,7 @@ import {
 } from "@/services/commentService";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { api } from "@/lib/api";
 import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface CommentSectionProps {
@@ -56,19 +57,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     }
 
     try {
-      const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
-      const res = await fetch(`${hostName}/api/messages/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ recipient_public_id: post.author_public_id }),
-      });
-
-      if (!res.ok) throw new Error(t("startConversationFailed"));
-
-      const data = await res.json();
-      console.log("data: ", data);
+      const data = await api<{ conversationId: number }>(
+        "/api/messages/start",
+        {
+          method: "POST",
+          body: { recipient_public_id: post.author_public_id },
+        },
+      );
 
       dispatch(
         openChat({
@@ -85,7 +80,10 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
     } catch (error) {
       console.error("Message error:", error);
       toast.error(
-        t("messageFailed", { username: displayName(post.username) ?? "" }),
+        apiErrorMessage(
+          error,
+          t("messageFailed", { username: displayName(post.username) ?? "" }),
+        ),
       );
     }
   };
@@ -136,19 +134,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ post, user }) => {
         const commentId = hash.substring(9); // remove '#comment-'
         try {
           // Fetch comment to get item_id
-          const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-          const res = await fetch(`${hostName}/api/comments/${commentId}`);
-          if (res.ok) {
-            const data = await res.json();
-            const itemId = data.comment.item_id;
-            const targetItemKey = itemId === null ? "all" : itemId;
-
-            setActiveItemKey(targetItemKey);
-
-            // Wait for comments to load and render, then scroll
-            // We need to poll or use a ref mechanism, but a simple timeout works for now
-            // better: relying on 'comments' dependency in another effect
-          }
+          const data = await api<{ comment: { item_id: number | null } }>(
+            `/api/comments/${commentId}`,
+          );
+          const itemId = data.comment.item_id;
+          setActiveItemKey(itemId === null ? "all" : itemId);
+          // Scrolling waits for the comments of that item to render (see the comments effect)
         } catch (e) {
           console.error("Deep link failed", e);
         }

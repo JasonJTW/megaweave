@@ -4,10 +4,7 @@
 
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { ApiError } from "@/lib/apiError";
 import { pickOrg } from "@/lib/orgAdminRules";
-
-export const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 export const AUDIENCE_TIERS = ["internal", "members", "public"] as const;
 export type AudienceTier = (typeof AUDIENCE_TIERS)[number];
@@ -122,28 +119,10 @@ export interface OrgItemRequest {
   receiverUnit: OrgUnitRef | null;
 }
 
-export async function requestJson<T>(
-  url: string,
-  init?: RequestInit,
-): Promise<T> {
-  const res = await fetch(url, {
-    credentials: "include",
-    cache: "no-store",
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  if (res.status === 204) return undefined as T;
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(body, res.status);
-  return body as T;
-}
-
 /** 呼叫者所屬的組織與目前選的那一個（`?org=<public id>`，沒帶就是第一個） */
 export function useSelectedOrg() {
   const searchParams = useSearchParams();
-  const { data, error, isLoading } = useSWR(`${hostName}/api/orgs`, (url) =>
-    requestJson<{ orgs: OrgAccess[] }>(url),
-  );
+  const { data, error, isLoading } = useSWR<{ orgs: OrgAccess[] }>("/api/orgs");
   const wanted = searchParams.get("org");
   const orgs = data?.orgs ?? [];
   const org = pickOrg(orgs, wanted);
@@ -155,9 +134,7 @@ export function useSelectedOrg() {
  * 和 useSelectedOrg 共用 `/api/orgs` 的 SWR key，不會多打一次
  */
 export function useOrgNav(signedIn: boolean) {
-  const { data } = useSWR(signedIn ? `${hostName}/api/orgs` : null, (url) =>
-    requestJson<{ orgs: OrgAccess[] }>(url),
-  );
+  const { data } = useSWR<{ orgs: OrgAccess[] }>(signedIn ? "/api/orgs" : null);
   const orgs = data?.orgs ?? [];
   return {
     isMember: orgs.length > 0,
@@ -166,11 +143,10 @@ export function useOrgNav(signedIn: boolean) {
 }
 
 export function useOrgItemCategories() {
-  const { data } = useSWR(`${hostName}/api/orgs/item-categories`, (url) =>
-    requestJson<{ categories: OrgItemCategory[]; factorTableVersion: string }>(
-      url,
-    ),
-  );
+  const { data } = useSWR<{
+    categories: OrgItemCategory[];
+    factorTableVersion: string;
+  }>("/api/orgs/item-categories");
   return data?.categories ?? [];
 }
 

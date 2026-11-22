@@ -4,20 +4,7 @@ import { useSocket } from "./useSocket";
 import { Conversation, Message } from "@/app/types/schema";
 import { useUser } from "@/app/contexts/UserContext";
 import { splitLocalePrefix } from "@/i18n/routing";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-// Fetcher function
-const fetcher = async (url: string) => {
-  const res = await fetch(url, {
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const error = new Error("An error occurred while fetching the data.");
-    throw error;
-  }
-  return res.json();
-};
+import { api } from "@/lib/api";
 
 export const useConversations = () => {
   const { user } = useUser();
@@ -25,7 +12,7 @@ export const useConversations = () => {
 
   const { data, error, isLoading, mutate } = useSWR<{
     conversations: Conversation[];
-  }>(userId ? `${hostName}/api/messages/conversations` : null, fetcher);
+  }>(userId ? "/api/messages/conversations" : null);
 
   return {
     conversations: data?.conversations || [],
@@ -40,15 +27,9 @@ export const useMessages = (conversationId: number | null) => {
     messages: Message[];
     hasMore: boolean;
     conversation?: Conversation;
-  }>(
-    conversationId
-      ? `${hostName}/api/messages/conversations/${conversationId}`
-      : null,
-    fetcher,
-    {
-      revalidateOnFocus: false, // Socket handles real-time updates; auto-revalidation causes race conditions with markAsRead
-    },
-  );
+  }>(conversationId ? `/api/messages/conversations/${conversationId}` : null, {
+    revalidateOnFocus: false, // Socket handles real-time updates; auto-revalidation causes race conditions with markAsRead
+  });
 
   const fetchMore = async () => {
     if (!data?.hasMore || data.messages.length === 0 || !conversationId) return;
@@ -57,15 +38,9 @@ export const useMessages = (conversationId: number | null) => {
     const lastMessageId = data.messages[data.messages.length - 1].id;
 
     try {
-      const res = await fetch(
-        `${hostName}/api/messages/conversations/${conversationId}?before_id=${lastMessageId}`,
-        {
-          credentials: "include",
-        },
+      const newData = await api<{ messages: Message[]; hasMore: boolean }>(
+        `/api/messages/conversations/${conversationId}?before_id=${lastMessageId}`,
       );
-      if (!res.ok) throw new Error("Failed to fetch more messages");
-
-      const newData = await res.json();
 
       // Update the SWR cache by appending new messages to the end
       mutate((current) => {
@@ -112,7 +87,7 @@ export const useChatSocket = (conversationId: number | null) => {
       // ONLY execute this if this hook instance is for the current conversation
       if (isCurrentConversationInHook) {
         mutateMessages(
-          `${hostName}/api/messages/conversations/${conversationId}`,
+          `/api/messages/conversations/${conversationId}`,
           (
             currentData: { messages: Message[]; hasMore: boolean } | undefined,
           ) => {
@@ -168,7 +143,7 @@ export const useChatSocket = (conversationId: number | null) => {
       // This prevents double updates (+2) when multiple hooks are mounted.
       if (conversationId === null) {
         mutateConversations(
-          `${hostName}/api/messages/conversations`,
+          `/api/messages/conversations`,
           (currentData: { conversations: Conversation[] } | undefined) => {
             if (!currentData) return currentData;
 
@@ -196,12 +171,10 @@ export const useChatSocket = (conversationId: number | null) => {
               if (!isMyOwnMessage) {
                 if (isBeingViewed && isFocused) {
                   shouldIncrement = false;
-                  fetch(
-                    `${hostName}/api/messages/conversations/${newMessage.conversation_id}/read`,
+                  api(
+                    `/api/messages/conversations/${newMessage.conversation_id}/read`,
                     {
                       method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
                     },
                   ).catch((err) =>
                     console.error("Failed to mark read on global update", err),
@@ -243,7 +216,7 @@ export const useChatSocket = (conversationId: number | null) => {
       // 1. Update Messages list if we are in that conversation
       if (conversationId && Number(conversationId) === data.conversation_id) {
         mutateMessages(
-          `${hostName}/api/messages/conversations/${conversationId}`,
+          `/api/messages/conversations/${conversationId}`,
           (
             currentData: { messages: Message[]; hasMore: boolean } | undefined,
           ) => {
@@ -280,7 +253,7 @@ export const useChatSocket = (conversationId: number | null) => {
 
         if (iReadIt) {
           mutateConversations(
-            `${hostName}/api/messages/conversations`,
+            `/api/messages/conversations`,
             (currentData: { conversations: Conversation[] } | undefined) => {
               if (!currentData) return currentData;
               const conversations = currentData.conversations;
@@ -314,7 +287,7 @@ export const useChatSocket = (conversationId: number | null) => {
       )
         return;
       mutateMessages(
-        `${hostName}/api/messages/conversations/${conversationId}`,
+        `/api/messages/conversations/${conversationId}`,
         (
           currentData: { messages: Message[]; hasMore: boolean } | undefined,
         ) => {
@@ -354,15 +327,13 @@ export const useChatSocket = (conversationId: number | null) => {
       if (!document.hasFocus()) return;
 
       // 1. Mark as read on server (this will emit messages_read to the sender)
-      fetch(`${hostName}/api/messages/conversations/${conversationId}/read`, {
+      api(`/api/messages/conversations/${conversationId}/read`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
       }).catch((err) => console.error("Failed to mark read on focus", err));
 
       // 2. Clear locally for THIS conversation in the global list
       mutateConversations(
-        `${hostName}/api/messages/conversations`,
+        `/api/messages/conversations`,
         (currentData: { conversations: Conversation[] } | undefined) => {
           if (!currentData) return currentData;
           const conversations = currentData.conversations;

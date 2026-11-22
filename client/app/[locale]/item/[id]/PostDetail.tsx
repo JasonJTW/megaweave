@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { compressImagesParallel } from "@/utils/imageProcessor";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { api } from "@/lib/api";
+import { ApiError } from "@/lib/apiError";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import { ArrowLeft, ExternalLink, Heart, Share2, Trash2 } from "lucide-react";
 import Image from "next/image";
@@ -87,7 +89,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const formatter = useFormatter();
   const categoryName = useCategoryName();
   const conditionLabel = usePostConditionName();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
   const [post, setPost] = useState<Post | null>(null);
   const displayName = useDisplayName();
@@ -117,85 +118,60 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   // back and share bar — sync with Navbar visibility
   const { isNavbarVisible } = useNavbar();
 
-  const fetchOwnerSidebar = useCallback(
-    async (authorPublicId: string) => {
-      try {
-        const [profileRes, statsRes] = await Promise.all([
-          fetch(`${hostName}/api/userprofile/public/${authorPublicId}`, {
-            method: "GET",
-            cache: "no-store",
-          }),
-          fetch(`${hostName}/api/user/stats/public/${authorPublicId}`, {
-            method: "GET",
-            cache: "no-store",
-          }),
-        ]);
-
-        if (profileRes.ok) {
-          const profileData: OwnerProfile = await profileRes.json();
-          setOwnerProfile(profileData);
-        }
-
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setOwnerPosts(statsData.posts || []);
-        }
-      } catch (error) {
-        console.error("Error fetching owner sidebar:", error);
-      }
-    },
-    [hostName],
-  );
+  const fetchOwnerSidebar = useCallback(async (authorPublicId: string) => {
+    //* 側欄兩塊各自顯示，一塊失敗不影響另一塊
+    const [profile, stats] = await Promise.allSettled([
+      api<OwnerProfile>(`/api/userprofile/public/${authorPublicId}`),
+      api<{ posts?: Post[] }>(`/api/user/stats/public/${authorPublicId}`),
+    ]);
+    if (profile.status === "fulfilled") setOwnerProfile(profile.value);
+    else console.error("Error fetching owner profile:", profile.reason);
+    if (stats.status === "fulfilled") setOwnerPosts(stats.value.posts || []);
+    else console.error("Error fetching owner stats:", stats.reason);
+  }, []);
 
   // 獲取貼文詳情
   const fetchPost = useCallback(async () => {
     if (!postId) return;
     setLoading(true);
     try {
-      const response = await fetch(`${hostName}/api/posts/${postId}`, {
-        credentials: "include",
-        method: "GET",
-      });
-      const data = await response.json();
+      const data = await api<{ post: Post }>(`/api/posts/${postId}`);
+      setPost(data.post);
+      setLikeCount(data.post.likes_count);
+      likeConfirmedRef.current.count = data.post.likes_count;
 
-      if (response.ok) {
-        setPost(data.post);
-        setLikeCount(data.post.likes_count);
-        likeConfirmedRef.current.count = data.post.likes_count;
+      //* 組織物品的發文者是組織（#140），沒有個人頁可載入
+      const ownerId = profilePublicId(data.post.author_public_id);
+      if (ownerId) {
+        fetchOwnerSidebar(ownerId);
+      }
 
-        //* 組織物品的發文者是組織（#140），沒有個人頁可載入
-        const ownerId = profilePublicId(data.post.author_public_id);
-        if (ownerId) {
-          fetchOwnerSidebar(ownerId);
-        }
-
-        // 檢查用戶是否已按讚
-        if (user) {
-          const likeResponse = await fetch(
-            `${hostName}/api/posts/${postId}/like`,
-            { credentials: "include", method: "GET" },
-          );
-          if (likeResponse.ok) {
-            const likeData = await likeResponse.json();
-            likeIntentRef.current = likeData.liked;
-            likeConfirmedRef.current.liked = likeData.liked;
-            setIsLiked(likeData.liked);
-          }
-        }
-      } else {
-        if (response.status !== 404) {
-          toast.error(t("fetchFailed"));
+      // 檢查用戶是否已按讚
+      if (user) {
+        const likeData = await api<{ liked: boolean }>(
+          `/api/posts/${postId}/like`,
+        ).catch((error) => {
+          console.error("Error fetching like state:", error);
+          return null;
+        });
+        if (likeData) {
+          likeIntentRef.current = likeData.liked;
+          likeConfirmedRef.current.liked = likeData.liked;
+          setIsLiked(likeData.liked);
         }
       }
     } catch (error) {
       console.error("Error fetching post:", error);
-      toast.error(t("fetchFailed"));
+      //* 404 由頁面顯示「找不到貼文」，不另外跳通知
+      if (!(error instanceof ApiError && error.status === 404)) {
+        toast.error(t("fetchFailed"));
+      }
     } finally {
       setLoading(false);
       // 按讚初始狀態載入完成前不開放點擊，避免以錯誤的基準翻轉
       setLikeReady(true);
     }
-  }, [hostName, postId, user, fetchOwnerSidebar, t]);
+  }, [postId, user, fetchOwnerSidebar, t]);
 
   // 處理更新貼文
   const handleUpdatePost = async (data: PostFormSubmitData) => {
@@ -212,7 +188,6 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         );
         stagingKeys = await uploadImagesToS3Staging(
           processedImages.map(({ blob, filename }) => ({ blob, filename })),
-          hostName || "",
         );
       }
 
@@ -256,28 +231,14 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         stagingKeys,
       };
 
-      const response = await fetch(`${hostName}/api/posts/${postId}`, {
+      await api(`/api/posts/${postId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatePayload),
-        credentials: "include",
+        body: updatePayload,
       });
-
-      if (response.ok) {
-        toast.success(t("updated"));
-        setShowEditForm(false);
-        fetchPost(); // Refresh page data without changing URL layout
-        mutate(() => true, undefined, { revalidate: true }); // Revalidate all SWR caches (including main page feed)
-      } else {
-        toast.error(
-          apiErrorMessage(
-            await response.json().catch(() => null),
-            t("updateFailed"),
-          ),
-        );
-      }
+      toast.success(t("updated"));
+      setShowEditForm(false);
+      fetchPost(); // Refresh page data without changing URL layout
+      mutate(() => true, undefined, { revalidate: true }); // Revalidate all SWR caches (including main page feed)
     } catch (error: unknown) {
       console.error("Error updating post:", error);
       toast.error(apiErrorMessage(error, t("updateFailed")));
@@ -314,20 +275,10 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), LIKE_TIMEOUT_MS);
         try {
-          const response = await fetch(`${hostName}/api/posts/${postId}/like`, {
-            method: "PUT",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ liked }),
-            signal: controller.signal,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.errorMessage || "Unknown error");
-          }
-
-          const result = await response.json();
+          const result = await api<{ liked: boolean; likesCount: number }>(
+            `/api/posts/${postId}/like`,
+            { method: "PUT", body: { liked }, signal: controller.signal },
+          );
           likeConfirmedRef.current = {
             liked: result.liked,
             count: result.likesCount,
@@ -345,7 +296,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
       likeIntentRef.current = likeConfirmedRef.current.liked;
       setIsLiked(likeConfirmedRef.current.liked);
       setLikeCount(likeConfirmedRef.current.count);
-      toast.error(t("likeFailed"));
+      toast.error(apiErrorMessage(error, t("likeFailed")));
     } finally {
       likeSendingRef.current = false;
     }
@@ -357,31 +308,17 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
     }
 
     try {
-      const response = await fetch(`${hostName}/api/posts/${postId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        toast.success(t("deleted"));
-        mutate(
-          (key) =>
-            typeof key === "string" && key.startsWith(`${hostName}/api/posts?`),
-          undefined,
-          { revalidate: true },
-        );
-        router.push("/");
-      } else {
-        toast.error(
-          apiErrorMessage(
-            await response.json().catch(() => null),
-            t("deleteFailed"),
-          ),
-        );
-      }
+      await api(`/api/posts/${postId}`, { method: "DELETE" });
+      toast.success(t("deleted"));
+      mutate(
+        (key) => typeof key === "string" && key.startsWith("/api/posts?"),
+        undefined,
+        { revalidate: true },
+      );
+      router.push("/");
     } catch (error) {
       console.error("Error deleting post:", error);
-      toast.error(t("deleteFailed"));
+      toast.error(apiErrorMessage(error, t("deleteFailed")));
     }
   };
 
@@ -395,6 +332,7 @@ const PostDetail: React.FC<PostDetailProps> = ({ postId }) => {
   const handleIGShare = async () => {
     //* IG Share to story with link requires native app deep link, not supported in web app
     try {
+      // eslint-disable-next-line no-restricted-globals -- same-origin Next route that returns an image
       const response = await fetch(`/api/og?id=${postId}`);
       if (!response.ok) {
         throw new Error("Failed to generate OG image");

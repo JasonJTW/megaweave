@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
-import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 dotenv.config();
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 export interface Experience {
   position: string;
@@ -74,22 +72,8 @@ export function memberToFormValues(member: TeamMember) {
 
 export async function getTeamMembers() {
   try {
-    const response = await fetch(`${hostName}/api/member/all`, {
-      cache: "no-store",
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-    if (!response.ok) {
-      throw new ApiError(
-        await response.json().catch(() => null),
-        response.status,
-      );
-    }
-    const data = await response.json();
-    return (data as TeamMember[]).map(normalizeTeamMember);
+    const data = await api<TeamMember[]>("/api/member/all");
+    return data.map(normalizeTeamMember);
   } catch (error) {
     console.error("Error fetching team members:", error);
     return [];

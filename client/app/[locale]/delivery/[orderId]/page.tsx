@@ -26,9 +26,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import SandboxPanel from "@/app/components/Lalamove/SandboxPanel";
 import { deliveryStatusView, type DeliveryStage } from "@/utils/deliveryStatus";
 import { ApiError } from "@/lib/apiError";
+import { api, type ApiPath } from "@/lib/api";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
 interface DriverInfo {
   id: string;
@@ -85,14 +84,9 @@ interface OrderDetail {
   metadata?: Record<string, unknown>;
 }
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url, { cache: "no-store", credentials: "include" });
-  if (!res.ok) {
-    throw new ApiError(await res.json().catch(() => null), res.status);
-  }
-  const data = await res.json();
-  return data.order as OrderDetail;
-};
+//* 回應是 `{ order }`，SWR 只存 order
+const orderFetcher = (path: ApiPath) =>
+  api<{ order: OrderDetail }>(path).then((data) => data.order);
 
 // 車型圖示；名稱在翻譯檔（Lalamove.vehicles 與 Delivery.vehicles）
 const VEHICLE_ICONS: Record<string, string> = {
@@ -160,8 +154,8 @@ export default function DeliveryTrackingPage() {
     isLoading,
     mutate,
   } = useSWR<OrderDetail>(
-    orderId ? `${hostName}/api/lalamove/orders/${orderId}` : null,
-    fetcher,
+    orderId ? `/api/lalamove/orders/${orderId}` : null,
+    orderFetcher,
     {
       refreshInterval: (latestData) => {
         if (!latestData) return 10000;
@@ -515,14 +509,11 @@ export default function DeliveryTrackingPage() {
     if (!orderId) return;
     try {
       setIsCancelling(true);
-      const res = await fetch(`${hostName}/api/lalamove/orders/${orderId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new ApiError(data);
-      }
+      const data = await api<{ success: boolean }>(
+        `/api/lalamove/orders/${orderId}`,
+        { method: "DELETE" },
+      );
+      if (!data.success) throw new ApiError(data);
       toast.success(t("cancelled"));
       setIsCancelModalOpen(false);
       mutate();

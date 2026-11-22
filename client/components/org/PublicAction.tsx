@@ -12,7 +12,8 @@ import useSWR, { useSWRConfig } from "swr";
 import toast from "react-hot-toast";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { Button } from "@/components/ui/button";
-import { hostName, OrgAccess, OrgItem, requestJson } from "@/lib/orgApi";
+import type { OrgAccess, OrgItem } from "@/lib/orgApi";
+import { api, type ApiOptions, type ApiPath } from "@/lib/api";
 import { compactButton } from "@/components/org/OrgShell";
 import { isOrgListingKey } from "@/lib/orgSwrKeys";
 import { PublicListingFields } from "@/components/org/PublicListingFields";
@@ -46,14 +47,14 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const remaining = useRemaining(item.pendingPublic?.dueAt ?? null);
-  const base = `${hostName}/api/orgs/${org.id}/items/${item.id}`;
+  const base: ApiPath = `/api/orgs/${org.id}/items/${item.id}`;
 
   //* 倒數結束後，排程最多晚一分鐘公開：每 15 秒重抓一次清單直到層級變了
   const due = remaining === 0;
   useEffect(() => {
     if (!due) return;
     const timer = window.setInterval(
-      () => mutate(isOrgListingKey(hostName, org.id)),
+      () => mutate(isOrgListingKey(org.id)),
       15_000,
     );
     return () => window.clearInterval(timer);
@@ -62,14 +63,14 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
   if (!org.isAdmin) return null;
 
   async function run(
-    url: string,
-    init: RequestInit,
+    path: ApiPath,
+    options: ApiOptions,
     success: string,
   ): Promise<boolean> {
     setBusy(true);
     try {
-      await requestJson(url, init);
-      await mutate(isOrgListingKey(hostName, org.id));
+      await api(path, options);
+      await mutate(isOrgListingKey(org.id));
       toast.success(success);
       return true;
     } catch (err) {
@@ -140,7 +141,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
             return;
           run(
             `${base}/tier`,
-            { method: "PATCH", body: JSON.stringify({ tier: "members" }) },
+            { method: "PATCH", body: { tier: "members" } },
             t("demotedFromPublic"),
           );
         }}
@@ -173,7 +174,7 @@ export function PublicAction({ org, item }: { org: OrgAccess; item: OrgItem }) {
       onSubmit={async (body) => {
         const ok = await run(
           `${base}/pending-public`,
-          { method: "POST", body: JSON.stringify(body) },
+          { method: "POST", body },
           t("pendingPublicStarted"),
         );
         if (ok) setConfirming(false);
@@ -191,7 +192,7 @@ function PublicConfirm({
   onSubmit,
 }: {
   item: OrgItem;
-  base: string;
+  base: ApiPath;
   busy: boolean;
   onCancel: () => void;
   onSubmit: (body: {
@@ -212,9 +213,8 @@ function PublicConfirm({
   //* 按過送出才標出缺的欄位；之後邊填邊更新
   const [attempted, setAttempted] = useState(false);
   //* 每次打開都重抓，不沿用快取：別人可能剛改過
-  const { data, error } = useSWR(
+  const { data, error } = useSWR<{ listing: PublicListing }>(
     `${base}/public-listing`,
-    (url) => requestJson<{ listing: PublicListing }>(url),
     { revalidateOnFocus: false, dedupingInterval: 0 },
   );
   useEffect(() => {

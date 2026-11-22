@@ -5,7 +5,7 @@
 //* 仍顯示時間、操作者與 kind 本身，不必改這裡就看得到。#140 的待公開（送出、取消、跳過）已有標籤
 import { useFormatter, useTranslations } from "next-intl";
 import useSWR from "swr";
-import { hostName, OrgTimelineEntry, requestJson } from "@/lib/orgApi";
+import type { OrgTimelineEntry } from "@/lib/orgApi";
 
 const KNOWN_KINDS = [
   "listed",
@@ -114,9 +114,8 @@ export function ItemTimeline({
   const t = useTranslations("Org");
   const format = useFormatter();
   const detailOf = useDetail();
-  const { data, error } = useSWR(
-    `${hostName}/api/orgs/${orgId}/items/${itemId}/timeline`,
-    (url: string) => requestJson<{ timeline: OrgTimelineEntry[] }>(url),
+  const { data, error } = useSWR<{ timeline: OrgTimelineEntry[] }>(
+    `/api/orgs/${orgId}/items/${itemId}/timeline`,
   );
 
   if (error) {

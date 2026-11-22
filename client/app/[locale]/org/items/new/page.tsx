@@ -31,14 +31,9 @@ import { useConditionText } from "@/i18n/referenceNames";
 import { uploadImagesToS3Staging } from "@/services/imageUploadService";
 import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
 import { NoUnitsNotice } from "@/components/org/NoUnitsNotice";
-import {
-  hostName,
-  OrgAccess,
-  requestJson,
-  useOrgItemCategories,
-  useSelectedOrg,
-} from "@/lib/orgApi";
+import { OrgAccess, useOrgItemCategories, useSelectedOrg } from "@/lib/orgApi";
 import { isOrgListingKey } from "@/lib/orgSwrKeys";
+import { api } from "@/lib/api";
 
 //* 與一般貼文相同（PostFormModal 的 MAX_IMAGES_COUNT、server 的 UPLOAD_IMAGE_LIMIT 預設值）
 const MAX_PHOTOS = 5;
@@ -127,9 +122,9 @@ function ItemForm({ org }: { org: OrgAccess }) {
       const stagingKeys = await uploadImagesToS3Staging(
         photos.map((file) => ({ blob: file, filename: file.name })),
       );
-      await requestJson(`${hostName}/api/orgs/${org.id}/items`, {
+      await api(`/api/orgs/${org.id}/items`, {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           unitId: Number(form.unitId),
           orgCategory: form.orgCategory,
           title: form.title,
@@ -140,10 +135,10 @@ function ItemForm({ org }: { org: OrgAccess }) {
           assetNumber: form.assetNumber.trim() || null,
           estimatedValueTwd: toNumber(form.estimatedValueTwd) ?? null,
           stagingKeys,
-        }),
+        },
       });
       //* 導回組織頁前讓清單重新抓，否則 dedupe 區間內會顯示沒有新物品的舊快取
-      void mutate(isOrgListingKey(hostName, org.id));
+      void mutate(isOrgListingKey(org.id));
       toast.success(t("created"));
       router.push(`/org?org=${org.id}`);
     } catch (error) {

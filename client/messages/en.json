@@ -448,8 +448,7 @@
     "replyCount": "{count} replies",
     "signInToMessage": "Please log in to message.",
     "cannotMessageSelf": "You cannot message yourself.",
-    "messageFailed": "Could not message {username}",
-    "startConversationFailed": "Failed to start conversation"
+    "messageFailed": "Could not message {username}"
   },
   "Tinder": {
     "radiusTitle": "Search radius",
@@ -633,8 +632,7 @@
     "facebookNoToken": "Facebook login failed: no access token received",
     "facebookNotAuthorized": "Facebook login failed: app not authorized",
     "facebookCancelled": "Facebook login was cancelled or failed",
-    "facebookFailed": "Facebook sign in failed",
-    "unexpectedError": "An unexpected error occurred"
+    "facebookFailed": "Facebook sign in failed"
   },
   "Profile": {
     "loading": "Loading...",

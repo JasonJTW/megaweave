@@ -16,7 +16,7 @@ import { useTranslations } from "next-intl";
 import toast from "react-hot-toast";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
 
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { api } from "@/lib/api";
 
 interface HistoryResponse {
   posts: (Post & { viewed_at?: string })[];
@@ -60,19 +60,9 @@ export default function HistoryPage() {
           setIsLoading(true);
         }
 
-        const res = await fetch(
-          `${hostName}/api/posts/history?page=${page}&limit=20`,
-          {
-            credentials: "include",
-            cache: "no-store",
-          },
+        const data = await api<HistoryResponse>(
+          `/api/posts/history?page=${page}&limit=20`,
         );
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch viewing history");
-        }
-
-        const data: HistoryResponse = await res.json();
 
         const nextPosts = data.posts ?? [];
         if (append) {

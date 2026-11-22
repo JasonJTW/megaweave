@@ -1,7 +1,5 @@
 // services/commentService.ts
-import { ApiError } from "@/lib/apiError";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { api, type ApiPath } from "@/lib/api";
 
 // ============ 型別定義 ============
 
@@ -53,27 +51,17 @@ export interface CommentCountsResponse {
 export async function createComment(
   params: CreateCommentParams,
 ): Promise<Comment> {
-  const res = await fetch(`${hostName}/api/comments`, {
+  return api<Comment>("/api/comments", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    credentials: "include", // 如果有用 cookie 驗證
-    body: JSON.stringify({
+    body: {
       post_id: params.post_id,
       item_id: params.item_id ?? null,
       parent_id: params.parent_id ?? null,
       user_id: params.user_id,
       content: params.content,
       public_id: params.public_id,
-    }),
+    },
   });
-
-  if (!res.ok) {
-    throw new ApiError(await res.json().catch(() => null), res.status);
-  }
-
-  return res.json();
 }
 
 /**
@@ -85,23 +73,14 @@ export async function getComments(
   postId: number,
   itemId?: number | "all", //
 ): Promise<CommentsResponse> {
-  let url = `${hostName}/api/comments?post_id=${postId}`;
+  let path: ApiPath = `/api/comments?post_id=${postId}`;
 
   if (itemId !== undefined) {
-    url += `&item_id=${itemId}`;
+    path = `${path}&item_id=${itemId}`;
   }
   // undefined = 不加參數，取全部留言
 
-  const res = await fetch(url, {
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    throw new ApiError(await res.json().catch(() => null), res.status);
-  }
-
-  return res.json();
+  return api<CommentsResponse>(path);
 }
 
 /**
@@ -110,14 +89,5 @@ export async function getComments(
 export async function getCommentCounts(
   postId: number,
 ): Promise<CommentCountsResponse> {
-  const res = await fetch(`${hostName}/api/comments/counts?post_id=${postId}`, {
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (!res.ok) {
-    throw new ApiError(await res.json().catch(() => null), res.status);
-  }
-
-  return res.json();
+  return api<CommentCountsResponse>(`/api/comments/counts?post_id=${postId}`);
 }

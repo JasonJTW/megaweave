@@ -4,6 +4,7 @@
   "main": "server.js",
   "scripts": {
     "test": "jest",
+    "test:db": "jest -c jest.db.config.js",
     "build": "dotenv -e .env.production -- tsc -p tsconfig.build.json",
     "build:dev": "dotenv -e .env.development -- tsc -p tsconfig.build.json",
     "start": "dotenv -e .env.production -v APP_ROLE=api -- node ./dist/server.js",

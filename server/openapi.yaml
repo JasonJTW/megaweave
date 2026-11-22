@@ -3293,6 +3293,20 @@ components:
         receiver_confirmed: { type: boolean }
         conversation_id: { type: integer }
         post: { $ref: "#/components/schemas/Post" }
+        viewer: { $ref: "#/components/schemas/WeaveViewer" }
+    WeaveCommand:
+      type: string
+      description: A move on a Weave (server/src/services/weave/transitions.ts). PATCH /api/weaves/{id}/status takes the target status instead.
+      enum: [approve, decline, withdraw, cancel, confirm]
+    WeaveViewer:
+      type: object
+      description: The signed-in viewer's part in this Weave and the commands they may send now. Reviewer only applies while Requested; confirm drops out once the viewer confirmed their own side.
+      required: [role, isInitiator, isReviewer, commands]
+      properties:
+        role: { type: [string, "null"], enum: [giver, receiver, null], description: Item direction (ADR 0001); null for a Reviewer who is not a party }
+        isInitiator: { type: boolean }
+        isReviewer: { type: boolean }
+        commands: { type: array, items: { $ref: "#/components/schemas/WeaveCommand" } }
     PublicWeave:
       description: A Weave on a public profile, without the parties' `notes` and `conversation_id`
       allOf:

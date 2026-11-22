@@ -61,19 +61,24 @@ _Avoid_: Recipient, Buyer, Claimer, 收受者
 _Avoid_: Requester, Sender
 
 **Post Author**:
-張貼該 Post、因而負責 approve 或 decline 進來的 Weave 請求的一方。永遠是 Initiator 的對造。
+張貼該 Post 的一方。永遠是 Initiator 的對造。
 _Avoid_: Poster, Owner, 發文者
+
+**Reviewer (審核者)**:
+有權 approve 或 decline 某個 Weave 請求的人。個人 Post 的 Reviewer 就是 Post Author；組織 Post 的 Reviewer 是負責該單位的 Unit Contact、Org Admin 與 Platform Admin，不一定是上架的那個人。
+_Avoid_: Approver, 核可者
 
 > Giver / Receiver 隨 Post 類型翻轉，Initiator / Post Author 不會：
 > Share → Post Author 是 Giver；Wish → Post Author 是 Receiver。
+> Post Author 是「誰發的文」，Reviewer 是「誰有權審」；只有組織 Post 會把兩者分開。
 
 ### Weave 狀態
 
 **Requested**:
-Weave 已提出，等待 Post Author 回應。
+Weave 已提出，等待 Reviewer 回應。
 
 **Approved**:
-Post Author 已同意，交換進行中，等待雙方各自 Confirm。
+Reviewer 已同意，交換進行中，等待雙方各自 Confirm。
 DB `weaves.status` 值為 `approved`。
 _Avoid_: Pending, In progress
 
@@ -84,7 +89,8 @@ _Avoid_: Pending, In progress
 雙方都已 Confirm，交換結束。
 
 **Declined (已婉拒)**:
-Post Author 在 Requested 階段拒絕了這次 Weave 請求。不涉及違背承諾。
+Reviewer 在 Requested 階段拒絕了這次 Weave 請求。不涉及違背承諾。
+請求者失去提出這次請求的資格時（例如組織 Post 降層後請求者看不到它，或請求者不再代表所選的單位），系統會代 Reviewer 婉拒；對使用者而言同樣是 Declined。
 DB `weaves.status` 值為 `declined`。
 _Avoid_: Rejected, Refused
 
@@ -96,7 +102,7 @@ _Avoid_: Cancelled（Requested 階段的退出不叫取消）
 Weave 在 Approved 之後、Completed 之前被任一方中止。雙方已有約定，屬於違背承諾。
 _Avoid_: Withdrawn, Aborted
 
-> Requested 階段的退出由「誰」決定名稱（Initiator → Withdrawn，Post Author → Declined）；Approved 之後任一方退出都是 Cancelled。
+> Requested 階段的退出由「誰」決定名稱（Initiator → Withdrawn，Reviewer 或系統 → Declined）；Approved 之後任一方退出都是 Cancelled。
 
 ### 探索
 

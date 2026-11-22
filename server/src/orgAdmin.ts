@@ -5,7 +5,7 @@ import Router, { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware/auth";
 import { HttpError } from "./utils/httpError";
-import { announceAutoDeclined } from "./utils/weaveService";
+import { announceAutoDeclined } from "./services/weave";
 import { orgHandoverService } from "./services/orgHandoverService";
 import { getOrgReport } from "./services/orgReportService";
 import { OrgIdSchema } from "./utils/idSchemas";

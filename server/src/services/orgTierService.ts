@@ -9,10 +9,9 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import dbPool from "../utils/db";
 import { HttpError } from "../utils/httpError";
 import { getVectorRedisClient } from "../utils/redis";
-import { announceAutoDeclined } from "../utils/weaveService";
+import { announceAutoDeclined, declineAsSystem } from "./weave";
 import { syncPostVectorScope } from "./postVectorScope";
 import { syncPublicTrending } from "./publicTrending";
-import { recordOrgWeaveEvents } from "./orgWeaveEvents";
 import {
   AUDIENCE_TIERS,
   AudienceTier,
@@ -126,24 +125,17 @@ export async function changePostTier(
       receiverId: Number(weave.receiver_id),
     });
   }
-  if (declined.length > 0) {
-    //* IN (?) 需要 query() 展開陣列
-    await connection.query(
-      "UPDATE weaves SET status = 'declined' WHERE id IN (?) AND status = 'requested'",
-      [declined.map((d) => d.weaveId)],
-    );
-    //* 流轉紀錄（#141）：系統婉拒，操作者留空；層級變更本身另有紀錄與操作者
-    await recordOrgWeaveEvents(
-      connection,
-      declined.map((d) => ({
-        weaveId: d.weaveId,
-        postId,
-        orgId,
-        action: "declined" as const,
-        actorUserId: null,
-      })),
-    );
-  }
+  //* 系統代 Reviewer 婉拒（CONTEXT.md Declined）；層級變更本身另有紀錄與操作者
+  await declineAsSystem(
+    connection,
+    orgId,
+    declined.map((d) => ({
+      id: d.weaveId,
+      postId,
+      giverId: d.giverId,
+      receiverId: d.receiverId,
+    })),
+  );
 
   return {
     postId,

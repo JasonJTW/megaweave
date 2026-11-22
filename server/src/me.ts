@@ -7,7 +7,7 @@ import Router, { NextFunction, Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
-import { WEAVE_QUERY_BASE, WeaveOutput, processWeaveRows } from "./weaves";
+import { WEAVE_QUERY_BASE, type WeaveOutput, processWeaveRows } from "./services/weave";
 import { UpdateLocaleSchema } from "./validations";
 
 const router = Router();

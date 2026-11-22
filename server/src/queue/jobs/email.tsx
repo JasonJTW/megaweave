@@ -12,7 +12,7 @@ import {
   getDeliveryNoticeCopy,
   type DeliveryNoticeEvent,
 } from "../../services/deliveryNoticeCopy";
-import type { WeaveActionType, WeaveRole, WeaveStatus } from "../../utils/weaveService";
+import type { WeaveActionType, WeaveRole, WeaveStatus } from "../../services/weave";
 import type { Locale } from "../../validations";
 
 /**

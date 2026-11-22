@@ -27,6 +27,7 @@ The CI review workflows apply `docs/agents/code-review.md` and `docs/agents/secu
 ## Testing
 - Run tests: `make test` or `cd server && npm test`
 - Single test: `cd server && npx jest path/to/file.test.ts`
+- DB tests: `*.db.test.ts` run against a real MySQL built from `server/db/schema.sql` (`cd server && npm run test:db`, part of `make test`; needs `make dev-services`). Test SQL-heavy modules there through their interface; don't write fakes that match SQL text.
 - Test pattern: Unit and integration tests colocated or in `__tests__/` with `*.test.ts` naming.
 - Force exit: `--forceExit` is configured in Jest for async handles/connections.
 

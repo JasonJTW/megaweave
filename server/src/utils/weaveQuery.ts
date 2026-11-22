@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { WeaveStatus } from "./weaveService";
+import type { WeaveStatus } from "../services/weave";
 
 export const WeavesListQuerySchema = z.object({
   role: z.enum(["giver", "receiver"]).optional(),

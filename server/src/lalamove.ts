@@ -6,7 +6,6 @@ import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import {
   requestLalamoveQuotation,
-  createLalamoveOrder,
   cancelLalamoveOrder,
   getLalamoveDriverDetail,
   getLalamoveOrderDetail,
@@ -15,7 +14,6 @@ import {
   sandboxPickup,
   sandboxDeliver,
   GetQuotationParams,
-  CreateOrderParams,
   getLalamoveMarketInfo,
 } from "./services/lalamove";
 import {
@@ -222,79 +220,6 @@ router.post(
     }
   },
 );
-
-/**
- * POST /api/lalamove/orders
- * 下單建立 Lalamove 配送
- */
-router.post(
-  "/orders",
-  requireAuth,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const {
-      quotationId,
-      sender,
-      recipients,
-      isPODEnabled,
-      isRecipientSmsEnabled,
-      partner,
-      metadata,
-    } = req.body;
-
-    if (!quotationId) {
-      return next(new HttpError(400, "INVALID_REQUEST", "quotationId is required"));
-    }
-
-    if (!sender?.name || !sender?.phone) {
-      return next(new HttpError(400, "INVALID_REQUEST", "Sender name and phone are required"));
-    }
-
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      return next(new HttpError(400, "INVALID_REQUEST", "At least one recipient is required"));
-    }
-
-    for (const r of recipients) {
-      if (!r.name || !r.phone) {
-        return next(new HttpError(400, "INVALID_REQUEST", "Each recipient must have name and phone"));
-      }
-    }
-
-    const orderParams: CreateOrderParams = {
-      quotationId,
-      sender,
-      recipients,
-      isPODEnabled,
-      isRecipientSmsEnabled,
-      partner,
-      metadata,
-    };
-
-    const orderResult = await createLalamoveOrder(orderParams);
-
-    // Broadcast new order event to socket room if available
-    const io: Server | undefined = res.locals.io || req.app.get("io");
-    if (io && orderResult.orderId) {
-      io.to(`delivery_${orderResult.orderId}`).emit(
-        "delivery_update",
-        orderResult,
-      );
-    }
-
-    res.status(201).json({
-      success: true,
-      order: orderResult,
-    });
-  } catch (error: unknown) {
-    const errObj = error as {
-      errors?: Array<{ id?: string; message?: string; detail?: string }>;
-    };
-    if (errObj.errors?.length) {
-      console.error("Lalamove create order details:", errObj.errors);
-    }
-    return next(deliveryProviderError("create order", error));
-  }
-});
 
 /**
  * GET /api/lalamove/orders/:orderId

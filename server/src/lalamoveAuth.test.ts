@@ -51,6 +51,16 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
     jest.clearAllMocks();
   });
 
+  //* 叫車只能經由付款流程（paymentService 建 delivery_orders 後派單）；
+  //* 曾有一條只檢查登入就直接向 Lalamove 下單的 POST /orders
+  it("does not expose POST /orders for placing orders outside the payment flow", () => {
+    const layers = (lalamoveRouter as unknown as { stack: RouterLayer[] }).stack;
+    const placeOrder = layers.find(
+      (l) => l.route?.path === "/orders" && l.route?.methods.post === true,
+    );
+    expect(placeOrder).toBeUndefined();
+  });
+
   describe("GET /orders/:orderId", () => {
     const handlers = getRouteHandlers("/orders/:orderId", "get");
     const authMiddleware = handlers[0];

@@ -7,7 +7,7 @@ import Router, { NextFunction, Request, Response } from "express";
 import { RowDataPacket } from "mysql2";
 import dbPool from "./utils/db";
 import { requireAuth } from "./middleware/auth";
-import { WeaveOutput, processWeaveRows } from "./weaves";
+import { WEAVE_QUERY_BASE, WeaveOutput, processWeaveRows } from "./weaves";
 import { UpdateLocaleSchema } from "./validations";
 
 const router = Router();
@@ -54,50 +54,9 @@ router.get(
           ),
 
           // 4. weaves (giver or receiver)
+          //* 共用 WEAVE_QUERY_BASE：手抄的 SELECT 少了流向單位與發文者欄位
           dbPool.execute<WeaveOutput[]>(
-            `SELECT
-            w.*,
-            p.id AS post_id_original,
-            p.public_id AS post_public_id,
-            p.user_id AS post_user_id,
-            p.org_id AS post_org_id,
-            p.org_unit_id AS post_org_unit_id,
-            p.title AS post_title,
-            p.content AS post_content,
-            p.type AS post_type,
-            p.status AS post_status_original,
-            l.full_address AS post_location,
-            l.place_id AS post_place_id,
-            l.name AS post_location_name,
-            l.url AS post_location_url,
-            l.province AS post_province,
-            l.city AS post_city,
-            l.route AS post_route,
-            l.zip_code AS post_zip_code,
-            l.lat AS post_lat,
-            l.lng AS post_lng,
-            p.tags AS post_tags,
-            p.category_id AS post_category_id,
-            p.condition_level AS post_condition_level,
-            p.expires_at AS post_expires_at,
-            p.view_count AS post_view_count,
-            p.likes_count AS post_likes_count,
-            p.created_at AS post_created_at,
-            p.updated_at AS post_updated_at,
-            p.comment_count AS post_comment_count,
-            COALESCE(NULLIF(TRIM(g_up.custom_name), ''), giver.username) AS giver_name,
-            giver.avatar_url AS giver_avatar,
-            COALESCE(NULLIF(TRIM(r_up.custom_name), ''), receiver.username) AS receiver_name,
-            receiver.avatar_url AS receiver_avatar,
-            GROUP_CONCAT(img.s3_key ORDER BY img.id ASC) AS s3_keys
-         FROM weaves w
-         JOIN posts p ON w.post_id = p.id
-         LEFT JOIN locations l ON p.location_id = l.id
-         JOIN users giver ON w.giver_id = giver.id
-         LEFT JOIN user_profiles g_up ON giver.id = g_up.user_id
-         JOIN users receiver ON w.receiver_id = receiver.id
-         LEFT JOIN user_profiles r_up ON receiver.id = r_up.user_id
-         LEFT JOIN images img ON p.id = img.post_id
+            `${WEAVE_QUERY_BASE}
          WHERE (w.giver_id = ? OR w.receiver_id = ?)
          GROUP BY w.id
          ORDER BY w.created_at DESC`,

@@ -3,7 +3,7 @@
 //
 //   node scripts/check-adr-decisions.mjs
 //
-// An ADR's H1 is its decision (docs/adr/, CONTEXT.md). Changing the H1 of an ADR already on
+// ADR 0010: an ADR's H1 is its decision. Changing the H1 of an ADR already on
 // BASE, or renaming or deleting one, reverses a decision only the maintainer makes, so it needs
 // the `adr-approved` label, counted only when a repository admin added it (verifyApproval, the
 // same rule as `migration-approved`). Adding an ADR or editing an existing one's body passes

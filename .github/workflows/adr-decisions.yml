@@ -1,6 +1,6 @@
 name: ADR decisions
 
-# Changing the H1 (the decision) of an accepted ADR, or renaming or deleting one, needs the
+# ADR 0010: changing the H1 (the decision) of an accepted ADR, or renaming or deleting one, needs the
 # `adr-approved` label added by an admin. Logic and tests: scripts/check-adr-decisions.mjs.
 # No `paths` filter: "ADR decisions" is a required check, and a required check that never
 # reports blocks the PR, so PRs without docs/adr/ changes pass in-job.

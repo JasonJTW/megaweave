@@ -20,9 +20,9 @@ import toast from "react-hot-toast";
 import { useCallback, useRef } from "react";
 import { useUser } from "@/app/contexts/UserContext";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
+import { api } from "@/lib/api";
 
 function SigninForm() {
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
   const [username, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -78,27 +78,16 @@ function SigninForm() {
     }
 
     try {
-      const response = await fetch(`${hostName}/api/signin/google`, {
+      await api(`/api/signin/google`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential: credentialResponse.credential }),
-        credentials: "include",
+        body: { credential: credentialResponse.credential },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Google sign in failed:", data.errorMessage);
-        toast.error(apiErrorMessage(data, t("googleFailed")));
-        return;
-      }
-
-      console.log("Google sign in response data:", data);
       await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during Google sign in:", error);
-      toast.error(t("unexpectedError"));
+      toast.error(apiErrorMessage(error, t("googleFailed")));
     } finally {
       setLoading(false);
     }
@@ -122,28 +111,16 @@ function SigninForm() {
     }
 
     try {
-      const response = await fetch(`${hostName}/api/signin`, {
+      await api(`/api/signin`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
+        body: { email, password },
       });
-
-      const data = await response.json();
-      console.log("data:", data);
-      // /// handle error
-      if (!response.ok) {
-        toast.error(apiErrorMessage(data, t("signInFailed")));
-        console.error("Sign in failed", data.errorMessage);
-        return;
-      }
       /// Sign in success
-      console.log("response data:", data);
       await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during sign in:", error);
-      toast.error(t("unexpectedError"));
+      toast.error(apiErrorMessage(error, t("signInFailed")));
     } finally {
       setLoading(false);
     }
@@ -202,29 +179,16 @@ function SigninForm() {
 
   const sendToYourBackend = async (accessToken: string) => {
     try {
-      const response = await fetch(`${hostName}/api/signin/facebook`, {
+      await api(`/api/signin/facebook`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ accessToken }),
-        credentials: "include",
+        body: { accessToken },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Facebook backend signin failed:", data.errorMessage);
-        toast.error(apiErrorMessage(data, t("facebookFailed")));
-        return;
-      }
-
-      console.log("Facebook backend response:", data);
       await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error sending Facebook token to backend:", error);
-      toast.error(t("unexpectedError"));
+      toast.error(apiErrorMessage(error, t("facebookFailed")));
     } finally {
       setLoading(false);
     }
@@ -256,26 +220,17 @@ function SigninForm() {
     };
 
     try {
-      const response = await fetch(`${hostName}/api/signup`, {
+      await api(`/api/signup`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
-        credentials: "include", // Include cookies in the request
+        body: newUser,
       });
-
-      const data = await response.json();
-      // /// handle error
-      if (!response.ok) {
-        toast.error(apiErrorMessage(data, t("signUpFailed")));
-        return;
-      }
       /// Sign up success
       toast.success(t("welcomeToast", { username }));
       await mutate(); // Update global user context
       handleSigninSignupSuccess();
     } catch (error) {
       console.error("Error during sign up:", error);
-      toast.error(t("unexpectedError"));
+      toast.error(apiErrorMessage(error, t("signUpFailed")));
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,5 @@
 // services/imageUploadService.ts
-import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 
 export interface UploadableImage {
   blob: Blob | File;
@@ -19,35 +19,24 @@ interface PresignedUrlResponse {
  */
 export async function uploadImagesToS3Staging(
   images: UploadableImage[],
-  hostName: string = process.env.NEXT_PUBLIC_HOSTNAME || "",
 ): Promise<string[]> {
   if (!images || images.length === 0) {
     return [];
   }
 
   // 1. Request presigned upload URLs from backend
-  const presignedRes = await fetch(`${hostName}/api/posts/presigned-urls`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const { urls } = await api<PresignedUrlResponse>(
+    "/api/posts/presigned-urls",
+    {
+      method: "POST",
+      body: {
+        files: images.map((img) => ({
+          filename: img.filename,
+          contentType: img.blob.type || "image/jpeg",
+        })),
+      },
     },
-    credentials: "include",
-    body: JSON.stringify({
-      files: images.map((img) => ({
-        filename: img.filename,
-        contentType: img.blob.type || "image/jpeg",
-      })),
-    }),
-  });
-
-  if (!presignedRes.ok) {
-    throw new ApiError(
-      await presignedRes.json().catch(() => null),
-      presignedRes.status,
-    );
-  }
-
-  const { urls }: PresignedUrlResponse = await presignedRes.json();
+  );
 
   if (!urls || urls.length !== images.length) {
     throw new Error("Mismatch in presigned URL response count");
@@ -59,6 +48,7 @@ export async function uploadImagesToS3Staging(
       const { blob, filename } = images[index];
       const contentType = blob.type || "image/jpeg";
 
+      // eslint-disable-next-line no-restricted-globals -- presigned PUT straight to S3, not our API
       const uploadRes = await fetch(presignedUrl, {
         method: "PUT",
         headers: {

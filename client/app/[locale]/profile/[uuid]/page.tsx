@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 // import type { Weave } from "@/services/weaveService";
 import { usePost } from "@/app/contexts/PostContext";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { api } from "@/lib/api";
 // 定義公開 Profile 的資料型別
 interface PublicProfile {
   user_id: string;
@@ -72,26 +72,9 @@ const PublicProfilePage = () => {
 
   const fetchPublicProfile = async (userId: string) => {
     try {
-      const response = await fetch(
-        `${hostName}/api/userprofile/public/${userId}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        },
+      const data = await api<PublicProfile>(
+        `/api/userprofile/public/${userId}`,
       );
-
-      if (!response.ok) {
-        setError({
-          message: apiErrorMessage(
-            await response.json().catch(() => null),
-            t("loadFailed"),
-          ),
-        });
-        return;
-      }
-
-      const data: PublicProfile = await response.json();
-      console.log("Fetched public profile:", data);
 
       setProfileData(data);
 
@@ -101,7 +84,7 @@ const PublicProfilePage = () => {
       setError(null);
     } catch (error) {
       console.error("Error fetching profile:", error);
-      setError({ message: t("loadFailed") });
+      setError({ message: apiErrorMessage(error, t("loadFailed")) });
     }
     // 注意：這裡不設定 setLoading(false)，交給 init 統一處理
   };
@@ -110,25 +93,19 @@ const PublicProfilePage = () => {
   const fetchStatsAndPosts = async (userId: string) => {
     try {
       // 利用 stats.ts 裡面的 /public/:uuid 路由
-      const response = await fetch(
-        `${hostName}/api/user/stats/public/${userId}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Fetched stats: ", data);
-        // stats API 回傳結構中有 posts 陣列
-        setPosts(data.posts || []);
-        setStats({
-          postCount: data.postCount || 0,
-          weaveCount: data.weaveCount || 0,
-          points: data.points || 0,
-        });
-      }
+      const data = await api<{
+        posts?: Post[];
+        postCount?: number;
+        weaveCount?: number;
+        points?: number;
+      }>(`/api/user/stats/public/${userId}`);
+      // stats API 回傳結構中有 posts 陣列
+      setPosts(data.posts || []);
+      setStats({
+        postCount: data.postCount || 0,
+        weaveCount: data.weaveCount || 0,
+        points: data.points || 0,
+      });
     } catch (error) {
       console.error("Error fetching public posts:", error);
     }
@@ -138,7 +115,7 @@ const PublicProfilePage = () => {
   // const fetchPublicWeaves = async (userId: string) => {
   //   try {
   //     // 呼叫我們將在 weaves.ts 新增的公開路由
-  //     const response = await fetch(`${hostName}/api/weaves/public/${userId}`, {
+  //     const response = await api(`/api/weaves/public/${userId}`, {
   //       method: "GET",
   //       cache: "no-store",
   //     });
@@ -247,7 +224,9 @@ const PublicProfilePage = () => {
                       <div className="absolute inset-0">
                         <Image
                           src={profileData.avatar_url}
-                          alt={t("avatarAlt", { username: profileData.username })}
+                          alt={t("avatarAlt", {
+                            username: profileData.username,
+                          })}
                           fill
                           sizes="(max-width: 1024px) 300px, 288px"
                           className="object-cover"
@@ -374,9 +353,7 @@ const PublicProfilePage = () => {
                   {profileData.bio ? (
                     renderTextWithUrls(profileData.bio)
                   ) : (
-                    <span className="italic text-gray-500">
-                      {t("noBio")}
-                    </span>
+                    <span className="italic text-gray-500">{t("noBio")}</span>
                   )}
                 </motion.p>
               </div>
@@ -438,11 +415,7 @@ const PublicProfilePage = () => {
                 weaves={weaves}
                 conditions={conditions}
               /> */}
-              <Drawer
-                kind="share"
-                posts={sharePosts}
-                conditions={conditions}
-              />
+              <Drawer kind="share" posts={sharePosts} conditions={conditions} />
               <Drawer kind="wish" posts={wishPosts} conditions={conditions} />
             </motion.div>
           </div>

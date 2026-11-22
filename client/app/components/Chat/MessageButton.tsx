@@ -7,14 +7,15 @@ import { Button } from "@/components/ui/button";
 import { MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { api } from "@/lib/api";
+import { ApiError } from "@/lib/apiError";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 interface MessageButtonProps {
   recipientPublicId: string;
   recipientName: string;
   className?: string; // Allow custom styling
 }
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 
 export const MessageButton: React.FC<MessageButtonProps> = ({
   recipientPublicId,
@@ -23,32 +24,27 @@ export const MessageButton: React.FC<MessageButtonProps> = ({
 }) => {
   const router = useRouter();
   const t = useTranslations("Chat");
+  const apiErrorMessage = useApiErrorMessage();
   const [loading, setLoading] = useState(false);
 
   const handleMessageClick = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${hostName}/api/messages/start`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ recipient_public_id: recipientPublicId }),
-      });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          toast.error(t("signInToMessage"));
-          router.push(signinUrlForCurrentPage());
-          return;
-        }
-        throw new Error("Failed to start conversation");
-      }
-
-      const data = await res.json();
+      const data = await api<{ conversationId: number }>(
+        "/api/messages/start",
+        { method: "POST", body: { recipient_public_id: recipientPublicId } },
+      );
       router.push(`/messages/${data.conversationId}`);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        toast.error(t("signInToMessage"));
+        router.push(signinUrlForCurrentPage());
+        return;
+      }
       console.error("Message error:", error);
-      toast.error(t("messageFailed", { username: recipientName }));
+      toast.error(
+        apiErrorMessage(error, t("messageFailed", { username: recipientName })),
+      );
     } finally {
       setLoading(false);
     }

@@ -14,10 +14,8 @@ import { useImageWithRetry } from "@/hooks/useImageWithRetry";
 import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
 import { TierPill } from "@/components/org/TierPill";
 import {
-  hostName,
   OrgAccess,
   OrgPagePost,
-  requestJson,
   useOrgItemCategories,
   useSelectedOrg,
 } from "@/lib/orgApi";
@@ -83,9 +81,7 @@ function OrgPosts({ org }: { org: OrgAccess }) {
   const t = useTranslations("Org");
   const categories = useOrgItemCategories();
   const [category, setCategory] = useState(ALL);
-  const { data, error } = useSWR(orgPostsKey(hostName, org.id), (url: string) =>
-    requestJson<{ posts: OrgPagePost[] }>(url),
-  );
+  const { data, error } = useSWR<{ posts: OrgPagePost[] }>(orgPostsKey(org.id));
 
   if (error) return <OrgNotice tone="error">{t("loadFailed")}</OrgNotice>;
   if (!data) {

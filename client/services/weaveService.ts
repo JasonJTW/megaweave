@@ -1,7 +1,6 @@
 // src/services/weaveService.ts
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
 import { Post } from "../app/types/schema";
-import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 interface WeaveItemParam {
   itemId: number | null;
   quantity: number;
@@ -80,28 +79,16 @@ export const createWeave = async ({
           ? [{ itemId, quantity: quantity || 1 }]
           : [];
 
-    const response = await fetch(`${hostName}/api/weaves`, {
+    //* 後端錯誤碼（例如 WEAVE_OWN_POST、INSUFFICIENT_STOCK）由 api 包成 ApiError 交給 UI 翻譯
+    return await api("/api/weaves", {
       method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+      body: {
         postId,
         items: requestItems,
         notes,
         ...(actingUnitId !== undefined && { actingUnitId }),
-      }),
+      },
     });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      // 後端錯誤碼（例如 WEAVE_OWN_POST、INSUFFICIENT_STOCK）交給 UI 翻譯
-      throw new ApiError(data);
-    }
-
-    return data;
   } catch (error) {
     throw error;
   }

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import type { Weave } from "@/services/weaveService";
 import { useSocket } from "@/hooks/useSocket";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
-import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 import {
   getWeaveViewModel,
   type WeaveAction,
@@ -12,18 +12,11 @@ import {
   type WeaveStatusKey,
 } from "@/utils/weaveViewModel";
 
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
-async function patchWeaveStatus(weaveId: number, status: Weave["status"]) {
-  const response = await fetch(`${hostName}/api/weaves/${weaveId}/status`, {
+function patchWeaveStatus(weaveId: number, status: Weave["status"]) {
+  return api<{ newStatus: Weave["status"] }>(`/api/weaves/${weaveId}/status`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ status }),
+    body: { status },
   });
-  const data = await response.json();
-  if (!response.ok) throw new ApiError(data);
-  return data;
 }
 
 interface UseWeaveActionsOptions {

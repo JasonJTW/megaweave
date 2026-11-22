@@ -12,7 +12,7 @@ import { pickOrg } from "@/lib/orgAdminRules";
 import { cn } from "@/lib/utils";
 import { OrgNotice, OrgShell, orgTabs } from "@/components/org/OrgShell";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
-import { hostName, OrgAccess, OrgReport, requestJson } from "@/lib/orgApi";
+import type { OrgAccess, OrgReport } from "@/lib/orgApi";
 
 /** 一個數字：標籤在上、數值、補充說明 */
 function Stat({
@@ -556,17 +556,15 @@ function OrgReportContent() {
   const t = useTranslations("OrgReport");
   const apiErrorMessage = useApiErrorMessage();
   const searchParams = useSearchParams();
-  const { data: orgList, error: orgError } = useSWR(
-    `${hostName}/api/orgs`,
-    (url: string) => requestJson<{ orgs: OrgAccess[] }>(url),
+  const { data: orgList, error: orgError } = useSWR<{ orgs: OrgAccess[] }>(
+    "/api/orgs",
   );
   const adminOrgs = (orgList?.orgs ?? []).filter((o) => o.isAdmin);
   const wanted = searchParams.get("org");
   const org = pickOrg(adminOrgs, wanted);
 
-  const { data, error } = useSWR(
-    org ? `${hostName}/api/org-admin/orgs/${org.id}/report` : null,
-    (url: string) => requestJson<{ report: OrgReport }>(url),
+  const { data, error } = useSWR<{ report: OrgReport }>(
+    org ? `/api/org-admin/orgs/${org.id}/report` : null,
   );
   const loadError = orgError ?? error;
 

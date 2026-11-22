@@ -1,0 +1,48 @@
+name: ADR decisions
+
+# ADR 0010: changing the H1 (the decision) of an accepted ADR, or renaming or deleting one, needs the
+# `adr-approved` label added by an admin. Logic and tests: scripts/check-adr-decisions.mjs.
+# No `paths` filter: "ADR decisions" is a required check, and a required check that never
+# reports blocks the PR, so PRs without docs/adr/ changes pass in-job.
+# labeled/unlabeled re-run the check, so adding the label re-evaluates it.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+# issues/pull-requests: read the PR's label events, so `adr-approved` counts only when a
+# repository admin added it (verifyApproval in scripts/check-db-migrations.mjs).
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: adr-decisions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: ADR decisions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Unit-test the check
+        run: node --test scripts/check-adr-decisions.test.mjs
+
+      # Labels travel through env as JSON, never interpolated into the script.
+      - name: Check ADR decisions
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-adr-decisions.mjs

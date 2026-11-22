@@ -1,3 +1,9 @@
+# Print only failing jobs and the summary: passing test output floods agent contexts
+output:
+  - meta
+  - summary
+  - failure
+
 pre-commit:
   commands:
     # Only client/ is Prettier-formatted (client/.prettierrc); server/ is left to ESLint.

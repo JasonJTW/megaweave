@@ -21,3 +21,4 @@ Edit the right-hand column to match whatever vocabulary you actually use.
 | `agent:claimed`      | Issue      | An agent holds the issue (`docs/agents/contributing.md`, ADR 0007)                                     |
 | `needs-migration`    | PR         | The PR changes `server/db/schema.sql` and adds a migration; the `DB migrations` check requires it      |
 | `migration-approved` | PR         | Maintainer only: lets the `DB migrations` check pass a destructive migration (ADR 0009)               |
+| `adr-approved`       | PR         | Maintainer only: lets the `ADR decisions` check pass a changed, renamed or deleted ADR                |

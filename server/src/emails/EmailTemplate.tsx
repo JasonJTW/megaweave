@@ -13,7 +13,7 @@ import {
   Hr,
 } from "react-email";
 import EmailBanner from "./EmailBanner";
-import type { WeaveRole, WeaveStatus } from "../utils/weaveService";
+import type { WeaveRole, WeaveStatus } from "../services/weave";
 import { getTranslator } from "../utils/i18n";
 import type { Locale } from "../validations";
 

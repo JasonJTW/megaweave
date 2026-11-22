@@ -16,7 +16,7 @@ import { withTransaction } from "../utils/transaction";
 import { emitNewMessage } from "./orgConversation";
 import type { OrgUnitRef } from "./orgItemService";
 import type { Queryable } from "./orgService";
-import { recordOrgWeaveEvents } from "./orgWeaveEvents";
+import { declineAsSystem } from "./weave";
 
 /** 系統代為婉拒的 Weave（通知申請人、更新兩造畫面用） */
 export interface DeclinedWeave {
@@ -81,24 +81,8 @@ async function declineRows(
     giverId: Number(row.giver_id),
     receiverId: Number(row.receiver_id),
   }));
-  if (declined.length > 0) {
-    await db.query(
-      "UPDATE weaves SET status = 'declined' WHERE id IN (?) AND status = 'requested'",
-      [declined.map((w) => w.id)],
-    );
-    //* 流轉紀錄（#141）：系統婉拒，操作者留空
-    await recordOrgWeaveEvents(
-      db,
-      declined.map((w) => ({
-        weaveId: w.id,
-        postId: w.postId,
-        orgId,
-        action: "declined" as const,
-        actorUserId: null,
-      })),
-    );
-  }
-  return declined;
+  //* 系統代 Reviewer 婉拒（CONTEXT.md Declined）
+  return declineAsSystem(db, orgId, declined);
 }
 
 /**

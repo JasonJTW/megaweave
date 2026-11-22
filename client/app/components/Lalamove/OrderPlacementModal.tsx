@@ -40,6 +40,7 @@ import {
 } from "@/utils/lalamove";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { ApiError } from "@/lib/apiError";
+import { api } from "@/lib/api";
 
 // FIXME: [Lalamove TW API Limitation] In Taipei, TRUCK175 and TRUCK330 yield the same quotation due to API merging 1.75T/3.49T into TRUCK330.
 const VEHICLE_ICONS: Record<VehicleType, "bike" | "car" | "van" | "truck"> = {
@@ -166,7 +167,6 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
   const router = useRouter();
   const t = useTranslations("Lalamove");
   const apiErrorMessage = useApiErrorMessage();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
 
   const [currentQuotation, setCurrentQuotation] =
     useState<QuotationItem | null>(initialQuotation);
@@ -429,23 +429,18 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         },
       ];
 
-      const res = await fetch(`${hostName}/api/lalamove/quotation`, {
+      const data = await api<{
+        success: boolean;
+        quotations?: QuotationItem[];
+      }>("/api/lalamove/quotation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           serviceTypes: VEHICLE_TYPES,
           stops,
           language: LALAMOVE_LANGUAGE,
-        }),
+        },
       });
-
-      const data = await res.json();
-      if (
-        !res.ok ||
-        !data.success ||
-        !data.quotations ||
-        data.quotations.length === 0
-      ) {
+      if (!data.success || !data.quotations || data.quotations.length === 0) {
         throw new ApiError(data);
       }
 
@@ -628,31 +623,33 @@ export const OrderPlacementModal: React.FC<OrderPlacementModalProps> = ({
         recipientPhone: formatPhone(recipientPhone),
       };
 
-      const response = await fetch(`${hostName}/api/payments/checkout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(checkoutPayload),
-      });
-
-      // 若未登入或 Session 過期，自動跳轉至登入頁面並帶上 returnTo
-      if (response.status === 401) {
-        const currentPath =
-          typeof window !== "undefined"
-            ? window.location.pathname + window.location.search
-            : "/";
-        toast.error(t("order.sessionExpired"));
-        router.push(`/signin?returnTo=${encodeURIComponent(currentPath)}`);
-        return;
+      let data: {
+        success: boolean;
+        session?: {
+          formData?: { MerchantTradeNo?: string };
+          htmlForm?: string;
+        };
+      };
+      try {
+        data = await api("/api/payments/checkout", {
+          method: "POST",
+          body: checkoutPayload,
+        });
+      } catch (err) {
+        // 若未登入或 Session 過期，自動跳轉至登入頁面並帶上 returnTo
+        if (err instanceof ApiError && err.status === 401) {
+          const currentPath =
+            typeof window !== "undefined"
+              ? window.location.pathname + window.location.search
+              : "/";
+          toast.error(t("order.sessionExpired"));
+          router.push(`/signin?returnTo=${encodeURIComponent(currentPath)}`);
+          return;
+        }
+        throw err;
       }
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new ApiError(data);
-      }
+      if (!data.success) throw new ApiError(data);
 
       // 儲存 MerchantTradeNo 與當前貼文網址到 sessionStorage，供付款後查詢與返回
       const tradeNo = data.session?.formData?.MerchantTradeNo;

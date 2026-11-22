@@ -17,8 +17,7 @@ import LalamoveQuotation from "./Lalamove/LalamoveQuotation";
 import { shouldShowLalamoveQuotation } from "@/utils/weaveGuard";
 import { getWeaveStatusKey, type WeaveStatusKey } from "@/utils/weaveViewModel";
 import { useDisplayName } from "@/hooks/useDisplayName";
-
-const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
+import { api } from "@/lib/api";
 
 interface WeavesCardProps {
   post?: Post;
@@ -100,14 +99,11 @@ const WeavingCard = ({
     let isMounted = true;
     const fetchWeaveData = async () => {
       try {
-        const res = await fetch(`${hostName}/api/weaves/${targetWeaveId}`, {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted && data.weave) {
-            setFetchedWeave(data.weave);
-          }
+        const data = await api<{ weave?: Weave }>(
+          `/api/weaves/${targetWeaveId}`,
+        );
+        if (isMounted && data.weave) {
+          setFetchedWeave(data.weave);
         }
       } catch (err) {
         console.error("Failed to fetch weave detail in WeavingCard:", err);
@@ -125,10 +121,7 @@ const WeavingCard = ({
 
     const handleStatusUpdate = (data: { weaveId: number }) => {
       if (Number(data.weaveId) === Number(targetWeaveId)) {
-        fetch(`${hostName}/api/weaves/${targetWeaveId}`, {
-          credentials: "include",
-        })
-          .then((res) => res.json())
+        api<{ weave?: Weave }>(`/api/weaves/${targetWeaveId}`)
           .then((data) => {
             if (data.weave) setFetchedWeave(data.weave);
             onWeaveStatusChange?.();

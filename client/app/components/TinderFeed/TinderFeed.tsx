@@ -29,6 +29,8 @@ import {
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { signinUrlForCurrentPage } from "@/lib/returnTo";
+import { api, type ApiPath } from "@/lib/api";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 
 interface SwipeHistoryItem {
   post: Post;
@@ -46,7 +48,7 @@ export default function TinderFeed({
 }: TinderFeedProps) {
   const t = useTranslations("Tinder");
   const router = useRouter();
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME || "";
+  const apiErrorMessage = useApiErrorMessage();
   const { user } = useUser();
   const { coords, isReady } = useLocation();
 
@@ -69,23 +71,18 @@ export default function TinderFeed({
   const enqueueLikeState = useCallback(
     (postId: number, publicId: string, liked: boolean) => {
       const prev = likeQueueRef.current.get(postId) ?? Promise.resolve();
-      const next = prev.catch(() => undefined).then(async () => {
-        const response = await fetch(
-          `${hostName}/api/posts/${publicId}/like`,
-          {
+      const next = prev
+        .catch(() => undefined)
+        .then(() =>
+          api(`/api/posts/${publicId}/like`, {
             method: "PUT",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ liked }),
-          },
+            body: { liked },
+          }),
         );
-        if (!response.ok) throw new Error(`Like request failed: ${response.status}`);
-        return response;
-      });
       likeQueueRef.current.set(postId, next);
       return next;
     },
-    [hostName],
+    [],
   );
 
   // SWR Infinite fetcher for personal recommendation feed
@@ -107,17 +104,13 @@ export default function TinderFeed({
       if (maxDistanceKm !== null && maxDistanceKm > 0) {
         params.append("radius", maxDistanceKm.toString());
       }
-      return `${hostName}/api/posts/feed?${params.toString()}`;
+      return `/api/posts/feed?${params.toString()}` as ApiPath;
     },
-    [isReady, hostName, coords?.lat, coords?.lng, maxDistanceKm],
+    [isReady, coords?.lat, coords?.lng, maxDistanceKm],
   );
-
-  const fetcher = (url: string) =>
-    fetch(url, { credentials: "include" }).then((res) => res.json());
 
   const { data, setSize, isValidating, mutate } = useSWRInfinite<PostsResponse>(
     getKey,
-    fetcher,
     {
       revalidateFirstPage: false,
     },
@@ -289,27 +282,22 @@ export default function TinderFeed({
 
       setIsMessaging(true);
       try {
-        const res = await fetch(`${hostName}/api/messages/start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ recipient_public_id: post.author_public_id }),
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to start message");
-        }
-
-        const data = await res.json();
+        const data = await api<{ conversationId: number }>(
+          "/api/messages/start",
+          {
+            method: "POST",
+            body: { recipient_public_id: post.author_public_id },
+          },
+        );
         router.push(`/messages/${data.conversationId}`);
       } catch (error) {
         console.error("Message error:", error);
-        toast.error(t("messageFailed"));
+        toast.error(apiErrorMessage(error, t("messageFailed")));
       } finally {
         setIsMessaging(false);
       }
     },
-    [t, user, router, hostName],
+    [t, user, router, apiErrorMessage],
   );
 
   // Reload / reset feed

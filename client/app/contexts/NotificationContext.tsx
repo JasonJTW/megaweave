@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect } from "react";
 import useSWR from "swr";
+import { api } from "@/lib/api";
 import { useSocket } from "@/hooks/useSocket";
 import toast from "react-hot-toast";
 import { useTranslations } from "next-intl";
@@ -39,10 +40,6 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
   undefined,
 );
 
-// Generic fetcher for SWR
-const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then((res) => res.json());
-
 export const useNotification = () => {
   const context = useContext(NotificationContext);
   if (!context) {
@@ -61,8 +58,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   // Consume User context
   const { user, loading: isUserLoading } = useUser();
 
-  const hostName = process.env.NEXT_PUBLIC_HOSTNAME;
-
   const userId = user?.userId || null;
   const isUserFetching = isUserLoading;
 
@@ -75,7 +70,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     data,
     isLoading,
     mutate: mutateNotifications,
-  } = useSWR(userId ? `${hostName}/api/notifications` : null, fetcher, {
+  } = useSWR<{
+    notifications: NotificationItem[];
+    unreadCount: number;
+  }>(userId ? "/api/notifications" : null, {
     revalidateOnFocus: true,
     dedupingInterval: 5000,
   });
@@ -160,9 +158,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     );
 
     try {
-      await fetch(`${hostName}/api/notifications/${id}/read`, {
+      await api(`/api/notifications/${id}/read`, {
         method: "PATCH",
-        credentials: "include",
       });
       // Optionally revalidate here to ensure sync
       mutateNotifications();
@@ -195,9 +192,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     );
 
     try {
-      await fetch(`${hostName}/api/notifications/read-all`, {
+      await api("/api/notifications/read-all", {
         method: "PUT",
-        credentials: "include",
       });
       toast.success(t("markedAllRead"));
       mutateNotifications();

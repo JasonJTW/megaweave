@@ -524,7 +524,6 @@ const PostsApp = () => {
         );
         stagingKeys = await uploadImagesToS3Staging(
           processedImages.map(({ blob, filename }) => ({ blob, filename })),
-          hostName || "",
         );
       }
 

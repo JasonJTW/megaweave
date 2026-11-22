@@ -14,6 +14,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // A separate build dir lets the E2E dev server run alongside `npm run dev`
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  experimental: {
+    // Next stops `next build`/`next start` (exit 1) under a coding agent when an advisory
+    // exists, which fails the pre-push E2E. CI's `npm audit` step gates advisories instead.
+    agentUpgrade: false,
+  },
   images: {
     remotePatterns: [
       {

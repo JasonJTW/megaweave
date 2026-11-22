@@ -258,32 +258,33 @@ export function parseLabels(json) {
 }
 
 /**
- * Decides whether the `migration-approved` label counts (ADR 0009). Anyone with triage
- * rights can add a label, so it counts only when its most recent `labeled` event was by a
- * user whose repository permission is `admin`.
+ * Decides whether a maintainer-approval label counts: `migration-approved` (ADR 0009) by
+ * default, `adr-approved` for scripts/check-adr-decisions.mjs. Anyone with triage rights can
+ * add a label, so it counts only when its most recent `labeled` event was by a user whose
+ * repository permission is `admin`.
  *
  *   events        issue events of the PR (GET /repos/{repo}/issues/{n}/events)
  *   permissionOf  async (login) => "admin" | "write" | "read" | "none" | ...
  *
  * Returns { approved, reason }.
  */
-export async function verifyApproval({ labels, events, permissionOf }) {
-  if (!labels.includes(LABEL_APPROVED)) return { approved: false, reason: `the PR has no \`${LABEL_APPROVED}\` label` };
+export async function verifyApproval({ labels, events, permissionOf, label = LABEL_APPROVED }) {
+  if (!labels.includes(label)) return { approved: false, reason: `the PR has no \`${label}\` label` };
   const labeled = events
-    .filter((e) => e?.event === "labeled" && e.label?.name === LABEL_APPROVED)
+    .filter((e) => e?.event === "labeled" && e.label?.name === label)
     .sort((a, b) => byteOrder(String(a.created_at), String(b.created_at)) || (a.id ?? 0) - (b.id ?? 0));
   const last = labeled[labeled.length - 1];
-  if (!last) return { approved: false, reason: `no \`labeled\` event found for \`${LABEL_APPROVED}\`` };
+  if (!last) return { approved: false, reason: `no \`labeled\` event found for \`${label}\`` };
   const login = last.actor?.login;
-  if (!login) return { approved: false, reason: `the latest \`${LABEL_APPROVED}\` event has no actor` };
+  if (!login) return { approved: false, reason: `the latest \`${label}\` event has no actor` };
   const permission = await permissionOf(login);
   if (permission !== "admin") {
     return {
       approved: false,
-      reason: `\`${LABEL_APPROVED}\` was last added by ${login}, whose repository permission is ${permission}, not admin; ask a maintainer to remove and re-add it`,
+      reason: `\`${label}\` was last added by ${login}, whose repository permission is ${permission}, not admin; ask a maintainer to remove and re-add it`,
     };
   }
-  return { approved: true, reason: `\`${LABEL_APPROVED}\` added by admin ${login}` };
+  return { approved: true, reason: `\`${label}\` added by admin ${login}` };
 }
 
 async function githubGet(path) {
@@ -298,8 +299,8 @@ async function githubGet(path) {
 }
 
 /** Fetches the PR's issue events and checks the label's actor; any failure means "not approved". */
-export async function approvalFromGitHub(labels) {
-  if (!labels.includes(LABEL_APPROVED)) return { approved: false, reason: "label absent" };
+export async function approvalFromGitHub(labels, label = LABEL_APPROVED) {
+  if (!labels.includes(label)) return { approved: false, reason: "label absent" };
   const { GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER } = process.env;
   if (!GITHUB_TOKEN || !GITHUB_REPOSITORY || !PR_NUMBER) {
     if (inActions) return { approved: false, reason: "GITHUB_TOKEN, GITHUB_REPOSITORY or PR_NUMBER is not set, so the label cannot be verified" };
@@ -319,6 +320,7 @@ export async function approvalFromGitHub(labels) {
     }
     return await verifyApproval({
       labels,
+      label,
       events,
       permissionOf: async (login) => {
         const res = await githubGet(`/repos/${GITHUB_REPOSITORY}/collaborators/${encodeURIComponent(login)}/permission`);

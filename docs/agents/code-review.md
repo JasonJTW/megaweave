@@ -8,12 +8,12 @@ Apply every standard to every changed line:
 
 - **Correctness**: logic errors, unhandled `await`, races, missing transaction on multi-step writes, unvalidated input at a boundary.
 - **Conventions**: every rule under "Code Style", "Conventions" and "Design: deep modules" in `AGENTS.md`.
-- **ADRs**: a change that contradicts an ADR in `docs/adr/` (cite its number and the contradicted sentence), or makes a new architectural decision with no ADR.
+- **ADRs**: a change that contradicts an ADR in `docs/adr/` (cite its number and the contradicted sentence), makes a new architectural decision with no ADR, or rewrites an accepted ADR's decision. Reversing a decision is the maintainer's call: the `ADR decisions` check catches a changed H1; you judge whether an edit to the body changes the decision itself or only adds implementation notes.
 - **Tests**: a behaviour change ships with a test.
 
 ## Blocking
 
-A finding is **blocking** when it is a correctness defect, a behaviour change without a test, a route that no longer matches `server/openapi.yaml` (path, method, auth, parameters, request or response shape), or a contradiction of an ADR. Blocking findings fail the PR check. Every other finding is advisory: post it, and the PR can still merge.
+A finding is **blocking** when it is a correctness defect, a behaviour change without a test, a route that no longer matches `server/openapi.yaml` (path, method, auth, parameters, request or response shape), or a contradiction or rewritten decision of an ADR. Blocking findings fail the PR check. Every other finding is advisory: post it, and the PR can still merge.
 
 ## Scope
 

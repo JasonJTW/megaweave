@@ -76,6 +76,7 @@ dev-worker:
 # 開發用 Docker 服務（Redis x3、MySQL、S3 mock；詳見 docs/development.md）
 # -----------------------------------------------------------------------------
 dev-services:
+	@sh scripts/ensure-docker.sh
 	docker compose -f docker-compose.dev.yml up -d --wait redis-cache redis-queue redis-vector mysql s3
 	docker compose -f docker-compose.dev.yml run --rm dev-marker
 	@echo "✅ 開發服務已啟動："
@@ -102,6 +103,7 @@ dev-seed:
 # Benchmark 隔離環境（詳見 docs/benchmark-runner.md）
 # -----------------------------------------------------------------------------
 benchmark-up:
+	@sh scripts/ensure-docker.sh
 	docker compose -f docker-compose.benchmark.yml up -d --wait mysql redis-cache redis-queue redis-vector
 	docker compose -f docker-compose.benchmark.yml run --rm benchmark-marker
 
@@ -116,6 +118,7 @@ benchmark-reset:
 # E2E 隔離環境（詳見 docs/e2e.md）
 # -----------------------------------------------------------------------------
 e2e-up:
+	@sh scripts/ensure-docker.sh
 	docker compose -f docker-compose.e2e.yml up -d --wait mysql redis-cache redis-queue redis-vector s3
 	docker compose -f docker-compose.e2e.yml run --rm e2e-marker
 

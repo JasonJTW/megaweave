@@ -1,23 +1,23 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import type { Weave } from "@/services/weaveService";
+import type { Weave, WeaveCommand, WeaveRole } from "@/lib/weave";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { User as UserIcon } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React from "react";
+import toast from "react-hot-toast";
 import { getImageUrl, parseS3Keys } from "@/utils/imageUtils";
 import type { Post } from "../types/schema";
 import AcceptIcon from "./icons/AcceptIcon";
 import CancelIcon from "./icons/CancelIcon";
 import WeavingIcon from "./icons/WeavingIcon";
-import { useWeaveActions } from "@/hooks/useWeaveActions";
-import { useSocket } from "@/hooks/useSocket";
+import { useWeave } from "@/hooks/useWeave";
+import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import LalamoveQuotation from "./Lalamove/LalamoveQuotation";
 import { shouldShowLalamoveQuotation } from "@/utils/weaveGuard";
 import { getWeaveStatusKey, type WeaveStatusKey } from "@/utils/weaveViewModel";
 import { useDisplayName } from "@/hooks/useDisplayName";
-import { api } from "@/lib/api";
 
 interface WeavesCardProps {
   post?: Post;
@@ -34,7 +34,8 @@ interface WeavesCardProps {
     quantity: number | string;
     imageUrl?: string;
     weaveId: number | string;
-    isGiver: boolean;
+    /** Weave 還沒載入時的物品流向（lib/weave draftRole）；載入後看 viewer.role */
+    fallbackRole: WeaveRole | undefined;
     isPostAuthor: boolean;
   };
 }
@@ -45,17 +46,11 @@ function getThumbnail(post: Post): string | undefined {
   return keys[0].startsWith("http") ? keys[0] : getImageUrl(keys[0], "thumb");
 }
 
-function getDisplayUsername(
-  post: Post,
-  weave: Weave | undefined,
-  currentUserId?: number,
-): string {
-  if (weave && currentUserId) {
-    return currentUserId === weave.giver_id
-      ? weave.receiver_name
-      : weave.giver_name;
-  }
-  return post.username;
+/** 對方的名字：我是 Giver 就顯示 Receiver，反之顯示 Giver（看 viewer.role，不比對 giver_id：組織 Weave 會遮蔽它） */
+function getDisplayUsername(post: Post, weave: Weave | undefined): string {
+  const role = weave?.viewer?.role;
+  if (!weave || !role) return post.username;
+  return role === "giver" ? weave.receiver_name : weave.giver_name;
 }
 
 const statusStyles: Record<WeaveStatusKey, { badge: string; icon: string }> = {
@@ -85,74 +80,63 @@ const WeavingCard = ({
 }: WeavesCardProps) => {
   const t = useTranslations("WeaveCard");
   const displayName = useDisplayName();
-  const { socket } = useSocket();
-  const [fetchedWeave, setFetchedWeave] = useState<Weave | undefined>(
-    undefined,
-  );
-
-  const activeWeave = weave || fetchedWeave;
-  const targetWeaveId = weave?.id || inChatWindow?.weaveId;
-
-  // 自動拉取單筆 Weave 詳情 (當在 ChatWindow 中只傳入 weaveId 時)
-  useEffect(() => {
-    if (weave || !targetWeaveId) return;
-    let isMounted = true;
-    const fetchWeaveData = async () => {
-      try {
-        const data = await api<{ weave?: Weave }>(
-          `/api/weaves/${targetWeaveId}`,
-        );
-        if (isMounted && data.weave) {
-          setFetchedWeave(data.weave);
-        }
-      } catch (err) {
-        console.error("Failed to fetch weave detail in WeavingCard:", err);
-      }
-    };
-    fetchWeaveData();
-    return () => {
-      isMounted = false;
-    };
-  }, [weave, targetWeaveId]);
-
-  // 監聽即時 Socket 狀態更新，在 ChatWindow 中自動重抓最新細節
-  useEffect(() => {
-    if (!socket || !targetWeaveId) return;
-
-    const handleStatusUpdate = (data: { weaveId: number }) => {
-      if (Number(data.weaveId) === Number(targetWeaveId)) {
-        api<{ weave?: Weave }>(`/api/weaves/${targetWeaveId}`)
-          .then((data) => {
-            if (data.weave) setFetchedWeave(data.weave);
-            onWeaveStatusChange?.();
-          })
-          .catch((err) => console.error("Error re-fetching weave:", err));
-      }
-    };
-
-    socket.on("weave_status_updated", handleStatusUpdate);
-    return () => {
-      socket.off("weave_status_updated", handleStatusUpdate);
-    };
-  }, [socket, targetWeaveId, onWeaveStatusChange]);
-
+  const apiErrorMessage = useApiErrorMessage();
   const {
-    hasIConfirmed,
-    availableActions,
-    statusKey: viewModelStatusKey,
-    hintKey,
-    localStatus,
-    isProcessing,
-    handleApproveWeave,
-    handleRejectWeave,
-    handleCompleteWeave,
-    handleCancelWeave,
-    handleWithdrawWeave,
-  } = useWeaveActions({
     weave: activeWeave,
-    currentUserId,
-    onWeaveStatusChange,
-  });
+    view,
+    hasIConfirmed,
+    isProcessing,
+    perform,
+  } = useWeave(weave?.id ?? inChatWindow?.weaveId, weave);
+  const availableActions = view.actions;
+  const hintKey = view.hintKey;
+
+  //* 提示與通知文字留在卡片；能不能做由 server 的 viewer.commands 決定（useWeave）
+  const run = async (e: React.MouseEvent, command: WeaveCommand) => {
+    e.stopPropagation();
+    const prompt = {
+      approve: null,
+      decline: "prompts.decline",
+      withdraw: "prompts.withdraw",
+      cancel: "prompts.cancel",
+      confirm:
+        activeWeave?.viewer?.role === "receiver"
+          ? "prompts.confirmReceipt"
+          : "prompts.confirmHandover",
+    } as const;
+    const failed = {
+      approve: "toast.approveFailed",
+      decline: "toast.declineFailed",
+      withdraw: "toast.withdrawFailed",
+      cancel: "toast.cancelFailed",
+      confirm: "toast.confirmFailed",
+    } as const;
+    const ask = prompt[command];
+    if (ask && !window.confirm(t(ask))) return;
+    try {
+      const result = await perform(command);
+      if (!result) return;
+      const done = {
+        approve: "toast.approved",
+        decline: "toast.declined",
+        withdraw: "toast.withdrawn",
+        cancel: "toast.cancelled",
+        confirm:
+          result.newStatus === "completed"
+            ? "toast.completed"
+            : "toast.confirmedWaiting",
+      } as const;
+      toast.success(t(done[command]));
+      onWeaveStatusChange?.();
+    } catch (error) {
+      toast.error(apiErrorMessage(error, t(failed[command])));
+    }
+  };
+  const handleApproveWeave = (e: React.MouseEvent) => run(e, "approve");
+  const handleRejectWeave = (e: React.MouseEvent) => run(e, "decline");
+  const handleCompleteWeave = (e: React.MouseEvent) => run(e, "confirm");
+  const handleCancelWeave = (e: React.MouseEvent) => run(e, "cancel");
+  const handleWithdrawWeave = (e: React.MouseEvent) => run(e, "withdraw");
 
   // Early return only if neither inChatWindow nor post is provided
   if (!inChatWindow && !post) return null;
@@ -170,17 +154,15 @@ const WeavingCard = ({
         viewer: inChatWindow.isPostAuthor ? "author" : "initiator",
       })
     : post
-      ? displayName(getDisplayUsername(post, activeWeave, currentUserId))
+      ? displayName(getDisplayUsername(post, activeWeave))
       : "";
 
   const currentStatus =
-    localStatus ||
-    activeWeave?.status ||
-    (isInChatWindow ? "requested" : undefined);
+    activeWeave?.status || (isInChatWindow ? "requested" : undefined);
 
   // Weave not loaded yet (chat window): fall back to the Post Author flag.
   const statusKey =
-    viewModelStatusKey ??
+    view.statusKey ??
     getWeaveStatusKey(
       currentStatus,
       isInChatWindow ? inChatWindow.isPostAuthor : false,
@@ -214,9 +196,13 @@ const WeavingCard = ({
 
   const hasMoreItems = isInChatWindow ? false : itemsToDisplay.length > 2;
 
+  //* 我是哪一方：有 Weave 看 viewer.role；聊天室裡還沒載入就用草稿的推導
+  const myRole =
+    activeWeave?.viewer?.role ??
+    (isInChatWindow ? inChatWindow.fallbackRole : undefined);
   const displayUser =
-    activeWeave && currentUserId
-      ? currentUserId === activeWeave.giver_id
+    activeWeave && currentUserId && activeWeave.viewer?.role
+      ? myRole === "giver"
         ? {
             name: displayName(activeWeave.receiver_name),
             avatar: activeWeave.receiver_avatar,
@@ -229,9 +215,9 @@ const WeavingCard = ({
           }
       : isInChatWindow
         ? {
-            name: t(inChatWindow.isGiver ? "role.receiver" : "role.giver"),
+            name: t(myRole === "giver" ? "role.receiver" : "role.giver"),
             avatar: "",
-            role: t(inChatWindow.isGiver ? "role.receiver" : "role.giver"),
+            role: t(myRole === "giver" ? "role.receiver" : "role.giver"),
           }
         : null;
 
@@ -345,7 +331,7 @@ const WeavingCard = ({
                       (weaveItems.length > 0 &&
                         weaveItems.every((it) => it.item_id === null));
 
-                    const direction = inChatWindow.isGiver ? "give" : "receive";
+                    const direction = myRole === "giver" ? "give" : "receive";
 
                     if (isAll) {
                       return t("chatSummary.all", { direction });

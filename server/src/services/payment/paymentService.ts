@@ -6,7 +6,7 @@ import {
   RefundPaymentResult,
 } from "./types";
 import { CreateOrderParams, GetQuotationParams } from "../lalamove";
-import { predecessorsOf } from "../deliveryStatus";
+import { predecessorsOf } from "../delivery/status";
 import { cancelOrphanLalamoveOrder } from "../deliveryRecovery";
 import { LalamoveDispatchError } from "../lalamoveErrors";
 import { HttpError } from "../../utils/httpError";
@@ -225,16 +225,18 @@ export class PaymentService {
       // 插入 delivery_orders 表 (含地址快照與 FK)
       await conn.query<ResultSetHeader>(
         `INSERT INTO delivery_orders (
-          user_id, payment_id, post_id,
+          user_id, payment_id, post_id, weave_id,
           pickup_location_id, pickup_address_snapshot, pickup_remarks,
           dropoff_location_id, dropoff_address_snapshot, dropoff_remarks,
           sender_name, sender_phone, recipient_name, recipient_phone,
           service_type, quotation_id, fee_total, expires_at, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT_PENDING')`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAYMENT_PENDING')`,
         [
           input.userId,
           paymentId,
           input.postId,
+          //* 這張單服務的 Weave：兩造都能查看與追蹤（DeliveryOrder module access.ts）
+          Number(pendingWeaveRows[0].id),
           input.pickupLocationId,
           pickupAddressSnapshot,
           input.pickupRemarks || null,

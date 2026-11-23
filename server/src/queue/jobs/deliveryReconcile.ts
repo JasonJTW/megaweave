@@ -6,10 +6,12 @@ import dbPool from "../../utils/db";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getLalamoveOrderDetail } from "../../services/lalamove";
 import {
-  REFUNDABLE_STATUSES,
+  SWEPT_REFUND_STATUSES,
   canTransition,
   lalamoveFailureReason,
-} from "../../services/deliveryStatus";
+  transitionDeliveryOrder,
+  type DeliveryStatus,
+} from "../../services/delivery";
 import { enqueueDeliveryRefund } from "../queues";
 import { mapLalamoveStatusToDbStatus } from "../../lalamove";
 import { getSocketBroadcaster } from "../../utils/socket";
@@ -123,7 +125,7 @@ export async function processDeliveryReconciliation(
      WHERE d.status IN (?)
        AND p.status = 'PAID'
        AND d.updated_at < NOW() - INTERVAL ? MINUTE`,
-    [REFUNDABLE_STATUSES, REFUND_SWEEP_GRACE_MINUTES],
+    [SWEPT_REFUND_STATUSES, REFUND_SWEEP_GRACE_MINUTES],
   );
   for (const row of unrefundedRows) {
     try {
@@ -148,40 +150,24 @@ export async function processDeliveryReconciliation(
   let expiredCount = 0;
   for (const row of expiredRows) {
     try {
-      // 將 delivery_orders 標為 EXPIRED（用 AND status = 'PAYMENT_PENDING' 防止 race condition）
-      const [expireResult] = await dbPool.query<ResultSetHeader>(
-        `UPDATE delivery_orders
-         SET status = 'EXPIRED',
-             failure_reason = 'Payment not completed within payment window'
-         WHERE id = ? AND status = 'PAYMENT_PENDING'`,
-        [row.delivery_order_id],
-      );
-      // 期間已付款（轉為 ORDER_PLACING）→ 不再過期，也不取消 payment
-      if (expireResult.affectedRows === 0) continue;
-
-      // 若對應的 payment 仍在 PENDING，一併取消
-      if (row.payment_id) {
-        await dbPool.query(
-          `UPDATE payments
-           SET status = 'CANCELLED'
-           WHERE id = ? AND status = 'PENDING'`,
-          [row.payment_id],
-        );
-      }
-
-      // 記錄稽核事件
-      await dbPool.query(
-        `INSERT INTO delivery_order_events (delivery_order_id, event_status, raw_payload)
-         VALUES (?, 'EXPIRED', ?)`,
-        [
-          row.delivery_order_id,
-          JSON.stringify({
+      //* 只從 PAYMENT_PENDING 過期：期間已付款（轉為 ORDER_PLACING）就不動；
+      //* DeliveryOrder module 一併取消仍在 PENDING 的付款並記錄稽核事件
+      const expired = await transitionDeliveryOrder(
+        dbPool,
+        { id: Number(row.delivery_order_id) },
+        "EXPIRED",
+        {
+          source: "background_reconciliation_worker",
+          expectedFrom: "PAYMENT_PENDING",
+          failureReason: "Payment not completed within payment window",
+          payload: {
             source: "background_reconciliation_worker",
             reason: "Payment not completed within payment window",
             expiredAt: new Date().toISOString(),
-          }),
-        ],
+          },
+        },
       );
+      if (!expired.applied) continue;
 
       await log(
         `⏰ Marked delivery_order #${row.delivery_order_id} as EXPIRED (payment_id=${row.payment_id})`,
@@ -246,61 +232,47 @@ export async function processDeliveryReconciliation(
 
         const newStatus =
           isValidTransition && remoteDbStatus ? remoteDbStatus : row.status;
-        const driverName = remoteDriver?.name || null;
-        const driverPhone = remoteDriver?.phone || null;
-        const driverPlate = remoteDriver?.plateNumber || null;
+        const driver = {
+          name: remoteDriver?.name || null,
+          phone: remoteDriver?.phone || null,
+          plateNumber: remoteDriver?.plateNumber || null,
+        };
 
-        const failureReason = isValidTransition
-          ? lalamoveFailureReason(newStatus, remoteRawStatus)
-          : null;
-
-        // 更新 DB 狀態與司機資訊（AND status = 掃描時的狀態：期間若被 Webhook 改過則放棄，下輪再對帳）
-        // 不更新 status_updated_at：該欄位只存 Lalamove 事件時間，避免與本機時鐘混用造成誤擋
-        const [updateResult] = await dbPool.query<ResultSetHeader>(
-          `UPDATE delivery_orders
-           SET status = ?,
-               driver_name = COALESCE(?, driver_name),
-               driver_phone = COALESCE(?, driver_phone),
-               driver_plate_number = COALESCE(?, driver_plate_number),
-               failure_reason = COALESCE(?, failure_reason)
-           WHERE id = ? AND status = ?`,
-          [
-            newStatus,
-            driverName,
-            driverPhone,
-            driverPlate,
-            failureReason,
-            row.id,
-            row.status,
-          ],
-        );
-        if (updateResult.affectedRows === 0) {
-          await logWarn(
-            `Order ${row.lalamove_order_id} changed concurrently (was '${row.status}'), skipping`,
-          );
-          continue;
-        }
-
-        // 記錄稽核事件
-        await dbPool.query(
-          `INSERT INTO delivery_order_events (delivery_order_id, event_status, raw_payload)
-           VALUES (?, ?, ?)`,
-          [
-            row.id,
-            newStatus,
-            JSON.stringify({
+        if (isValidTransition) {
+          //* 比較並設定：期間若被 webhook 改過就放棄，下輪再對帳；不更新 status_updated_at（只存 Lalamove 事件時間）
+          const reconciled = await transitionDeliveryOrder(
+            dbPool,
+            { id: row.id },
+            newStatus as DeliveryStatus,
+            {
               source: "background_reconciliation_worker",
-              reconciledAt: new Date().toISOString(),
-              remoteOrder: remoteDetail,
-            }),
-          ],
-        );
-
-        if (failureReason) {
-          await enqueueDeliveryRefund({
-            deliveryOrderId: row.id,
-            reason: failureReason,
-          });
+              expectedFrom: row.status as DeliveryStatus,
+              driver,
+              failureReason: lalamoveFailureReason(newStatus, remoteRawStatus),
+              payload: {
+                source: "background_reconciliation_worker",
+                reconciledAt: new Date().toISOString(),
+                remoteOrder: remoteDetail,
+              },
+            },
+          );
+          if (!reconciled.applied) {
+            await logWarn(
+              `Order ${row.lalamove_order_id} changed concurrently (was '${row.status}'), skipping`,
+            );
+            continue;
+          }
+        } else {
+          //* 狀態沒變，只補上司機資訊（不是狀態轉移）
+          const [driverResult] = await dbPool.query<ResultSetHeader>(
+            `UPDATE delivery_orders
+             SET driver_name = COALESCE(?, driver_name),
+                 driver_phone = COALESCE(?, driver_phone),
+                 driver_plate_number = COALESCE(?, driver_plate_number)
+             WHERE id = ? AND status = ?`,
+            [driver.name, driver.phone, driver.plateNumber, row.id, row.status],
+          );
+          if (driverResult.affectedRows === 0) continue;
         }
 
         // 透過 Socket.IO 推播給前端

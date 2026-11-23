@@ -27,3 +27,11 @@ export function classifyLalamoveHttpStatus(
   }
   return "UNKNOWN";
 }
+
+/**
+ * Cancel Order 被 Lalamove 拒絕（409 ERR_CANCELLATION_FORBIDDEN）：只有 ASSIGNING_DRIVER，
+ * 或司機接單（ON_GOING）不到 5 分鐘的單能取消（developers.lalamove.com#order-flow-user-cancellation）
+ */
+export function isCancellationForbidden(error: unknown): boolean {
+  return (error as { httpStatus?: number } | null)?.httpStatus === 409;
+}

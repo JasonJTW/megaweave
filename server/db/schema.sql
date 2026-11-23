@@ -287,6 +287,7 @@ CREATE TABLE `delivery_orders` (
   `user_id` int NOT NULL COMMENT '建立訂單的使用者 ID',
   `payment_id` int DEFAULT NULL COMMENT '關聯的金流交易 ID (payments.id)',
   `post_id` int DEFAULT NULL COMMENT '關聯的刊登貼文/商品 ID',
+  `weave_id` bigint unsigned DEFAULT NULL COMMENT '這張外送單服務的 Weave（兩造可查看）；NULL = 舊單無法唯一對應',
   `pickup_location_id` bigint unsigned NOT NULL COMMENT '取件地點 ID (locations.id)',
   `pickup_address_snapshot` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '取件地址快照文字',
   `pickup_remarks` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '取件備註 (如樓層、門禁)',
@@ -321,6 +322,7 @@ CREATE TABLE `delivery_orders` (
   KEY `dropoff_location_id` (`dropoff_location_id`),
   KEY `idx_user_status` (`user_id`,`status`),
   KEY `idx_expires_at` (`expires_at`),
+  KEY `idx_weave_id` (`weave_id`),
   CONSTRAINT `delivery_orders_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `delivery_orders_ibfk_2` FOREIGN KEY (`pickup_location_id`) REFERENCES `locations` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `delivery_orders_ibfk_3` FOREIGN KEY (`dropoff_location_id`) REFERENCES `locations` (`id`) ON DELETE RESTRICT

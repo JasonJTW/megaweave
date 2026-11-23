@@ -5,7 +5,7 @@ import { Job } from "bullmq";
 import { RowDataPacket } from "mysql2";
 import dbPool from "../../utils/db";
 import { notifyDeliveryUser } from "../../services/deliveryNotifier";
-import { isRefundableStatus } from "../../services/deliveryStatus";
+import { isRefundableStatus } from "../../services/delivery/status";
 import type { PaymentService } from "../../services/payment/paymentService";
 import { createPaymentService } from "../../services/payment/defaultPaymentService";
 

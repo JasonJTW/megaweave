@@ -1,4 +1,3 @@
-// server/src/services/deliveryStatus.ts
 // delivery_orders.status 狀態機：所有 UPDATE 以 `WHERE status IN (合法前置狀態)` 守衛，
 // 防止亂序 / 重送的 Webhook、對帳 Worker 與使用者操作互相覆蓋（例如晚到的 ON_GOING 蓋掉 COMPLETED）
 
@@ -58,19 +57,34 @@ export function predecessorsOf(to: DeliveryStatus): DeliveryStatus[] {
   return DELIVERY_STATUSES.filter((from) => TRANSITIONS[from].includes(to));
 }
 
-/** Lalamove 端失敗（REJECTED / FAILED）或無司機接單（EXPIRED）：已付款者需自動退款 */
-export const REFUNDABLE_STATUSES: readonly DeliveryStatus[] = ["FAILED", "EXPIRED"];
+/** Lalamove 端失敗（REJECTED / FAILED）或無司機接單（EXPIRED） */
+const LALAMOVE_FAILURE_STATUSES: readonly DeliveryStatus[] = ["FAILED", "EXPIRED"];
+
+/**
+ * 進入這些狀態時，已付款者自動全額退款（退款 worker 會再確認付款仍是 PAID）。
+ * CANCELLED 只在 Lalamove 接受取消後才會出現（使用者取消要先經 Lalamove 同意，見 transition.ts）
+ */
+export const REFUNDABLE_STATUSES: readonly DeliveryStatus[] = [
+  ...LALAMOVE_FAILURE_STATUSES,
+  "CANCELLED",
+];
 
 export function isRefundableStatus(status: string | null | undefined): boolean {
   return REFUNDABLE_STATUSES.includes(status as DeliveryStatus);
 }
+
+/**
+ * 對帳 worker 補排退款的範圍。不含 CANCELLED：CANCELLED 從這個改動起才退款，
+ * 補排會連改動前已取消（可能已人工退款）的舊單一起退。CANCELLED 的退款只在轉移當下排入
+ */
+export const SWEPT_REFUND_STATUSES: readonly DeliveryStatus[] = LALAMOVE_FAILURE_STATUSES;
 
 /** 終止原因，例如 LALAMOVE_REJECTED；非失敗類狀態回傳 null（保留原 failure_reason） */
 export function lalamoveFailureReason(
   dbStatus: string | null | undefined,
   rawStatus: string | null | undefined,
 ): string | null {
-  if (!isRefundableStatus(dbStatus)) return null;
+  if (!LALAMOVE_FAILURE_STATUSES.includes(dbStatus as DeliveryStatus)) return null;
   const raw = String(rawStatus ?? dbStatus)
     .replace(/[\s-]/g, "_")
     .toUpperCase();

@@ -2,6 +2,7 @@ import { Request, Response, RequestHandler } from "express";
 import lalamoveRouter from "./lalamove";
 import dbPool from "./utils/db";
 import * as lalamoveService from "./services/lalamove";
+import { transitionDeliveryOrder } from "./services/delivery";
 import { nextThroughErrorMiddleware } from "./testUtils/nextThroughErrorMiddleware";
 
 // Mock dependencies
@@ -14,7 +15,15 @@ jest.mock("./services/lalamove", () => ({
   ...jest.requireActual("./services/lalamove"),
   cancelLalamoveOrder: jest.fn(),
   getLalamoveDriverDetail: jest.fn(),
+  getLalamoveOrderDetail: jest.fn(),
 }));
+
+//* 狀態轉移與副作用由 DeliveryOrder module 負責（delivery.db.test.ts）；這裡只驗路由怎麼呼叫它
+jest.mock("./services/delivery", () => ({
+  ...jest.requireActual("./services/delivery"),
+  transitionDeliveryOrder: jest.fn().mockResolvedValue({ applied: true }),
+}));
+jest.mock("./queue/queues", () => ({ enqueueDeliveryRefund: jest.fn() }));
 
 jest.mock("./middleware/auth", () => ({
   requireAuth: (req: Request, res: Response, next: () => void) => {
@@ -108,7 +117,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
     it("should reject non-owner request with 403 (and NOT pass-through to remote API)", async () => {
       // Order exists with user_id: 14, but requester is user: 99
       (dbPool.query as jest.Mock).mockResolvedValueOnce([
-        [{ id: 1, user_id: 14, seller_user_id: 59 }],
+        [{ id: 1, orderer_id: 14, post_author_id: 59 }],
       ]);
 
       const req = {
@@ -133,8 +142,8 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
     it("should return order details for authorized owner", async () => {
       const mockOrderRow = {
         id: 1,
-        user_id: 42,
-        seller_user_id: 59,
+        orderer_id: 42,
+        post_author_id: 59,
         status: "ASSIGNING_DRIVER",
         driver_name: null,
         driver_phone: null,
@@ -253,39 +262,88 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
       expect(lalamoveService.cancelLalamoveOrder).not.toHaveBeenCalled();
     });
 
-    it("should allow order creator to cancel when status is cancellable", async () => {
-      (dbPool.query as jest.Mock)
-        .mockResolvedValueOnce([[{ id: 1, status: "ASSIGNING_DRIVER", user_id: 42 }]]) // query order
-        .mockResolvedValueOnce([{ affectedRows: 1 }]); // update status
-
-      (lalamoveService.cancelLalamoveOrder as jest.Mock).mockResolvedValueOnce({
-        orderId: "LALA_123",
-        status: "CANCELED",
-      });
-
+    const cancelRequest = () => {
       const req = {
         user: { userId: 42, role: "user" },
         params: { orderId: "LALA_123" },
         app: { get: jest.fn().mockReturnValue(null) },
       } as unknown as Request;
-
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
         locals: {},
       } as unknown as Response;
+      return { req, res };
+    };
+
+    it("cancels at Lalamove first, then moves the order to CANCELLED with a user-cancel refund", async () => {
+      (dbPool.query as jest.Mock).mockResolvedValueOnce([
+        [{ id: 1, status: "ASSIGNING_DRIVER", user_id: 42, lalamove_order_id: "LALA_123" }],
+      ]);
+      (lalamoveService.cancelLalamoveOrder as jest.Mock).mockResolvedValueOnce({
+        orderId: "LALA_123",
+        status: "CANCELED",
+      });
+      const { req, res } = cancelRequest();
 
       await cancelHandler(req, res, nextThroughErrorMiddleware(res));
 
       expect(lalamoveService.cancelLalamoveOrder).toHaveBeenCalledWith("LALA_123");
-      expect(dbPool.query).toHaveBeenCalledWith(
-        "UPDATE delivery_orders SET status = 'CANCELLED' WHERE lalamove_order_id = ? AND status IN (?)",
-        ["LALA_123", ["PAYMENT_PENDING", "ASSIGNING_DRIVER", "ON_GOING"]],
+      expect(transitionDeliveryOrder).toHaveBeenCalledWith(
+        dbPool,
+        { lalamoveOrderId: "LALA_123" },
+        "CANCELLED",
+        expect.objectContaining({ source: "user", refundReason: "USER_CANCELLED" }),
       );
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         result: { orderId: "LALA_123", status: "CANCELED" },
       });
+    });
+
+    it("lets Lalamove refuse (409): answers ORDER_NOT_CANCELLABLE and syncs the real status, without cancelling", async () => {
+      (dbPool.query as jest.Mock).mockResolvedValueOnce([
+        [{ id: 1, status: "ON_GOING", user_id: 42, lalamove_order_id: "LALA_123" }],
+      ]);
+      (lalamoveService.cancelLalamoveOrder as jest.Mock).mockRejectedValueOnce(
+        Object.assign(new Error("ERR_CANCELLATION_FORBIDDEN"), { httpStatus: 409 }),
+      );
+      (lalamoveService.getLalamoveOrderDetail as jest.Mock).mockResolvedValueOnce({
+        status: "PICKED_UP",
+      });
+      const { req, res } = cancelRequest();
+
+      await cancelHandler(req, res, nextThroughErrorMiddleware(res));
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "ORDER_NOT_CANCELLABLE" }),
+      );
+      expect(transitionDeliveryOrder).toHaveBeenCalledTimes(1);
+      expect(transitionDeliveryOrder).toHaveBeenCalledWith(
+        dbPool,
+        { lalamoveOrderId: "LALA_123" },
+        "PICKED_UP",
+        expect.anything(),
+      );
+    });
+
+    it("cancels locally when no Lalamove order was placed yet (still awaiting payment)", async () => {
+      (dbPool.query as jest.Mock).mockResolvedValueOnce([
+        [{ id: 1, status: "PAYMENT_PENDING", user_id: 42, lalamove_order_id: null }],
+      ]);
+      const { req, res } = cancelRequest();
+
+      await cancelHandler(req, res, nextThroughErrorMiddleware(res));
+
+      expect(lalamoveService.cancelLalamoveOrder).not.toHaveBeenCalled();
+      expect(transitionDeliveryOrder).toHaveBeenCalledWith(
+        dbPool,
+        { id: 1 },
+        "CANCELLED",
+        expect.objectContaining({ source: "user" }),
+      );
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
   });
 
@@ -315,7 +373,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
 
     it("should return 403 if user is not authorized to view driver", async () => {
       (dbPool.query as jest.Mock).mockResolvedValueOnce([
-        [{ id: 1, user_id: 14, seller_user_id: 59 }],
+        [{ id: 1, orderer_id: 14, post_author_id: 59 }],
       ]);
 
       const req = {
@@ -337,7 +395,7 @@ describe("Lalamove Routes Authentication & Ownership Protection", () => {
 
     it("should return driver detail if user is authorized", async () => {
       (dbPool.query as jest.Mock).mockResolvedValueOnce([
-        [{ id: 1, user_id: 42, seller_user_id: 59, lalamove_order_id: "LALA_123" }],
+        [{ id: 1, orderer_id: 42, post_author_id: 59, lalamove_order_id: "LALA_123" }],
       ]);
       (lalamoveService.getLalamoveDriverDetail as jest.Mock).mockResolvedValueOnce({
         name: "Driver Lee",

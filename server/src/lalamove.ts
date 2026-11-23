@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { Server } from "socket.io";
 import dbPool from "./utils/db";
-import { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { RowDataPacket } from "mysql2/promise";
 import { requireAuth, AuthenticatedRequest } from "./middleware/auth";
 import {
   requestLalamoveQuotation,
@@ -19,11 +19,14 @@ import {
 import {
   DeliveryStatus,
   canTransition,
-  isRefundableStatus,
   lalamoveFailureReason,
-  predecessorsOf,
-} from "./services/deliveryStatus";
-import { enqueueDeliveryRefund } from "./queue/queues";
+  transitionDeliveryOrder,
+  DELIVERY_ACCESS_COLUMNS,
+  DELIVERY_ACCESS_JOIN,
+  canViewDeliveryOrder,
+  type DeliveryAccessRow,
+} from "./services/delivery";
+import { isCancellationForbidden } from "./services/lalamoveErrors";
 import { adoptLalamoveOrder } from "./services/deliveryRecovery";
 import { HttpError } from "./utils/httpError";
 
@@ -250,14 +253,14 @@ router.get(
                 d.updated_at,
                 d.pickup_address_snapshot, d.dropoff_address_snapshot,
                 d.sender_name, d.sender_phone, d.recipient_name, d.recipient_phone,
-                d.user_id,
-                p.user_id AS seller_user_id,
+                ${DELIVERY_ACCESS_COLUMNS},
                 pu.full_address AS pickup_full_address, pu.lat AS pickup_lat, pu.lng AS pickup_lng,
                 dr.full_address AS dropoff_full_address, dr.lat AS dropoff_lat, dr.lng AS dropoff_lng
          FROM delivery_orders d
          LEFT JOIN locations pu ON d.pickup_location_id = pu.id
          LEFT JOIN locations dr ON d.dropoff_location_id = dr.id
          LEFT JOIN posts p ON d.post_id = p.id
+         ${DELIVERY_ACCESS_JOIN}
          WHERE d.lalamove_order_id = ? OR d.id = ?
          LIMIT 1`,
         [orderId, orderId],
@@ -268,11 +271,8 @@ router.get(
       }
 
       const row = dbRows[0];
-      const isOwner = row.user_id === userId;
-      const isSeller = row.seller_user_id === userId;
-      const isAdmin = userRole === "admin";
-
-      if (!isOwner && !isSeller && !isAdmin) {
+      //* 下單的人、Weave 的兩造（ADR 0001）或 Platform Admin（DeliveryOrder module）
+      if (!canViewDeliveryOrder(row as DeliveryAccessRow, { userId, role: userRole })) {
         return next(new HttpError(403, "FORBIDDEN", "Forbidden: You do not have permission to view this order"));
       }
 
@@ -373,27 +373,44 @@ async function handleCancelOrder(
       );
     }
 
-    const cancelResult = await cancelLalamoveOrder(orderId).catch((e) => {
-      throw deliveryProviderError(`cancel order ${orderId}`, e);
-    });
+    const io: Server | null = res.locals.io || req.app.get("io") || null;
+    const lalamoveOrderId = orderRecord.lalamove_order_id as string | null;
 
-    // 更新資料庫 delivery_orders 狀態為 CANCELLED
-    await dbPool
-      .query(
-        "UPDATE delivery_orders SET status = 'CANCELLED' WHERE lalamove_order_id = ? AND status IN (?)",
-        [orderId, predecessorsOf("CANCELLED")],
-      )
-      .catch((e) =>
-        console.warn("[Lalamove] Update cancel status to DB error:", e),
-      );
-
-    const io: Server | undefined = res.locals.io || req.app.get("io");
-    if (io) {
-      io.to(`delivery_${orderId}`).emit("delivery_update", {
-        orderId,
-        status: "CANCELLED",
+    //* 還沒向 Lalamove 下單（例如還在等付款）：本機取消即可，沒有款要退
+    if (!lalamoveOrderId) {
+      await transitionDeliveryOrder(dbPool, { id: Number(orderRecord.id) }, "CANCELLED", {
+        source: "user",
+        payload: { source: "user", userId },
+        io,
       });
+      res.json({ success: true, result: { success: true, orderId } });
+      return;
     }
+
+    //* 能不能取消由 Lalamove 決定（配司機中，或司機接單不到 5 分鐘）。被拒就向 Lalamove 重拿狀態，
+    //* 讓畫面顯示實際進度；不會因本機狀態落後而取消已上路的單
+    let cancelResult: Awaited<ReturnType<typeof cancelLalamoveOrder>>;
+    try {
+      cancelResult = await cancelLalamoveOrder(lalamoveOrderId);
+    } catch (error) {
+      if (!isCancellationForbidden(error)) {
+        throw deliveryProviderError(`cancel order ${lalamoveOrderId}`, error);
+      }
+      await syncFromLalamove(lalamoveOrderId, io).catch((e) =>
+        console.warn(`[Lalamove] Status sync after refused cancel failed for ${lalamoveOrderId}:`, e),
+      );
+      return next(
+        new HttpError(400, "ORDER_NOT_CANCELLABLE", "Lalamove no longer allows cancelling this order"),
+      );
+    }
+
+    //* Lalamove 已接受取消：轉成 CANCELLED，已付款就全額退款（DeliveryOrder module）
+    await transitionDeliveryOrder(dbPool, { lalamoveOrderId }, "CANCELLED", {
+      source: "user",
+      payload: { source: "user", userId, lalamove: cancelResult },
+      refundReason: "USER_CANCELLED",
+      io,
+    });
 
     res.json({
       success: true,
@@ -402,6 +419,19 @@ async function handleCancelOrder(
   } catch (error: unknown) {
     return next(error);
   }
+}
+
+/** 向 Lalamove 重拿一張單的狀態並套用（取消被拒時，本機狀態可能落後） */
+async function syncFromLalamove(lalamoveOrderId: string, io: Server | null): Promise<void> {
+  const detail = await getLalamoveOrderDetail(lalamoveOrderId);
+  const remote = mapLalamoveStatusToDbStatus(detail?.status);
+  if (!remote) return;
+  await transitionDeliveryOrder(dbPool, { lalamoveOrderId }, remote, {
+    source: "user",
+    payload: { source: "cancel_refused_sync", remoteOrder: detail },
+    failureReason: lalamoveFailureReason(remote, detail?.status),
+    io,
+  });
 }
 
 /**
@@ -439,11 +469,12 @@ router.get(
         return next(new HttpError(400, "INVALID_REQUEST", "orderId and driverId query param are required"));
       }
 
-      // 驗證是否有權限查看此訂單（買方、賣方或管理員）
+      // 與 GET /orders/:orderId 相同的權限（DeliveryOrder module）
       const [orderRows] = await dbPool.query<RowDataPacket[]>(
-        `SELECT d.id, d.user_id, p.user_id AS seller_user_id, d.lalamove_order_id
+        `SELECT d.id, d.lalamove_order_id, ${DELIVERY_ACCESS_COLUMNS}
          FROM delivery_orders d
          LEFT JOIN posts p ON d.post_id = p.id
+         ${DELIVERY_ACCESS_JOIN}
          WHERE d.lalamove_order_id = ? OR d.id = ?
          LIMIT 1`,
         [orderId, orderId],
@@ -454,11 +485,7 @@ router.get(
       }
 
       const orderRecord = orderRows[0];
-      if (
-        orderRecord.user_id !== userId &&
-        orderRecord.seller_user_id !== userId &&
-        userRole !== "admin"
-      ) {
+      if (!canViewDeliveryOrder(orderRecord as DeliveryAccessRow, { userId, role: userRole })) {
         return next(new HttpError(403, "FORBIDDEN", "Forbidden: You do not have permission to view this order"));
       }
 
@@ -648,47 +675,24 @@ router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
         //           比已套用事件更舊的事件丟棄 —— 否則允許「退回 ASSIGNING_DRIVER」後，
         //           晚到的舊 ASSIGNING_DRIVER 會把 ON_GOING 蓋回去
         if (dbStatus) {
-          const eventTime = getWebhookEventTime(payload);
-          const [updateResult] = await dbPool.query<ResultSetHeader>(
-            `UPDATE delivery_orders 
-             SET status = ?,
-                 raw_webhook_payload = ?,
-                 status_updated_at = ?,
-                 failure_reason = COALESCE(?, failure_reason)
-             WHERE lalamove_order_id = ? AND status IN (?)
-               AND (status_updated_at IS NULL OR status_updated_at <= ?)`,
-            [
-              dbStatus,
-              JSON.stringify(payload),
-              eventTime,
-              lalamoveFailureReason(dbStatus, rawStatus),
-              orderId,
-              predecessorsOf(dbStatus),
-              eventTime,
-            ],
+          //* 守衛（狀態機、事件時間）、稽核、退款由 DeliveryOrder module 負責；推播在下面合併司機與座標
+          const transition = await transitionDeliveryOrder(
+            dbPool,
+            { lalamoveOrderId: orderId },
+            dbStatus,
+            {
+              source: "lalamove_webhook",
+              eventTime: getWebhookEventTime(payload),
+              eventId: payload.eventId || null,
+              payload,
+              failureReason: lalamoveFailureReason(dbStatus, rawStatus),
+            },
           );
-          statusApplied = updateResult.affectedRows > 0;
-
+          statusApplied = transition.applied;
           if (!statusApplied) {
             console.warn(
-              `[Lalamove Webhook] Ignored ${dbStatus} for order ${orderId}: invalid transition or stale event (${eventTime.toISOString()})`,
+              `[Lalamove Webhook] Ignored ${dbStatus} for order ${orderId}: invalid transition or stale event`,
             );
-          } else if (deliveryOrderId) {
-            const eventId = payload.eventId || null;
-            await dbPool.query(
-              `INSERT INTO delivery_order_events (delivery_order_id, event_id, event_status, raw_payload)
-               VALUES (?, ?, ?, ?)
-               ON DUPLICATE KEY UPDATE received_at = CURRENT_TIMESTAMP`,
-              [deliveryOrderId, eventId, dbStatus, JSON.stringify(payload)],
-            );
-
-            // Lalamove 端終止（REJECTED / EXPIRED）→ 排入自動退款（worker 會再確認付款狀態）
-            if (isRefundableStatus(dbStatus)) {
-              await enqueueDeliveryRefund({
-                deliveryOrderId: Number(deliveryOrderId),
-                reason: lalamoveFailureReason(dbStatus, rawStatus) ?? dbStatus,
-              });
-            }
           }
         }
       } catch (dbErr) {
@@ -809,24 +813,12 @@ router.put(
         return;
       }
 
-      // 更新資料庫 delivery_orders 狀態為 ON_GOING
-      await dbPool
-        .query(
-          "UPDATE delivery_orders SET status = 'ON_GOING' WHERE lalamove_order_id = ? AND status IN (?)",
-          [orderId, predecessorsOf("ON_GOING")],
-        )
-        .catch((e) =>
-          console.warn("[Sandbox] Update ON_GOING status to DB error:", e),
-        );
-
-      const io: Server | undefined = res.locals.io || req.app.get("io");
-      if (io) {
-        io.to(`delivery_${orderId}`).emit("delivery_update", {
-          orderId,
-          status: "ON_GOING",
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      //* 與真實事件同一條轉移（守衛、稽核、推播）
+      await transitionDeliveryOrder(dbPool, { lalamoveOrderId: orderId }, "ON_GOING", {
+        source: "sandbox",
+        payload: { source: "sandbox", status: "ON_GOING" },
+        io: res.locals.io || req.app.get("io") || null,
+      });
 
       res.json({ success: true, message: "Driver matched (ON_GOING)" });
     } catch (error: unknown) {
@@ -860,24 +852,12 @@ router.put(
       }
       const result = await sandboxPickup(orderId);
 
-      // 更新資料庫 delivery_orders 狀態為 PICKED_UP
-      await dbPool
-        .query(
-          "UPDATE delivery_orders SET status = 'PICKED_UP' WHERE lalamove_order_id = ? AND status IN (?)",
-          [orderId, predecessorsOf("PICKED_UP")],
-        )
-        .catch((e) =>
-          console.warn("[Sandbox] Update PICKED_UP status to DB error:", e),
-        );
-
-      const io: Server | undefined = res.locals.io || req.app.get("io");
-      if (io) {
-        io.to(`delivery_${orderId}`).emit("delivery_update", {
-          orderId,
-          status: "PICKED_UP",
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      //* 與真實事件同一條轉移（守衛、稽核、推播）
+      await transitionDeliveryOrder(dbPool, { lalamoveOrderId: orderId }, "PICKED_UP", {
+        source: "sandbox",
+        payload: { source: "sandbox", status: "PICKED_UP" },
+        io: res.locals.io || req.app.get("io") || null,
+      });
 
       res.json({ success: true, result });
     } catch (error: unknown) {
@@ -911,24 +891,12 @@ router.put(
       }
       const result = await sandboxDeliver(orderId);
 
-      // 更新資料庫 delivery_orders 狀態為 COMPLETED
-      await dbPool
-        .query(
-          "UPDATE delivery_orders SET status = 'COMPLETED' WHERE lalamove_order_id = ? AND status IN (?)",
-          [orderId, predecessorsOf("COMPLETED")],
-        )
-        .catch((e) =>
-          console.warn("[Sandbox] Update COMPLETED status to DB error:", e),
-        );
-
-      const io: Server | undefined = res.locals.io || req.app.get("io");
-      if (io) {
-        io.to(`delivery_${orderId}`).emit("delivery_update", {
-          orderId,
-          status: "COMPLETED",
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      //* 與真實事件同一條轉移（守衛、稽核、推播）
+      await transitionDeliveryOrder(dbPool, { lalamoveOrderId: orderId }, "COMPLETED", {
+        source: "sandbox",
+        payload: { source: "sandbox", status: "COMPLETED" },
+        io: res.locals.io || req.app.get("io") || null,
+      });
 
       res.json({ success: true, result });
     } catch (error: unknown) {

@@ -1050,21 +1050,15 @@
       "withdraw": "Are you sure you want to withdraw this request?"
     },
     "toast": {
-      "onlyAuthorCanApprove": "Only the post author can approve this request",
-      "notAwaitingApproval": "This weave request is no longer awaiting approval",
       "approved": "Request approved! The weave is now in progress.",
       "approveFailed": "Failed to approve request",
-      "onlyAuthorCanDecline": "Only the post author can decline this request",
       "declined": "Request declined.",
       "declineFailed": "Failed to decline request",
-      "cannotConfirm": "You cannot confirm this weave right now",
       "completed": "Weaved!",
       "confirmedWaiting": "Your confirmation was received. Waiting for the other party.",
       "confirmFailed": "Failed to confirm",
-      "cannotCancel": "You cannot cancel this weave right now",
       "cancelled": "Weave cancelled.",
       "cancelFailed": "Failed to cancel weave",
-      "cannotWithdraw": "You cannot withdraw this request right now",
       "withdrawn": "Request withdrawn.",
       "withdrawFailed": "Failed to withdraw request"
     },

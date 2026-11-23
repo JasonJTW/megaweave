@@ -1,5 +1,5 @@
 "use client";
-import { Weave } from "@/services/weaveService";
+import type { Weave } from "@/lib/weave";
 import React, {
   useCallback,
   useEffect,

@@ -365,6 +365,7 @@ export async function actOnWeave(
     giverId: Number(weave.giver_id),
     receiverId: Number(weave.receiver_id),
     actor,
+    status: newStatus,
     action: eventAction,
   });
 

@@ -2,221 +2,105 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   getWeaveViewModel,
-  type WeaveAction,
   type WeaveViewStatus,
 } from "@/utils/weaveViewModel";
+import type { WeaveViewer } from "@/lib/weave";
 
-const AUTHOR = 1;
-const INITIATOR = 2;
-const STRANGER = 3;
-
-type PostType = "share" | "wish";
-
-// ADR 0001: Share -> author gives; Wish -> initiator gives.
-function parties(postType: PostType) {
-  return postType === "share"
-    ? { giverId: AUTHOR, receiverId: INITIATOR }
-    : { giverId: INITIATOR, receiverId: AUTHOR };
-}
-
-function actions(
-  postType: PostType,
-  status: WeaveViewStatus,
-  viewerId: number,
-  confirmed: { giver?: boolean; receiver?: boolean } = {},
-): WeaveAction[] {
-  return [
-    ...getWeaveViewModel({
-      status,
-      viewerId,
-      postAuthorId: AUTHOR,
-      ...parties(postType),
-      giverConfirmed: confirmed.giver ?? false,
-      receiverConfirmed: confirmed.receiver ?? false,
-    }).actions,
-  ].sort();
-}
-
-describe("getWeaveViewModel actions", () => {
-  for (const postType of ["share", "wish"] as PostType[]) {
-    describe(postType, () => {
-      it("requested: Post Author can approve and decline, not withdraw", () => {
-        assert.deepEqual(actions(postType, "requested", AUTHOR), [
-          "approve",
-          "decline",
-        ]);
-      });
-
-      it("requested: Initiator can only withdraw (never approve own request)", () => {
-        assert.deepEqual(actions(postType, "requested", INITIATOR), [
-          "withdraw",
-        ]);
-      });
-
-      it("requested: non-party has no actions", () => {
-        assert.deepEqual(actions(postType, "requested", STRANGER), []);
-      });
-
-      for (const viewer of [AUTHOR, INITIATOR]) {
-        const who = viewer === AUTHOR ? "Post Author" : "Initiator";
-        it(`approved: ${who} can confirm and cancel when nobody confirmed`, () => {
-          assert.deepEqual(actions(postType, "approved", viewer), [
-            "cancel",
-            "confirm",
-          ]);
-        });
-
-        it(`approved: ${who} can only cancel after confirming own side`, () => {
-          const { giverId } = parties(postType);
-          const mine =
-            viewer === giverId ? { giver: true } : { receiver: true };
-          assert.deepEqual(actions(postType, "approved", viewer, mine), [
-            "cancel",
-          ]);
-        });
-
-        it(`approved: ${who} can still confirm when only the other side confirmed`, () => {
-          const { giverId } = parties(postType);
-          const theirs =
-            viewer === giverId ? { receiver: true } : { giver: true };
-          assert.deepEqual(actions(postType, "approved", viewer, theirs), [
-            "cancel",
-            "confirm",
-          ]);
-        });
-
-        it(`approved: ${who} can only cancel when both confirmed`, () => {
-          assert.deepEqual(
-            actions(postType, "approved", viewer, {
-              giver: true,
-              receiver: true,
-            }),
-            ["cancel"],
-          );
-        });
-      }
-
-      it("approved: non-party has no actions", () => {
-        assert.deepEqual(actions(postType, "approved", STRANGER), []);
-      });
-
-      for (const status of [
-        "completed",
-        "declined",
-        "withdrawn",
-        "cancelled",
-      ] as WeaveViewStatus[]) {
-        it(`${status}: nobody has actions`, () => {
-          for (const viewer of [AUTHOR, INITIATOR, STRANGER])
-            assert.deepEqual(actions(postType, status, viewer), []);
-        });
-      }
-    });
-  }
-
-  it("requested with unknown Post Author yields no actions", () => {
-    const { actions } = getWeaveViewModel({
-      status: "requested",
-      viewerId: AUTHOR,
-      postAuthorId: undefined,
-      giverId: AUTHOR,
-      receiverId: INITIATOR,
-      giverConfirmed: false,
-      receiverConfirmed: false,
-    });
-    assert.equal(actions.size, 0);
-  });
-
-  it("undefined status or viewer yields no actions", () => {
-    assert.deepEqual(
-      getWeaveViewModel({
-        status: undefined,
-        viewerId: undefined,
-        postAuthorId: AUTHOR,
-        giverId: AUTHOR,
-        receiverId: INITIATOR,
-        giverConfirmed: false,
-        receiverConfirmed: false,
-      }).actions.size,
-      0,
-    );
-  });
+// Which commands a viewer may send comes from the server's transition table
+// (server/src/services/weave/weave.db.test.ts). Here: labels and hints for a given viewer.
+const reviewer: WeaveViewer = {
+  role: "receiver",
+  isInitiator: false,
+  isReviewer: true,
+  commands: ["approve", "decline"],
+};
+const initiator: WeaveViewer = {
+  role: "giver",
+  isInitiator: true,
+  isReviewer: false,
+  commands: ["withdraw"],
+};
+const party = (role: "giver" | "receiver"): WeaveViewer => ({
+  role,
+  isInitiator: false,
+  isReviewer: false,
+  commands: ["cancel", "confirm"],
 });
 
 function view(
-  postType: PostType,
   status: WeaveViewStatus,
-  viewerId: number,
+  viewer: WeaveViewer | undefined,
   confirmed: { giver?: boolean; receiver?: boolean } = {},
 ) {
-  const { statusKey, hintKey } = getWeaveViewModel({
+  return getWeaveViewModel({
     status,
-    viewerId,
-    postAuthorId: AUTHOR,
-    ...parties(postType),
+    viewer,
     giverConfirmed: confirmed.giver ?? false,
     receiverConfirmed: confirmed.receiver ?? false,
   });
-  return { statusKey, hintKey };
 }
 
-describe("getWeaveViewModel labels and hints", () => {
-  for (const postType of ["share", "wish"] as PostType[]) {
-    describe(postType, () => {
-      it("requested: Post Author sees New Request, Initiator sees Request Sent", () => {
-        assert.deepEqual(view(postType, "requested", AUTHOR), {
-          statusKey: "newRequest",
-          hintKey: "requested.decideOnRequest",
-        });
-        assert.deepEqual(view(postType, "requested", INITIATOR), {
-          statusKey: "requestSent",
-          hintKey: "requested.awaitingAuthor",
-        });
-      });
+describe("getWeaveViewModel", () => {
+  it("takes the actions from the server's viewer commands", () => {
+    assert.deepEqual(
+      [...view("requested", reviewer).actions],
+      ["approve", "decline"],
+    );
+    assert.deepEqual([...view("requested", initiator).actions], ["withdraw"]);
+    assert.equal(view("requested", undefined).actions.size, 0);
+  });
 
-      it("approved: hints follow Giver / Receiver and confirmation state", () => {
-        const { giverId, receiverId } = parties(postType);
-        const hint = (
-          viewer: number,
-          c: { giver?: boolean; receiver?: boolean },
-        ) => view(postType, "approved", viewer, c).hintKey;
+  it("requested: the Reviewer sees New Request, the Initiator sees Request Sent", () => {
+    assert.deepEqual(
+      {
+        statusKey: view("requested", reviewer).statusKey,
+        hintKey: view("requested", reviewer).hintKey,
+      },
+      { statusKey: "newRequest", hintKey: "requested.decideOnRequest" },
+    );
+    assert.deepEqual(
+      {
+        statusKey: view("requested", initiator).statusKey,
+        hintKey: view("requested", initiator).hintKey,
+      },
+      { statusKey: "requestSent", hintKey: "requested.awaitingAuthor" },
+    );
+  });
 
-        assert.equal(hint(giverId, {}), "approved.confirmHandover");
-        assert.equal(hint(receiverId, {}), "approved.confirmReceipt");
-        assert.equal(
-          hint(giverId, { giver: true }),
-          "approved.waitingForReceiver",
-        );
-        assert.equal(
-          hint(receiverId, { receiver: true }),
-          "approved.waitingForGiver",
-        );
-        assert.equal(
-          hint(giverId, { receiver: true }),
-          "approved.receiverConfirmedPleaseConfirmHandover",
-        );
-        assert.equal(
-          hint(receiverId, { giver: true }),
-          "approved.giverConfirmedPleaseConfirmReceipt",
-        );
-        assert.equal(view(postType, "approved", giverId).statusKey, "weaving");
-      });
+  it("approved: hints follow Giver / Receiver and confirmation state", () => {
+    const hint = (
+      role: "giver" | "receiver",
+      c: { giver?: boolean; receiver?: boolean },
+    ) => view("approved", party(role), c).hintKey;
+    assert.equal(hint("giver", {}), "approved.confirmHandover");
+    assert.equal(hint("receiver", {}), "approved.confirmReceipt");
+    assert.equal(hint("giver", { giver: true }), "approved.waitingForReceiver");
+    assert.equal(
+      hint("receiver", { receiver: true }),
+      "approved.waitingForGiver",
+    );
+    assert.equal(
+      hint("giver", { receiver: true }),
+      "approved.receiverConfirmedPleaseConfirmHandover",
+    );
+    assert.equal(
+      hint("receiver", { giver: true }),
+      "approved.giverConfirmedPleaseConfirmReceipt",
+    );
+    assert.equal(view("approved", party("giver")).statusKey, "weaving");
+  });
 
-      const terminal: [WeaveViewStatus, string][] = [
-        ["completed", "weaved"],
-        ["declined", "declined"],
-        ["withdrawn", "withdrawn"],
-        ["cancelled", "cancelled"],
-      ];
-      for (const [status, key] of terminal) {
-        it(`${status}: both parties see ${key} with no hint`, () => {
-          for (const viewer of [AUTHOR, INITIATOR])
-            assert.deepEqual(view(postType, status, viewer), {
-              statusKey: key,
-              hintKey: null,
-            });
-        });
-      }
+  const terminal: [WeaveViewStatus, string][] = [
+    ["completed", "weaved"],
+    ["declined", "declined"],
+    ["withdrawn", "withdrawn"],
+    ["cancelled", "cancelled"],
+  ];
+  for (const [status, key] of terminal) {
+    it(`${status}: shows ${key} with no hint`, () => {
+      const closed = { ...party("giver"), commands: [] };
+      assert.equal(view(status, closed).statusKey, key);
+      assert.equal(view(status, closed).hintKey, null);
     });
   }
 });

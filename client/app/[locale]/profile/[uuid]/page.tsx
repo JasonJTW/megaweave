@@ -13,7 +13,7 @@ import { ArrowLeft, User as UserIcon } from "lucide-react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-// import type { Weave } from "@/services/weaveService";
+// import type { Weave } from "@/lib/weave";
 import { usePost } from "@/app/contexts/PostContext";
 import { useApiErrorMessage } from "@/hooks/useApiErrorMessage";
 import { api } from "@/lib/api";

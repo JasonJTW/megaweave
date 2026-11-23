@@ -1,3 +1,5 @@
+import { draftRole } from "@/lib/weave";
+
 export type WeavingRole = "offer" | "give" | "request";
 
 export interface WeavingBanner {
@@ -40,10 +42,6 @@ export function weavingRole(
   postType: string,
   isPostAuthor: boolean,
 ): WeavingRole {
-  const isGiver =
-    postType === "share" || postType === "commons"
-      ? isPostAuthor
-      : !isPostAuthor;
-  if (!isGiver) return "request";
+  if (draftRole(postType, isPostAuthor) !== "giver") return "request";
   return postType === "wish" ? "offer" : "give";
 }

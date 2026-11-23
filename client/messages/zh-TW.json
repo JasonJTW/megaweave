@@ -1050,21 +1050,15 @@
       "withdraw": "確定要撤回這個請求嗎？"
     },
     "toast": {
-      "onlyAuthorCanApprove": "只有貼文作者可以同意這個請求",
-      "notAwaitingApproval": "這個交織請求已不在等待同意的狀態",
       "approved": "已同意請求！交織進行中。",
       "approveFailed": "同意請求失敗",
-      "onlyAuthorCanDecline": "只有貼文作者可以婉拒這個請求",
       "declined": "已婉拒請求。",
       "declineFailed": "婉拒請求失敗",
-      "cannotConfirm": "目前無法確認這次交織",
       "completed": "交織成功！",
       "confirmedWaiting": "已收到你的確認，等待對方確認。",
       "confirmFailed": "確認失敗",
-      "cannotCancel": "目前無法取消這次交織",
       "cancelled": "已取消交織。",
       "cancelFailed": "取消交織失敗",
-      "cannotWithdraw": "目前無法撤回這個請求",
       "withdrawn": "已撤回請求。",
       "withdrawFailed": "撤回請求失敗"
     },

@@ -239,15 +239,10 @@ describe("notifications and push", () => {
     ]);
   });
 
-  it("pushes one weave_status_updated payload shape to both parties", async () => {
+  it("pushes { weaveId, status } to both parties; the client refetches the rest", async () => {
     const w = await personalWeave("share", "requested");
     await act(w.weaveId, w.author, "approved");
-    const payload = {
-      weaveId: w.weaveId,
-      status: "approved",
-      giver_confirmed: false,
-      receiver_confirmed: false,
-    };
+    const payload = { weaveId: w.weaveId, status: "approved" };
     expect(emits).toEqual(
       expect.arrayContaining([
         { room: `user_${w.giver.id}`, event: "weave_status_updated", payload },

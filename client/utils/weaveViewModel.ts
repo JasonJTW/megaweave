@@ -1,20 +1,12 @@
-export type WeaveViewStatus =
-  | "requested"
-  | "approved"
-  | "completed"
-  | "declined"
-  | "cancelled"
-  | "withdrawn";
+import type { WeaveCommand, WeaveStatus, WeaveViewer } from "@/lib/weave";
 
-export type WeaveAction =
-  "approve" | "decline" | "withdraw" | "confirm" | "cancel";
+export type WeaveViewStatus = WeaveStatus;
+export type WeaveAction = WeaveCommand;
 
 export interface WeaveViewModelInput {
   status: WeaveViewStatus | undefined;
-  viewerId: number | undefined;
-  postAuthorId: number | undefined;
-  giverId: number;
-  receiverId: number;
+  /** server 依轉移表算好的身分與可下的命令；沒有就不顯示任何動作 */
+  viewer: WeaveViewer | undefined;
   giverConfirmed: boolean;
   receiverConfirmed: boolean;
 }
@@ -54,15 +46,15 @@ export interface WeaveViewModel {
 
 /**
  * Status badge key. Only the Requested stage depends on the viewer
- * (Post Author vs Initiator); other stages read the same for both parties.
+ * (the Reviewer decides, the Initiator waits); other stages read the same for both parties.
  */
 export function getWeaveStatusKey(
   status: WeaveViewStatus | undefined,
-  isPostAuthor: boolean,
+  isReviewer: boolean,
 ): WeaveStatusKey | null {
   switch (status) {
     case "requested":
-      return isPostAuthor ? "newRequest" : "requestSent";
+      return isReviewer ? "newRequest" : "requestSent";
     case "approved":
       return "weaving";
     case "completed":
@@ -79,45 +71,26 @@ export function getWeaveStatusKey(
 }
 
 /**
- * Requested stage is judged by Post Author / Initiator;
- * Approved stage by Giver / Receiver (ADR 0001).
- * The Initiator is the party who is not the Post Author.
+ * 標籤與提示文字。可做的動作直接是 server 給的 `viewer.commands`（轉移表在 server），
+ * 這裡只決定怎麼說：Requested 看 Reviewer / Initiator，Approved 看 Giver / Receiver 與確認狀態（ADR 0001）
  */
 export function getWeaveViewModel(input: WeaveViewModelInput): WeaveViewModel {
-  const actions = new Set<WeaveAction>();
+  const { status, viewer } = input;
+  const statusKey = getWeaveStatusKey(status, viewer?.isReviewer ?? false);
+  const actions = new Set<WeaveAction>(viewer?.commands ?? []);
   let hintKey: WeaveHintKey | null = null;
-  const { status, viewerId } = input;
-  const isPostAuthor =
-    viewerId !== undefined && viewerId === input.postAuthorId;
-  const statusKey = getWeaveStatusKey(status, isPostAuthor);
-  const result = () => ({ statusKey, hintKey, actions });
-  if (!status || viewerId === undefined) return result();
 
-  const isGiver = viewerId === input.giverId;
-  const isReceiver = viewerId === input.receiverId;
-  if (!isGiver && !isReceiver) return result();
-
-  if (status === "requested") {
-    // Unknown Post Author: show nothing rather than guess the viewer's role.
-    if (input.postAuthorId === undefined) return result();
-    if (isPostAuthor) {
-      actions.add("approve");
-      actions.add("decline");
-      hintKey = "requested.decideOnRequest";
-    } else {
-      actions.add("withdraw");
-      hintKey = "requested.awaitingAuthor";
-    }
-  } else if (status === "approved") {
+  if (status === "requested" && viewer) {
+    if (viewer.isReviewer) hintKey = "requested.decideOnRequest";
+    else if (viewer.isInitiator) hintKey = "requested.awaitingAuthor";
+  } else if (status === "approved" && viewer?.role) {
+    const isGiver = viewer.role === "giver";
     const confirmedMine = isGiver
       ? input.giverConfirmed
       : input.receiverConfirmed;
     const confirmedOther = isGiver
       ? input.receiverConfirmed
       : input.giverConfirmed;
-    if (!confirmedMine) actions.add("confirm");
-    actions.add("cancel");
-
     if (!confirmedMine && confirmedOther) {
       hintKey = isGiver
         ? "approved.receiverConfirmedPleaseConfirmHandover"
@@ -133,5 +106,5 @@ export function getWeaveViewModel(input: WeaveViewModelInput): WeaveViewModel {
     }
   }
 
-  return result();
+  return { statusKey, hintKey, actions };
 }

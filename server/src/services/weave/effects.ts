@@ -213,42 +213,22 @@ export async function notifyWeaveStatusChange(params: NotifyWeaveStatusParams) {
 
 // ─── Socket ───────────────────────────────────────────────────────────────────
 
-export interface WeaveConfirmState {
-  status: WeaveStatus;
-  giver_confirmed: boolean;
-  receiver_confirmed: boolean;
-}
-
-/** `weave_status_updated` 唯一的 payload 形狀 */
-export function weaveStatusPayload(weaveId: number, state: WeaveConfirmState) {
-  return {
-    weaveId,
-    status: state.status,
-    giver_confirmed: state.giver_confirmed,
-    receiver_confirmed: state.receiver_confirmed,
-  };
+/**
+ * `weave_status_updated` 唯一的 payload：只說哪筆 Weave 變成什麼狀態。
+ * 確認狀態、可做的動作因人而異，client 收到後重抓讀取模型（client lib/weave invalidateWeave）
+ */
+export function weaveStatusPayload(weaveId: number, status: WeaveStatus) {
+  return { weaveId, status };
 }
 
 function emitWeaveStatus(
   io: Server,
   weaveId: number,
-  state: WeaveConfirmState,
+  status: WeaveStatus,
   userIds: Iterable<number>,
 ): void {
-  const payload = weaveStatusPayload(weaveId, state);
+  const payload = weaveStatusPayload(weaveId, status);
   for (const id of new Set(userIds)) io.to(`user_${id}`).emit("weave_status_updated", payload);
-}
-
-async function readConfirmState(weaveId: number): Promise<WeaveConfirmState> {
-  const [rows] = await dbPool.execute<RowDataPacket[]>(
-    `SELECT status, giver_confirmed, receiver_confirmed FROM weaves WHERE id = ?`,
-    [weaveId],
-  );
-  return {
-    status: rows[0]?.status as WeaveStatus,
-    giver_confirmed: Boolean(rows[0]?.giver_confirmed),
-    receiver_confirmed: Boolean(rows[0]?.receiver_confirmed),
-  };
 }
 
 async function postTitleOf(postId: number): Promise<string> {
@@ -267,6 +247,8 @@ export interface AnnouncedTransition {
   giverId: number;
   receiverId: number;
   actor: { id: number; name: string };
+  /** 轉移後的狀態（單方確認仍是 approved） */
+  status: WeaveStatus;
   /** 通知用的動作；單方確認是 confirmed，雙方都確認是 completed */
   action: Exclude<WeaveActionType, "requested">;
 }
@@ -279,7 +261,7 @@ export async function announceTransition(
   io: Server | null,
   transition: AnnouncedTransition,
 ): Promise<void> {
-  const { weaveId, postId, giverId, receiverId, actor, action } = transition;
+  const { weaveId, postId, giverId, receiverId, actor, status, action } = transition;
   //* 對方：動作者是 Receiver 就通知 Giver，否則通知 Receiver（不是兩造的審核者站在 Giver 這一側）
   const recipientId = receiverId === actor.id ? giverId : receiverId;
   const roleOf = (id: number): WeaveRole => (id === giverId ? "giver" : "receiver");
@@ -304,17 +286,7 @@ export async function announceTransition(
   } catch (error) {
     console.error("[weave] Transition notification failed:", error);
   }
-  if (io) {
-    try {
-      emitWeaveStatus(io, weaveId, await readConfirmState(weaveId), [
-        giverId,
-        receiverId,
-        actor.id,
-      ]);
-    } catch (error) {
-      console.error("[weave] Socket emit failed:", error);
-    }
-  }
+  if (io) emitWeaveStatus(io, weaveId, status, [giverId, receiverId, actor.id]);
   if (action === "completed") {
     updateUserStats(giverId.toString()).catch(console.error);
     updateUserStats(receiverId.toString()).catch(console.error);
@@ -357,12 +329,7 @@ export async function announceAutoDeclined(
         recipientRole: "receiver",
       });
       if (io) {
-        emitWeaveStatus(
-          io,
-          weave.id,
-          { status: "declined", giver_confirmed: false, receiver_confirmed: false },
-          [weave.giverId, weave.receiverId],
-        );
+        emitWeaveStatus(io, weave.id, "declined", [weave.giverId, weave.receiverId]);
       }
     } catch (error) {
       console.error("[announceAutoDeclined] Notification failed:", error);

@@ -1,9 +1,8 @@
 //* 外送單的狀態轉移：守衛（狀態機、比較並設定、事件時間）、稽核紀錄、退款、付款連動、推播，
 //* 所有來源（Lalamove webhook、對帳 worker、使用者取消、sandbox）都走這裡，副作用才不會因來源而不同
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { Server } from "socket.io";
 import { enqueueDeliveryRefund } from "../../queue/queues";
-import type { Queryable } from "../orgService";
 import { type DeliveryStatus, isRefundableStatus, predecessorsOf } from "./status";
 
 /** 外送單的兩種識別：本機 id，或 Lalamove 的訂單編號 */
@@ -48,8 +47,12 @@ function keyOf(ref: DeliveryOrderRef): { sql: string; value: string | number } {
     : { sql: "lalamove_order_id = ?", value: ref.lalamoveOrderId };
 }
 
+/**
+ * 狀態、稽核紀錄、付款連動與退款標記（refund_due_at）在同一個交易寫入；commit 後才排退款。
+ * 排退款失敗（例如 Redis 暫時連不上）不丟錯：轉移已生效，對帳 worker 會依 refund_due_at 補排
+ */
 export async function transitionDeliveryOrder(
-  db: Queryable,
+  db: Pool,
   ref: DeliveryOrderRef,
   to: DeliveryStatus,
   options: DeliveryTransitionOptions,
@@ -84,43 +87,64 @@ export async function transitionDeliveryOrder(
     guardParams.push(options.eventTime);
   }
 
-  //* status IN (?) 需要 query() 展開陣列
-  const [update] = await db.query<ResultSetHeader>(
-    `UPDATE delivery_orders SET ${sets.join(", ")} WHERE ${guards.join(" AND ")}`,
-    [...setParams, ...guardParams],
-  );
-  const [rows] = await db.query<RowDataPacket[]>(
-    `SELECT id, lalamove_order_id, payment_id FROM delivery_orders WHERE ${key.sql}`,
-    [key.value],
-  );
-  const order = rows[0];
-  const result: DeliveryTransitionResult = {
-    applied: update.affectedRows > 0,
-    deliveryOrderId: order ? Number(order.id) : null,
-    lalamoveOrderId: (order?.lalamove_order_id as string | null) ?? null,
-  };
-  if (!result.applied || !order) return result;
+  const refundable = isRefundableStatus(to);
+  if (refundable) sets.push("refund_due_at = COALESCE(refund_due_at, NOW(3))");
 
-  await db.query(
-    `INSERT INTO delivery_order_events (delivery_order_id, event_id, event_status, raw_payload)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE received_at = CURRENT_TIMESTAMP`,
-    [order.id, options.eventId ?? null, to, payload],
-  );
-
-  //* 付款窗口關了（過期或還沒付就取消）：還在 PENDING 的付款一併取消
-  if ((to === "EXPIRED" || to === "CANCELLED") && order.payment_id != null) {
-    await db.query("UPDATE payments SET status = 'CANCELLED' WHERE id = ? AND status = 'PENDING'", [
-      order.payment_id,
-    ]);
+  const conn = await db.getConnection();
+  let result: DeliveryTransitionResult;
+  try {
+    await conn.beginTransaction();
+    //* status IN (?) 需要 query() 展開陣列
+    const [update] = await conn.query<ResultSetHeader>(
+      `UPDATE delivery_orders SET ${sets.join(", ")} WHERE ${guards.join(" AND ")}`,
+      [...setParams, ...guardParams],
+    );
+    const [rows] = await conn.query<RowDataPacket[]>(
+      `SELECT id, lalamove_order_id, payment_id FROM delivery_orders WHERE ${key.sql}`,
+      [key.value],
+    );
+    const order = rows[0];
+    result = {
+      applied: update.affectedRows > 0 && order != null,
+      deliveryOrderId: order ? Number(order.id) : null,
+      lalamoveOrderId: (order?.lalamove_order_id as string | null) ?? null,
+    };
+    if (result.applied) {
+      await conn.query(
+        `INSERT INTO delivery_order_events (delivery_order_id, event_id, event_status, raw_payload)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE received_at = CURRENT_TIMESTAMP`,
+        [order.id, options.eventId ?? null, to, payload],
+      );
+      //* 付款窗口關了（過期或還沒付就取消）：還在 PENDING 的付款一併取消
+      if ((to === "EXPIRED" || to === "CANCELLED") && order.payment_id != null) {
+        await conn.query("UPDATE payments SET status = 'CANCELLED' WHERE id = ? AND status = 'PENDING'", [
+          order.payment_id,
+        ]);
+      }
+    }
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback().catch((e) => console.error("Rollback failed:", e));
+    throw error;
+  } finally {
+    conn.release();
   }
+  if (!result.applied) return result;
 
-  if (isRefundableStatus(to)) {
+  if (refundable) {
     //* 退款 worker 再確認付款仍是 PAID，沒付過款的單會略過
-    await enqueueDeliveryRefund({
-      deliveryOrderId: result.deliveryOrderId!,
-      reason: options.refundReason ?? options.failureReason ?? to,
-    });
+    try {
+      await enqueueDeliveryRefund({
+        deliveryOrderId: result.deliveryOrderId!,
+        reason: options.refundReason ?? options.failureReason ?? to,
+      });
+    } catch (enqueueErr) {
+      console.error(
+        `[ALERT] Failed to enqueue refund for delivery_order #${result.deliveryOrderId}; the reconcile sweep will retry`,
+        enqueueErr,
+      );
+    }
   }
 
   if (options.io) {

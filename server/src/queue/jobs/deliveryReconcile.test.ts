@@ -100,9 +100,7 @@ describe("Phase 0: interrupted dispatch saga (backstop) + refund sweep", () => {
 
     await processDeliveryReconciliation(undefined, service);
 
-    const [sweepSql, sweepParams] = query.mock.calls[1];
-    expect(sweepSql).toContain("p.status = 'PAID'");
-    expect(sweepParams[0]).toEqual(["FAILED", "EXPIRED"]);
+    //* 哪些單該補退由 listOrdersOwedRefund 決定（delivery.db.test.ts）
     expect(enqueueDeliveryRefund).toHaveBeenCalledWith({ deliveryOrderId: 8, reason: "REFUND_SWEEP" });
   });
 });

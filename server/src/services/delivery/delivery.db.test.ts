@@ -11,7 +11,7 @@ import dbPool from "../../utils/db";
 import { closeDatabase, resetDb } from "../../testUtils/db/reset";
 import { createPost, createUser, type TestUser } from "../../testUtils/db/fixtures";
 import { enqueueDeliveryRefund } from "../../queue/queues";
-import { deliveryAccessFor, transitionDeliveryOrder, type DeliveryStatus } from ".";
+import { deliveryAccessFor, listOrdersOwedRefund, transitionDeliveryOrder, type DeliveryStatus } from ".";
 
 jest.mock("../../queue/queues", () => ({
   enqueueDeliveryRefund: jest.fn().mockResolvedValue(undefined),
@@ -93,6 +93,11 @@ async function row(id: number) {
     [id],
   );
   return rows[0];
+}
+
+/** 讓外送單的最後變動落在退款補排的寬限期之前 */
+async function ageOrder(id: number) {
+  await dbPool.execute("UPDATE delivery_orders SET updated_at = NOW() - INTERVAL 1 HOUR WHERE id = ?", [id]);
 }
 
 async function events(id: number) {
@@ -179,6 +184,36 @@ describe("transitionDeliveryOrder side effects", () => {
     },
   );
 
+  it("keeps the move when the refund enqueue fails, and the sweep picks the order up", async () => {
+    const user = await createUser("u");
+    const o = await order(user, { status: "ASSIGNING_DRIVER" });
+    (enqueueDeliveryRefund as jest.Mock).mockRejectedValueOnce(new Error("redis down"));
+    jest.spyOn(console, "error").mockImplementationOnce(() => {});
+
+    const result = await transitionDeliveryOrder(dbPool, { id: o.id }, "CANCELLED", { source: "user", payload: {} });
+
+    expect(result.applied).toBe(true);
+    expect(await row(o.id)).toMatchObject({ status: "CANCELLED", payment_status: "PAID" });
+    await ageOrder(o.id);
+    expect(await listOrdersOwedRefund(dbPool, 10)).toContain(o.id);
+  });
+
+  it("rolls the status back when a later write in the move fails", async () => {
+    const user = await createUser("u");
+    const o = await order(user, { status: "ASSIGNING_DRIVER" });
+    await expect(
+      transitionDeliveryOrder(dbPool, { id: o.id }, "CANCELLED", {
+        source: "user",
+        payload: {},
+        eventId: "x".repeat(101), // longer than event_id varchar(100): the event INSERT fails
+      }),
+    ).rejects.toThrow();
+
+    expect((await row(o.id)).status).toBe("ASSIGNING_DRIVER");
+    expect(await events(o.id)).toEqual([]);
+    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
+  });
+
   it("does not refund a non-terminal move", async () => {
     const user = await createUser("u");
     const o = await order(user, { status: "ASSIGNING_DRIVER" });
@@ -217,6 +252,43 @@ describe("transitionDeliveryOrder side effects", () => {
       [`delivery_${o.id}`, `delivery_${o.lalamoveOrderId}`].sort(),
     );
     expect(emits.every((e) => e.payload.status === "PICKED_UP")).toBe(true);
+  });
+});
+
+describe("listOrdersOwedRefund (the reconcile sweep)", () => {
+  it("lists paid FAILED and EXPIRED orders and paid CANCELLED orders this module marked", async () => {
+    const user = await createUser("u");
+    const failed = await order(user, { status: "FAILED" }); // e.g. written by PaymentService's saga
+    const expired = await order(user, { status: "EXPIRED" });
+    const cancelled = await order(user, { status: "ASSIGNING_DRIVER" });
+    await transitionDeliveryOrder(dbPool, { id: cancelled.id }, "CANCELLED", { source: "user", payload: {} });
+    for (const o of [failed, expired, cancelled]) await ageOrder(o.id);
+
+    expect(await listOrdersOwedRefund(dbPool, 10)).toEqual(
+      expect.arrayContaining([failed.id, expired.id, cancelled.id]),
+    );
+  });
+
+  it("never lists a CANCELLED order from before cancels were refunded", async () => {
+    const user = await createUser("u");
+    const legacy = await order(user, { status: "CANCELLED" }); // refund_due_at NULL
+    await ageOrder(legacy.id);
+    expect(await listOrdersOwedRefund(dbPool, 10)).not.toContain(legacy.id);
+  });
+
+  it("skips unpaid orders, live orders and orders still inside the grace period", async () => {
+    const user = await createUser("u");
+    const unpaid = await order(user, { status: "PAYMENT_PENDING", paymentStatus: "PENDING", lalamoveOrderId: null });
+    await transitionDeliveryOrder(dbPool, { id: unpaid.id }, "EXPIRED", { source: "sandbox", payload: {} });
+    const live = await order(user, { status: "ON_GOING" });
+    const fresh = await order(user, { status: "FAILED" });
+    await ageOrder(unpaid.id);
+    await ageOrder(live.id);
+
+    const owed = await listOrdersOwedRefund(dbPool, 10);
+    expect(owed).not.toContain(unpaid.id);
+    expect(owed).not.toContain(live.id);
+    expect(owed).not.toContain(fresh.id);
   });
 });
 

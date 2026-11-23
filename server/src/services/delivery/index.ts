@@ -7,6 +7,7 @@ export {
   type DeliveryTransitionResult,
   type DeliveryTransitionSource,
 } from "./transition";
+export { listOrdersOwedRefund } from "./refundSweep";
 export {
   DELIVERY_ACCESS_COLUMNS,
   DELIVERY_ACCESS_JOIN,

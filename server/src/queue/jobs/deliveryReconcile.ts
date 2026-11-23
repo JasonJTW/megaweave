@@ -6,7 +6,7 @@ import dbPool from "../../utils/db";
 import { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getLalamoveOrderDetail } from "../../services/lalamove";
 import {
-  SWEPT_REFUND_STATUSES,
+  listOrdersOwedRefund,
   canTransition,
   lalamoveFailureReason,
   transitionDeliveryOrder,
@@ -118,23 +118,15 @@ export async function processDeliveryReconciliation(
   }
 
   // 退款保底：同一外送單以 jobId 去重，重複排入安全
-  const [unrefundedRows] = await dbPool.query<RowDataPacket[]>(
-    `SELECT d.id
-     FROM delivery_orders d
-     JOIN payments p ON p.id = d.payment_id
-     WHERE d.status IN (?)
-       AND p.status = 'PAID'
-       AND d.updated_at < NOW() - INTERVAL ? MINUTE`,
-    [SWEPT_REFUND_STATUSES, REFUND_SWEEP_GRACE_MINUTES],
-  );
-  for (const row of unrefundedRows) {
+  const unrefundedIds = await listOrdersOwedRefund(dbPool, REFUND_SWEEP_GRACE_MINUTES);
+  for (const id of unrefundedIds) {
     try {
       await enqueueDeliveryRefund({
-        deliveryOrderId: Number(row.id),
+        deliveryOrderId: id,
         reason: "REFUND_SWEEP",
       });
     } catch (sweepErr) {
-      await logError(`Failed to enqueue refund for delivery_order #${row.id}`, sweepErr);
+      await logError(`Failed to enqueue refund for delivery_order #${id}`, sweepErr);
     }
   }
 

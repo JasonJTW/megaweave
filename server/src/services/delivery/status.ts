@@ -74,8 +74,9 @@ export function isRefundableStatus(status: string | null | undefined): boolean {
 }
 
 /**
- * 對帳 worker 補排退款的範圍。不含 CANCELLED：CANCELLED 從這個改動起才退款，
- * 補排會連改動前已取消（可能已人工退款）的舊單一起退。CANCELLED 的退款只在轉移當下排入
+ * 對帳 worker 不看標記、只看狀態就補排退款的狀態（PaymentService 的派單流程會自己寫 FAILED，不經 refund_due_at）。
+ * CANCELLED 另外要有 refund_due_at 才補排：CANCELLED 從 refund_due_at 加入起才退款，
+ * 之前取消的舊單（可能已人工退款）沒有標記，不回溯退款。見 refundSweep.ts
  */
 export const SWEPT_REFUND_STATUSES: readonly DeliveryStatus[] = LALAMOVE_FAILURE_STATUSES;
 

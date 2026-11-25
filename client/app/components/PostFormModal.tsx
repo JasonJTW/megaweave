@@ -4,6 +4,7 @@ import React, { useState, useEffect, useId, useRef } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { enUS, zhTW, type Locale as DateFnsLocale } from "date-fns/locale";
 import type { Locale } from "@/i18n/routing";
+import { APP_TIME_ZONE, endOfDay, isBeforeToday } from "@/i18n/timeZone";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { useCategoryName, useConditionText } from "@/i18n/referenceNames";
 import { Button } from "@/components/ui/button";
@@ -519,7 +520,7 @@ export default function PostFormModal({
       categoryId: formData.categoryId!,
       conditionLevel: formData.conditionLevel!,
       status: formData.status,
-      expires_at: formData.expires_at,
+      expires_at: formData.expires_at && endOfDay(formData.expires_at),
       items: filteredItems,
       place_id: formData.place_id,
       location_name: formData.location_name,
@@ -878,6 +879,7 @@ export default function PostFormModal({
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
                         mode="single"
+                        timeZone={APP_TIME_ZONE}
                         locale={CALENDAR_LOCALES[locale]}
                         labels={{
                           labelPrevious: () => t("previousMonth"),
@@ -896,11 +898,7 @@ export default function PostFormModal({
                           }));
                         }}
                         defaultMonth={formData.expires_at}
-                        disabled={(date) => {
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          return date < today;
-                        }}
+                        disabled={(date) => isBeforeToday(date)}
                         required
                       />
                     </PopoverContent>

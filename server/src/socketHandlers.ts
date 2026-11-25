@@ -2,11 +2,11 @@
 import type { IncomingMessage } from "http";
 import type { Server, Socket } from "socket.io";
 import cookieParser from "cookie-parser";
-import { RowDataPacket } from "mysql2";
 import { z } from "zod";
 import dbPool from "./utils/db";
 import { getUserFromCookies } from "./session";
 import { UserSession } from "./schema";
+import { deliveryAccessFor } from "./services/delivery/access";
 
 const orderIdSchema = z.string().trim().min(1).max(64);
 
@@ -47,25 +47,13 @@ export async function authenticateSocket(
   }
 }
 
-//* 與 GET /lalamove/orders/:orderId 相同的權限：買方、賣方或管理員
+//* 與 GET /lalamove/orders/:orderId 相同的權限：下單的人、Weave 的兩造或 Platform Admin
 export async function canAccessDeliveryOrder(
   orderId: string,
   user: UserSession,
 ): Promise<boolean> {
   if (user.role === "admin") return true;
-
-  const [rows] = await dbPool.query<RowDataPacket[]>(
-    `SELECT d.user_id, p.user_id AS seller_user_id
-     FROM delivery_orders d
-     LEFT JOIN posts p ON d.post_id = p.id
-     WHERE d.lalamove_order_id = ? OR d.id = ?
-     LIMIT 1`,
-    [orderId, orderId],
-  );
-
-  if (!rows || rows.length === 0) return false;
-  const row = rows[0];
-  return row.user_id === user.userId || row.seller_user_id === user.userId;
+  return (await deliveryAccessFor(dbPool, orderId, user)) === true;
 }
 
 export async function handleJoinDelivery(

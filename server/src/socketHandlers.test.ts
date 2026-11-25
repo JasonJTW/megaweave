@@ -73,7 +73,17 @@ describe("authenticateSocket", () => {
 });
 
 describe("handleJoinDelivery", () => {
-  const orderRow = [[{ user_id: buyer.userId, seller_user_id: seller.userId }]];
+  //* 誰能看由 DeliveryOrder module 判斷（delivery.db.test.ts）；這裡只看 seam：允許就加入房間
+  const orderRow = [
+    [
+      {
+        orderer_id: buyer.userId,
+        post_author_id: seller.userId,
+        weave_giver_id: null,
+        weave_receiver_id: null,
+      },
+    ],
+  ];
 
   it.each([
     ["buyer", buyer],

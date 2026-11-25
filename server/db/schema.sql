@@ -287,6 +287,7 @@ CREATE TABLE `delivery_orders` (
   `user_id` int NOT NULL COMMENT '建立訂單的使用者 ID',
   `payment_id` int DEFAULT NULL COMMENT '關聯的金流交易 ID (payments.id)',
   `post_id` int DEFAULT NULL COMMENT '關聯的刊登貼文/商品 ID',
+  `weave_id` bigint unsigned DEFAULT NULL COMMENT '這張外送單服務的 Weave（兩造可查看）；NULL = 舊單無法唯一對應',
   `pickup_location_id` bigint unsigned NOT NULL COMMENT '取件地點 ID (locations.id)',
   `pickup_address_snapshot` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '取件地址快照文字',
   `pickup_remarks` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '取件備註 (如樓層、門禁)',
@@ -308,6 +309,7 @@ CREATE TABLE `delivery_orders` (
   `driver_phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '接單司機電話',
   `driver_plate_number` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '司機車牌號碼',
   `failure_reason` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '訂單失敗或取消原因說明',
+  `refund_due_at` datetime(3) DEFAULT NULL COMMENT '進入可退款狀態（FAILED / EXPIRED / CANCELLED）的時間；對帳 worker 只補退有這個標記的 CANCELLED 單。NULL 的 CANCELLED 是開始退款前的舊單，不回溯退款',
   `raw_webhook_payload` json DEFAULT NULL COMMENT 'Lalamove Webhook 最新推送之原始 Payload (JSON)',
   `status_updated_at` datetime(3) DEFAULT NULL COMMENT '最後套用之 Lalamove 狀態事件時間 (webhook data.updatedAt)；用於丟棄亂序 / 重送的舊事件',
   `dispatch_attempted_at` datetime(3) DEFAULT NULL COMMENT '送出 Lalamove 建單請求的時間；NULL 代表從未送出（可安全重新派單），非 NULL 代表結果可能不明（只能等 webhook 認領）',
@@ -321,6 +323,7 @@ CREATE TABLE `delivery_orders` (
   KEY `dropoff_location_id` (`dropoff_location_id`),
   KEY `idx_user_status` (`user_id`,`status`),
   KEY `idx_expires_at` (`expires_at`),
+  KEY `idx_weave_id` (`weave_id`),
   CONSTRAINT `delivery_orders_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `delivery_orders_ibfk_2` FOREIGN KEY (`pickup_location_id`) REFERENCES `locations` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `delivery_orders_ibfk_3` FOREIGN KEY (`dropoff_location_id`) REFERENCES `locations` (`id`) ON DELETE RESTRICT

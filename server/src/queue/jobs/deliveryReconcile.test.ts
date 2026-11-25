@@ -7,6 +7,7 @@ import {
 } from "./deliveryReconcile";
 import type { PaymentService } from "../../services/payment/paymentService";
 import { enqueueDeliveryRefund } from "../queues";
+import { transitionDeliveryOrder } from "../../services/delivery";
 
 jest.mock("../../utils/db", () => ({
   __esModule: true,
@@ -19,6 +20,12 @@ jest.mock("../../lalamove", () => ({
   mapLalamoveStatusToDbStatus: (s: string) => s,
 }));
 jest.mock("../../utils/socket", () => ({ getSocketBroadcaster: () => null }));
+//* 守衛、稽核、付款連動與退款在 DeliveryOrder module（delivery.db.test.ts）；這裡驗對帳怎麼呼叫它
+jest.mock("../../services/delivery", () => ({
+  ...jest.requireActual("../../services/delivery"),
+  transitionDeliveryOrder: jest.fn(),
+}));
+const transition = transitionDeliveryOrder as jest.Mock;
 jest.mock("../../services/payment/defaultPaymentService", () => ({
   createPaymentService: jest.fn(),
 }));
@@ -37,8 +44,6 @@ function staleRow(status: string) {
     updated_at: new Date(),
   };
 }
-
-const sqls = () => query.mock.calls.map((c) => c[0] as string);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -95,9 +100,7 @@ describe("Phase 0: interrupted dispatch saga (backstop) + refund sweep", () => {
 
     await processDeliveryReconciliation(undefined, service);
 
-    const [sweepSql, sweepParams] = query.mock.calls[1];
-    expect(sweepSql).toContain("p.status = 'PAID'");
-    expect(sweepParams[0]).toEqual(["FAILED", "EXPIRED"]);
+    //* 哪些單該補退由 listOrdersOwedRefund 決定（delivery.db.test.ts）
     expect(enqueueDeliveryRefund).toHaveBeenCalledWith({ deliveryOrderId: 8, reason: "REFUND_SWEEP" });
   });
 });
@@ -116,17 +119,21 @@ describe("Phase 1: expire PAYMENT_PENDING", () => {
     expect(params).toEqual([PAYMENT_WINDOW_MINUTES]);
   });
 
-  it("skips payment cancel + event when the order was paid concurrently", async () => {
+  it("expires only from PAYMENT_PENDING and counts only what the module applied", async () => {
     query
-      .mockResolvedValueOnce([[{ delivery_order_id: 9, payment_id: 3 }]]) // expired scan
-      .mockResolvedValueOnce([{ affectedRows: 0 }]) // guarded EXPIRED update lost the race
+      .mockResolvedValueOnce([[{ delivery_order_id: 9, payment_id: 3 }, { delivery_order_id: 10, payment_id: 4 }]])
       .mockResolvedValueOnce([[]]); // Phase 2 scan
+    transition.mockResolvedValueOnce({ applied: false }).mockResolvedValueOnce({ applied: true });
 
     const result = await processDeliveryReconciliation();
 
-    expect(result.expiredCount).toBe(0);
-    expect(sqls().some((q) => q.includes("UPDATE payments"))).toBe(false);
-    expect(sqls().some((q) => q.includes("delivery_order_events"))).toBe(false);
+    expect(transition).toHaveBeenCalledWith(
+      dbPool,
+      { id: 9 },
+      "EXPIRED",
+      expect.objectContaining({ expectedFrom: "PAYMENT_PENDING" }),
+    );
+    expect(result.expiredCount).toBe(1);
   });
 });
 
@@ -134,76 +141,64 @@ describe("Phase 2: reconcile in-progress orders", () => {
   beforeEach(() => query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[]])); // Phase 0
 
   it("applies a valid transition with CAS on the scanned status", async () => {
-    query
-      .mockResolvedValueOnce([[]]) // Phase 1
-      .mockResolvedValueOnce([[staleRow("ON_GOING")]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
-      .mockResolvedValueOnce([{}]); // INSERT event
+    query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[staleRow("ON_GOING")]]);
     (getLalamoveOrderDetail as jest.Mock).mockResolvedValue({ status: "PICKED_UP" });
+    transition.mockResolvedValueOnce({ applied: true });
 
     const result = await processDeliveryReconciliation();
 
-    const [sql, params] = query.mock.calls[4];
-    expect(sql).toContain("WHERE id = ? AND status = ?");
-    expect(params[0]).toBe("PICKED_UP");
-    expect(params[params.length - 1]).toBe("ON_GOING");
+    expect(transition).toHaveBeenCalledWith(
+      dbPool,
+      { id: 1 },
+      "PICKED_UP",
+      expect.objectContaining({ expectedFrom: "ON_GOING", failureReason: null }),
+    );
     expect(result.reconciledCount).toBe(1);
   });
 
   it("does not regress status on an invalid transition", async () => {
-    query
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[staleRow("PICKED_UP")]]);
+    query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[staleRow("PICKED_UP")]]);
     (getLalamoveOrderDetail as jest.Mock).mockResolvedValue({ status: "ON_GOING" });
 
     const result = await processDeliveryReconciliation();
 
-    expect(sqls().some((q) => q.includes("UPDATE delivery_orders"))).toBe(false);
+    expect(transition).not.toHaveBeenCalled();
     expect(result.reconciledCount).toBe(0);
   });
 
-  it("skips event + broadcast when a webhook changed the row concurrently", async () => {
-    query
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[staleRow("ON_GOING")]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
+  it("counts nothing when a webhook changed the row concurrently", async () => {
+    query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[staleRow("ON_GOING")]]);
     (getLalamoveOrderDetail as jest.Mock).mockResolvedValue({ status: "PICKED_UP" });
+    transition.mockResolvedValueOnce({ applied: false });
 
     const result = await processDeliveryReconciliation();
 
-    expect(sqls().some((q) => q.includes("delivery_order_events"))).toBe(false);
     expect(result.reconciledCount).toBe(0);
   });
 
   it("PICKED_UP -> ASSIGNING_DRIVER (driver rejected) is applied", async () => {
-    query
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[staleRow("PICKED_UP")]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([{}]);
+    query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[staleRow("PICKED_UP")]]);
     (getLalamoveOrderDetail as jest.Mock).mockResolvedValue({ status: "ASSIGNING_DRIVER" });
+    transition.mockResolvedValueOnce({ applied: true });
 
     const result = await processDeliveryReconciliation();
 
-    expect(query.mock.calls[4][1][0]).toBe("ASSIGNING_DRIVER");
+    expect(transition).toHaveBeenCalledWith(dbPool, { id: 1 }, "ASSIGNING_DRIVER", expect.anything());
     expect(result.reconciledCount).toBe(1);
-    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
   });
 
-  it("remote EXPIRED sets failure reason and enqueues refund", async () => {
-    query
-      .mockResolvedValueOnce([[]])
-      .mockResolvedValueOnce([[staleRow("ASSIGNING_DRIVER")]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([{}]);
+  it("remote EXPIRED passes the Lalamove failure reason", async () => {
+    query.mockResolvedValueOnce([[]]).mockResolvedValueOnce([[staleRow("ASSIGNING_DRIVER")]]);
     (getLalamoveOrderDetail as jest.Mock).mockResolvedValue({ status: "EXPIRED" });
+    transition.mockResolvedValueOnce({ applied: true });
 
     await processDeliveryReconciliation();
 
-    expect(query.mock.calls[4][1][4]).toBe("LALAMOVE_EXPIRED");
-    expect(enqueueDeliveryRefund).toHaveBeenCalledWith({
-      deliveryOrderId: 1,
-      reason: "LALAMOVE_EXPIRED",
-    });
+    expect(transition).toHaveBeenCalledWith(
+      dbPool,
+      { id: 1 },
+      "EXPIRED",
+      expect.objectContaining({ failureReason: "LALAMOVE_EXPIRED" }),
+    );
   });
 });

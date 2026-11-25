@@ -1,8 +1,10 @@
 import {
+  SWEPT_REFUND_STATUSES,
   canTransition,
+  isRefundableStatus,
   lalamoveFailureReason,
   predecessorsOf,
-} from "./deliveryStatus";
+} from "./status";
 
 describe("delivery status state machine", () => {
   it.each([
@@ -55,5 +57,16 @@ describe("lalamoveFailureReason", () => {
   it("returns null for non-failure statuses", () => {
     expect(lalamoveFailureReason("COMPLETED", "COMPLETED")).toBeNull();
     expect(lalamoveFailureReason("CANCELLED", "CANCELED")).toBeNull();
+  });
+});
+
+describe("refunds", () => {
+  it("refunds a paid order that Lalamove failed, expired or cancelled", () => {
+    for (const status of ["FAILED", "EXPIRED", "CANCELLED"]) expect(isRefundableStatus(status)).toBe(true);
+    for (const status of ["COMPLETED", "PICKED_UP", "PAYMENT_PENDING"]) expect(isRefundableStatus(status)).toBe(false);
+  });
+
+  it("does not sweep CANCELLED: orders cancelled before refunds existed may have been refunded by hand", () => {
+    expect(SWEPT_REFUND_STATUSES).toEqual(["FAILED", "EXPIRED"]);
   });
 });

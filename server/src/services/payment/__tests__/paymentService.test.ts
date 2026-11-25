@@ -137,6 +137,11 @@ describe("PaymentService (Seam 3: Domain Orchestration & Idempotency)", () => {
       expect(mockProvider.createPaymentSession).toHaveBeenCalled();
       expect(result.formData.MerchantTradeNo).toBeDefined();
       expect(result.htmlForm).toContain("<form>Mock</form>");
+      //* 外送單記下它服務的 Weave（兩造可查看，DeliveryOrder module）
+      const insertCall = mockConnection.query.mock.calls.find(([sql]) =>
+        String(sql).includes("INSERT INTO delivery_orders"),
+      );
+      expect(insertCall?.[1][3]).toBe(7);
     });
 
     it("should reject checkout and roll back when the user has no pending weave for the post", async () => {

@@ -3,8 +3,8 @@ import { Request, Response, RequestHandler } from "express";
 import lalamoveRouter, { getWebhookEventTime } from "./lalamove";
 import dbPool from "./utils/db";
 import { verifyLalamoveWebhookSignature } from "./services/lalamove";
-import { enqueueDeliveryRefund } from "./queue/queues";
 import { adoptLalamoveOrder } from "./services/deliveryRecovery";
+import { transitionDeliveryOrder } from "./services/delivery";
 
 jest.mock("./utils/db", () => ({
   query: jest.fn(),
@@ -13,6 +13,12 @@ jest.mock("./utils/db", () => ({
 
 jest.mock("./queue/queues", () => ({
   enqueueDeliveryRefund: jest.fn().mockResolvedValue(undefined),
+}));
+
+//* 守衛、稽核與退款在 DeliveryOrder module（delivery.db.test.ts）；這裡驗 webhook 怎麼交給它、怎麼推播
+jest.mock("./services/delivery", () => ({
+  ...jest.requireActual("./services/delivery"),
+  transitionDeliveryOrder: jest.fn(),
 }));
 
 jest.mock("./services/deliveryRecovery", () => ({
@@ -209,52 +215,38 @@ describe("POST /webhook handler", () => {
     return { req, emit };
   }
 
-  it("guards status UPDATE with valid predecessor statuses", async () => {
-    (dbPool.query as jest.Mock)
-      .mockResolvedValueOnce([[{ id: 7 }]]) // SELECT id
-      .mockResolvedValueOnce([{ affectedRows: 1 }]) // guarded UPDATE
-      .mockResolvedValueOnce([{}]); // INSERT event
+  const transition = transitionDeliveryOrder as jest.Mock;
+
+  it("hands the status to the DeliveryOrder module with the event time and id, then broadcasts it", async () => {
+    (dbPool.query as jest.Mock).mockResolvedValueOnce([[{ id: 7 }]]); // SELECT id
+    transition.mockResolvedValueOnce({ applied: true, deliveryOrderId: 7, lalamoveOrderId: "O1" });
     const { req, emit } = signedStatusReq("PICKED_UP");
     const res = mockRes();
     await handler(req, res, jest.fn());
 
-    const [sql, params] = (dbPool.query as jest.Mock).mock.calls[1];
-    expect(sql).toContain("AND status IN (?)");
-    expect(sql).toContain("status_updated_at IS NULL OR status_updated_at <= ?");
-    expect(params[2]).toEqual(new Date("2026-10-15T08:00:00.000Z"));
-    expect(params[3]).toBeNull(); // failure_reason untouched for non-failure status
-    expect(params[5]).toEqual(["ASSIGNING_DRIVER", "ON_GOING"]);
-    expect(params[6]).toEqual(new Date("2026-10-15T08:00:00.000Z"));
-    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
-    expect((dbPool.query as jest.Mock).mock.calls[2][0]).toContain("INSERT INTO delivery_order_events");
+    expect(transition).toHaveBeenCalledWith(dbPool, { lalamoveOrderId: "O1" }, "PICKED_UP", {
+      source: "lalamove_webhook",
+      eventTime: new Date("2026-10-15T08:00:00.000Z"),
+      eventId: "E1",
+      payload: expect.objectContaining({ eventId: "E1" }),
+      failureReason: null,
+    });
     expect(emit).toHaveBeenCalledWith("delivery_update", expect.objectContaining({ status: "PICKED_UP" }));
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it("REJECTED: records failure reason and enqueues auto-refund", async () => {
-    (dbPool.query as jest.Mock)
-      .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 1 }])
-      .mockResolvedValueOnce([{}]);
+  it("REJECTED: maps to FAILED with the Lalamove failure reason", async () => {
+    (dbPool.query as jest.Mock).mockResolvedValueOnce([[{ id: 7 }]]);
+    transition.mockResolvedValueOnce({ applied: true, deliveryOrderId: 7, lalamoveOrderId: "O1" });
     const { req } = signedStatusReq("REJECTED");
     await handler(req, mockRes(), jest.fn());
 
-    const params = (dbPool.query as jest.Mock).mock.calls[1][1];
-    expect(params[0]).toBe("FAILED");
-    expect(params[3]).toBe("LALAMOVE_REJECTED");
-    expect(enqueueDeliveryRefund).toHaveBeenCalledWith({
-      deliveryOrderId: 7,
-      reason: "LALAMOVE_REJECTED",
-    });
-  });
-
-  it("does not enqueue refund when the REJECTED event is rejected by the guard", async () => {
-    (dbPool.query as jest.Mock)
-      .mockResolvedValueOnce([[{ id: 7 }]])
-      .mockResolvedValueOnce([{ affectedRows: 0 }]);
-    const { req } = signedStatusReq("REJECTED");
-    await handler(req, mockRes(), jest.fn());
-    expect(enqueueDeliveryRefund).not.toHaveBeenCalled();
+    expect(transition).toHaveBeenCalledWith(
+      dbPool,
+      { lalamoveOrderId: "O1" },
+      "FAILED",
+      expect.objectContaining({ failureReason: "LALAMOVE_REJECTED" }),
+    );
   });
 
   it("ORDER_CREATED for an unknown orderId adopts it by quotationId, then applies the status", async () => {
@@ -296,15 +288,17 @@ describe("POST /webhook handler", () => {
     expect(adoptLalamoveOrder).not.toHaveBeenCalled();
   });
 
-  it("ignores an out-of-order status (no event row, no status broadcast)", async () => {
-    (dbPool.query as jest.Mock)
-      .mockResolvedValueOnce([[{ id: 7 }]]) // SELECT id
-      .mockResolvedValueOnce([{ affectedRows: 0 }]); // guard rejects (e.g. already COMPLETED)
+  it("leaves the status out of the broadcast when the module did not apply it", async () => {
+    (dbPool.query as jest.Mock).mockResolvedValueOnce([[{ id: 7 }]]); // SELECT id
+    (transitionDeliveryOrder as jest.Mock).mockResolvedValueOnce({
+      applied: false,
+      deliveryOrderId: 7,
+      lalamoveOrderId: "O1",
+    });
     const { req, emit } = signedStatusReq("ON_GOING");
     const res = mockRes();
     await handler(req, res, jest.fn());
 
-    expect(dbPool.query).toHaveBeenCalledTimes(2);
     expect(emit.mock.calls[0][1]).not.toHaveProperty("status");
     expect(res.status).toHaveBeenCalledWith(200);
   });

@@ -2,7 +2,6 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   draftFromListing,
-  endOfDay,
   listingPayload,
   missingListingFields,
   pickedLocationFrom,
@@ -12,12 +11,13 @@ import {
 
 // 組織物品升到 Public 前，Org Admin 在確認框補上的公開資訊（地點、到期日、分類必填，標籤選填）
 
-const NOW = new Date(2026, 10, 10, 15, 0, 0);
+// Instants pinned in Taipei time (UTC+8), so the tests pass on any machine clock
+const NOW = new Date("2026-11-10T15:00:00+08:00");
 
 const SAVED: PublicListing = {
   categoryId: 3,
   tags: "螢幕, 辦公設備",
-  expiresAt: new Date(2026, 11, 1, 23, 59, 59, 999).toISOString(),
+  expiresAt: "2026-12-01T15:59:59.999Z",
   location: {
     placeId: "place-101",
     name: "台北101",
@@ -90,19 +90,20 @@ describe("the public listing an Org Admin fills in before making an item public"
   });
 
   it("accepts today as the expiry date, which lasts until the end of the day", () => {
-    const today = new Date(2026, 10, 10);
+    // What the calendar hands back for 10 Nov: Taipei midnight
+    const today = new Date("2026-11-10T00:00:00+08:00");
     const draft = { ...draftFromListing(SAVED), expiresOn: today };
     assert.deepEqual(missingListingFields(draft, NOW), []);
     assert.equal(
       listingPayload(draft, NOW)?.expiresAt,
-      endOfDay(today).toISOString(),
+      "2026-11-10T15:59:59.999Z",
     );
   });
 
   it("refuses an expiry date that already passed", () => {
     const draft = {
       ...draftFromListing(SAVED),
-      expiresOn: new Date(2026, 10, 9),
+      expiresOn: new Date("2026-11-09T00:00:00+08:00"),
     };
     assert.deepEqual(missingListingFields(draft, NOW), ["expiresOn"]);
   });

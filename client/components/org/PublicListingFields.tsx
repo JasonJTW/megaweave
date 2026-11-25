@@ -7,6 +7,7 @@ import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { enUS, zhTW, type Locale as DateFnsLocale } from "date-fns/locale";
 import { Calendar as CalendarIcon, X } from "lucide-react";
 import type { Locale } from "@/i18n/routing";
+import { APP_TIME_ZONE, isBeforeToday } from "@/i18n/timeZone";
 import { useCategoryName } from "@/i18n/referenceNames";
 import { usePost } from "@/app/contexts/PostContext";
 import { Button } from "@/components/ui/button";
@@ -175,6 +176,7 @@ export function PublicListingFields({
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
+              timeZone={APP_TIME_ZONE}
               locale={CALENDAR_LOCALES[locale]}
               labels={{
                 labelPrevious: () => tForm("previousMonth"),
@@ -185,11 +187,7 @@ export function PublicListingFields({
               onSelect={(date) =>
                 onChange((prev) => ({ ...prev, expiresOn: date ?? undefined }))
               }
-              disabled={(date) => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                return date < today;
-              }}
+              disabled={(date) => isBeforeToday(date)}
               required
             />
           </PopoverContent>

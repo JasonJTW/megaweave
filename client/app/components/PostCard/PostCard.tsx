@@ -8,7 +8,7 @@ import {
   buildLocationDisplayParts,
 } from "@/utils/locationUtils";
 import { motion } from "framer-motion";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import Image from "next/image";
 import React from "react";
 import { useLocation } from "../../contexts/LocationContext";
@@ -74,6 +74,7 @@ function PostCardInner({
   } = useImageWithRetry(primarySrc, fallbackSrc);
 
   const t = useTranslations("PostCard");
+  const formatter = useFormatter();
   const displayName = useDisplayName();
   const posterName = displayName(post.username);
   const { coords } = useLocation();
@@ -278,8 +279,8 @@ function PostCardInner({
                 {post.expires_at && (
                   <div className="flex gap-2">
                     <ClockIcon className="text-primary" />
-                    {new Date(post.created_at).toLocaleDateString()} -{" "}
-                    {new Date(post.expires_at).toLocaleDateString()}
+                    {formatter.dateTime(new Date(post.created_at))} -{" "}
+                    {formatter.dateTime(new Date(post.expires_at))}
                   </div>
                 )}
                 {distanceStr && (

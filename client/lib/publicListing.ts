@@ -2,6 +2,7 @@
 //* 組織物品上架時沒有地點、到期日與標籤；進公開 Feed 之前要像一般貼文一樣有地點、到期日與分類，標籤選填。
 //* 這裡只有資料轉換與檢查，畫面在 components/org/PublicListingFields
 
+import { endOfDay } from "@/i18n/timeZone";
 import type { ParsedGooglePlace } from "@/utils/locationUtils";
 
 /** GET /api/orgs/:orgId/items/:itemId/public-listing：目前存的公開資訊，沒填過為 null */
@@ -107,13 +108,6 @@ export function pickedLocationFrom(
     lat: parsed.lat,
     lng: parsed.lng,
   };
-}
-
-/** 到期日當天的最後一刻（當地時間）：選今天也還沒過期，與一般貼文「選到哪天就到哪天」一致 */
-export function endOfDay(date: Date): Date {
-  const end = new Date(date);
-  end.setHours(23, 59, 59, 999);
-  return end;
 }
 
 /** 還沒填好的必填欄位；空陣列代表可以送出 */
